@@ -74,9 +74,15 @@ Sign in as someone who **owns a draft or a paper in review**.
 
 | Date | Asked by | Deployed commit | Passed | Failed (numbers) | Notes |
 |---|---|---|---|---|---|
-| | | | | | |
+| 2026-11-24 | `student@cit.edu`, by script | `main` e8211b7b + PR 994 + this branch at e3414fff | 20 of 25 | 10, 12, 13, 19, 20 | `openai/gpt-6-luna` on Azure, `agent-research-15`, ordinary depth; ~912k tokens, under US$0.46 |
 
-**Not run yet.** No question here has been asked of the live model.
+Run file: [`runs/20261124-ir1316-gpt-6-luna.json`](runs/20261124-ir1316-gpt-6-luna.json). Every count (1–6), every year listing (7–9) and every one-paper date question passed. The failures:
+
+- **10:** three of four; *Noise-adjusted turnover* (2025) missing. It searched instead of listing the Area.
+- **12:** two papers from other Areas, and 27, 29 and 30 missing. Same cause.
+- **13:** five papers, expected eight; it filtered 12's incomplete list.
+- **19:** correctly none, but did not offer the newest upload (6 October 2026).
+- **20:** correctly none in 2025, but offered an unrelated 2025 paper instead of 56 (2026).
 
 ## Recomputing the answers
 

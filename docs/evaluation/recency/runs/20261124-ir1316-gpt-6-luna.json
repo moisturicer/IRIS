@@ -1,0 +1,910 @@
+[
+ {
+  "n": 1,
+  "ask": "How many recent papers are there?",
+  "state": "completed",
+  "seconds": 8,
+  "usage": {
+   "calls": 2,
+   "total_tokens": 6125,
+   "context_tokens": 3125,
+   "capacity_tokens": 272000,
+   "reserved_tokens": 32000,
+   "compacts_at_tokens": 200000
+  },
+  "answer": "There are **21 recent papers** among the records you can see, using completion years **2022–2026**. None were left out as undated.",
+  "papers": [],
+  "citations": [],
+  "conversation_id": "068a39af-9e84-42b5-8f71-3bc15425c367"
+ },
+ {
+  "n": 2,
+  "ask": "How many papers were published recently?",
+  "state": "completed",
+  "seconds": 8,
+  "usage": {
+   "calls": 2,
+   "total_tokens": 6041,
+   "context_tokens": 3055,
+   "capacity_tokens": 272000,
+   "reserved_tokens": 32000,
+   "compacts_at_tokens": 200000
+  },
+  "answer": "26 papers in the records you can see were published recently, using the publication-year range 2022–2026.",
+  "papers": [],
+  "citations": [],
+  "conversation_id": "5d126355-d994-4181-a0d9-3238941d909f"
+ },
+ {
+  "n": 3,
+  "ask": "How many papers were uploaded recently?",
+  "state": "completed",
+  "seconds": 6,
+  "usage": {
+   "calls": 2,
+   "total_tokens": 6064,
+   "context_tokens": 3064,
+   "capacity_tokens": 272000,
+   "reserved_tokens": 32000,
+   "compacts_at_tokens": 200000
+  },
+  "answer": "40 papers were uploaded recently—between 2026-08-26 and 2026-11-24, among the records you can see.",
+  "papers": [],
+  "citations": [],
+  "conversation_id": "0a46ba50-1ff1-4bfc-a932-98076c36cf8f"
+ },
+ {
+  "n": 4,
+  "ask": "How many papers were completed last year?",
+  "state": "completed",
+  "seconds": 6,
+  "usage": {
+   "calls": 2,
+   "total_tokens": 6057,
+   "context_tokens": 3074,
+   "capacity_tokens": 272000,
+   "reserved_tokens": 32000,
+   "compacts_at_tokens": 200000
+  },
+  "answer": "6 papers in the records you can see were completed in 2025.",
+  "papers": [],
+  "citations": [],
+  "conversation_id": "c3254090-9e18-44cb-8972-eb117ce5d0eb"
+ },
+ {
+  "n": 5,
+  "ask": "How many papers were published last year?",
+  "state": "completed",
+  "seconds": 6,
+  "usage": {
+   "calls": 2,
+   "total_tokens": 6060,
+   "context_tokens": 3076,
+   "capacity_tokens": 272000,
+   "reserved_tokens": 32000,
+   "compacts_at_tokens": 200000
+  },
+  "answer": "4 papers were published in 2025 among the records you can see.",
+  "papers": [],
+  "citations": [],
+  "conversation_id": "e14ac5d3-0767-4d46-a9cb-79b291014775"
+ },
+ {
+  "n": 6,
+  "ask": "How many papers were completed before 2018?",
+  "state": "completed",
+  "seconds": 6,
+  "usage": {
+   "calls": 2,
+   "total_tokens": 6018,
+   "context_tokens": 3044,
+   "capacity_tokens": 272000,
+   "reserved_tokens": 32000,
+   "compacts_at_tokens": 200000
+  },
+  "answer": "6 papers in the records you can see were completed before 2018.",
+  "papers": [],
+  "citations": [],
+  "conversation_id": "66110ce4-853c-4b3a-850d-8bd4adf54c19"
+ },
+ {
+  "n": 7,
+  "ask": "What are the newest papers?",
+  "state": "completed",
+  "seconds": 20,
+  "usage": {
+   "calls": 3,
+   "total_tokens": 16958,
+   "context_tokens": 6747,
+   "capacity_tokens": 272000,
+   "reserved_tokens": 32000,
+   "compacts_at_tokens": 200000
+  },
+  "answer": "By **completion year**, the latest records I can see are marked **2026**. Their titles are:\n\n- «Beyond Linearity Semiparametric Solutions to Contamination Bias with Multi-valued Treatments»\n- «Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning»\n- «Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties»\n- «Exploring the observed properties of JWST Little Red Dots with cosmological simulations and dust radiative transfer»\n- «Extreme MgII Emission in Recently-Quenched Galaxies A New Sample of Intermediate-Redshift Post-Starburst Quasars from the DESI Early Data Release»\n\nEach is also listed as published in **2026** and added to IRIS on **2026-10-06**.",
+  "papers": [
+   {
+    "title": "Beyond Linearity Semiparametric Solutions to Contamination Bias with Multi-valued Treatments",
+    "record_id": 50
+   },
+   {
+    "title": "Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning",
+    "record_id": 20
+   },
+   {
+    "title": "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties",
+    "record_id": 21
+   },
+   {
+    "title": "Exploring the observed properties of JWST Little Red Dots with cosmological simulations and dust radiative transfer",
+    "record_id": 26
+   },
+   {
+    "title": "Extreme MgII Emission in Recently-Quenched Galaxies A New Sample of Intermediate-Redshift Post-Starburst Quasars from the DESI Early Data Release",
+    "record_id": 27
+   }
+  ],
+  "citations": [],
+  "conversation_id": "0d128eaf-e4ab-4b86-9344-9a8b1146efcd"
+ },
+ {
+  "n": 8,
+  "ask": "Which papers were published this year?",
+  "state": "completed",
+  "seconds": 8,
+  "usage": {
+   "calls": 2,
+   "total_tokens": 7067,
+   "context_tokens": 3859,
+   "capacity_tokens": 272000,
+   "reserved_tokens": 32000,
+   "compacts_at_tokens": 200000
+  },
+  "answer": "There are **11 papers published in 2026** among the records you can see:\n\n- «Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition»\n- «Beyond Linearity Semiparametric Solutions to Contamination Bias with Multi-valued Treatments»\n- «Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning»\n- «Cosine metric as a structural economic similarity measure»\n- «Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning»\n- «Evaluation of Power-Clock Waveforms for Positive Feedback Adiabatic Logic in 16 nm FinFET Technology»\n- «Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties»\n- «Exploring the observed properties of JWST Little Red Dots with cosmological simulations and dust radiative transfer»\n- «Extreme MgII Emission in Recently-Quenched Galaxies A New Sample of Intermediate-Redshift Post-Starburst Quasars from the DESI Early Data Release»\n- «Noise-adjusted turnover in estimated networks»\n- «The abundance and emission of PAHs from the local to early Universe»",
+  "papers": [
+   {
+    "title": "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition",
+    "record_id": 35
+   },
+   {
+    "title": "Beyond Linearity Semiparametric Solutions to Contamination Bias with Multi-valued Treatments",
+    "record_id": 50
+   },
+   {
+    "title": "Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning",
+    "record_id": 20
+   },
+   {
+    "title": "Cosine metric as a structural economic similarity measure",
+    "record_id": 51
+   },
+   {
+    "title": "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning",
+    "record_id": 25
+   },
+   {
+    "title": "Evaluation of Power-Clock Waveforms for Positive Feedback Adiabatic Logic in 16 nm FinFET Technology",
+    "record_id": 56
+   },
+   {
+    "title": "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties",
+    "record_id": 21
+   },
+   {
+    "title": "Exploring the observed properties of JWST Little Red Dots with cosmological simulations and dust radiative transfer",
+    "record_id": 26
+   },
+   {
+    "title": "Extreme MgII Emission in Recently-Quenched Galaxies A New Sample of Intermediate-Redshift Post-Starburst Quasars from the DESI Early Data Release",
+    "record_id": 27
+   },
+   {
+    "title": "Noise-adjusted turnover in estimated networks",
+    "record_id": 52
+   },
+   {
+    "title": "The abundance and emission of PAHs from the local to early Universe",
+    "record_id": 47
+   }
+  ],
+  "citations": [],
+  "conversation_id": "2a17c478-da08-4361-afb5-add83869a04c"
+ },
+ {
+  "n": 9,
+  "ask": "List the papers completed last year.",
+  "state": "completed",
+  "seconds": 8,
+  "usage": {
+   "calls": 2,
+   "total_tokens": 6544,
+   "context_tokens": 3463,
+   "capacity_tokens": 272000,
+   "reserved_tokens": 32000,
+   "compacts_at_tokens": 200000
+  },
+  "answer": "Six papers in the records you can see were completed in 2025:\n\n- «Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition»\n- «Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning»\n- «Gauge Backreaction in Standard Model Warm Inflation»\n- «Noise-adjusted turnover in estimated networks»\n- «The abundance and emission of PAHs from the local to early Universe»\n- «TTM-Bench A Framework for Text-to-Music System Performance Benchmarking»",
+  "papers": [
+   {
+    "title": "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition",
+    "record_id": 35
+   },
+   {
+    "title": "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning",
+    "record_id": 25
+   },
+   {
+    "title": "Gauge Backreaction in Standard Model Warm Inflation",
+    "record_id": 45
+   },
+   {
+    "title": "Noise-adjusted turnover in estimated networks",
+    "record_id": 52
+   },
+   {
+    "title": "The abundance and emission of PAHs from the local to early Universe",
+    "record_id": 47
+   },
+   {
+    "title": "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking",
+    "record_id": 39
+   }
+  ],
+  "citations": [],
+  "conversation_id": "7f28b7a0-9934-467d-8555-f6bcedfb8755"
+ },
+ {
+  "n": 10,
+  "ask": "Recent papers in econometrics?",
+  "state": "completed",
+  "seconds": 37,
+  "usage": {
+   "calls": 4,
+   "total_tokens": 96518,
+   "context_tokens": 35839,
+   "capacity_tokens": 272000,
+   "reserved_tokens": 32000,
+   "compacts_at_tokens": 200000
+  },
+  "answer": "Using **recent** to mean completion years **2022–2026**, I found these econometrics-related papers:\n\n- «Cosine metric as a structural economic similarity measure» (completed 2024; published 2026) proposes comparing economic mechanisms using cosine similarity between coefficient vectors. In its application to the New Jersey minimum-wage reform, the apparent change in New Jersey’s wage mechanism largely disappears when compared with a synthetic counterfactual. The authors caution that comparisons are meaningful when the mechanisms are economically comparable, and note limitations to inference near perfect similarity. [1] [2] [3]\n\n- «Using machine learning metrics to provide deeper insights into the performance of choice models» (completed 2024; published 2025) compares econometric choice models and machine-learning methods across three choice datasets. In its UK vaccine-choice case study, improvements in training log-likelihood did not translate into similarly large improvements on test data, and the models struggled to distinguish among alternatives. [4]\n\n- «Beyond Linearity Semiparametric Solutions to Contamination Bias with Multi-valued Treatments» (completed and published 2026) examines spline-based semiparametric approaches to contamination bias. Its conclusion reports substantial differences between linear parametric and spline estimates, and says flexible semiparametric methods may not increase statistical uncertainty. [5] [6]\n\nThese are papers surfaced by the searches, **not a complete repository list**: search results are samples, and one result set was truncated. Meaning search was unavailable, so the matches were keyword-based. I read selected passages rather than the full manuscripts.",
+  "papers": [
+   {
+    "title": "Cosine metric as a structural economic similarity measure",
+    "record_id": 51
+   },
+   {
+    "title": "Using machine learning metrics to provide deeper insights into the performance of choice models",
+    "record_id": 54
+   },
+   {
+    "title": "Beyond Linearity Semiparametric Solutions to Contamination Bias with Multi-valued Treatments",
+    "record_id": 50
+   }
+  ],
+  "citations": [
+   [
+    51,
+    1
+   ],
+   [
+    51,
+    15
+   ],
+   [
+    51,
+    14
+   ],
+   [
+    54,
+    10
+   ],
+   [
+    50,
+    5
+   ],
+   [
+    50,
+    15
+   ]
+  ],
+  "conversation_id": "75f993fb-9717-41c0-be49-f2f9c81267e8"
+ },
+ {
+  "n": 11,
+  "ask": "Recent papers in hardware architecture?",
+  "state": "completed",
+  "seconds": 20,
+  "usage": {
+   "calls": 5,
+   "total_tokens": 34478,
+   "context_tokens": 8225,
+   "capacity_tokens": 272000,
+   "reserved_tokens": 32000,
+   "compacts_at_tokens": 200000
+  },
+  "answer": "Among the records you can see, **1 paper** has a completion year from 2022 through 2026: «Evaluation of Power-Clock Waveforms for Positive Feedback Adiabatic Logic in 16 nm FinFET Technology». It was completed in 2024, published in 2026, and added to IRIS on 2026-10-06. No records without a completion year were left out.",
+  "papers": [
+   {
+    "title": "Evaluation of Power-Clock Waveforms for Positive Feedback Adiabatic Logic in 16 nm FinFET Technology",
+    "record_id": 56
+   }
+  ],
+  "citations": [],
+  "conversation_id": "119ae3a7-a4ee-4425-8af6-366c7fb6e6cd"
+ },
+ {
+  "n": 12,
+  "ask": "Which galaxy astrophysics papers are recent?",
+  "state": "completed",
+  "seconds": 71,
+  "usage": {
+   "calls": 7,
+   "total_tokens": 164137,
+   "context_tokens": 33037,
+   "capacity_tokens": 272000,
+   "reserved_tokens": 32000,
+   "compacts_at_tokens": 200000
+  },
+  "answer": "Taking the completion-year range 2022–2026 as the basis, the searches returned these galaxy astrophysics papers. The results are a sample, not a complete repository list.\n\n- «Can Fingers of God be Resummed» — completed 2022; published 2023; added to IRIS 2026-10-06. It examines resumming the effects of small-scale galaxy velocities in redshift-space clustering models. [1]\n- «ViCTORIA project A pilot study of the M49 region in the Virgo cluster in polarisation» — completed 2023; published 2025; added to IRIS 2026-10-06. Using MeerKAT observations, the study investigates polarised emission and magnetic-field effects around M49. [2]\n- «The abundance and emission of PAHs from the local to early Universe» — completed 2025; published 2026; added to IRIS 2026-10-06. The paper reports that PAH emission traces star-formation rate and molecular gas, but is a poor tracer of PAH mass unless the radiation field is considered. [3]\n- «Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning» — completed 2025; published 2026; added to IRIS 2026-10-06. Subaru spectroscopic follow-up confirmed four protoclusters; two showed marginally higher average metallicities than the field, while the others were statistically consistent with it. [4]\n- «Exploring the observed properties of JWST Little Red Dots with cosmological simulations and dust radiative transfer» — completed 2026; published 2026; added to IRIS 2026-10-06. The simulations find that both AGN-host and purely star-forming galaxies can reproduce the characteristic continuum colours; the final simulated candidate sample was about 1% of the AGN-host sources. [5]",
+  "papers": [
+   {
+    "title": "Can Fingers of God be Resummed",
+    "record_id": 41
+   },
+   {
+    "title": "ViCTORIA project A pilot study of the M49 region in the Virgo cluster in polarisation",
+    "record_id": 34
+   },
+   {
+    "title": "The abundance and emission of PAHs from the local to early Universe",
+    "record_id": 47
+   },
+   {
+    "title": "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning",
+    "record_id": 25
+   },
+   {
+    "title": "Exploring the observed properties of JWST Little Red Dots with cosmological simulations and dust radiative transfer",
+    "record_id": 26
+   }
+  ],
+  "citations": [
+   [
+    41,
+    21
+   ],
+   [
+    34,
+    1
+   ],
+   [
+    47,
+    20
+   ],
+   [
+    25,
+    1
+   ],
+   [
+    26,
+    8
+   ]
+  ],
+  "conversation_id": "5fd02f91-8214-4304-b0fd-16491a5bc7d0"
+ },
+ {
+  "n": 13,
+  "ask": "And which of those Areas' papers were published recently?",
+  "state": "completed",
+  "seconds": 18,
+  "usage": {
+   "calls": 3,
+   "total_tokens": 22940,
+   "context_tokens": 10678,
+   "capacity_tokens": 272000,
+   "reserved_tokens": 32000,
+   "compacts_at_tokens": 200000
+  },
+  "answer": "Using the recent publication-year range of 2022–2026, all five papers from the earlier list qualify: «Can Fingers of God be Resummed» (2023); «ViCTORIA project A pilot study of the M49 region in the Virgo cluster in polarisation» (2025); and «The abundance and emission of PAHs from the local to early Universe», «Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning», and «Exploring the observed properties of JWST Little Red Dots with cosmological simulations and dust radiative transfer» (all 2026).",
+  "papers": [
+   {
+    "title": "Can Fingers of God be Resummed",
+    "record_id": 41
+   },
+   {
+    "title": "ViCTORIA project A pilot study of the M49 region in the Virgo cluster in polarisation",
+    "record_id": 34
+   },
+   {
+    "title": "The abundance and emission of PAHs from the local to early Universe",
+    "record_id": 47
+   },
+   {
+    "title": "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning",
+    "record_id": 25
+   },
+   {
+    "title": "Exploring the observed properties of JWST Little Red Dots with cosmological simulations and dust radiative transfer",
+    "record_id": 26
+   }
+  ],
+  "citations": [],
+  "conversation_id": "5fd02f91-8214-4304-b0fd-16491a5bc7d0"
+ },
+ {
+  "n": 14,
+  "ask": "Recent papers about large language models",
+  "state": "completed",
+  "seconds": 29,
+  "usage": {
+   "calls": 3,
+   "total_tokens": 90596,
+   "context_tokens": 43513,
+   "capacity_tokens": 272000,
+   "reserved_tokens": 32000,
+   "compacts_at_tokens": 200000
+  },
+  "answer": "Using the **completion-year** range for recent papers (2022–2026), the searches surfaced these two papers directly about large language models:\n\n- «Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition» — recorded as completed in 2025 and published in 2026. It uses a non-streaming ASR-LLM teacher’s attention to create alignment paths for training a streaming student. The abstract reports relative error-rate reductions of 5.2% with alignment paths alone, 3.9% when combined with logit and hidden-state distillation, and 16.6% for the complete framework versus forced-alignment training without those extra distillation losses. In the combined comparison, mean emission latency was similar but flicker was higher. [1]\n- «Learning to Solve Hard Problems in RL for LLMs by Never Giving Up» — recorded as completed and published in 2022. Its introduction reports that RL-trained models improved more on problems they initially handled easily than on hard problems. It identifies equal compute allocation across problems as a contributor and proposes dynamic compute allocation. [2]\n\nThe searches matched keywords only; meaning-based search was unavailable. Search results are samples, so they do not establish that these are all relevant papers in the repository. I read the returned passages, not the full manuscripts, and can’t confirm details beyond those passages.",
+  "papers": [
+   {
+    "title": "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition",
+    "record_id": 35
+   },
+   {
+    "title": "Learning to Solve Hard Problems in RL for LLMs by Never Giving Up",
+    "record_id": 22
+   }
+  ],
+  "citations": [
+   [
+    35,
+    1
+   ],
+   [
+    22,
+    1
+   ]
+  ],
+  "conversation_id": "9c11ba4b-d7a3-43fe-b6ed-e4c223fe6aa6"
+ },
+ {
+  "n": 15,
+  "ask": "What is the latest paper on dark matter?",
+  "state": "completed",
+  "seconds": 33,
+  "usage": {
+   "calls": 5,
+   "total_tokens": 85061,
+   "context_tokens": 24518,
+   "capacity_tokens": 272000,
+   "reserved_tokens": 32000,
+   "compacts_at_tokens": 200000
+  },
+  "answer": "Among the dark-matter-related papers surfaced by the searches, the latest by recorded completion/publication year is «From Density to Mass: A New Parametrized Framework for Dark Matter Environment Around Black Holes» (completed and published in 2023; added to IRIS on 2026-10-06). Its abstract describes a framework for modeling dark-matter environments around black holes using enclosed mass [1].\n\nThe searches return samples, so they do not establish whether a later topic-relevant paper exists among repository records not surfaced. I read the paper’s abstract and introductory passage, not the full manuscript.",
+  "papers": [],
+  "citations": [
+   [
+    29,
+    1
+   ]
+  ],
+  "conversation_id": "35c7e091-d407-44a1-9d92-24607b03e760"
+ },
+ {
+  "n": 16,
+  "ask": "Recent speech papers, by publication date, 2020 to 2023",
+  "state": "completed",
+  "seconds": 14,
+  "usage": {
+   "calls": 3,
+   "total_tokens": 41618,
+   "context_tokens": 23855,
+   "capacity_tokens": 272000,
+   "reserved_tokens": 32000,
+   "compacts_at_tokens": 200000
+  },
+  "answer": "The speech-related papers I found, ordered from earliest to latest publication year, are:\n\n- **2021 — «Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark».** It studies using historical speech and dialogue text to improve speech recognition; its experiments report that multimodal context training improved context use, with Speech+Text achieving the highest overall entity recall in the tested models. [1] The paper also reports benefits for accent, dialect, and target-speaker recognition. [2]\n- **2023 — «Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition».** It proposes a linear classification head for recognizing emotion from speechLLM representations. [3] In its IEMOCAP experiments, the authors report that adding conversational context improved performance, and that the classification head improved or matched results on unweighted accuracy and Macro F1 across configurations. [4]\n\nThese are the matches from searches using different speech-related wording, not a guaranteed complete repository list.",
+  "papers": [
+   {
+    "title": "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
+    "record_id": 36
+   },
+   {
+    "title": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
+    "record_id": 37
+   }
+  ],
+  "citations": [
+   [
+    36,
+    1
+   ],
+   [
+    36,
+    2
+   ],
+   [
+    37,
+    1
+   ],
+   [
+    37,
+    5
+   ]
+  ],
+  "conversation_id": "2b329612-d440-4f1b-968f-c5f5c7248469"
+ },
+ {
+  "n": 17,
+  "ask": "When was MeshKV completed, published and uploaded?",
+  "state": "completed",
+  "seconds": 12,
+  "usage": {
+   "calls": 4,
+   "total_tokens": 13463,
+   "context_tokens": 3705,
+   "capacity_tokens": 272000,
+   "reserved_tokens": 32000,
+   "compacts_at_tokens": 200000
+  },
+  "answer": "«MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators» was recorded as completed in 2015, published in 2015, and uploaded to IRIS on October 6, 2026.",
+  "papers": [
+   {
+    "title": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
+    "record_id": 58
+   }
+  ],
+  "citations": [],
+  "conversation_id": "57cca4d8-a4f4-4939-8fd4-6f117751eab4"
+ },
+ {
+  "n": 18,
+  "ask": "Which papers completed in 2024 were published later than that?",
+  "state": "completed",
+  "seconds": 10,
+  "usage": {
+   "calls": 3,
+   "total_tokens": 10246,
+   "context_tokens": 3620,
+   "capacity_tokens": 272000,
+   "reserved_tokens": 32000,
+   "compacts_at_tokens": 200000
+  },
+  "answer": "The records list these papers as completed in 2024 and published later:\n\n- «Cosine metric as a structural economic similarity measure» — published in 2026.\n- «Evaluation of Power-Clock Waveforms for Positive Feedback Adiabatic Logic in 16 nm FinFET Technology» — published in 2026.\n- «Using machine learning metrics to provide deeper insights into the performance of choice models» — published in 2025.",
+  "papers": [
+   {
+    "title": "Cosine metric as a structural economic similarity measure",
+    "record_id": 51
+   },
+   {
+    "title": "Evaluation of Power-Clock Waveforms for Positive Feedback Adiabatic Logic in 16 nm FinFET Technology",
+    "record_id": 56
+   },
+   {
+    "title": "Using machine learning metrics to provide deeper insights into the performance of choice models",
+    "record_id": 54
+   }
+  ],
+  "citations": [],
+  "conversation_id": "06e2f0ac-e403-49ba-9b51-5d9237d7337b"
+ },
+ {
+  "n": 19,
+  "ask": "Which papers were uploaded in the past month?",
+  "state": "completed",
+  "seconds": 8,
+  "usage": {
+   "calls": 2,
+   "total_tokens": 6117,
+   "context_tokens": 3083,
+   "capacity_tokens": 272000,
+   "reserved_tokens": 32000,
+   "compacts_at_tokens": 200000
+  },
+  "answer": "No papers were uploaded to IRIS in the past month (October 24–November 24, 2026) among the records you can see.",
+  "papers": [],
+  "citations": [],
+  "conversation_id": "365c7bcf-6478-4e14-8798-2b8e0c38b9cb"
+ },
+ {
+  "n": 20,
+  "ask": "Hardware architecture papers published last year?",
+  "state": "completed",
+  "seconds": 35,
+  "usage": {
+   "calls": 6,
+   "total_tokens": 114194,
+   "context_tokens": 29653,
+   "capacity_tokens": 272000,
+   "reserved_tokens": 32000,
+   "compacts_at_tokens": 200000
+  },
+  "answer": "The searches for **2025 publications** did not identify a paper specifically about hardware or computer architecture. The closest related result was «TTM-Bench A Framework for Text-to-Music System Performance Benchmarking». It evaluates text-to-music systems from different model-architecture families [1] and measures local computational efficiency using an NVIDIA RTX PRO 6000 GPU [2]. Its stated focus is benchmarking text-to-music systems, not hardware architecture. The search results are samples, so they do not establish whether other papers matching your topic are in the repository.",
+  "papers": [
+   {
+    "title": "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking",
+    "record_id": 39
+   }
+  ],
+  "citations": [
+   [
+    39,
+    3
+   ],
+   [
+    39,
+    3
+   ]
+  ],
+  "conversation_id": "746f91a4-ba4a-425a-b435-2775bc914c43"
+ },
+ {
+  "n": 21,
+  "ask": "Which paper studies recently-quenched galaxies?",
+  "state": "completed",
+  "seconds": 6,
+  "usage": {
+   "calls": 2,
+   "total_tokens": 11859,
+   "context_tokens": 8778,
+   "capacity_tokens": 272000,
+   "reserved_tokens": 32000,
+   "compacts_at_tokens": 200000
+  },
+  "answer": "«Extreme MgII Emission in Recently-Quenched Galaxies: A New Sample of Intermediate-Redshift Post-Starburst Quasars from the DESI Early Data Release» studies recently quenched galaxies, focusing on post-starburst quasars observed by DESI [1] [2].",
+  "papers": [],
+  "citations": [
+   [
+    27,
+    1
+   ],
+   [
+    27,
+    1
+   ]
+  ],
+  "conversation_id": "5f244b7a-3f3d-42ff-bf3c-80a74f28ac7b"
+ },
+ {
+  "n": 22,
+  "ask": "What month was MeshKV published?",
+  "state": "completed",
+  "seconds": 25,
+  "usage": {
+   "calls": 6,
+   "total_tokens": 52601,
+   "context_tokens": 15461,
+   "capacity_tokens": 272000,
+   "reserved_tokens": 32000,
+   "compacts_at_tokens": 200000
+  },
+  "answer": "I couldn’t find a publication month for «MESHKV: A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators». Its first page gives the title and abstract but no publication date [1]. The repository records the publication year as 2015, but the sources I read do not establish the month. I read all the extracted manuscript text; figures were not interpreted.",
+  "papers": [],
+  "citations": [
+   [
+    58,
+    1
+   ]
+  ],
+  "conversation_id": "1e71aafc-94b5-45e4-87ce-147b6df7101f"
+ },
+ {
+  "n": 23,
+  "ask": "What does MeshKV propose?",
+  "state": "completed",
+  "seconds": 8,
+  "usage": {
+   "calls": 2,
+   "total_tokens": 10472,
+   "context_tokens": 7273,
+   "capacity_tokens": 272000,
+   "reserved_tokens": 32000,
+   "compacts_at_tokens": 200000
+  },
+  "answer": "«MeshKV: A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators» proposes a network-on-chip fabric that moves transformer key-value (KV) cache blocks across a tiled accelerator as packetized flows, rather than sending them through a centralized memory path. It combines TAKV affine striping to distribute KV homes, MARE multicast with duplicate suppression, and PAD to overlap prefetching, tile computation, and streaming softmax. [1]\n\nIn FPGA evaluations with LLaMA-2-7B and Mistral-7B, the paper reports up to 58% less interconnect traffic, 2.1× KV-bandwidth utilization, and 1.9× multi-stream throughput versus same-platform baselines. [1]",
+  "papers": [],
+  "citations": [
+   [
+    58,
+    1
+   ]
+  ],
+  "conversation_id": "dd1af5b7-33a1-4cac-8124-f48f7e9dda60"
+ },
+ {
+  "n": 24,
+  "ask": "When was [DEMO] Draft, never submitted uploaded?",
+  "state": "completed",
+  "seconds": 29,
+  "usage": {
+   "calls": 6,
+   "total_tokens": 61414,
+   "context_tokens": 16808,
+   "capacity_tokens": 272000,
+   "reserved_tokens": 32000,
+   "compacts_at_tokens": 200000
+  },
+  "answer": "I couldn’t find a record with that title, so the sources available here don’t establish when it was uploaded.",
+  "papers": [],
+  "citations": [],
+  "conversation_id": "0a1601db-1857-405b-adbf-b2b5522101ad"
+ },
+ {
+  "n": 25,
+  "ask": "List the newest uploads.",
+  "state": "completed",
+  "seconds": 43,
+  "usage": {
+   "calls": 4,
+   "total_tokens": 29574,
+   "context_tokens": 9131,
+   "capacity_tokens": 272000,
+   "reserved_tokens": 32000,
+   "compacts_at_tokens": 200000
+  },
+  "answer": "The newest uploads in the records I can see were added on **October 6, 2026**. There are **40**:\n\n- «Accelerating massive ensembles of ordinary differential equations-with-annotations»\n- «Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition»\n- «Beyond Linearity Semiparametric Solutions to Contamination Bias with Multi-valued Treatments»\n- «Can Fingers of God be Resummed»\n- «Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning»\n- «Cosine metric as a structural economic similarity measure»\n- «Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning»\n- «Empirical determination of the Galactic neutron star--black hole merger rate using StarTrack models-with-annotations»\n- «Evaluating Positive Feedback Adiabatic Logic in 16nm FinFET with a Realistic Power-Clock»\n- «Evaluation of Power-Clock Waveforms for Positive Feedback Adiabatic Logic in 16 nm FinFET Technology»\n- «Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties»\n- «Exploring the observed properties of JWST Little Red Dots with cosmological simulations and dust radiative transfer»\n- «Extreme MgII Emission in Recently-Quenched Galaxies A New Sample of Intermediate-Redshift Post-Starburst Quasars from the DESI Early Data Release»\n- «Far-Ultraviolet diffuse emission as a tracer of Galactic extinction at the North Galactic Pole-with-annotations»\n- «Freeze-in of anapole and charge-radius inelastic dark matter X-ray probes of a decoupled vector portal»\n- «From Density to Mass A New Parametrized Framework for Dark Matter Environment Around Black Holes»\n- «GAIA meets LZ a high velocity tail-tale sign for dark matter-with-annotations»\n- «Gauge Backreaction in Standard Model Warm Inflation»\n- «HBFlex A Flexible Memory System for Bridging Fine-Grained LLM States and Coarse-Grained HBF Parallel Execution»\n- «Learning to Solve Hard Problems in RL for LLMs by Never Giving Up»\n- «Localized Enhancements of the Primordial Power Spectrum and the Abundance of Early Bright Galaxies»\n- «MATISSE in the era of GRAVITY+»\n- «MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators»\n- «Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark»\n- «Nested Parallel von Neumann Architecture and Nested BSP»\n- «Noise-adjusted turnover in estimated networks»\n- «Online Adaptive Kernel Mixing for Gaussian Process Decision Making»\n- «Precise C-N-O Abundances of Individual Galaxies in the First Billion Years from Ultra-Deep, Rest-UV-to-Optical JWST Spectroscopy»\n- «Probing Spatial Variations in IGM Transmission Higher Ly$α$ Visibility in an H$α$-Selected Galaxy Overdensity at $zsimeq6.2$-with-annotations»\n- «Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition»\n- «Stable Policy Learning»\n- «State-Space-Based FIR Filtering on a Quantum Computer»\n- «The 2MIG isolated AGNs -- 4. Linking hot-dust reverberation to spectroscopically predicted BLR scales in IC~5287 and Mrk~845-with-annotations»\n- «The abundance and emission of PAHs from the local to early Universe»\n- «The separate universe approach with non minimal coupling to gravity»\n- «Tide-and-Seek Anisotropic scale-dependent bias in the Lyman-alpha forest and designer samples-with-annotations»\n- «Towards Active Cross-View Object Geo-Localization»\n- «TTM-Bench A Framework for Text-to-Music System Performance Benchmarking»\n- «Using machine learning metrics to provide deeper insights into the performance of choice models»\n- «ViCTORIA project A pilot study of the M49 region in the Virgo cluster in polarisation»",
+  "papers": [
+   {
+    "title": "Accelerating massive ensembles of ordinary differential equations-with-annotations",
+    "record_id": 40
+   },
+   {
+    "title": "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition",
+    "record_id": 35
+   },
+   {
+    "title": "Beyond Linearity Semiparametric Solutions to Contamination Bias with Multi-valued Treatments",
+    "record_id": 50
+   },
+   {
+    "title": "Can Fingers of God be Resummed",
+    "record_id": 41
+   },
+   {
+    "title": "Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning",
+    "record_id": 20
+   },
+   {
+    "title": "Cosine metric as a structural economic similarity measure",
+    "record_id": 51
+   },
+   {
+    "title": "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning",
+    "record_id": 25
+   },
+   {
+    "title": "Empirical determination of the Galactic neutron star--black hole merger rate using StarTrack models-with-annotations",
+    "record_id": 42
+   },
+   {
+    "title": "Evaluating Positive Feedback Adiabatic Logic in 16nm FinFET with a Realistic Power-Clock",
+    "record_id": 55
+   },
+   {
+    "title": "Evaluation of Power-Clock Waveforms for Positive Feedback Adiabatic Logic in 16 nm FinFET Technology",
+    "record_id": 56
+   },
+   {
+    "title": "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties",
+    "record_id": 21
+   },
+   {
+    "title": "Exploring the observed properties of JWST Little Red Dots with cosmological simulations and dust radiative transfer",
+    "record_id": 26
+   },
+   {
+    "title": "Extreme MgII Emission in Recently-Quenched Galaxies A New Sample of Intermediate-Redshift Post-Starburst Quasars from the DESI Early Data Release",
+    "record_id": 27
+   },
+   {
+    "title": "Far-Ultraviolet diffuse emission as a tracer of Galactic extinction at the North Galactic Pole-with-annotations",
+    "record_id": 28
+   },
+   {
+    "title": "Freeze-in of anapole and charge-radius inelastic dark matter X-ray probes of a decoupled vector portal",
+    "record_id": 43
+   },
+   {
+    "title": "From Density to Mass A New Parametrized Framework for Dark Matter Environment Around Black Holes",
+    "record_id": 29
+   },
+   {
+    "title": "GAIA meets LZ a high velocity tail-tale sign for dark matter-with-annotations",
+    "record_id": 44
+   },
+   {
+    "title": "Gauge Backreaction in Standard Model Warm Inflation",
+    "record_id": 45
+   },
+   {
+    "title": "HBFlex A Flexible Memory System for Bridging Fine-Grained LLM States and Coarse-Grained HBF Parallel Execution",
+    "record_id": 57
+   },
+   {
+    "title": "Learning to Solve Hard Problems in RL for LLMs by Never Giving Up",
+    "record_id": 22
+   },
+   {
+    "title": "Localized Enhancements of the Primordial Power Spectrum and the Abundance of Early Bright Galaxies",
+    "record_id": 46
+   },
+   {
+    "title": "MATISSE in the era of GRAVITY+",
+    "record_id": 30
+   },
+   {
+    "title": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
+    "record_id": 58
+   },
+   {
+    "title": "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
+    "record_id": 36
+   },
+   {
+    "title": "Nested Parallel von Neumann Architecture and Nested BSP",
+    "record_id": 59
+   },
+   {
+    "title": "Noise-adjusted turnover in estimated networks",
+    "record_id": 52
+   },
+   {
+    "title": "Online Adaptive Kernel Mixing for Gaussian Process Decision Making",
+    "record_id": 23
+   },
+   {
+    "title": "Precise C-N-O Abundances of Individual Galaxies in the First Billion Years from Ultra-Deep, Rest-UV-to-Optical JWST Spectroscopy",
+    "record_id": 31
+   },
+   {
+    "title": "Probing Spatial Variations in IGM Transmission Higher Ly$α$ Visibility in an H$α$-Selected Galaxy Overdensity at $zsimeq6.2$-with-annotations",
+    "record_id": 32
+   },
+   {
+    "title": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
+    "record_id": 37
+   },
+   {
+    "title": "Stable Policy Learning",
+    "record_id": 53
+   },
+   {
+    "title": "State-Space-Based FIR Filtering on a Quantum Computer",
+    "record_id": 38
+   },
+   {
+    "title": "The 2MIG isolated AGNs -- 4. Linking hot-dust reverberation to spectroscopically predicted BLR scales in IC~5287 and Mrk~845-with-annotations",
+    "record_id": 33
+   },
+   {
+    "title": "The abundance and emission of PAHs from the local to early Universe",
+    "record_id": 47
+   },
+   {
+    "title": "The separate universe approach with non minimal coupling to gravity",
+    "record_id": 48
+   },
+   {
+    "title": "Tide-and-Seek Anisotropic scale-dependent bias in the Lyman-alpha forest and designer samples-with-annotations",
+    "record_id": 49
+   },
+   {
+    "title": "Towards Active Cross-View Object Geo-Localization",
+    "record_id": 24
+   },
+   {
+    "title": "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking",
+    "record_id": 39
+   },
+   {
+    "title": "Using machine learning metrics to provide deeper insights into the performance of choice models",
+    "record_id": 54
+   },
+   {
+    "title": "ViCTORIA project A pilot study of the M49 region in the Virgo cluster in polarisation",
+    "record_id": 34
+   }
+  ],
+  "citations": [],
+  "conversation_id": "c0532df6-27e7-47cd-a936-ba574234a4ef"
+ }
+]
