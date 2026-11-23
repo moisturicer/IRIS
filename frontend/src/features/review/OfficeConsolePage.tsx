@@ -227,7 +227,7 @@ export default function OfficeConsolePage() {
 
 /** Tone by meaning, never the only signal: each chip also carries its words and an icon. */
 const STATUS_TONE: Record<OfficeConsoleStatusKind, { tone: string; icon: string }> = {
-  kept:       { tone: TONES.settled,   icon: "fa-check" },
+  kept:       { tone: TONES.cleared,   icon: "fa-check" },
   overdue:    { tone: TONES.attention, icon: "fa-triangle-exclamation" },
   unassigned: { tone: TONES.quiet,     icon: "fa-user-plus" },
   due:        { tone: TONES.active,    icon: "fa-clock" },

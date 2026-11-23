@@ -189,9 +189,19 @@ Decided by **Lee Jasmin Adolfo** (project lead and frontend owner) on 2026-11-14
   | Match (search, Find) | **Highlight Yellow** (#f7e08f); the current match **#f2c94c**; Ink text on it is 14:1 |
   | Pen (a reviewer's mark) | **Pen Rose**: fill #fbeaea, 2 px underline #b4474b, a numbered pin; the open thread's passage #f5d5d6 |
   | Highlight (the reader's own) | Binding Maroon at 15% opacity, multiplied, no edge or underline; a swatch of it names it in the selection menu and Notes (IR-581) |
-  | Status | White chip, tone in text and outline; only Attention is filled |
+  | Status | White chip, tone in text and outline; none is filled (IR-1290 reverses "only Attention is filled") |
 
   **Maroon Wash (#fdf2f2) is retired from the interface** and stops being the "on" tint. **Maroon Press** (#5a0c0f) is the pressed state of a filled button. Yellow is reserved for matches and rose for a reviewer's marks, and nothing else uses either. The **Four Inks Rule** becomes: white, black, stone and maroon, plus one yellow highlighter for matches and one rose pen for a reviewer's marks. The tokens are `hl`, `hl-now`, `pen`, `pen-wash`, `pen-now` and `brand-press` in `tailwind.config.js`, and the roles are class strings in `frontend/src/components/ui/highlightRoles.ts`. `palette.test.ts` keeps `brand-50`, `brand-100`, `brand-200`, gold, cream and the loose hexes out of the source. IR-1097 also edited this file's rules below.
+- **D7, status colours (IR-1290) — built.** Part of D6 is reversed, by the project lead. Maroon marked the main action, the overdue warning, "in review", errors and the focus ring, so on the RDCO review card a solid maroon "10 working days overdue" chip sat beside a solid maroon "Claim review" button and looked the same, and the three cleared offices were the quietest text on the card. Two status hues are added, a green and an amber, and **solid maroon is left to the one primary action**:
+
+  | Meaning | Look | Token |
+  |---|---|---|
+  | Cleared, kept (an office's clearance carried over) | Green text, green outline | `cleared` #1E6B3F (text, 6.5:1 on white), `cleared-line` #3F8A5A (outline, glyph, 4.2:1), `cleared-wash` #EAF3EC |
+  | In review, reset (an office that must review the new version) | Amber text, amber outline | `review` #8A5300 (text, 6.3:1), `review-line` #B07A1E (outline, glyph, 3.7:1), `review-wash` #FBF0DA |
+  | Attention (overdue, declined, an error) | **Maroon outline on white, with its icon, never filled** | `ring-brand` on `surface` |
+  | Quiet, settled | Unchanged | `stone` |
+
+  The clearance strip reads `kept` and `cleared` green, `reviewing` amber, `unclaimed` stone, and `revision` and `not_cleared` maroon, so a resubmission that kept two offices and reset one reads green, amber, green at a glance. Its words still come only from the server (IR-1083). **Amber is only ever an outline, a glyph and a word on white, never a flat fill behind text**, so it cannot be mistaken for the search-match yellow (`hl`). **Gold is not part of this change** and stays out of the interface. Every status keeps an icon plus a word, so in greyscale every state can still be told apart. The tokens are in `tailwind.config.js` and the tones in `frontend/src/components/ui/statusTones.ts`.
 
 ## Overview
 
@@ -216,13 +226,15 @@ Rejected outright: cards wrapped around reading content, controls floating over 
 A monochrome stone volume with one maroon binding; no other hue exists in the interface.
 
 ### Primary
-- **Binding Maroon** (#6B0F12): the institution's identity. The one filled action in a row (View, Continue, Send), the selected section thumb, the Ask IRIS icon, error and rejection states, and the focus ring. 12.3:1 on white.
+- **Binding Maroon** (#6B0F12): the institution's identity. The one filled action in a row (View, Continue, Send), the selected section thumb, the Ask IRIS icon, the focus ring, and, as an outline or text only and never a fill, error, rejection and overdue states (IR-1290). 12.3:1 on white.
 - **Binding Maroon Light** (#8B1316): hover on maroon fills only.
 - **Binding Maroon Dark** (#4A0A0C): destructive actions (with a warning glyph) and dark accents.
 - **Maroon Thread** (#f9b8b9): the browser's text selection. **Maroon Wash (#fdf2f2) is retired** (IR-1097): the "on" tint did about fifteen jobs, and each now has its own look (see Decided changes, D6).
 - **Maroon Press** (#5a0c0f): the pressed state of a filled maroon button.
 - **Highlight Yellow** (#f7e08f, current match #f2c94c): a word a search or Find matched, and nothing else. Ink on it is 14:1.
 - **Pen Rose** (underline #b4474b, fill #fbeaea, open thread #f5d5d6): a reviewer's mark on a passage, and nothing else.
+- **Cleared Green** (text #1E6B3F, outline #3F8A5A, wash #EAF3EC): an office that cleared a record or whose clearance was kept, and nothing else (IR-1290).
+- **Review Amber** (text #8A5300, outline #B07A1E, wash #FBF0DA): a review in progress, or an office reset by a new version. An outline, glyph and word on white, never a flat fill behind text (IR-1290).
 
 ### Neutral
 - **Endpaper** (#fafaf9): a section fill (`stone-50`) where white on white would lose an edge, such as the Ask IRIS conversation list and table headers. Since IR-1132 the ground under every screen (`canvas`) is white, not Endpaper.
@@ -236,9 +248,9 @@ A monochrome stone volume with one maroon binding; no other hue exists in the in
 - **Ink** (#1c1917): titles, section headings and the *settled* status.
 
 ### Named Rules
-**The Binding Rule.** Maroon marks at most the one filled action, the current section and citations on any screen. If two filled maroon things compete in one row, one of them is wrong.
+**The Binding Rule.** Maroon marks at most the one filled action, the current section and citations on any screen. If two filled maroon things compete in one row, one of them is wrong. A status is never a solid maroon fill (IR-1290), so nothing that is only a status can look like the action.
 
-**The Four Inks Rule.** The palette is white, black, stone and maroon (light, dark and press), plus one yellow highlighter for matches and one rose pen for a reviewer's marks. `brand-400` to `brand-600` are bright reds, not maroon, and are never used. Status is carried by four tones plus a word, never by a new hue (`palette.test.ts` enforces this).
+**The Four Inks Rule.** The palette is white, black, stone and maroon (light, dark and press), plus one yellow highlighter for matches and one rose pen for a reviewer's marks, plus, for status only, one green and one amber (IR-1290). `brand-400` to `brand-600` are bright reds, not maroon, and are never used. Status is carried by five tones plus an icon and a word, never by any other hue (`palette.test.ts` enforces this).
 
 Gold and cream are gone (IR-1097): the thumbnail ring and the other decoration were off palette, and the Folio Ribbon logo never used them.
 
