@@ -418,6 +418,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-1277** | Record types keep one order in every list (Publish, Setup, Guidelines, filters): Proposal, Thesis / Research, Project, then any other type, however often a type is saved — no FR- id | [details](traceability/IR-1277.md) | **IMPLEMENTED** |
 | **IR-1278** | Ask IRIS reads a paper's recorded details (authors, Adviser by name, the three years, type, Area, PSCED, keywords, abstract, origin, flags) with `paper_details` under `research-13`, read under the row policy; the Adviser only through `iris_authz.research_advisers` — ADR-049 amendment 2026-11-23 (Proposed); no FR- id | [details](traceability/IR-1278.md) | **PARTIAL** |
 | **IR-1279** | A draft's row in My Library has a red trash can again, rightmost under its *Updated* date (the row itself continues the draft); the trash can asks once, in the *Delete this draft?* dialog, with no "⋯" menu before it — no FR- id | [details](traceability/IR-1279.md) | **IMPLEMENTED** |
+| **IR-1280** | An Ask IRIS or Paper Chat answer delivered after failed repairs keeps its Markdown: paragraph breaks, list nesting, fenced code and table rows survive the qualifying pass — no FR- id | [details](traceability/IR-1280.md) | **VERIFIED** |
 | NFR-U3 | Responsive at 360 px, no horizontal scroll | [details](traceability/NFR-U3.md) | **PARTIAL** |
 | NFR-A1 | WCAG 2.1 AA on interactive controls | [details](traceability/NFR-A1.md) | **PARTIAL** |
 
