@@ -146,7 +146,11 @@ export function AccountMenu({ collapsed, onNavigate }: AccountMenuProps) {
         >
           <div className="border-b border-stone-100 px-3 pb-2 pt-1.5">
             <p className="break-words text-xs font-semibold text-stone-900">{fullName}</p>
-            {user?.email && <p className="break-words text-2xs text-stone-500">{user.email}</p>}
+            {user?.email && (
+              <p className="truncate text-2xs text-stone-500" title={user.email}>
+                {user.email}
+              </p>
+            )}
           </div>
           <ul role="list" className="pt-1.5">
             <li>

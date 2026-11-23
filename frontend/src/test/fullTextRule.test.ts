@@ -1,10 +1,10 @@
 /**
- * The Full Text Rule's guard (IR-1219; DESIGN.md "The seven allowed cuts").
+ * The Full Text Rule's guard (IR-1219; DESIGN.md "The eight allowed cuts").
  *
  * Text is never cut off. It reads every non-test `.ts`, `.tsx` and `.css` file
  * under `src/` and fails naming each file and cut class that is not one of the
- * seven cuts DESIGN.md allows. Each allowed file lists exactly the classes it
- * may hold, so a second cut in the same file fails too. Two of the seven have
+ * eight cuts DESIGN.md allows. Each allowed file lists exactly the classes it
+ * may hold, so a second cut in the same file fails too. Two of the eight have
  * no entry: a review comment's See more cuts in code (`truncateBody`), not
  * with a class, and no table cell cuts a file name today.
  */
@@ -29,6 +29,8 @@ const ALLOWED: Record<string, string[]> = {
   // A conversation's title in Ask IRIS's list, whole in a tooltip on hover and
   // focus while cut, and in the conversation (IR-1253).
   "src/features/ai/components/ConversationSidebar.tsx": ["truncate"],
+  // The signed-in email in the account menu, whole on hover and on Profile (IR-1307).
+  "src/components/layout/AccountMenu.tsx": ["truncate"],
 };
 
 const SOURCES: Record<string, string> = Object.fromEntries(
