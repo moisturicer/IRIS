@@ -188,12 +188,11 @@ describe("My Library: an author's research", () => {
     const { container } = renderScreen(<MyLibraryPage />, SUBMISSIONS);
 
     // The whole row is the link: a draft's opens Publish over this tab
-    // (IR-1258), and so does its Continue draft button (IR-1279).
+    // (IR-1258), so it has no separate "Continue draft" button (IR-1279).
     expect(await screen.findByRole("link", { name: "Community Water Monitoring" }))
       .toHaveAttribute("href", "/records/mine?section=research&publish=12");
     expect(within(section("Drafts")).getByText("Draft: not yet submitted")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Continue draft “Community Water Monitoring”" }))
-      .toHaveAttribute("href", "/records/mine?section=research&publish=12");
+    expect(screen.queryByRole("link", { name: /^Continue draft/ })).not.toBeInTheDocument();
     expect(recordsApi.mine).toHaveBeenCalledOnce();
     await expectNoBlockingA11yViolations(container);
   });
@@ -213,10 +212,9 @@ describe("My Library: an author's research", () => {
     await waitFor(() => expect(screen.queryByRole("link", { name: "Community Water Monitoring" })).not.toBeInTheDocument());
     expect(recordsApi.delete).toHaveBeenCalledWith(12);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    // Only a draft offers it, or Continue draft.
+    // Only a draft offers it.
     expect(screen.getByRole("link", { name: "Still with the offices" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Delete draft/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /^Continue draft/ })).not.toBeInTheDocument();
   });
 
   it("keeps the draft and says why when the delete fails", async () => {
@@ -415,9 +413,9 @@ describe("My Library: what each paper waits on (IR-1084)", () => {
 
     const draft = within(recent).getByRole("link", { name: "Community Water Monitoring" }).closest("li") as HTMLElement;
     expect(within(draft).getByText("Not submitted yet. It waits on you to finish and send it.")).toBeInTheDocument();
-    // The row and its Continue draft reopen Publish; the trash can sits beside it.
+    // The row reopens Publish; the trash can is its one button.
     expect(within(recent).getByRole("link", { name: "Community Water Monitoring" })).toHaveAttribute("href", "/?publish=12");
-    expect(within(draft).getByRole("link", { name: "Continue draft “Community Water Monitoring”" })).toHaveAttribute("href", "/?publish=12");
+    expect(within(draft).queryByRole("link", { name: /^Continue draft/ })).not.toBeInTheDocument();
     expect(within(draft).getByRole("button", { name: "Delete draft “Community Water Monitoring”" })).toBeInTheDocument();
   });
 
@@ -467,19 +465,19 @@ describe("My Library: what each paper waits on (IR-1084)", () => {
     expect(screen.queryByRole("link", { name: /^Open review/ })).not.toBeInTheDocument();
   });
 
-  it("puts Continue draft and a red trash can under the draft's Updated date, and the trash can asks once (IR-1279)", async () => {
+  it("puts a red trash can alone under the draft's Updated date, and it asks once (IR-1279)", async () => {
     mine([ownRecord({})]);
     const user = userEvent.setup();
     renderScreen(<MyLibraryPage />, SUBMISSIONS);
 
     const row = (await screen.findByRole("link", { name: "Community Water Monitoring" })).closest("li") as HTMLElement;
     const updated = within(row).getByText(/^Updated /);
-    const resume = within(row).getByRole("link", { name: "Continue draft “Community Water Monitoring”" });
     const remove = within(row).getByRole("button", { name: "Delete draft “Community Water Monitoring”" });
-    // Under the date, in the same column, Continue draft first.
-    expect(updated.compareDocumentPosition(resume) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(resume.compareDocumentPosition(remove) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(updated.parentElement).toBe(resume.parentElement?.parentElement);
+    // After the date, in the same column, and the row's only button.
+    expect(updated.compareDocumentPosition(remove) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(updated.parentElement?.contains(remove)).toBe(true);
+    expect(within(row).getAllByRole("button")).toEqual([remove]);
+    expect(within(row).queryByRole("link", { name: /^Continue draft/ })).not.toBeInTheDocument();
     // A red trash can, not a menu.
     expect(remove).toHaveClass("text-brand");
     expect(remove).not.toHaveAttribute("aria-haspopup");

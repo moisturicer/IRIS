@@ -17,8 +17,7 @@ import type { MyResearchItem } from "@/types/records";
  * Where the row itself leads: a draft opens Publish over this page, since a
  * draft has no paper page (IR-1227) and going through one would leave My
  * Library (IR-1258); anything else opens Paper View. The whole row is that
- * link (IR-1261). A draft also has a *Continue draft* button to the same
- * place (IR-1279); other rows carry no "Open review" button.
+ * link (IR-1261), so it carries no "Continue draft" or "Open review" button.
  */
 function rowHref(item: MyResearchItem, publishHref: (target: number) => string) {
   return item.pipeline_status === "draft" ? publishHref(item.id) : `/records/${item.id}`;
@@ -62,7 +61,7 @@ interface SubmissionRowProps {
 /**
  * One of the owner's records as a row in a ruled list (IR-410). The title is
  * the row's one link, stretched over the row, so a click anywhere opens it
- * (`rowHref`); only the actions and a draft's buttons sit above it. The
+ * (`rowHref`); only the actions and a draft's trash can sit above it. The
  * status words are the server's (`submitter_status.line`); the sentence under
  * the title says what the record waits on (`waitingOn`, IR-1084).
  */
@@ -73,7 +72,7 @@ export function SubmissionRow({ item, brief = false, onDeleted }: SubmissionRowP
     item.adviser_name && `Adviser: ${item.adviser_name}`,
   ].filter(Boolean).join(" · ");
   const actions = rowActions(item, brief);
-  const draft = item.pipeline_status === "draft";
+  const deletable = item.pipeline_status === "draft" && onDeleted;
 
   return (
     <li className={cn("group relative flex gap-4 px-4 py-4 hover:bg-stone-50 sm:px-5", COLOUR_TRANSITION)}>
@@ -108,14 +107,13 @@ export function SubmissionRow({ item, brief = false, onDeleted }: SubmissionRowP
           <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 md:flex-col md:items-end">
             <StatusBadge state={item.workflow_state} label={item.submitter_status.line} />
             <span className="text-label tabular-nums text-stone-500">Updated {formatDate(item.updated_at)}</span>
-            {/* Under the date, level with the people line and what the draft
-                waits on (IR-1279). Above the row's link, so a press acts here. */}
-            {draft && (
-              <div className="relative z-10 flex basis-full items-center gap-1 md:mt-1 md:basis-auto">
-                <Link to={publishHref(item.id)} className={cn(PILL_PRIMARY, "min-h-9 px-4", FOCUS_RING)}>
-                  Continue draft <span className="sr-only">“{item.title}”</span>
-                </Link>
-                {onDeleted && <DeleteDraft recordId={item.id} title={item.title} onDeleted={onDeleted} />}
+            {/* The trash can alone, rightmost under the date and level with the
+                people line (IR-1279); the row itself continues the draft. Above
+                the row's link, so a press deletes rather than opens. The
+                negative margin lines its icon up with the date's right edge. */}
+            {deletable && (
+              <div className="relative z-10 -mr-2 ml-auto md:ml-0">
+                <DeleteDraft recordId={item.id} title={item.title} onDeleted={onDeleted} />
               </div>
             )}
           </div>

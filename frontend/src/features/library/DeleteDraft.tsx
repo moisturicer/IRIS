@@ -20,9 +20,9 @@ interface DeleteDraftProps {
  * decision, and its other owners are told (IR-517). Asked once, in a dialog
  * that keeps a failure in front of the owner rather than closing on it.
  *
- * A red trash can beside Continue draft, under the row's *Updated* date,
- * named for its draft, with "Delete draft" as its tooltip (IR-1256, brought
- * back from IR-1261's "⋯" menu by IR-1279). The dialog is the one question
+ * A red trash can, rightmost under the row's *Updated* date, named for its
+ * draft, with "Delete draft" as its tooltip (IR-1256, brought back from
+ * IR-1261's "⋯" menu by IR-1279). The row itself continues the draft. The dialog is the one question
  * asked. Publish asks the same question the same way.
  */
 export function DeleteDraft({ recordId, title, onDeleted }: DeleteDraftProps) {
@@ -50,7 +50,7 @@ export function DeleteDraft({ recordId, title, onDeleted }: DeleteDraftProps) {
         <button
           type="button"
           aria-label={`Delete draft “${title}”`}
-          // No fill or outline at rest (IR-1084), so Continue draft stays the row's one pill.
+          // No fill or outline at rest (IR-1084): a quiet icon beside the row's text.
           className={cn(
             "inline-flex h-9 w-9 items-center justify-center rounded-full text-brand",
             "hover:bg-stone-100 hover:text-brand-dark",
