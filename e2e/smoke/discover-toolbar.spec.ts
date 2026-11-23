@@ -92,7 +92,7 @@ for (const vp of VIEWPORTS) {
 }
 
 // The tightest the labelled row gets: no sidebar below 768 (content 584 px at 640), the
-// icon rail at 768, the full sidebar at 1024 (content 728 px) -- with three filters on,
+// icon rail at 768, the full sidebar at 1024 (content 712 px beside the 256 px sidebar, IR-1276) -- with three filters on,
 // so the Filters count badge is drawn too.
 for (const width of [640, 700, 1024]) {
   test(`Discover controls stay one row at ${width}px with filters on`, async ({ page, api }) => {

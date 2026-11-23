@@ -189,11 +189,11 @@ export function AppShell() {
           "flex flex-col flex-1 min-w-0 transition-shell duration-200 ease-out motion-reduce:transition-none",
           // Ask IRIS fills the window; its own panes scroll, so the page never does.
           isAskIris && "min-h-0",
-          // The sidebar's own widths: the 76 px rail from md, or w-60 from lg
+          // The sidebar's own widths: the 76 px rail from md, or w-64 (256 px, IR-1276) from lg
           // unless the reader chose the rail. Between md and lg the rail is all
           // that takes room; an opened sidebar overlaps the page (IR-1086).
           "md:ml-rail",
-          !collapsed && "lg:ml-60",
+          !collapsed && "lg:ml-64",
         )}
       >
         {showPhoneBar && <PhoneBar ref={menuButtonRef} />}

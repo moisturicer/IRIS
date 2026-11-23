@@ -10,7 +10,7 @@
 |---|---|---|
 | < 768 px | Off-canvas drawer | Overlay with `aria-label="Close menu"` backdrop; toggled from Header |
 | 768–1023 px | 76 px icon rail | Icons only, section titles hidden; every control named, with a tooltip on hover and focus (IR-1086). The IRIS mark opens the full sidebar over the page |
-| ≥ 1024 px | 240 px full | Icons + labels + section titles; the reader may collapse it to the same rail |
+| ≥ 1024 px | 256 px full (IR-1276) | Icons + labels + section titles; the reader may collapse it to the same rail |
 
 `Sidebar` builds its sections from `navFor(role)` in [`lib/access.ts`](../../frontend/src/lib/access.ts), with badges attached per item. Active state is a brand-tinted background plus a left rail. There is no longer a "coming soon" pill — see §3.
 

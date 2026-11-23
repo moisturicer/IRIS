@@ -143,9 +143,9 @@ test("RDCO's coordination screens, Import records included, are one RDCO group",
   // Workflow analytics is in this group since IR-1216, not under My Reviews.
   expect(labels(ROLES.RDCO, REVIEW_WORK)).toEqual([
     "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: My Reviews", "Main: Calls & Conferences",
-    "Main: Guidelines", "RDCO: Import records", "RDCO: Users", "RDCO: Role requests", "RDCO: Download requests",
-    "RDCO: Call requests", "RDCO: Delete requests", "RDCO: Reported comments",
-    "RDCO: Workflow analytics", "RDCO: Setup",
+    "Main: Guidelines", "RDCO: Import Records", "RDCO: Users", "RDCO: Role Requests", "RDCO: Download Requests",
+    "RDCO: Call Requests", "RDCO: Delete Requests", "RDCO: Reported Comments",
+    "RDCO: Workflow Analytics", "RDCO: Setup",
   ]);
 });
 
@@ -160,12 +160,12 @@ describe("the pages nested under My Reviews (IR-1085, D5)", () => {
 
   test("a coordinator reaches the console at its existing address, and nothing else nests", () => {
     expect(nested(ROLES.ITSO, COORDINATOR_WORK)).toEqual([
-      { label: "Office console", to: "/review/office" },
+      { label: "Office Console", to: "/review/office" },
     ]);
   });
 
   test("RDCO's coordinator gets it too, and a missing flag is not a coordinator", () => {
-    expect(nested(ROLES.RDCO, COORDINATOR_WORK).map((i) => i.label)).toEqual(["Office console"]);
+    expect(nested(ROLES.RDCO, COORDINATOR_WORK).map((i) => i.label)).toEqual(["Office Console"]);
     expect(nested(ROLES.RDCO, { my_reviews: true, is_coordinator: undefined })).toEqual([]);
   });
 
@@ -195,7 +195,7 @@ test("the System Admin's nav is Discover, Users, Audit Log, Account Deletions, R
   expect(labels(ROLES.SYSTEM_ADMIN)).toEqual([
     "Main: Discover",
     "Administration: Users", "Administration: Audit Log", "Administration: Account Deletions",
-    "Administration: Reported comments", "Administration: Retention",
+    "Administration: Reported Comments", "Administration: Retention",
   ]);
 });
 
@@ -203,7 +203,7 @@ test("the System Admin's nav is Discover, Users, Audit Log, Account Deletions, R
 // System Admin's navigation and nobody else's.
 test("the Reported comments page is RDCO's and the System Admin's alone, at /moderation/comments", () => {
   for (const role of Object.values(ROLES)) {
-    const page = navFor(role).filter((item) => item.label === "Reported comments");
+    const page = navFor(role).filter((item) => item.label === "Reported Comments");
     const allowed = role === ROLES.RDCO || role === ROLES.SYSTEM_ADMIN;
     expect(page.map((item) => item.to), role).toEqual(allowed ? ["/moderation/comments"] : []);
   }
@@ -353,14 +353,14 @@ test("Student sees no administration section at all", () => {
 // IR-783: each office has its own addresses and named section.
 test("RDCO coordination links use the RDCO section and addresses", () => {
   expect(navFor(ROLES.RDCO).filter((item) => item.section !== "Main").map(({ label, to, section }) => ({ label, to, section }))).toEqual([
-    { label: "Import records", to: "/records/import", section: "RDCO" },
+    { label: "Import Records", to: "/records/import", section: "RDCO" },
     { label: "Users", to: "/rdco/users", section: "RDCO" },
-    { label: "Role requests", to: "/rdco/role-requests", section: "RDCO" },
-    { label: "Download requests", to: "/rdco/download-requests", section: "RDCO" },
-    { label: "Call requests", to: "/rdco/call-requests", section: "RDCO" },
-    { label: "Delete requests", to: "/rdco/delete-requests", section: "RDCO" },
-    { label: "Reported comments", to: "/moderation/comments", section: "RDCO" },
-    { label: "Workflow analytics", to: "/rdco/analytics", section: "RDCO" },
+    { label: "Role Requests", to: "/rdco/role-requests", section: "RDCO" },
+    { label: "Download Requests", to: "/rdco/download-requests", section: "RDCO" },
+    { label: "Call Requests", to: "/rdco/call-requests", section: "RDCO" },
+    { label: "Delete Requests", to: "/rdco/delete-requests", section: "RDCO" },
+    { label: "Reported Comments", to: "/moderation/comments", section: "RDCO" },
+    { label: "Workflow Analytics", to: "/rdco/analytics", section: "RDCO" },
     { label: "Setup", to: "/rdco/setup", section: "RDCO" },
   ]);
 });

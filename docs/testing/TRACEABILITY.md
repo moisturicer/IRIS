@@ -414,6 +414,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-1261** | A click anywhere on a My Library row opens it (a draft in Publish, others in Paper View), with no *Continue draft* or *Open review* button; a draft's Delete moves into the row's ⋯ menu — supersedes IR-1256's trash can; no FR- id | [details](traceability/IR-1261.md) | **IMPLEMENTED** |
 | **IR-1264** | Lighter record Overview: title sized by length, people pills, status in Record details, Review & routing a summary, no "Your submission" card — no FR- id | [details](traceability/IR-1264.md) | **IMPLEMENTED** |
 | **IR-1273** | Paper View's re-reads after *Submit new version* and *Open review* go through `useRecordLoader`'s reload, so a Record revoked mid-review falls to *Record not available* (IR-906); a failed seat call still opens the review (IR-1206) — no FR- id | [details](traceability/IR-1273.md) | **IMPLEMENTED** |
+| **IR-1276** | The sidebar is 256 px (`w-64`, page margin `lg:ml-64`), so *Download Requests* and *Reported Comments* stay on one line beside their count badge, and every sidebar item is in Title Case — no FR- id | [details](traceability/IR-1276.md) | **IMPLEMENTED** |
 | NFR-U3 | Responsive at 360 px, no horizontal scroll | [details](traceability/NFR-U3.md) | **PARTIAL** |
 | NFR-A1 | WCAG 2.1 AA on interactive controls | [details](traceability/NFR-A1.md) | **PARTIAL** |
 

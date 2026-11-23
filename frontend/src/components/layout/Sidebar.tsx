@@ -31,8 +31,8 @@ interface NavItem {
    */
   dot?: string;
   /**
-   * Pages listed under this row (IR-1085, D5): My Reviews' Office console
-   * (Workflow analytics moved to the RDCO group, IR-1216). A list inside the
+   * Pages listed under this row (IR-1085, D5): My Reviews' Office Console
+   * (Workflow Analytics moved to the RDCO group, IR-1216). A list inside the
    * row, so it reads as part of it.
    */
   children?: NavItem[];
@@ -65,7 +65,7 @@ function NavItemLink({ item, collapsed, onNavigate, nested }: { item: NavItem; c
           cn(
             // 44px on the phone drawer; compact from md, where a pointer is (IR-1092).
             // A nested row gives up some padding and gap so a name like "Workflow
-            // analytics" fits at 240px without being cut short (IR-1180).
+            // Analytics" fits without being cut short (IR-1180).
             "group relative flex min-h-11 md:min-h-0 touch:min-h-11 items-center rounded-control py-2 text-sm",
             nested ? "gap-2 px-2" : "gap-3 px-3",
             collapsed && "md:h-10 md:justify-center md:px-0",
@@ -235,8 +235,8 @@ interface SidebarProps {
  * The app's navigation (IR-413, spec §4.1).
  *
  * Discover and research links, RDCO's coordination group, and the System
- * Admin's Administration group. My Reviews carries the Office console under
- * it for coordinators (IR-1085, D5); Workflow analytics is RDCO's (IR-1216). The
+ * Admin's Administration group. My Reviews carries the Office Console under
+ * it for coordinators (IR-1085, D5); Workflow Analytics is RDCO's (IR-1216). The
  * bell is at the top (IR-519); the account menu is at the bottom, and Help is
  * in Settings (IR-1217). Below `md` it is a
  * drawer `AppShell` opens and closes. From 768 to 1023 px it is the 76 px icon
@@ -398,14 +398,16 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
       // React 18 has no `inert` prop; an empty string sets the attribute.
       {...(inert ? { inert: "" } : {})}
       className={cn(
-        // Below md: a 240px drawer over the page. From md: 240px, or the 76px
+        // Below md: a 256px drawer over the page. From md: 256px, or the 76px
         // rail when collapsed. AppShell's left margin follows the same widths,
         // except that an opened tablet sidebar overlaps the page instead.
-        "fixed left-0 top-0 z-50 flex h-screen w-60 flex-col border-r border-stone-200 bg-surface",
+        // 256, not 240 (IR-1276): at 240 "Download Requests" and "Reported
+        // Comments" wrapped to two lines beside their count badge.
+        "fixed left-0 top-0 z-50 flex h-screen w-64 flex-col border-r border-stone-200 bg-surface",
         // `shell` carries transform (the drawer's slide) and width (the rail)
         // together; AppShell sets the translate classes, not a transition.
         "transition-shell duration-200 ease-out motion-reduce:transition-none",
-        collapsed ? "md:w-rail" : "md:w-60",
+        collapsed ? "md:w-rail" : "md:w-64",
         mode === "rail" && !collapsed && "shadow-card-md",
         className,
       )}
