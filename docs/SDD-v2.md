@@ -524,7 +524,7 @@ Section D figures are in `docs/diagrams/section-d/png/` (IR-1021). The ERDs and 
 
 **Note on Section D:** D-16 and D-17 predate ADR-067 (Unstructured) and ADR-074 (ClamAV), and D-17 predates ADR-052's 2026-11-21 amendment. V-1 and V-2 are their corrected versions, and this document uses those instead.
 
-![V-1](diagrams/srs-sdd-v2/png/V-01-deployment.png)
+![V-1](diagrams/section-d/png/D-16-architecture-deployment.png)
 ![D-8](diagrams/section-d/png/D-08-erd-overview.png)
 ![D-9](diagrams/section-d/png/D-09-erd-accounts.png)
 ![D-10](diagrams/section-d/png/D-10-erd-records.png)
@@ -536,7 +536,7 @@ Section D figures are in `docs/diagrams/section-d/png/` (IR-1021). The ERDs and 
 ![D-19](diagrams/section-d/png/D-19-component-backend.png)
 ![D-20](diagrams/section-d/png/D-20-class-workflow-core.png)
 ![D-21](diagrams/section-d/png/D-21-component-ai-runtime.png)
-![V-2](diagrams/srs-sdd-v2/png/V-02-manuscript-flow.png)
+![V-2](diagrams/section-d/png/D-17-architecture-manuscript-flow.png)
 ![V-3](diagrams/srs-sdd-v2/png/V-03-record-states.png)
 ![V-4](diagrams/srs-sdd-v2/png/V-04-clearance-aware-resubmission.png)
 ![V-5](diagrams/srs-sdd-v2/png/V-05-sign-in-and-refresh.png)
