@@ -415,3 +415,172 @@ def test_the_legacy_generate_response_adapter_is_unchanged(monkeypatch):
     assert not legacy.accepts(PIN)
     with pytest.raises(UnsupportedCapability):
         run(legacy.converse(ask()))
+
+
+# --- A transient failure is resent once, and logged (IR-1286) -------------------
+
+class Ticket:
+    timeout_seconds = 5
+
+    def __init__(self):
+        self.usage = None
+
+    async def settle(self, usage):
+        self.usage = usage
+
+
+class Ledger:
+    """Admits everything and keeps each attempt's ticket."""
+
+    limits = SimpleNamespace(max_output_tokens=100)
+
+    def __init__(self):
+        self.tickets: list[Ticket] = []
+
+    async def admit(self, *_):
+        self.tickets.append(Ticket())
+        return self.tickets[-1]
+
+
+class Redis:
+    """What the draft stream would publish to the reader."""
+
+    def __init__(self):
+        self.events: list[dict] = []
+
+    async def xadd(self, _key, fields, **_):
+        self.events.append(json.loads(fields["e"]))
+
+    async def expire(self, *_):
+        pass
+
+    @property
+    def text(self) -> str:
+        return "".join(e["d"] for e in self.events if e["t"] == "text")
+
+
+def sse(*chunks, done=True) -> httpx.Response:
+    lines = [f"data: {json.dumps(c)}\n\n" for c in chunks] + (["data: [DONE]\n\n"] if done else [])
+    return httpx.Response(200, content="".join(lines).encode(), headers={"content-type": "text/event-stream"})
+
+
+def piece(text):
+    return {"id": "gen-ok", "choices": [{"index": 0, "delta": {"content": text}, "finish_reason": None}]}
+
+
+STOP = {"id": "gen-ok", "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
+        "usage": {"prompt_tokens": 21, "completion_tokens": 7}}
+STREAM_ERROR = {"id": "gen-FAILED-1", "error": {"code": 502, "message": "Upstream provider error"}}
+
+
+def streamed(vendor, *, retries=1, phase="final", live=True, request=None):
+    """One admitted converse with a live draft sink, as a worker runs it."""
+    from ai.admission.scope import RunBinding, bound as admission_bound
+    from ai.admission.transport import AdmittedAgentProvider
+    from ai.runs import stream
+
+    redis, ledger = Redis(), Ledger()
+    sink = stream.DraftSink(redis, "run-1")
+    provider = AdmittedAgentProvider(adapter(vendor), ledger, retries=retries)
+
+    async def go():
+        with admission_bound(RunBinding("run-1", 1)), stream.bound(sink):
+            await sink.attempt(phase, live=live)
+            try:
+                turn = await provider.converse(request or ask(max_output_tokens=50))
+            finally:
+                await sink.settle(True)
+        return turn
+
+    return redis, ledger, go
+
+
+def test_an_error_chunk_after_200_is_resent_once_and_the_answer_streams_once():
+    vendor = Vendor(sse(STREAM_ERROR, done=False), sse(piece("Answer."), STOP))
+    redis, ledger, go = streamed(vendor)
+    turn = run(go())
+    assert turn.text == "Answer."
+    assert len(vendor.requests) == 2
+    # Each send is its own admitted, settled attempt.
+    assert [t.usage.sent for t in ledger.tickets] == [True, True]
+    assert redis.text == "Answer."
+
+
+def test_two_transient_failures_end_the_answer_as_provider_failed():
+    from ai.agent.executor import AgentExecutor
+    from ai.admission.transport import AdmittedAgentProvider
+    from ai.runs.executor import Unavailable
+    from .test_ai_runtime_context_contract import RESERVES
+
+    vendor = Vendor(httpx.Response(503, json={}), httpx.ConnectError("refused"), reply("Never sent."))
+    direct = Pin(**{**PIN.as_dict(), "requires": PIN.requires,
+                    "prompt_version": "agent-direct-1", "tool_version": "none-1"})
+    ledger = Ledger()
+    ledger.limits = SimpleNamespace(max_output_tokens=CAPACITY["max_output_tokens"])
+    target = AdmittedAgentProvider(adapter(vendor), ledger, retries=1)
+    with pytest.raises(Unavailable) as failed:
+        run(AgentExecutor(target, direct, RESERVES).answer("q"))
+    assert failed.value.code == "provider_failed"
+    assert len(vendor.requests) == 2 and len(ledger.tickets) == 2
+
+
+def test_text_the_reader_already_saw_is_never_resent_or_repeated():
+    # Live: the first words reached the reader, so that attempt cannot be taken back.
+    vendor = Vendor(sse(piece("Partial words "), STREAM_ERROR, done=False), sse(piece("Answer."), STOP))
+    redis, ledger, go = streamed(vendor)
+    from ai.domain.ports import TransientProviderError
+    with pytest.raises(TransientProviderError):
+        run(go())
+    assert len(vendor.requests) == 1
+    assert redis.text == "Partial words "
+
+
+def test_text_held_from_a_failed_attempt_is_dropped_before_the_resend():
+    # Held (a research turn): nothing was shown, so it is resent and only the resend is kept.
+    vendor = Vendor(sse(piece("Partial words "), STREAM_ERROR, done=False), sse(piece("Answer."), STOP))
+    redis, ledger, go = streamed(vendor, phase="gather")
+    turn = run(go())
+    assert turn.text == "Answer." and len(vendor.requests) == 2
+    assert redis.text == "Answer."
+
+
+def test_with_no_retries_configured_one_failure_ends_the_attempt():
+    from ai.domain.ports import TransientProviderError
+
+    vendor = Vendor(sse(STREAM_ERROR, done=False), sse(piece("Answer."), STOP))
+    _, ledger, go = streamed(vendor, retries=0)
+    with pytest.raises(TransientProviderError):
+        run(go())
+    assert len(vendor.requests) == 1 and len(ledger.tickets) == 1
+
+
+def test_the_failure_log_names_status_code_and_generation_but_no_payload(caplog):
+    import logging
+
+    caplog.set_level(logging.WARNING)
+    error = {"id": "gen-FAILED-1", "error": {"code": 502, "message": f"Upstream said {API_KEY}"}}
+    vendor = Vendor(sse(error, done=False), sse(piece("Answer-TEXT."), STOP))
+    _, _, go = streamed(vendor, request=ask("Question-TEXT", max_output_tokens=50))
+    run(go())
+    logged = "\n".join(r.getMessage() for r in caplog.records)
+    for expected in ("status=200", "code=502", "generation=gen-FAILED-1", "Upstream said", "retrying"):
+        assert expected in logged
+    for secret in (API_KEY, "Question-TEXT", "Answer.", "Answer-TEXT", "Authorization"):
+        assert secret not in logged
+
+
+@pytest.mark.parametrize(("failure", "expected"), [
+    (httpx.Response(503, json={"error": {"code": "overloaded", "message": "try later"}}),
+     ("status=503", "code=overloaded", "try later")),
+    (httpx.ReadTimeout("slow"), ("exception=ReadTimeout",)),
+])
+def test_a_plain_send_logs_its_failure_too(caplog, failure, expected):
+    import logging
+    from ai.domain.ports import TransientProviderError
+
+    caplog.set_level(logging.WARNING)
+    with pytest.raises(TransientProviderError):
+        admitted(adapter(Vendor(failure)).converse(ask("Question-TEXT")))
+    logged = "\n".join(r.getMessage() for r in caplog.records)
+    assert all(e in logged for e in expected)
+    assert "Question-TEXT" not in logged and API_KEY not in logged

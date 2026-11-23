@@ -25,6 +25,7 @@ AGENT = dict(
     RUNS_AGENT_BOUNDS=json.dumps({"ordinary": BOUNDS, "deep": {**BOUNDS, "max_steps": 8}}),
     RUNS_AGENT_RESERVES=json.dumps(dict(output_tokens=60, reasoning_tokens=40, next_result_tokens=300,
                                         repair_tokens=100)),
+    RUNS_AGENT_PROVIDER_RETRIES="1",
     AGENT_LLM_ENDPOINT="https://llm.example.test/v1",
     AGENT_LLM_API_KEY=API_KEY,
     AGENT_LLM_MODELS="model-a,model-b",
@@ -109,9 +110,19 @@ def test_an_unknown_executor_refuses_to_start():
      "RUNS_AGENT_RESERVES"),
     ({"RUNS_AGENT_RESERVES": json.dumps({"output_tokens": 10})}, "RUNS_AGENT_RESERVES"),
     ({"AGENT_LLM_ENDPOINT": "ftp://llm.example.test"}, "AGENT_LLM_ENDPOINT"),
+    ({"RUNS_AGENT_PROVIDER_RETRIES": "4"}, "RUNS_AGENT_PROVIDER_RETRIES"),
+    ({"RUNS_AGENT_PROVIDER_RETRIES": "-1"}, "RUNS_AGENT_PROVIDER_RETRIES"),
+    ({"RUNS_AGENT_PROVIDER_RETRIES": "one"}, "RUNS_AGENT_PROVIDER_RETRIES"),
 ])
 def test_an_invalid_agent_profile_refuses_to_start_and_names_it(overrides, named):
     assert named in refusal(**overrides)
+
+
+@pytest.mark.parametrize("retries", [0, 1, 3])
+def test_the_configured_retries_reach_the_admitted_provider(retries):
+    # IR-1286: each resend is one more admitted attempt, never a hidden default.
+    service = build(settings(RUNS_AGENT_PROVIDER_RETRIES=str(retries)))
+    assert service.executor.provider.retries == retries
 
 
 # --- Compaction (IR-734) --------------------------------------------------------

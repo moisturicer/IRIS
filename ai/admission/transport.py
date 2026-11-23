@@ -10,6 +10,7 @@ attempt within the same allowance; nothing retries out of sight.
 from __future__ import annotations
 
 import asyncio
+import logging
 from dataclasses import replace
 from typing import Optional
 
@@ -19,6 +20,8 @@ from ai.domain.ports import LLMProvider, TransientProviderError, UnsupportedCapa
 from . import errors, scope
 from .errors import AdmissionDenied
 from .ledger import Ledger, Request, Usage, estimate_tokens
+
+log = logging.getLogger(__name__)
 
 RESEARCH_LANE = "research"
 
@@ -61,9 +64,11 @@ class AdmittedAgentProvider(LLMProvider):
         for attempt in range(self.retries + 1):
             try:
                 return await self._attempt(request)
-            except TransientProviderError:
-                if attempt == self.retries:
+            except TransientProviderError as failed:
+                if attempt == self.retries or not failed.replayable:
                     raise
+                log.warning("agent provider attempt %d of %d failed (%s); retrying",
+                            attempt + 1, self.retries + 1, failed)
 
     async def _attempt(self, request):
         binding = scope.current()
