@@ -7,25 +7,29 @@
  * never inferred here) is history: it shows a settled line instead of asking
  * for anything, and it is never counted as unread.
  *
- * A notification about a record has an Open button: it goes to the record and
- * marks the notification read, the way the bell's items do. A notification with
- * no record has only the mark-read control. Days are the viewer's own, from
+ * A notification about a record is itself the link: selecting the row goes to
+ * the record and marks the notification read, the way the bell's items do. A
+ * notification with no record has only the mark-read control. Days are the viewer's own, from
  * each timestamp in the browser's time zone (IR-1137).
  */
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { notificationsApi } from "@/api/notifications";
 import { notificationHref } from "./notificationHref";
 import { failureMessage } from "@/lib/readFailure";
 import { useNotificationsStore } from "@/store/notifications.store";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
-import { Button, ButtonLink } from "@/components/ui/Button";
+import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { cn } from "@/lib/utils";
 import type { Notification } from "@/types/notifications";
 import { SELECTED_SEGMENT } from "@/components/ui/highlightRoles";
 import { GROUP_BAND, groupByDay, isUnread, ResolvedPill, UnreadDot, UnreadWord, when } from "./unread";
+
+// Inset, so the ring is not clipped by the list's rounded, overflow-hidden frame.
+const FOCUS_RING_INSET = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand";
 
 const FAILED_LEAD = "Couldn't update your notifications.";
 
@@ -127,7 +131,7 @@ export default function NotificationsPage() {
     <div>
       <PageHeader
         title="Notifications"
-        description="Updates on your records and reviews. Use Open to go to the record."
+        description="Updates on your records and reviews. Select one to go to its record."
         actions={
           // Always there, as in the prototype; nothing to do at zero unread.
           <Button variant="outline" size="sm" onClick={handleMarkAllRead} disabled={unreadCount === 0}>
@@ -213,12 +217,12 @@ function NotificationRow({ n, time, onOpen, onMarkRead }: RowProps) {
   const href = notificationHref(n);
   const unread = isUnread(n);
 
-  return (
-    <li className="flex items-start gap-3 px-5 py-4 max-sm:flex-wrap">
+  const body = (
+    <>
       {/* Unread mark: a maroon dot, with the word for screen readers beside the text. */}
       <UnreadDot unread={unread} className="mt-2" />
 
-      <div className="flex-1 min-w-0 max-sm:basis-[calc(100%-1.25rem)]">
+      <div className="flex-1 min-w-0">
         <span
           className={cn(
             "block break-words text-body",
@@ -234,36 +238,51 @@ function NotificationRow({ n, time, onOpen, onMarkRead }: RowProps) {
           {resolved && <ResolvedPill label={n.resolved_label} />}
         </span>
       </div>
+    </>
+  );
 
-      <div className="flex items-center gap-1 shrink-0 self-center max-sm:ml-5">
-        {/* A notification with nowhere to open has no Open button; this is its way to be read. */}
-        {unread && href == null && (
-          <button
-            type="button"
-            onClick={onMarkRead}
-            aria-label="Mark as read"
-            title="Mark as read"
-            className={cn(
-              "w-9 h-9 touch:w-11 touch:h-11 rounded-control flex items-center justify-center text-stone-500 hover:bg-stone-100 hover:text-stone-900",
-              COLOUR_TRANSITION,
-              FOCUS_RING,
-            )}
-          >
-            <i className="fas fa-check text-small" aria-hidden />
-          </button>
-        )}
-        {href != null && (
-          <ButtonLink
-            to={href}
-            variant="outline"
-            size="sm"
-            onClick={onOpen}
-            aria-label={`Open: ${n.message}`}
-          >
-            Open
-          </ButtonLink>
-        )}
-      </div>
+  // The whole row is the link: its text is its accessible name.
+  if (href != null) {
+    return (
+      <li>
+        <Link
+          to={href}
+          onClick={onOpen}
+          className={cn(
+            "group flex items-start gap-3 px-5 py-4 hover:bg-stone-50",
+            COLOUR_TRANSITION,
+            FOCUS_RING_INSET,
+          )}
+        >
+          {body}
+          <i
+            className="fas fa-chevron-right self-center shrink-0 text-small text-stone-400 group-hover:text-stone-700"
+            aria-hidden
+          />
+        </Link>
+      </li>
+    );
+  }
+
+  return (
+    <li className="flex items-start gap-3 px-5 py-4">
+      {body}
+      {/* A notification with nowhere to open is not a link; this is its way to be read. */}
+      {unread && (
+        <button
+          type="button"
+          onClick={onMarkRead}
+          aria-label="Mark as read"
+          title="Mark as read"
+          className={cn(
+            "w-9 h-9 touch:w-11 touch:h-11 shrink-0 self-center rounded-control flex items-center justify-center text-stone-500 hover:bg-stone-100 hover:text-stone-900",
+            COLOUR_TRANSITION,
+            FOCUS_RING,
+          )}
+        >
+          <i className="fas fa-check text-small" aria-hidden />
+        </button>
+      )}
     </li>
   );
 }

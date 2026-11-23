@@ -426,6 +426,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-1303** | Sign in and sign up say a failure in a dialog in front of the form (the account-locked dialog's look), and every field keeps a one-line slot for its error, so neither a failure nor a field message moves the form; "Some of this form didn't load" stays inline — no FR- id | [details](traceability/IR-1303.md) | **PARTIAL** |
 | **IR-1291** | The office console shows each review as a stacked card below 768 px (title, authors and Version, reviewer and due date, status, clearances, one full-width action) and keeps its table from 768 px — no FR- id | [details](traceability/IR-1291.md) | **PARTIAL** |
 | **IR-1305** | Cite only on published work: the server offers `cite` only on a `published` paper, Paper View shows Cite only where offered and Library → Saved only on a published row; Save and Share stay; Discover already lists published papers only (ADR-021 §13); no FR- id | [details](traceability/IR-1305.md) | **PARTIAL** |
+| **IR-1308** | On Notifications, a notification with somewhere to open is itself the link (hover background, chevron, inset focus ring) and opening it marks it read; the *Open* button is gone; one with nowhere to open keeps *Mark as read* — no FR- id | [details](traceability/IR-1308.md) | **PARTIAL** |
 | NFR-U3 | Responsive at 360 px, no horizontal scroll | [details](traceability/NFR-U3.md) | **PARTIAL** |
 | NFR-A1 | WCAG 2.1 AA on interactive controls | [details](traceability/NFR-A1.md) | **PARTIAL** |
 
