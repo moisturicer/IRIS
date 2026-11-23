@@ -1,0 +1,165 @@
+{
+ "format": "portrait",
+ "direction": "DOWN",
+ "title": "A-3.7  Activity: reminders and escalation",
+ "caption": "SRS v2 §3.2.3.7. From apps/reviews/reminders.py, tasks.py, ADR-043 at a46d7fc4 (IR-1275).",
+ "elk": {
+  "elk.layered.spacing.nodeNodeBetweenLayers": "16",
+  "elk.spacing.nodeNode": "22",
+  "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
+  "elk.layered.nodePlacement.bk.fixedAlignment": "BALANCED",
+  "elk.aspectRatio": "0.7"
+ },
+ "nodes": [
+  {
+   "id": "start",
+   "shape": "start"
+  },
+  {
+   "id": "a1",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Hourly: find assignments with a due date",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "q2",
+   "shape": "diamond",
+   "wrap": 150,
+   "label": "Two working days before, or on, the due date?"
+  },
+  {
+   "id": "a3",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Remind the Seat holders (or coordinators)",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "q4",
+   "shape": "diamond",
+   "wrap": 150,
+   "label": "Overdue?"
+  },
+  {
+   "id": "q5",
+   "shape": "diamond",
+   "wrap": 150,
+   "label": "An office?"
+  },
+  {
+   "id": "a6",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Escalate to its coordinators; repeat every 5 working days",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "a7",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Show the owner 'Waiting on your Adviser · N days overdue'",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "q8",
+   "shape": "diamond",
+   "wrap": 150,
+   "label": "Coordinator extends?"
+  },
+  {
+   "id": "a9",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Move the due date later; audit; re-arm reminders",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "stop",
+   "shape": "end"
+  }
+ ],
+ "edges": [
+  {
+   "from": "start",
+   "to": "a1"
+  },
+  {
+   "from": "a1",
+   "to": "q2"
+  },
+  {
+   "from": "q2",
+   "to": "a3",
+   "label": "yes"
+  },
+  {
+   "from": "a3",
+   "to": "q4"
+  },
+  {
+   "from": "q2",
+   "to": "q4",
+   "label": "no"
+  },
+  {
+   "from": "q4",
+   "to": "q5",
+   "label": "yes"
+  },
+  {
+   "from": "q5",
+   "to": "a6",
+   "label": "yes"
+  },
+  {
+   "from": "q5",
+   "to": "a7",
+   "label": "no"
+  },
+  {
+   "from": "a6",
+   "to": "q8"
+  },
+  {
+   "from": "a7",
+   "to": "q8"
+  },
+  {
+   "from": "q4",
+   "to": "q8",
+   "label": "no"
+  },
+  {
+   "from": "q8",
+   "to": "a9",
+   "label": "yes"
+  },
+  {
+   "from": "a9",
+   "to": "stop"
+  },
+  {
+   "from": "q8",
+   "to": "stop",
+   "label": "no"
+  }
+ ],
+ "legend": [
+  "first line of an action: who does it",
+  {
+   "tone": "core",
+   "text": "IRIS"
+  }
+ ]
+}

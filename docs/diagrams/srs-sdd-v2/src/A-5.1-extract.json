@@ -1,0 +1,188 @@
+{
+ "format": "portrait",
+ "direction": "DOWN",
+ "title": "A-5.1  Activity: extract a published manuscript",
+ "caption": "SRS v2 §3.2.5.1. From apps/documents/tasks.py, apps/ai/extraction, ADR-067 at a46d7fc4 (IR-1275).",
+ "elk": {
+  "elk.layered.spacing.nodeNodeBetweenLayers": "16",
+  "elk.spacing.nodeNode": "22",
+  "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
+  "elk.layered.nodePlacement.bk.fixedAlignment": "BALANCED",
+  "elk.aspectRatio": "0.7"
+ },
+ "nodes": [
+  {
+   "id": "start",
+   "shape": "start"
+  },
+  {
+   "id": "a1",
+   "shape": "box",
+   "tag": "RDCO",
+   "label": "Publish the paper",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "a2",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Queue extract_manuscript_text (extraction queue)",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "q3",
+   "shape": "diamond",
+   "wrap": 150,
+   "label": "Gate passes?"
+  },
+  {
+   "id": "a4",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Admit the paid read (when admission enforces)",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "a5",
+   "shape": "box",
+   "tag": "Unstructured",
+   "label": "Read the PDF (hi_res)",
+   "plain": true,
+   "tone": "ext",
+   "wrap": 150
+  },
+  {
+   "id": "q6",
+   "shape": "diamond",
+   "wrap": 150,
+   "label": "Read complete?"
+  },
+  {
+   "id": "a7",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Store PdfExtraction and Figures; queue chunking",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "a8",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Mark failed",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "a9",
+   "shape": "box",
+   "tag": "Owner",
+   "label": "Retry from Publish",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "end10",
+   "shape": "end"
+  },
+  {
+   "id": "a11",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Send nothing",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "end12",
+   "shape": "end"
+  },
+  {
+   "id": "stop",
+   "shape": "end"
+  }
+ ],
+ "edges": [
+  {
+   "from": "start",
+   "to": "a1"
+  },
+  {
+   "from": "a1",
+   "to": "a2"
+  },
+  {
+   "from": "a2",
+   "to": "q3"
+  },
+  {
+   "from": "q3",
+   "to": "a4",
+   "label": "yes"
+  },
+  {
+   "from": "a4",
+   "to": "a5"
+  },
+  {
+   "from": "a5",
+   "to": "q6"
+  },
+  {
+   "from": "q6",
+   "to": "a7",
+   "label": "yes"
+  },
+  {
+   "from": "q6",
+   "to": "a8",
+   "label": "no"
+  },
+  {
+   "from": "a8",
+   "to": "a9"
+  },
+  {
+   "from": "a9",
+   "to": "end10"
+  },
+  {
+   "from": "q3",
+   "to": "a11",
+   "label": "no"
+  },
+  {
+   "from": "a11",
+   "to": "end12"
+  },
+  {
+   "from": "a7",
+   "to": "stop"
+  }
+ ],
+ "legend": [
+  "first line of an action: who does it",
+  {
+   "tone": "plain",
+   "text": "person"
+  },
+  {
+   "tone": "core",
+   "text": "IRIS"
+  },
+  {
+   "tone": "ext",
+   "text": "external service"
+  }
+ ]
+}

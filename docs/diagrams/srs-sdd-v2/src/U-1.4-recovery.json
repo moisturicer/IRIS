@@ -1,0 +1,86 @@
+{
+ "kind": "usecase",
+ "format": "portrait",
+ "title": "U-1.4  Use cases: account recovery (FR-1.4)",
+ "caption": "SRS v2 §3.2.1.4. From apps/accounts/recovery, ADR-045 at a46d7fc4 (IR-1275).",
+ "system": "Account recovery",
+ "left": [
+  {
+   "id": "Person",
+   "label": "Person who cannot sign in"
+  }
+ ],
+ "right": [
+  {
+   "id": "Mail",
+   "label": "Email service",
+   "tone": "ext"
+  }
+ ],
+ "cases": [
+  {
+   "id": "UC1",
+   "label": "Ask for a password reset",
+   "wrap": 160
+  },
+  {
+   "id": "UC2",
+   "label": "Receive a single-use link (30 min)",
+   "wrap": 160
+  },
+  {
+   "id": "UC3",
+   "label": "Set a new password",
+   "wrap": 160
+  },
+  {
+   "id": "UC4",
+   "label": "End every earlier session",
+   "wrap": 160
+  }
+ ],
+ "links": [
+  [
+   "Person",
+   "UC1",
+   "UC3"
+  ],
+  [
+   "Mail",
+   "UC2"
+  ]
+ ],
+ "deps": [
+  {
+   "from": "UC1",
+   "to": "UC2",
+   "label": "«include»"
+  },
+  {
+   "from": "UC3",
+   "to": "UC4",
+   "label": "«include»"
+  }
+ ],
+ "notes": [
+  {
+   "on": "UC1",
+   "text": "always answers the same, whether or not the account exists",
+   "wrap": 130
+  }
+ ],
+ "legend": [
+  {
+   "line": "solid",
+   "text": "actor takes part"
+  },
+  {
+   "line": "dash arrow",
+   "text": "dependency between use cases"
+  },
+  {
+   "tone": "ext",
+   "text": "external system"
+  }
+ ]
+}

@@ -1,0 +1,75 @@
+{
+ "kind": "usecase",
+ "format": "portrait",
+ "title": "U-3.5  Use cases: explicit document requests (FR-3.5)",
+ "caption": "SRS v2 §3.2.3.5. From apps/documents/requests.py, ADR-022 at a46d7fc4 (IR-1275).",
+ "system": "Document requests",
+ "left": [
+  {
+   "id": "Reviewer",
+   "label": "Reviewer"
+  },
+  {
+   "id": "Owner",
+   "label": "Record owner"
+  }
+ ],
+ "right": [],
+ "cases": [
+  {
+   "id": "UC1",
+   "label": "Ask for a missing document",
+   "wrap": 160
+  },
+  {
+   "id": "UC2",
+   "label": "Upload against the request",
+   "wrap": 160
+  },
+  {
+   "id": "UC3",
+   "label": "Accept or reject each item",
+   "wrap": 160
+  },
+  {
+   "id": "UC4",
+   "label": "Pause the requesting party's clock",
+   "wrap": 160
+  }
+ ],
+ "links": [
+  [
+   "Reviewer",
+   "UC1",
+   "UC3"
+  ],
+  [
+   "Owner",
+   "UC2"
+  ]
+ ],
+ "deps": [
+  {
+   "from": "UC1",
+   "to": "UC4",
+   "label": "«include»"
+  }
+ ],
+ "notes": [
+  {
+   "on": "UC1",
+   "text": "no clearance resets; no resubmission",
+   "wrap": 130
+  }
+ ],
+ "legend": [
+  {
+   "line": "solid",
+   "text": "actor takes part"
+  },
+  {
+   "line": "dash arrow",
+   "text": "dependency between use cases"
+  }
+ ]
+}

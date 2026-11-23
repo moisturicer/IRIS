@@ -1,0 +1,63 @@
+{
+ "kind": "usecase",
+ "format": "portrait",
+ "title": "U-7.3  Use cases: Settings and Help (FR-7.3)",
+ "caption": "SRS v2 §3.2.7.3. From features/settings, features/help at a46d7fc4 (IR-1275).",
+ "system": "Settings",
+ "left": [
+  {
+   "id": "Person",
+   "label": "Signed-in person"
+  }
+ ],
+ "right": [],
+ "cases": [
+  {
+   "id": "UC1",
+   "label": "Edit profile and photo",
+   "wrap": 160
+  },
+  {
+   "id": "UC2",
+   "label": "Change password",
+   "wrap": 160
+  },
+  {
+   "id": "UC3",
+   "label": "Change my AI answer",
+   "wrap": 160
+  },
+  {
+   "id": "UC4",
+   "label": "Download my data; request deletion",
+   "wrap": 160
+  },
+  {
+   "id": "UC5",
+   "label": "Read Help",
+   "wrap": 160
+  }
+ ],
+ "links": [
+  [
+   "Person",
+   "UC1",
+   "UC2",
+   "UC3",
+   "UC4",
+   "UC5"
+  ]
+ ],
+ "deps": [],
+ "notes": [],
+ "legend": [
+  {
+   "line": "solid",
+   "text": "actor takes part"
+  },
+  {
+   "line": "dash arrow",
+   "text": "dependency between use cases"
+  }
+ ]
+}

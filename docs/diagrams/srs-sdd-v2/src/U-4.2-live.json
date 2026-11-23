@@ -1,0 +1,65 @@
+{
+ "kind": "usecase",
+ "format": "portrait",
+ "title": "U-4.2  Use cases: live updates (FR-4.2)",
+ "caption": "SRS v2 §3.2.4.2. From apps/live, frontend/src/lib/live.ts, ADR-073 at a46d7fc4 (IR-1275).",
+ "system": "Live updates",
+ "left": [
+  {
+   "id": "Person",
+   "label": "Signed-in person"
+  }
+ ],
+ "right": [],
+ "cases": [
+  {
+   "id": "UC1",
+   "label": "Keep one hint stream per tab",
+   "wrap": 160
+  },
+  {
+   "id": "UC2",
+   "label": "Receive a hint naming what changed",
+   "wrap": 160
+  },
+  {
+   "id": "UC3",
+   "label": "Refetch the page through the API",
+   "wrap": 160
+  },
+  {
+   "id": "UC4",
+   "label": "Reconnect and refetch",
+   "wrap": 160
+  }
+ ],
+ "links": [
+  [
+   "Person",
+   "UC1"
+  ]
+ ],
+ "deps": [
+  {
+   "from": "UC2",
+   "to": "UC3",
+   "label": "«include»"
+  },
+  {
+   "from": "UC1",
+   "to": "UC4",
+   "label": "«extend»"
+  }
+ ],
+ "notes": [],
+ "legend": [
+  {
+   "line": "solid",
+   "text": "actor takes part"
+  },
+  {
+   "line": "dash arrow",
+   "text": "dependency between use cases"
+  }
+ ]
+}

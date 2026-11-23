@@ -1,0 +1,166 @@
+{
+ "format": "portrait",
+ "direction": "DOWN",
+ "title": "A-2.2  Activity: set a record type's requirements",
+ "caption": "SRS v2 §3.2.2.2. From apps/documents/setup.py, ADR-063 at a46d7fc4 (IR-1275).",
+ "elk": {
+  "elk.layered.spacing.nodeNodeBetweenLayers": "16",
+  "elk.spacing.nodeNode": "22",
+  "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
+  "elk.layered.nodePlacement.bk.fixedAlignment": "BALANCED",
+  "elk.aspectRatio": "0.7"
+ },
+ "nodes": [
+  {
+   "id": "start",
+   "shape": "start"
+  },
+  {
+   "id": "a1",
+   "shape": "box",
+   "tag": "RDCO",
+   "label": "Open Setup and pick a record type",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "a2",
+   "shape": "box",
+   "tag": "RDCO",
+   "label": "Add or edit a requirement: name, description, Required or Optional",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "q3",
+   "shape": "diamond",
+   "wrap": 150,
+   "label": "Attach a Template?"
+  },
+  {
+   "id": "a4",
+   "shape": "box",
+   "tag": "RDCO",
+   "label": "Upload the template (at most 50 MB, scanned)",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "q5",
+   "shape": "diamond",
+   "wrap": 150,
+   "label": "Remove it?"
+  },
+  {
+   "id": "q6",
+   "shape": "diamond",
+   "wrap": 150,
+   "label": "Any record uploaded to it?"
+  },
+  {
+   "id": "a7",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Hide it; keep the files",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "a8",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Delete it",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "a9",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Save; Guidelines and Publish show it at once",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "stop",
+   "shape": "end"
+  }
+ ],
+ "edges": [
+  {
+   "from": "start",
+   "to": "a1"
+  },
+  {
+   "from": "a1",
+   "to": "a2"
+  },
+  {
+   "from": "a2",
+   "to": "q3"
+  },
+  {
+   "from": "q3",
+   "to": "a4",
+   "label": "yes"
+  },
+  {
+   "from": "a4",
+   "to": "q5"
+  },
+  {
+   "from": "q3",
+   "to": "q5",
+   "label": "no"
+  },
+  {
+   "from": "q5",
+   "to": "q6",
+   "label": "yes"
+  },
+  {
+   "from": "q6",
+   "to": "a7",
+   "label": "yes"
+  },
+  {
+   "from": "q6",
+   "to": "a8",
+   "label": "no"
+  },
+  {
+   "from": "q5",
+   "to": "a9",
+   "label": "no"
+  },
+  {
+   "from": "a7",
+   "to": "stop"
+  },
+  {
+   "from": "a8",
+   "to": "stop"
+  },
+  {
+   "from": "a9",
+   "to": "stop"
+  }
+ ],
+ "legend": [
+  "first line of an action: who does it",
+  {
+   "tone": "plain",
+   "text": "person"
+  },
+  {
+   "tone": "core",
+   "text": "IRIS"
+  }
+ ]
+}

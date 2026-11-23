@@ -1,0 +1,166 @@
+{
+ "format": "portrait",
+ "direction": "DOWN",
+ "title": "A-3.1  Activity: the Adviser's review",
+ "caption": "SRS v2 §3.2.3.1. From apps/reviews/decisions.py, routing.py, ADR-032, ADR-047 at a46d7fc4 (IR-1275).",
+ "elk": {
+  "elk.layered.spacing.nodeNodeBetweenLayers": "16",
+  "elk.spacing.nodeNode": "22",
+  "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
+  "elk.layered.nodePlacement.bk.fixedAlignment": "BALANCED",
+  "elk.aspectRatio": "0.7"
+ },
+ "nodes": [
+  {
+   "id": "start",
+   "shape": "start"
+  },
+  {
+   "id": "a1",
+   "shape": "box",
+   "tag": "Adviser",
+   "label": "Open the record from To review",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "q2",
+   "shape": "diamond",
+   "wrap": 150,
+   "label": "A Proposal?"
+  },
+  {
+   "id": "q3",
+   "shape": "diamond",
+   "wrap": 150,
+   "label": "Accept?"
+  },
+  {
+   "id": "a4",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Set approved (Accepted); notify the owners",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "a5",
+   "shape": "box",
+   "tag": "Adviser",
+   "label": "Request revision or reject (with a reason)",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "q6",
+   "shape": "diamond",
+   "wrap": 150,
+   "label": "Accept?"
+  },
+  {
+   "id": "a7",
+   "shape": "box",
+   "tag": "Adviser",
+   "label": "Give a reason; maybe nominate RDCO officers and suggest offices",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "a8",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Complete the Adviser's assignment; open RDCO's; notify RDCO",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "a9",
+   "shape": "box",
+   "tag": "Adviser",
+   "label": "Request revision or reject (with a reason)",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "stop",
+   "shape": "end"
+  }
+ ],
+ "edges": [
+  {
+   "from": "start",
+   "to": "a1"
+  },
+  {
+   "from": "a1",
+   "to": "q2"
+  },
+  {
+   "from": "q2",
+   "to": "q3",
+   "label": "yes"
+  },
+  {
+   "from": "q3",
+   "to": "a4",
+   "label": "yes"
+  },
+  {
+   "from": "q3",
+   "to": "a5",
+   "label": "no"
+  },
+  {
+   "from": "q2",
+   "to": "q6",
+   "label": "no"
+  },
+  {
+   "from": "q6",
+   "to": "a7",
+   "label": "yes"
+  },
+  {
+   "from": "a7",
+   "to": "a8"
+  },
+  {
+   "from": "q6",
+   "to": "a9",
+   "label": "no"
+  },
+  {
+   "from": "a4",
+   "to": "stop"
+  },
+  {
+   "from": "a5",
+   "to": "stop"
+  },
+  {
+   "from": "a8",
+   "to": "stop"
+  },
+  {
+   "from": "a9",
+   "to": "stop"
+  }
+ ],
+ "legend": [
+  "first line of an action: who does it",
+  {
+   "tone": "plain",
+   "text": "person"
+  },
+  {
+   "tone": "core",
+   "text": "IRIS"
+  }
+ ]
+}

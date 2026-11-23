@@ -1,0 +1,83 @@
+{
+ "kind": "usecase",
+ "format": "portrait",
+ "title": "U-3.6  Use cases: review threads and comments (FR-3.6)",
+ "caption": "SRS v2 §3.2.3.6. From apps/reviews/threads.py, comments.py, mentions.py, saved_replies.py, ADR-032 §7 at a46d7fc4 (IR-1275).",
+ "system": "Review discussion",
+ "left": [
+  {
+   "id": "Reviewer",
+   "label": "Reviewer"
+  },
+  {
+   "id": "Owner",
+   "label": "Record owner"
+  },
+  {
+   "id": "Mod",
+   "label": "RDCO or System Admin"
+  }
+ ],
+ "right": [],
+ "cases": [
+  {
+   "id": "UC1",
+   "label": "Open a thread on a passage (Must fix or Suggestion)",
+   "wrap": 160
+  },
+  {
+   "id": "UC2",
+   "label": "Answer: Addressed or Declined",
+   "wrap": 160
+  },
+  {
+   "id": "UC3",
+   "label": "Resolve or reopen a thread",
+   "wrap": 160
+  },
+  {
+   "id": "UC4",
+   "label": "Mention a colleague; use a saved reply",
+   "wrap": 160
+  },
+  {
+   "id": "UC5",
+   "label": "Report a public comment",
+   "wrap": 160
+  },
+  {
+   "id": "UC6",
+   "label": "Remove a reported comment",
+   "wrap": 160
+  }
+ ],
+ "links": [
+  [
+   "Reviewer",
+   "UC1",
+   "UC3",
+   "UC4"
+  ],
+  [
+   "Owner",
+   "UC2",
+   "UC5"
+  ],
+  [
+   "Mod",
+   "UC6"
+  ]
+ ],
+ "deps": [],
+ "notes": [],
+ "legend": [
+  {
+   "line": "solid",
+   "text": "actor takes part"
+  },
+  {
+   "line": "dash arrow",
+   "text": "dependency between use cases"
+  }
+ ]
+}

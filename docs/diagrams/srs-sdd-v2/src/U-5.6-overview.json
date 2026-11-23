@@ -1,0 +1,76 @@
+{
+ "kind": "usecase",
+ "format": "portrait",
+ "title": "U-5.6  Use cases: AI Overview (FR-5.6)",
+ "caption": "SRS v2 §3.2.5.6. From apps/ai/overview, tasks.generate_record_overview, ADR-020 at a46d7fc4 (IR-1275).",
+ "system": "AI Overview",
+ "left": [
+  {
+   "id": "Reader",
+   "label": "Reader"
+  },
+  {
+   "id": "Reviewer",
+   "label": "Reviewer"
+  }
+ ],
+ "right": [
+  {
+   "id": "LLM",
+   "label": "Language model",
+   "tone": "ext"
+  }
+ ],
+ "cases": [
+  {
+   "id": "UC1",
+   "label": "Read a paper's stored, cited overview",
+   "wrap": 160
+  },
+  {
+   "id": "UC2",
+   "label": "Generate it after indexing",
+   "wrap": 160,
+   "tone": "ai"
+  },
+  {
+   "id": "UC3",
+   "label": "Read a paper brief for intake",
+   "wrap": 160
+  }
+ ],
+ "links": [
+  [
+   "Reader",
+   "UC1"
+  ],
+  [
+   "Reviewer",
+   "UC3"
+  ],
+  [
+   "LLM",
+   "UC2"
+  ]
+ ],
+ "deps": [],
+ "notes": [],
+ "legend": [
+  {
+   "line": "solid",
+   "text": "actor takes part"
+  },
+  {
+   "line": "dash arrow",
+   "text": "dependency between use cases"
+  },
+  {
+   "tone": "ai",
+   "text": "AI-assisted"
+  },
+  {
+   "tone": "ext",
+   "text": "external system"
+  }
+ ]
+}

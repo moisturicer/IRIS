@@ -1,0 +1,77 @@
+{
+ "kind": "usecase",
+ "format": "portrait",
+ "title": "U-7.2  Use cases: System Admin and RDCO consoles (FR-7.2)",
+ "caption": "SRS v2 §3.2.7.2. From features/admin, features/accounts, features/setup, ADR-051 at a46d7fc4 (IR-1275).",
+ "system": "Consoles",
+ "left": [
+  {
+   "id": "Admin",
+   "label": "System Admin"
+  },
+  {
+   "id": "RDCO",
+   "label": "RDCO"
+  }
+ ],
+ "right": [],
+ "cases": [
+  {
+   "id": "UC1",
+   "label": "Audit log, retention, settings, deletion requests",
+   "wrap": 160
+  },
+  {
+   "id": "UC2",
+   "label": "Office roles and coordinators",
+   "wrap": 160
+  },
+  {
+   "id": "UC3",
+   "label": "Publish a data notice; moderate comments",
+   "wrap": 160
+  },
+  {
+   "id": "UC4",
+   "label": "Users, role requests, sessions",
+   "wrap": 160
+  },
+  {
+   "id": "UC5",
+   "label": "Download and delete requests",
+   "wrap": 160
+  },
+  {
+   "id": "UC6",
+   "label": "Setup, call requests, analytics",
+   "wrap": 160
+  }
+ ],
+ "links": [
+  [
+   "Admin",
+   "UC1",
+   "UC2",
+   "UC3"
+  ],
+  [
+   "RDCO",
+   "UC3",
+   "UC4",
+   "UC5",
+   "UC6"
+  ]
+ ],
+ "deps": [],
+ "notes": [],
+ "legend": [
+  {
+   "line": "solid",
+   "text": "actor takes part"
+  },
+  {
+   "line": "dash arrow",
+   "text": "dependency between use cases"
+  }
+ ]
+}

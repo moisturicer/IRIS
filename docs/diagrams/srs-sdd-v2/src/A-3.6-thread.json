@@ -1,0 +1,137 @@
+{
+ "format": "portrait",
+ "direction": "DOWN",
+ "title": "A-3.6  Activity: a review thread",
+ "caption": "SRS v2 §3.2.3.6. From apps/reviews/threads.py, ADR-032 §7 at a46d7fc4 (IR-1275).",
+ "elk": {
+  "elk.layered.spacing.nodeNodeBetweenLayers": "16",
+  "elk.spacing.nodeNode": "22",
+  "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
+  "elk.layered.nodePlacement.bk.fixedAlignment": "BALANCED",
+  "elk.aspectRatio": "0.7"
+ },
+ "nodes": [
+  {
+   "id": "start",
+   "shape": "start"
+  },
+  {
+   "id": "a1",
+   "shape": "box",
+   "tag": "Reviewer",
+   "label": "Select a passage; open a thread (Must fix or Suggestion)",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "a2",
+   "shape": "box",
+   "tag": "Owner",
+   "label": "Answer it: Addressed or Declined",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "q3",
+   "shape": "diamond",
+   "wrap": 150,
+   "label": "Reviewer satisfied?"
+  },
+  {
+   "id": "a4",
+   "shape": "box",
+   "tag": "Reviewer",
+   "label": "Resolve it",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "a5",
+   "shape": "box",
+   "tag": "Reviewer",
+   "label": "Reopen it",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "q6",
+   "shape": "diamond",
+   "wrap": 150,
+   "label": "New Version submitted?"
+  },
+  {
+   "id": "a7",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Place the thread on the new text (found, changed, removed)",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "stop",
+   "shape": "end"
+  }
+ ],
+ "edges": [
+  {
+   "from": "start",
+   "to": "a1"
+  },
+  {
+   "from": "a1",
+   "to": "a2"
+  },
+  {
+   "from": "a2",
+   "to": "q3"
+  },
+  {
+   "from": "q3",
+   "to": "a4",
+   "label": "yes"
+  },
+  {
+   "from": "q3",
+   "to": "a5",
+   "label": "no"
+  },
+  {
+   "from": "a4",
+   "to": "q6"
+  },
+  {
+   "from": "a5",
+   "to": "q6"
+  },
+  {
+   "from": "q6",
+   "to": "a7",
+   "label": "yes"
+  },
+  {
+   "from": "a7",
+   "to": "stop"
+  },
+  {
+   "from": "q6",
+   "to": "stop",
+   "label": "no"
+  }
+ ],
+ "legend": [
+  "first line of an action: who does it",
+  {
+   "tone": "plain",
+   "text": "person"
+  },
+  {
+   "tone": "core",
+   "text": "IRIS"
+  }
+ ]
+}

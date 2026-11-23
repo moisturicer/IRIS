@@ -1,0 +1,74 @@
+{
+ "kind": "usecase",
+ "format": "portrait",
+ "title": "U-3.1  Use cases: adviser-first review (FR-3.1)",
+ "caption": "SRS v2 §3.2.3.1. From apps/reviews/decisions.py, routing.py (accept_and_route), ADR-032 §2-§3, ADR-047 §1 at a46d7fc4 (IR-1275).",
+ "system": "Adviser review",
+ "left": [
+  {
+   "id": "Adviser",
+   "label": "Adviser"
+  }
+ ],
+ "right": [],
+ "cases": [
+  {
+   "id": "UC1",
+   "label": "Accept a Proposal",
+   "wrap": 160
+  },
+  {
+   "id": "UC2",
+   "label": "Request revision",
+   "wrap": 160
+  },
+  {
+   "id": "UC3",
+   "label": "Reject, with a reason",
+   "wrap": 160
+  },
+  {
+   "id": "UC4",
+   "label": "Accept & send a Thesis or Project to RDCO",
+   "wrap": 160
+  },
+  {
+   "id": "UC5",
+   "label": "Nominate RDCO officers; suggest offices",
+   "wrap": 160
+  }
+ ],
+ "links": [
+  [
+   "Adviser",
+   "UC1",
+   "UC2",
+   "UC3",
+   "UC4"
+  ]
+ ],
+ "deps": [
+  {
+   "from": "UC4",
+   "to": "UC5",
+   "label": "«extend»"
+  }
+ ],
+ "notes": [
+  {
+   "on": "UC4",
+   "text": "not a Decision; refused while a revision request is open",
+   "wrap": 130
+  }
+ ],
+ "legend": [
+  {
+   "line": "solid",
+   "text": "actor takes part"
+  },
+  {
+   "line": "dash arrow",
+   "text": "dependency between use cases"
+  }
+ ]
+}

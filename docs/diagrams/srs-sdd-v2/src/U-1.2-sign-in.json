@@ -1,0 +1,84 @@
+{
+ "kind": "usecase",
+ "format": "portrait",
+ "title": "U-1.2  Use cases: sign in, stay signed in, sign out (FR-1.2)",
+ "caption": "SRS v2 §3.2.1.2. From apps/accounts (LoginView, RefreshView, LogoutView, refresh_cookie.py, sessions.py), ADR-072 at a46d7fc4 (IR-1275).",
+ "system": "Sessions",
+ "left": [
+  {
+   "id": "Person",
+   "label": "Verified person"
+  }
+ ],
+ "right": [],
+ "cases": [
+  {
+   "id": "UC1",
+   "label": "Sign in",
+   "wrap": 160
+  },
+  {
+   "id": "UC2",
+   "label": "Keep me signed in for 30 days",
+   "wrap": 160
+  },
+  {
+   "id": "UC3",
+   "label": "Open another tab and stay signed in (silent refresh)",
+   "wrap": 160
+  },
+  {
+   "id": "UC4",
+   "label": "Session ends after 30 idle minutes",
+   "wrap": 160
+  },
+  {
+   "id": "UC5",
+   "label": "Sign out",
+   "wrap": 160
+  },
+  {
+   "id": "UC6",
+   "label": "Change password",
+   "wrap": 160
+  }
+ ],
+ "links": [
+  [
+   "Person",
+   "UC1",
+   "UC3",
+   "UC5",
+   "UC6"
+  ]
+ ],
+ "deps": [
+  {
+   "from": "UC1",
+   "to": "UC2",
+   "label": "«extend»"
+  },
+  {
+   "from": "UC3",
+   "to": "UC4",
+   "label": "«extend»"
+  }
+ ],
+ "notes": [
+  {
+   "on": "UC3",
+   "text": "refresh token only in an HttpOnly cookie",
+   "wrap": 130
+  }
+ ],
+ "legend": [
+  {
+   "line": "solid",
+   "text": "actor takes part"
+  },
+  {
+   "line": "dash arrow",
+   "text": "dependency between use cases"
+  }
+ ]
+}

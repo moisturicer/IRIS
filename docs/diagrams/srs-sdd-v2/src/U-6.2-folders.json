@@ -1,0 +1,51 @@
+{
+ "kind": "usecase",
+ "format": "portrait",
+ "title": "U-6.2  Use cases: folders (FR-6.2)",
+ "caption": "SRS v2 §3.2.6.2. From apps/library/folders.py, ADR-070 at a46d7fc4 (IR-1275).",
+ "system": "Folders",
+ "left": [
+  {
+   "id": "Reader",
+   "label": "Reader"
+  }
+ ],
+ "right": [],
+ "cases": [
+  {
+   "id": "UC1",
+   "label": "Create, rename or delete a folder",
+   "wrap": 160
+  },
+  {
+   "id": "UC2",
+   "label": "Add or remove a saved record",
+   "wrap": 160
+  }
+ ],
+ "links": [
+  [
+   "Reader",
+   "UC1",
+   "UC2"
+  ]
+ ],
+ "deps": [],
+ "notes": [
+  {
+   "on": "UC1",
+   "text": "owner-only; never a discovery signal",
+   "wrap": 130
+  }
+ ],
+ "legend": [
+  {
+   "line": "solid",
+   "text": "actor takes part"
+  },
+  {
+   "line": "dash arrow",
+   "text": "dependency between use cases"
+  }
+ ]
+}

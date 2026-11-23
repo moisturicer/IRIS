@@ -1,0 +1,95 @@
+{
+ "kind": "usecase",
+ "format": "portrait",
+ "title": "U-1.1  Use cases: sign-up, consent and email verification (FR-1.1)",
+ "caption": "SRS v2 §3.2.1.1. From apps/accounts (RegisterView, notice.py, recovery/), ADR-045, ADR-054 at a46d7fc4 (IR-1275).",
+ "system": "Sign-up and verification",
+ "left": [
+  {
+   "id": "Guest",
+   "label": "Guest"
+  },
+  {
+   "id": "Person",
+   "label": "Registered person\n(unverified)"
+  }
+ ],
+ "right": [
+  {
+   "id": "Mail",
+   "label": "Email service",
+   "tone": "ext"
+  }
+ ],
+ "cases": [
+  {
+   "id": "UC1",
+   "label": "Register as Student or Adviser with an institutional email",
+   "wrap": 160
+  },
+  {
+   "id": "UC2",
+   "label": "Read the data notice and answer Yes or No to AI use",
+   "wrap": 160
+  },
+  {
+   "id": "UC3",
+   "label": "Verify the email address from the link",
+   "wrap": 160
+  },
+  {
+   "id": "UC4",
+   "label": "Ask for a new verification link",
+   "wrap": 160
+  },
+  {
+   "id": "UC5",
+   "label": "Expire an unverified registration after 30 days",
+   "wrap": 150
+  }
+ ],
+ "links": [
+  [
+   "Guest",
+   "UC1"
+  ],
+  [
+   "Person",
+   "UC3",
+   "UC4"
+  ],
+  [
+   "Mail",
+   "UC3",
+   "UC4"
+  ]
+ ],
+ "deps": [
+  {
+   "from": "UC1",
+   "to": "UC2",
+   "label": "«include»"
+  }
+ ],
+ "notes": [
+  {
+   "on": "UC5",
+   "text": "daily job (celery-beat)",
+   "wrap": 130
+  }
+ ],
+ "legend": [
+  {
+   "line": "solid",
+   "text": "actor takes part"
+  },
+  {
+   "line": "dash arrow",
+   "text": "dependency between use cases"
+  },
+  {
+   "tone": "ext",
+   "text": "external system"
+  }
+ ]
+}

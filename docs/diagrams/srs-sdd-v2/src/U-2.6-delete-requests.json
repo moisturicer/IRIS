@@ -1,0 +1,69 @@
+{
+ "kind": "usecase",
+ "format": "portrait",
+ "title": "U-2.6  Use cases: delete requests (FR-2.6)",
+ "caption": "SRS v2 §3.2.2.6. From DeleteRequestViewSet, apps/records/models.py DeleteRequest at a46d7fc4 (IR-1275).",
+ "system": "Delete requests",
+ "left": [
+  {
+   "id": "Owner",
+   "label": "Record owner"
+  },
+  {
+   "id": "RDCO",
+   "label": "RDCO"
+  }
+ ],
+ "right": [],
+ "cases": [
+  {
+   "id": "UC1",
+   "label": "Ask for a record's deletion",
+   "wrap": 160
+  },
+  {
+   "id": "UC2",
+   "label": "Hold the record as pending_delete",
+   "wrap": 160
+  },
+  {
+   "id": "UC3",
+   "label": "Approve the request",
+   "wrap": 160
+  },
+  {
+   "id": "UC4",
+   "label": "Decline it, restoring the previous status",
+   "wrap": 160
+  }
+ ],
+ "links": [
+  [
+   "Owner",
+   "UC1"
+  ],
+  [
+   "RDCO",
+   "UC3",
+   "UC4"
+  ]
+ ],
+ "deps": [
+  {
+   "from": "UC1",
+   "to": "UC2",
+   "label": "«include»"
+  }
+ ],
+ "notes": [],
+ "legend": [
+  {
+   "line": "solid",
+   "text": "actor takes part"
+  },
+  {
+   "line": "dash arrow",
+   "text": "dependency between use cases"
+  }
+ ]
+}

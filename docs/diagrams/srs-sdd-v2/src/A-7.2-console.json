@@ -1,0 +1,95 @@
+{
+ "format": "portrait",
+ "direction": "DOWN",
+ "title": "A-7.2  Activity: the consoles",
+ "caption": "SRS v2 §3.2.7.2. From features/admin, ADR-051 at a46d7fc4 (IR-1275).",
+ "elk": {
+  "elk.layered.spacing.nodeNodeBetweenLayers": "16",
+  "elk.spacing.nodeNode": "22",
+  "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
+  "elk.layered.nodePlacement.bk.fixedAlignment": "BALANCED",
+  "elk.aspectRatio": "0.7"
+ },
+ "nodes": [
+  {
+   "id": "start",
+   "shape": "start"
+  },
+  {
+   "id": "a1",
+   "shape": "box",
+   "tag": "Person",
+   "label": "Sign in",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "q2",
+   "shape": "diamond",
+   "wrap": 150,
+   "label": "Role?"
+  },
+  {
+   "id": "a3",
+   "shape": "box",
+   "tag": "System Admin",
+   "label": "Administration: audit log, settings, retention, deletions, office roles",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "a4",
+   "shape": "box",
+   "tag": "RDCO",
+   "label": "RDCO: users, requests, sessions, Setup, analytics",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "stop",
+   "shape": "end"
+  }
+ ],
+ "edges": [
+  {
+   "from": "start",
+   "to": "a1"
+  },
+  {
+   "from": "a1",
+   "to": "q2"
+  },
+  {
+   "from": "q2",
+   "to": "a3",
+   "label": "System Admin"
+  },
+  {
+   "from": "q2",
+   "to": "a4",
+   "label": "RDCO"
+  },
+  {
+   "from": "a3",
+   "to": "stop"
+  },
+  {
+   "from": "a4",
+   "to": "stop"
+  }
+ ],
+ "legend": [
+  "first line of an action: who does it",
+  {
+   "tone": "plain",
+   "text": "person"
+  },
+  {
+   "tone": "core",
+   "text": "IRIS"
+  }
+ ]
+}

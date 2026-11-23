@@ -1,0 +1,76 @@
+{
+ "kind": "usecase",
+ "format": "portrait",
+ "title": "U-4.1  Use cases: notifications (FR-4.1)",
+ "caption": "SRS v2 §3.2.4.1. From apps/notifications (services.py, settling.py), ADR-069 at a46d7fc4 (IR-1275).",
+ "system": "Notifications",
+ "left": [
+  {
+   "id": "Person",
+   "label": "Signed-in person"
+  }
+ ],
+ "right": [
+  {
+   "id": "Mail",
+   "label": "Email service",
+   "tone": "ext"
+  }
+ ],
+ "cases": [
+  {
+   "id": "UC1",
+   "label": "Receive an in-app notice at a workflow event",
+   "wrap": 160
+  },
+  {
+   "id": "UC2",
+   "label": "Receive an email for some events",
+   "wrap": 160
+  },
+  {
+   "id": "UC3",
+   "label": "See a task's notice marked resolved",
+   "wrap": 160
+  },
+  {
+   "id": "UC4",
+   "label": "Mark notices read",
+   "wrap": 160
+  }
+ ],
+ "links": [
+  [
+   "Person",
+   "UC1",
+   "UC3",
+   "UC4"
+  ],
+  [
+   "Mail",
+   "UC2"
+  ]
+ ],
+ "deps": [
+  {
+   "from": "UC1",
+   "to": "UC2",
+   "label": "«extend»"
+  }
+ ],
+ "notes": [],
+ "legend": [
+  {
+   "line": "solid",
+   "text": "actor takes part"
+  },
+  {
+   "line": "dash arrow",
+   "text": "dependency between use cases"
+  },
+  {
+   "tone": "ext",
+   "text": "external system"
+  }
+ ]
+}

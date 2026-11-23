@@ -1,0 +1,206 @@
+{
+ "format": "portrait",
+ "direction": "DOWN",
+ "title": "A-3.2  Activity: RDCO routes and decides",
+ "caption": "SRS v2 §3.2.3.2. From apps/reviews/routing.py, decisions.py, ADR-047 at a46d7fc4 (IR-1275).",
+ "elk": {
+  "elk.layered.spacing.nodeNodeBetweenLayers": "16",
+  "elk.spacing.nodeNode": "22",
+  "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
+  "elk.layered.nodePlacement.bk.fixedAlignment": "BALANCED",
+  "elk.aspectRatio": "0.7"
+ },
+ "nodes": [
+  {
+   "id": "start",
+   "shape": "start"
+  },
+  {
+   "id": "a1",
+   "shape": "box",
+   "tag": "RDCO",
+   "label": "Open the record; read the Adviser's and author's suggestions",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "q2",
+   "shape": "diamond",
+   "wrap": 150,
+   "label": "Need specialist review?"
+  },
+  {
+   "id": "a3",
+   "shape": "box",
+   "tag": "RDCO",
+   "label": "Pick offices (Pool or named officers) with a reason",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "a4",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Open an assignment per office; notify them",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "a5",
+   "shape": "box",
+   "tag": "Office member",
+   "label": "Review in parallel (A-3.3)",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "a6",
+   "shape": "box",
+   "tag": "RDCO",
+   "label": "Choose Publish, Keep unlisted or Reject",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "a7",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Warn: offices still reviewing, findings recorded",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "q8",
+   "shape": "diamond",
+   "wrap": 150,
+   "label": "Publish and still embargoed?"
+  },
+  {
+   "id": "a9",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Refuse until the embargo is released",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "end10",
+   "shape": "end"
+  },
+  {
+   "id": "a11",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Write RDCO's Review; set the status",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "a12",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Withdraw open assignments, Seats, document and revision requests",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "a13",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Notify the owners once and each closed Seat",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "stop",
+   "shape": "end"
+  }
+ ],
+ "edges": [
+  {
+   "from": "start",
+   "to": "a1"
+  },
+  {
+   "from": "a1",
+   "to": "q2"
+  },
+  {
+   "from": "q2",
+   "to": "a3",
+   "label": "yes"
+  },
+  {
+   "from": "a3",
+   "to": "a4"
+  },
+  {
+   "from": "a4",
+   "to": "a5"
+  },
+  {
+   "from": "a5",
+   "to": "a6"
+  },
+  {
+   "from": "q2",
+   "to": "a6",
+   "label": "no"
+  },
+  {
+   "from": "a6",
+   "to": "a7"
+  },
+  {
+   "from": "a7",
+   "to": "q8"
+  },
+  {
+   "from": "q8",
+   "to": "a9",
+   "label": "yes"
+  },
+  {
+   "from": "a9",
+   "to": "end10"
+  },
+  {
+   "from": "q8",
+   "to": "a11",
+   "label": "no"
+  },
+  {
+   "from": "a11",
+   "to": "a12"
+  },
+  {
+   "from": "a12",
+   "to": "a13"
+  },
+  {
+   "from": "a13",
+   "to": "stop"
+  }
+ ],
+ "legend": [
+  "first line of an action: who does it",
+  {
+   "tone": "plain",
+   "text": "person"
+  },
+  {
+   "tone": "core",
+   "text": "IRIS"
+  }
+ ]
+}

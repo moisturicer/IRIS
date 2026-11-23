@@ -1,0 +1,193 @@
+{
+ "format": "portrait",
+ "direction": "DOWN",
+ "title": "A-2.1  Activity: publish a record",
+ "caption": "SRS v2 §3.2.2.1. From RecordViewSet create/submit, features/publish at a46d7fc4 (IR-1275).",
+ "elk": {
+  "elk.layered.spacing.nodeNodeBetweenLayers": "16",
+  "elk.spacing.nodeNode": "22",
+  "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
+  "elk.layered.nodePlacement.bk.fixedAlignment": "BALANCED",
+  "elk.aspectRatio": "0.7"
+ },
+ "nodes": [
+  {
+   "id": "start",
+   "shape": "start"
+  },
+  {
+   "id": "a1",
+   "shape": "box",
+   "tag": "Author",
+   "label": "Choose the record type",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "a2",
+   "shape": "box",
+   "tag": "Author",
+   "label": "Upload the manuscript (checked: A-2.3)",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "q3",
+   "shape": "diamond",
+   "wrap": 150,
+   "label": "Identical manuscript already in IRIS?"
+  },
+  {
+   "id": "a4",
+   "shape": "box",
+   "tag": "Author",
+   "label": "Review the matches and acknowledge",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "a5",
+   "shape": "box",
+   "tag": "Author",
+   "label": "Enter metadata, authors, co-owners, Adviser, origin",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "a6",
+   "shape": "box",
+   "tag": "Author",
+   "label": "Upload the type's documents (Required never blocks)",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "a7",
+   "shape": "box",
+   "tag": "Author",
+   "label": "Submit",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "q8",
+   "shape": "diamond",
+   "wrap": 150,
+   "label": "Adviser is one of the owners?"
+  },
+  {
+   "id": "a9",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Refuse with a message",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "end10",
+   "shape": "end"
+  },
+  {
+   "id": "a11",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Write Version 1; status in_review; embargoed",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "a12",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Open the Adviser's assignment; notify the Adviser; audit",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "stop",
+   "shape": "end"
+  }
+ ],
+ "edges": [
+  {
+   "from": "start",
+   "to": "a1"
+  },
+  {
+   "from": "a1",
+   "to": "a2"
+  },
+  {
+   "from": "a2",
+   "to": "q3"
+  },
+  {
+   "from": "q3",
+   "to": "a4",
+   "label": "yes"
+  },
+  {
+   "from": "a4",
+   "to": "a5"
+  },
+  {
+   "from": "q3",
+   "to": "a5",
+   "label": "no"
+  },
+  {
+   "from": "a5",
+   "to": "a6"
+  },
+  {
+   "from": "a6",
+   "to": "a7"
+  },
+  {
+   "from": "a7",
+   "to": "q8"
+  },
+  {
+   "from": "q8",
+   "to": "a9",
+   "label": "yes"
+  },
+  {
+   "from": "a9",
+   "to": "end10"
+  },
+  {
+   "from": "q8",
+   "to": "a11",
+   "label": "no"
+  },
+  {
+   "from": "a11",
+   "to": "a12"
+  },
+  {
+   "from": "a12",
+   "to": "stop"
+  }
+ ],
+ "legend": [
+  "first line of an action: who does it",
+  {
+   "tone": "plain",
+   "text": "person"
+  },
+  {
+   "tone": "core",
+   "text": "IRIS"
+  }
+ ]
+}

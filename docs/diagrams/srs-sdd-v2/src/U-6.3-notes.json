@@ -1,0 +1,66 @@
+{
+ "kind": "usecase",
+ "format": "portrait",
+ "title": "U-6.3  Use cases: private notes and highlights (FR-6.3)",
+ "caption": "SRS v2 §3.2.6.3. From apps/library (notes, highlights.py), ADR-064, ADR-065 (proposed) at a46d7fc4 (IR-1275).",
+ "system": "Notes and highlights",
+ "left": [
+  {
+   "id": "Reader",
+   "label": "Reader"
+  }
+ ],
+ "right": [],
+ "cases": [
+  {
+   "id": "UC1",
+   "label": "Write a private note (autosaved)",
+   "wrap": 160
+  },
+  {
+   "id": "UC2",
+   "label": "Keep both texts on a conflict",
+   "wrap": 160
+  },
+  {
+   "id": "UC3",
+   "label": "Highlight a passage",
+   "wrap": 160
+  },
+  {
+   "id": "UC4",
+   "label": "See a highlight marked stale after replacement",
+   "wrap": 160
+  }
+ ],
+ "links": [
+  [
+   "Reader",
+   "UC1",
+   "UC3"
+  ]
+ ],
+ "deps": [
+  {
+   "from": "UC1",
+   "to": "UC2",
+   "label": "«extend»"
+  },
+  {
+   "from": "UC3",
+   "to": "UC4",
+   "label": "«extend»"
+  }
+ ],
+ "notes": [],
+ "legend": [
+  {
+   "line": "solid",
+   "text": "actor takes part"
+  },
+  {
+   "line": "dash arrow",
+   "text": "dependency between use cases"
+  }
+ ]
+}

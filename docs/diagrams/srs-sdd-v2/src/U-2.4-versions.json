@@ -1,0 +1,76 @@
+{
+ "kind": "usecase",
+ "format": "portrait",
+ "title": "U-2.4  Use cases: versions (FR-2.4)",
+ "caption": "SRS v2 §3.2.2.4. From apps/records/versions.py, review_text/, apps/reviews/version_comparison.py, ADR-058 at a46d7fc4 (IR-1275).",
+ "system": "Versions",
+ "left": [
+  {
+   "id": "Owner",
+   "label": "Record owner"
+  },
+  {
+   "id": "Reviewer",
+   "label": "Reviewer"
+  }
+ ],
+ "right": [],
+ "cases": [
+  {
+   "id": "UC1",
+   "label": "Submit a new Version",
+   "wrap": 160
+  },
+  {
+   "id": "UC2",
+   "label": "Keep its own manuscript, documents and review text",
+   "wrap": 160
+  },
+  {
+   "id": "UC3",
+   "label": "Pick a Version to read",
+   "wrap": 160
+  },
+  {
+   "id": "UC4",
+   "label": "Compare two Versions section by section",
+   "wrap": 160
+  },
+  {
+   "id": "UC5",
+   "label": "Continue an accepted Proposal as a Thesis or Project",
+   "wrap": 160
+  }
+ ],
+ "links": [
+  [
+   "Owner",
+   "UC1",
+   "UC3",
+   "UC5"
+  ],
+  [
+   "Reviewer",
+   "UC3",
+   "UC4"
+  ]
+ ],
+ "deps": [
+  {
+   "from": "UC1",
+   "to": "UC2",
+   "label": "«include»"
+  }
+ ],
+ "notes": [],
+ "legend": [
+  {
+   "line": "solid",
+   "text": "actor takes part"
+  },
+  {
+   "line": "dash arrow",
+   "text": "dependency between use cases"
+  }
+ ]
+}

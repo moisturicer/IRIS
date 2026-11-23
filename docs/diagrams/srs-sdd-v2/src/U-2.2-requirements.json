@@ -1,0 +1,82 @@
+{
+ "kind": "usecase",
+ "format": "portrait",
+ "title": "U-2.2  Use cases: required documents and templates (FR-2.2)",
+ "caption": "SRS v2 §3.2.2.2. From apps/documents (setup.py, adviser_templates.py), features/setup, features/guidelines, ADR-063 at a46d7fc4 (IR-1275).",
+ "system": "Requirements and templates",
+ "left": [
+  {
+   "id": "RDCO",
+   "label": "RDCO"
+  },
+  {
+   "id": "Adviser",
+   "label": "Adviser"
+  },
+  {
+   "id": "Author",
+   "label": "Author"
+  }
+ ],
+ "right": [],
+ "cases": [
+  {
+   "id": "UC1",
+   "label": "Add, edit, reorder or remove a requirement",
+   "wrap": 160
+  },
+  {
+   "id": "UC2",
+   "label": "Label it Required or Optional",
+   "wrap": 160
+  },
+  {
+   "id": "UC3",
+   "label": "Attach a Template",
+   "wrap": 160
+  },
+  {
+   "id": "UC4",
+   "label": "Share a proposal template",
+   "wrap": 160
+  },
+  {
+   "id": "UC5",
+   "label": "Read Guidelines and download templates",
+   "wrap": 160
+  }
+ ],
+ "links": [
+  [
+   "RDCO",
+   "UC1",
+   "UC3"
+  ],
+  [
+   "Adviser",
+   "UC4"
+  ],
+  [
+   "Author",
+   "UC5"
+  ]
+ ],
+ "deps": [
+  {
+   "from": "UC1",
+   "to": "UC2",
+   "label": "«include»"
+  }
+ ],
+ "notes": [],
+ "legend": [
+  {
+   "line": "solid",
+   "text": "actor takes part"
+  },
+  {
+   "line": "dash arrow",
+   "text": "dependency between use cases"
+  }
+ ]
+}

@@ -1,0 +1,63 @@
+{
+ "kind": "usecase",
+ "format": "portrait",
+ "title": "U-5.8  Use cases: index administration (FR-5.8)",
+ "caption": "SRS v2 §3.2.5.8. From apps/ai/views/embedding.py, management commands at a46d7fc4 (IR-1275).",
+ "system": "Index administration",
+ "left": [
+  {
+   "id": "Staff",
+   "label": "Office staff"
+  }
+ ],
+ "right": [],
+ "cases": [
+  {
+   "id": "UC1",
+   "label": "See index status",
+   "wrap": 160
+  },
+  {
+   "id": "UC2",
+   "label": "Re-embed one record",
+   "wrap": 160
+  },
+  {
+   "id": "UC3",
+   "label": "Embed all records",
+   "wrap": 160
+  },
+  {
+   "id": "UC4",
+   "label": "Read the embedding job log",
+   "wrap": 160
+  }
+ ],
+ "links": [
+  [
+   "Staff",
+   "UC1",
+   "UC2",
+   "UC3",
+   "UC4"
+  ]
+ ],
+ "deps": [],
+ "notes": [
+  {
+   "on": "UC1",
+   "text": "API only: no screen",
+   "wrap": 130
+  }
+ ],
+ "legend": [
+  {
+   "line": "solid",
+   "text": "actor takes part"
+  },
+  {
+   "line": "dash arrow",
+   "text": "dependency between use cases"
+  }
+ ]
+}

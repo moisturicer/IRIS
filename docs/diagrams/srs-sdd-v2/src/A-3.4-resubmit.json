@@ -1,0 +1,206 @@
+{
+ "format": "portrait",
+ "direction": "DOWN",
+ "title": "A-3.4  Activity: clearance-aware resubmission",
+ "caption": "SRS v2 §3.2.3.4. From apps/reviews/new_version.py, ADR-003, ADR-004 at a46d7fc4 (IR-1275).",
+ "elk": {
+  "elk.layered.spacing.nodeNodeBetweenLayers": "16",
+  "elk.spacing.nodeNode": "22",
+  "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
+  "elk.layered.nodePlacement.bk.fixedAlignment": "BALANCED",
+  "elk.aspectRatio": "0.7"
+ },
+ "nodes": [
+  {
+   "id": "start",
+   "shape": "start"
+  },
+  {
+   "id": "a1",
+   "shape": "box",
+   "tag": "Reviewer",
+   "label": "Request revision on the Version reviewed",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "a2",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Open a ResubmissionRequest; record awaiting_resubmission",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "a3",
+   "shape": "box",
+   "tag": "Owner",
+   "label": "Answer each Must fix thread; upload changes",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "a4",
+   "shape": "box",
+   "tag": "Owner",
+   "label": "Submit the new Version",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "q5",
+   "shape": "diamond",
+   "wrap": 150,
+   "label": "Changed, and every Must fix answered?"
+  },
+  {
+   "id": "a6",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Write Version n+1; resolve the requests",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "q7",
+   "shape": "diamond",
+   "wrap": 150,
+   "label": "Policy?"
+  },
+  {
+   "id": "a8",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Reset ONLY the asking parties' clearances; keep every other",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "a9",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Reset every office's clearance",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "a10",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Reopen the asking parties' Seats",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "a11",
+   "shape": "box",
+   "tag": "Reviewer",
+   "label": "Review the new Version",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "a12",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Refuse, saying what is missing",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "end13",
+   "shape": "end"
+  },
+  {
+   "id": "stop",
+   "shape": "end"
+  }
+ ],
+ "edges": [
+  {
+   "from": "start",
+   "to": "a1"
+  },
+  {
+   "from": "a1",
+   "to": "a2"
+  },
+  {
+   "from": "a2",
+   "to": "a3"
+  },
+  {
+   "from": "a3",
+   "to": "a4"
+  },
+  {
+   "from": "a4",
+   "to": "q5"
+  },
+  {
+   "from": "q5",
+   "to": "a6",
+   "label": "yes"
+  },
+  {
+   "from": "a6",
+   "to": "q7"
+  },
+  {
+   "from": "q7",
+   "to": "a8",
+   "label": "clearance-aware"
+  },
+  {
+   "from": "q7",
+   "to": "a9",
+   "label": "restart-all"
+  },
+  {
+   "from": "a8",
+   "to": "a10"
+  },
+  {
+   "from": "a9",
+   "to": "a10"
+  },
+  {
+   "from": "a10",
+   "to": "a11"
+  },
+  {
+   "from": "q5",
+   "to": "a12",
+   "label": "no"
+  },
+  {
+   "from": "a12",
+   "to": "end13"
+  },
+  {
+   "from": "a11",
+   "to": "stop"
+  }
+ ],
+ "legend": [
+  "first line of an action: who does it",
+  {
+   "tone": "plain",
+   "text": "person"
+  },
+  {
+   "tone": "core",
+   "text": "IRIS"
+  }
+ ]
+}
