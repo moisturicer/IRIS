@@ -16,6 +16,8 @@ interface SidePanelProps {
   /** The arrival Paper Chat is told of; null while the next Record loads. */
   arrival: ComponentProps<typeof PaperChatPanel>["arrival"];
   onReviewTab: boolean;
+  /** Not on the Overview of a paper in review, which is the review's summary. */
+  notesOffered: boolean;
   askOffered: boolean;
   highlights: ReturnType<typeof useReadingHighlights>;
   onOpenHighlight: (h: ReadableHighlight) => void;
@@ -38,6 +40,7 @@ export function SidePanel({
   panel,
   arrival,
   onReviewTab,
+  notesOffered,
   askOffered,
   highlights,
   onOpenHighlight,
@@ -115,7 +118,7 @@ export function SidePanel({
           (IR-569, IR-1079). On the bar while minimized, which is its way back. */}
       {!chat.open && !onReviewTab && (
         <>
-          <NotesFab onOpen={panel.openNotes} buttonRef={panel.notesButtonRef} />
+          {notesOffered && <NotesFab onOpen={panel.openNotes} buttonRef={panel.notesButtonRef} />}
           {askOffered && <AskIrisFab onOpen={panel.openAsk} buttonRef={panel.askButtonRef} />}
         </>
       )}

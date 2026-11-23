@@ -3,6 +3,8 @@ import { useLocation, useSearchParams } from "react-router-dom";
 
 import { landingSection, type PaperSection } from "@/features/records/capabilities";
 
+import { reviewTargetFrom, type ReviewTarget } from "./reviewTarget";
+
 export interface ViewLocation {
   /** The section shown: the one asked for, else the reader for a cited page, else Overview. */
   section: PaperSection;
@@ -10,6 +12,8 @@ export interface ViewLocation {
   readerSection: PaperSection;
   /** Review's Documents tab is asked for (`?documents=open`, or an old `?section=files`). */
   documentsWanted: boolean;
+  /** The tab of Review a link asked for, and whose request in it; null for none. */
+  reviewTarget: ReviewTarget | null;
   /** `?edit=details` is in the address. Whether the viewer may edit is the caller's to decide. */
   editRequested: boolean;
   /** The version `?version=` asks for, as a number (0 or NaN when none). */
@@ -86,6 +90,7 @@ export function useViewLocation({
     section,
     readerSection,
     documentsWanted,
+    reviewTarget: section === "review" ? reviewTargetFrom(searchParams) : null,
     editRequested: searchParams.get("edit") === "details",
     askedVersion: Number(searchParams.get("version")),
     arrivalKey: arrivalKey.current,

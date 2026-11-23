@@ -94,6 +94,11 @@ function refusal(files: File[], patterns: string[], maxBytes: number | undefined
   return null;
 }
 
+/** Why `files` may not go up, in the words the zone itself uses, or null. For a row that takes drops of its own. */
+export function refuseFiles(files: File[], accept: string, maxBytes: number): string | null {
+  return refusal(files, acceptedPatterns(accept), maxBytes);
+}
+
 function defaultHint(patterns: string[], maxBytes: number | undefined): string | undefined {
   const parts = [
     patterns.length > 0 ? describeAccepted(patterns) : null,

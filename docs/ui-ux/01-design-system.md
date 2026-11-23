@@ -136,6 +136,35 @@ Asked for by Jive Tyler I. Revalde, who chose direction **B · Library rail** fr
 
 **The ⋯ menu rule (IR-1311).** A row's acts beyond opening it live in one ⋯ menu (`RowMenu`, `features/accounts/RowMenu.tsx`), never as a strip of icon buttons. The one exception is the act the viewer owes next, which stays a filled pill. This reverses IR-1279's trash can on My Library rows, at the project owner's request.
 
+#### IR-1311, refined (2026-11-24)
+
+Asked for by Jive Tyler I. Revalde after using the first build. Where this differs from the table above, this is current.
+
+| Element | Now |
+|---|---|
+| **Pane** | The rail is a pane docked to the sidebar, as Ask IRIS's conversations are: 17.5rem, `stone-50`, full height, its name at the top. It folds to a 3.75rem strip of icons with tooltips (`iris-library-pane` in the browser). *Publish* is its first row. My Library is full-bleed in `AppShell` |
+| **Pane titles** | My Library, Conversations and Ask IRIS share `PANE_TITLE` (Garamond 20/28) |
+| **Hover** | A 7% maroon wash (`brand/[0.07]`) on the sidebar, both panes and menus. The sidebar and the panes share `stone-50` |
+| **Counts** | *Needs your action* is white on maroon |
+| **Rows** | One line of type, Adviser and date, then the title; status at the end; the row's ⋯ is vertical and centred. No filled action: an open request is answered on the paper's Overview. Continue on an accepted Proposal stays |
+| **Reading status** | A label at the row's end: an outline (Want to read), an ink fill (Reading), a green outline (Completed). Set from the menu's *Reading status* flyout |
+| **Menus** | `RowMenu` items may carry an icon and a `submenu`: beside the item, or under it where a phone has no room |
+| **Conversations** | On the left of the chat, reversing IR-1306 |
+| **Publish, Details** | A taller dialog that does not scroll at desktop sizes; the preview is the paper and its tools alone; field hints are an `InfoHint` "?" |
+
+### Review Overview amendment: the Overview summarises the review (2026-11-24)
+
+Asked for by Jive Tyler I. Revalde, who chose **D · Branches** from the prototypes in [`prototypes/review-overview.html`](prototypes/review-overview.html). The Overview is the review's summary and the Review tab its detail, so a request is read whole, and a comment answered, in Review.
+
+| Element | Rule |
+|---|---|
+| **Branches** | While a paper is in review, its participants see the Adviser, the offices **side by side** (they review at the same time) and RDCO, joined by lines. Green cleared or kept, amber reviewing, a maroon outline for who asks. The lines are decoration: each box says its state in the server's words |
+| **Requests** | On the box of who asked, in their words, opening in place when long (the Full Text Rule's review-comment cut). *Read in Review* opens Conversation on that request, or Documents |
+| **The owner's files** | One panel under whoever asked: a drop field, a row per file, and *Submit new version*. A file dropped on a row goes there; several dropped on the field ask which is which. The file name never decides. Requested documents go at once, the manuscript with the new version, and each row says so |
+| **Comments** | Counted per party, linked to Review's Threads |
+| **Left out while in review** | The AI Overview (until a decision), Related works, Notes, and the detail rows that say nothing |
+| **Review** | Its tabs have addresses (`?section=review&tab=…&party=…`, spent once shown), and an owner's Review points back to the Overview to submit. Readiness says *waiting on you* when the owner has been asked for a revision or a document |
+
 ### IR-1072 amendment: the UI/UX audit's design decisions (D1, D4, D5, D6)
 
 Decided on 2026-11-14 by **Lee Jasmin Adolfo** (project lead and frontend owner), from the audit in [`frontend_ui_audit_spec.md`](../frontend_ui_audit_spec.md) §7.1 and the prototype it points to. **Decided, not built:** the tickets named below build each one, and `DESIGN.md` carries the same text under "Decided changes". D2 and D3 are server decisions and live in [ADR-069](../adr/069-notifications-know-when-their-task-closed.md) and [ADR-032](../adr/032-adviser-first-review-and-office-reviewer-pools.md) §9.

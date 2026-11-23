@@ -5,6 +5,7 @@ import type { RecordDetail, ThreadDocument } from "@/types/records";
 import { DocumentInReader, type ShownDocumentState } from "./DocumentInReader";
 import { DocumentsTab } from "./DocumentsTab";
 import type { ReaderDocument } from "./readerDocument";
+import type { ReviewTarget } from "./reviewTarget";
 import { ReviewWorkspaceLayout } from "./ReviewWorkspaceLayout";
 
 interface ReviewSectionProps {
@@ -28,6 +29,11 @@ interface ReviewSectionProps {
   /** Review's Documents tab is asked for by the address. */
   showDocuments: boolean;
   onDocumentsShown: () => void;
+  /** The tab a link asked for, and whose request in it. */
+  target: ReviewTarget | null;
+  onTargetShown: () => void;
+  /** The Overview, where the owner sends their files and new version. */
+  onShowOverview: () => void;
 }
 
 /**
@@ -53,6 +59,9 @@ export function ReviewSection({
   onChanged,
   showDocuments,
   onDocumentsShown,
+  target,
+  onTargetShown,
+  onShowOverview,
 }: ReviewSectionProps) {
   const paper = hasPaper(record);
   return (
@@ -76,6 +85,9 @@ export function ReviewSection({
       showDocuments={showDocuments}
       // Once shown, the request is spent: the tab is the reviewer's to change.
       onDocumentsShown={onDocumentsShown}
+      target={target}
+      onTargetShown={onTargetShown}
+      onShowOverview={onShowOverview}
       documents={
         <DocumentsTab
           record={record}

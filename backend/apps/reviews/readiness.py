@@ -14,6 +14,9 @@ Every action endpoint still re-checks its own predicate.
   one blocker item, so nothing the services refuse is left unsaid.
 - `None` -- not disclosed, which is not an empty list -- to a viewer who may
   not read the review (IR-479).
+- An owner with an open revision or document request is `waiting_on_you`, and
+  the headline names who asked: the same requests `submitter_status` says wait
+  on them, so the two cannot disagree.
 - `open_thread` (ADR-032 §7, 2026-11-04; IR-874): one item per party with
   open review threads, a `blocker` exactly where a thread block applies to
   the viewer -- their party's approval (`routing.send_to_rdco_blocked`,
@@ -159,6 +162,25 @@ def _thread_items(*, facts, routing, office_review, decision, revision, deciding
     return items
 
 
+def _asked_of_owner(revision, document_requests) -> Optional[str]:
+    """What the owner has been asked for, in one sentence, or None."""
+    from .revisions import join_labels
+
+    def who(requests):
+        return join_labels(list(dict.fromkeys(r["label"] for r in requests)))
+
+    revisions = revision.get(ResubmissionRequestState.OPEN.value) or []
+    if revisions and document_requests:
+        if who(revisions) == who(document_requests):
+            return f"{who(revisions)} asked you for a revision and a document."
+        return f"{who(revisions)} asked you for a revision, and {who(document_requests)} for a document."
+    if revisions:
+        return f"{who(revisions)} asked you for a revision."
+    if document_requests:
+        return f"{who(document_requests)} asked you for a document."
+    return None
+
+
 def build_readiness(*, user, readable: bool, in_review: bool, decision: dict,
                     revision: dict, office_review: dict, my_seats: list,
                     review_claim: Optional[dict], facts: dict,
@@ -288,6 +310,8 @@ def build_readiness(*, user, readable: bool, in_review: bool, decision: dict,
         # Version, so the headline can't say nothing waits on them (IR-875).
         verdict = "waiting_on_you"
         headline = "Answer the open Must fix threads before you submit your next version."
+    elif facts.get("owner") and (asked := _asked_of_owner(revision, facts["document_requests"])):
+        verdict, headline = "waiting_on_you", asked
     else:
         verdict, headline = "none", "Nothing here waits on you."
     return {"verdict": verdict, "headline": headline, "items": items}

@@ -44,6 +44,8 @@ interface EditorialHeaderProps {
   onChooseVersion: (n: number | null) => void;
   onOpenReview: () => Promise<void>;
   onEditDetails: () => void;
+  /** In review: the type leads the byline, the version is short and the acts stand beside the title. */
+  compact?: boolean;
   /** View, where there is a paper to view. */
   viewAction: ReactNode;
   /** Save, Cite and Share. */
@@ -66,16 +68,50 @@ export function EditorialHeader({
   onChooseVersion,
   onOpenReview,
   onEditDetails,
+  compact = false,
   viewAction,
   saveCiteShareActions,
 }: EditorialHeaderProps) {
   const authorNames = record.authors.map((a) => a.name.trim()).filter(Boolean);
+  const acts = (section !== "overview" || primary === "open_review" || can.has("edit_details")) && (
+    <div className="flex items-center gap-2 flex-wrap">
+      {primary === "open_review" && (
+        <button type="button" onClick={() => void onOpenReview()} className={PILL_PRIMARY}>
+          <i className="fas fa-clipboard-check text-xs" aria-hidden />
+          Open review
+        </button>
+      )}
+
+      {section !== "overview" && viewAction}
+
+      {can.has("edit_details") && (
+        <button type="button" onClick={onEditDetails} className={PILL_SECONDARY}>
+          <i className="fas fa-pen text-2xs" aria-hidden />
+          Edit details
+        </button>
+      )}
+
+      {section !== "overview" && saveCiteShareActions}
+    </div>
+  );
+  const picker = latestVersion && (
+    <VersionPicker
+      compact={compact}
+      unsubmitted={record.manuscript_unsubmitted}
+      versions={versions}
+      viewing={viewedVersion?.number ?? null}
+      onChoose={onChooseVersion}
+    />
+  );
   return (
     <header className={cn("space-y-5", section === "overview" && "pb-1")}>
       {/* Sized by its length (IR-1264), never cut. */}
-      <h1 className={cn("font-display font-semibold tracking-tight text-stone-900 text-balance", titleSizeClasses(record.title))}>
-        {record.title}
-      </h1>
+      <div className={cn(compact && "flex flex-wrap items-start justify-between gap-x-6 gap-y-3")}>
+        <h1 className={cn("min-w-0 font-display font-semibold tracking-tight text-stone-900 text-balance", compact && "flex-1 basis-80", titleSizeClasses(record.title))}>
+          {record.title}
+        </h1>
+        {compact && acts}
+      </div>
 
       {/* The byline (IR-1264): each author, then the Adviser when the
           record names one (IR-472), in their own pill. Where the record
@@ -83,6 +119,7 @@ export function EditorialHeader({
           year and what it is held under are Record details' rows
           (IR-1089), so the header carries neither. */}
       <div className="flex items-center gap-2 flex-wrap">
+        {compact && record.record_type_name && <span className="mr-1 text-small font-medium text-stone-600">{record.record_type_name}</span>}
         {authorNames.length > 0 ? (
           <ul className="flex items-center gap-2 flex-wrap" aria-label="Authors">
             {authorNames.map((name) => {
@@ -108,6 +145,7 @@ export function EditorialHeader({
           </ul>
         )}
         <ResearchOriginBadge origin={record.origin} />
+        {compact && picker}
       </div>
 
       <LineageLinks lineage={record.lineage} />
@@ -115,36 +153,9 @@ export function EditorialHeader({
       {/* The version picker (IR-416) whenever there is a version,
           v1 alone included (IR-1214), and beside the owner's
           unsubmitted revision (IR-273). */}
-      {latestVersion && (
-        <VersionPicker
-          unsubmitted={record.manuscript_unsubmitted}
-          versions={versions}
-          viewing={viewedVersion?.number ?? null}
-          onChoose={onChooseVersion}
-        />
-      )}
+      {!compact && picker}
 
-      {(section !== "overview" || primary === "open_review" || can.has("edit_details")) && (
-        <div className="flex items-center gap-2 flex-wrap">
-          {primary === "open_review" && (
-            <button type="button" onClick={() => void onOpenReview()} className={PILL_PRIMARY}>
-              <i className="fas fa-clipboard-check text-xs" aria-hidden />
-              Open review
-            </button>
-          )}
-
-          {section !== "overview" && viewAction}
-
-          {can.has("edit_details") && (
-            <button type="button" onClick={onEditDetails} className={PILL_SECONDARY}>
-              <i className="fas fa-pen text-2xs" aria-hidden />
-              Edit details
-            </button>
-          )}
-
-          {section !== "overview" && saveCiteShareActions}
-        </div>
-      )}
+      {!compact && acts}
     </header>
   );
 }

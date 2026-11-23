@@ -52,6 +52,7 @@ import { useRecordLoader } from "./useRecordLoader";
 import { useSidePanel } from "./useSidePanel";
 import { PaperReader } from "./PaperReader";
 import { OverviewSection } from "./OverviewSection";
+import { reviewTargetParams } from "./reviewTarget";
 import { ReviewSection } from "./ReviewSection";
 import { RecordDetailsRail } from "./RecordDetailsRail";
 import { EditorialHeader, LineageLinks, type PrimaryAction } from "./EditorialHeader";
@@ -130,6 +131,7 @@ export default function PaperViewPage() {
     section,
     readerSection,
     documentsWanted,
+    reviewTarget,
     editRequested,
     askedVersion,
     arrivalKey,
@@ -214,6 +216,9 @@ export default function PaperViewPage() {
   const reviewWorkspace = onReviewTab;
   const participant = isParticipant(record, viewer);
   const reviewing = isReviewing(record, viewer);
+  // The Overview draws the review itself while it is under way, for those in it.
+  const underReview = record.pipeline_status === PIPELINE_STATUS.IN_REVIEW;
+  const reviewOverview = underReview && participant;
 
   const editOpen = editRequested && can.has("edit_details") && !arriving;
 
@@ -330,11 +335,26 @@ export default function PaperViewPage() {
     (onPaperTab || reviewWorkspace) && (tier === "wide" || tier === "overlay") && !viewedVersion && !shown &&
     record.download?.state === "pending";
 
+  // Beside the page, or in review beside the abstract.
+  const railHidden = section === "overview" && !arriving && chat.open && !chatMinimized;
+  const detailsRail = (
+    <RecordDetailsRail
+      record={record}
+      headingId={`${tabsId}-details`}
+      participant={participant}
+      inReview={reviewOverview}
+      hidden={railHidden && !reviewOverview}
+      trackerVersion={trackerVersion}
+      onOpenHistory={() => setViewParam("section", "review")}
+      onChanged={reloadRecord}
+      onWithdrawn={handleRdcoWithdrawn}
+    />
+  );
+
   // Where *View* opens the paper: Paper, or a participant's Review (IR-879).
   const hasPaper = readerSection !== "overview" && recordHasPaper(record);
-  const showRail = section === "overview" && !arriving;
-  // Ask IRIS open beside the page leaves no room for the rail (IR-569).
-  const railHidden = showRail && chat.open && !chatMinimized;
+  const showRail = section === "overview" && !arriving && !reviewOverview;
+  // Ask IRIS open beside the page leaves no room for the rail (IR-569): `railHidden`.
   // One filled action per region (spec §4.6, 01-design-system §0): the
   // owner's pending action, else the reviewer's Open review, else View (Save
   // where there is no paper to view, IR-569). When
@@ -526,7 +546,7 @@ export default function PaperViewPage() {
           <div
             className={cn(
               onPaperTab || reviewWorkspace ? "flex-1 min-h-0 flex flex-col" : "grid gap-8 items-start",
-              !onPaperTab && !onReviewTab && cn("px-4 sm:pl-14 sm:pr-8 pt-8", CORNER_CLEARANCE_CLASS, PAGE_WIDTH[showRail ? "wide-left" : "standard"]),
+              !onPaperTab && !onReviewTab && cn("px-4 sm:pl-14 sm:pr-8 pt-8", reviewOverview ? "pb-16" : CORNER_CLEARANCE_CLASS, PAGE_WIDTH[showRail ? "wide-left" : "standard"]),
               // Wide: the page takes the width it has, with what the record is
               // held under beside it while there is room, and under it when
               // the panel or the sidebar leave none (IR-569). Ask IRIS open
@@ -572,6 +592,7 @@ export default function PaperViewPage() {
                 onChooseVersion={chooseVersion}
                 onOpenReview={openReview}
                 onEditDetails={() => setViewParam("edit", "details")}
+                compact={reviewOverview}
                 viewAction={viewAction}
                 saveCiteShareActions={saveCiteShare}
               />
@@ -610,6 +631,10 @@ export default function PaperViewPage() {
                   replaceRecord(fresh);
                   setTrackerVersion((n) => n + 1);
                 }}
+                inReview={reviewOverview}
+                trackerVersion={trackerVersion}
+                onOpenReview={(to) => setViewParams(to ? reviewTargetParams(to) : { section: "review" })}
+                details={detailsRail}
                 onDocumentsChanged={handleDocumentRequestChanged}
                 onRecordReplaced={replaceRecord}
               />
@@ -633,24 +658,16 @@ export default function PaperViewPage() {
                 onChanged={handleDocumentRequestChanged}
                 showDocuments={documentsWanted}
                 onDocumentsShown={() => setViewParams({ documents: null, section: "review" })}
+                target={reviewTarget}
+                onTargetShown={() => setViewParams({ tab: null, party: null, section: "review" })}
+                onShowOverview={() => setViewParam("section", "overview")}
               />
             )}
             </div>
           </div>
           )}
 
-          {showRail && (
-            <RecordDetailsRail
-              record={record}
-              headingId={`${tabsId}-details`}
-              participant={participant}
-              hidden={railHidden}
-              trackerVersion={trackerVersion}
-              onOpenHistory={() => setViewParam("section", "review")}
-              onChanged={reloadRecord}
-              onWithdrawn={handleRdcoWithdrawn}
-            />
-          )}
+          {showRail && detailsRail}
           </div>
 
         <PaperCiteModal record={record} isOpen={citeOpen} onClose={() => setCiteOpen(false)} />
@@ -677,6 +694,7 @@ export default function PaperViewPage() {
             : { key: arrivalKey, fromPaperChat: followedFromPaperChat(location.state) }
         }
         onReviewTab={onReviewTab}
+        notesOffered={!(underReview && section === "overview")}
         askOffered={askOffered}
         highlights={highlights}
         onOpenHighlight={openHighlight}

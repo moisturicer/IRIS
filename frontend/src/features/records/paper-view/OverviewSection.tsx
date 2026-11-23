@@ -1,19 +1,20 @@
 import type { ReactNode } from "react";
 
-import { PILL_PRIMARY } from "@/components/ui/pillStyles";
-import { ActionRequiredPanel } from "@/features/document-requests/ActionRequiredPanel";
 import type { Capability } from "@/features/records/capabilities";
+import { PIPELINE_STATUS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import type { RecordDetail } from "@/types/records";
-import { WAITING_TARGET } from "../waitingOnYou";
 import { CommentsSection } from "./CommentsSection";
 import { SectionHeading } from "./headings";
 import { IpTagger } from "./IpTagger";
-import { NewVersionDialog, newVersionSummary } from "./NewVersionDialog";
+import { NewVersionDialog } from "./NewVersionDialog";
 import { PaperAiOverview } from "./PaperAiOverview";
 import { RelatedPublishedResearch } from "./RelatedPublishedResearch";
 import { RelatedWorks } from "./RelatedWorks";
-import { RevisionManuscriptUpload } from "./RevisionManuscriptUpload";
+import { ReviewOverview } from "./review-overview/ReviewOverview";
+import type { ReviewTarget } from "./reviewTarget";
+
+const OVERVIEW_STATUSES: ReadonlySet<string> = new Set([PIPELINE_STATUS.PUBLISHED, PIPELINE_STATUS.APPROVED, PIPELINE_STATUS.COMPLETED]);
 
 interface OverviewSectionProps {
   record: RecordDetail;
@@ -31,6 +32,12 @@ interface OverviewSectionProps {
   onCloseNewVersion: () => void;
   onNewVersionDone: (outcome: string) => void;
   onNewVersionRefreshed: (fresh: RecordDetail) => void;
+  /** The viewer is in this paper's review, and it is under way. */
+  inReview: boolean;
+  trackerVersion: number;
+  onOpenReview: (target?: ReviewTarget) => void;
+  /** In review, the record's details stand beside the abstract rather than beside the whole page. */
+  details: ReactNode;
   /** A document or request changed. */
   onDocumentsChanged: () => Promise<void> | void;
   /** A save returned the Record. */
@@ -38,9 +45,10 @@ interface OverviewSectionProps {
 }
 
 /**
- * Paper View's Overview (IR-1271, moved out of the page unchanged): what is
- * waiting on the owner first, then the abstract, the AI Overview, IP
- * tagging, related research and the published paper's comments.
+ * Paper View's Overview (IR-1271): while the paper is in review, where the
+ * review stands and what the owner has been asked for (`ReviewOverview`);
+ * then the abstract, the AI Overview, IP tagging, related research and the
+ * published paper's comments. Related works wait until review is over.
  */
 export function OverviewSection({
   record,
@@ -55,81 +63,26 @@ export function OverviewSection({
   onCloseNewVersion,
   onNewVersionDone,
   onNewVersionRefreshed,
+  inReview,
+  trackerVersion,
+  onOpenReview,
+  details,
   onDocumentsChanged,
   onRecordReplaced,
 }: OverviewSectionProps) {
   return (
     <>
-      {/* Action required (spec §4.10): what is waiting on the
-          owner comes first. The revision banner and the document
-          requests below are that, whole; a separate "Your
-          submission" summary repeated them and the rail (IR-1264). */}
-      {/* Revision requests are answered through Submit new version. */}
-      {userIsOwner && record.revision.open.length > 0 && (
-        <section
-          id={WAITING_TARGET.revision}
-          tabIndex={-1}
-          aria-labelledby="revision-requested-heading"
-          className="rounded-card border border-stone-300 bg-surface p-4 scroll-mt-20 focus:outline-none"
-        >
-          <h2
-            id="revision-requested-heading"
-            className="text-sm font-bold text-brand-dark flex items-center gap-2"
-          >
-            <i className="fas fa-arrow-rotate-left text-xs" aria-hidden />
-            Revision requested
-          </h2>
-          <p className="text-sm text-brand leading-relaxed mt-1">
-            Nothing can be decided on this record until you answer with a new version. Offices
-            that already cleared it keep their clearance; only the reviewers who asked look again.
-          </p>
-          <ul className="mt-3 space-y-3">
-            {record.revision.open.map((r) => (
-              <li key={r.id} className="text-sm text-stone-900">
-                <p className="font-semibold">
-                  {r.label} asked for changes
-                  {r.version != null && <span className="font-normal text-stone-600"> · on v{r.version}</span>}
-                </p>
-                {r.reason && (
-                  <p className="text-justified mt-1 whitespace-pre-wrap break-words leading-relaxed text-stone-700">
-                    {r.reason}
-                  </p>
-                )}
-              </li>
-            ))}
-          </ul>
-          {can.has("create_version") && record.revision.new_version && (
-            <div className="mt-4 border-t border-stone-300 pt-3">
-              <p className="text-sm text-stone-700 leading-relaxed">
-                Upload your revised manuscript here, add any requested document below, or edit
-                the details, then submit. {newVersionSummary(record.revision.new_version)}
-              </p>
-              {can.has("replace_manuscript") && (
-                <div className="mt-3">
-                  <RevisionManuscriptUpload
-                    recordId={record.id}
-                    staged={record.manuscript_unsubmitted}
-                    onUploaded={onDocumentsChanged}
-                  />
-                </div>
-              )}
-              {record.revision.new_version.blocked && (
-                <p id="new-version-blocked" className="text-sm text-brand mt-2">
-                  {record.revision.new_version.blocked}
-                </p>
-              )}
-              <button
-                type="button"
-                onClick={onOpenNewVersion}
-                aria-describedby={record.revision.new_version.blocked ? "new-version-blocked" : undefined}
-                className={cn(PILL_PRIMARY, "mt-3")}
-              >
-                <i className="fas fa-paper-plane text-2xs" aria-hidden />
-                Submit new version
-              </button>
-            </div>
-          )}
-        </section>
+      {/* In review: where it stands, who asks for what, and the owner's files. */}
+      {inReview && (
+        <ReviewOverview
+          record={record}
+          can={can}
+          userIsOwner={userIsOwner}
+          trackerVersion={trackerVersion}
+          onOpenReview={onOpenReview}
+          onSubmitNewVersion={onOpenNewVersion}
+          onDocumentsChanged={onDocumentsChanged}
+        />
       )}
       {/* Rendered while a version can be submitted, so the
           announcement lands when it fills; nowhere else, so the page
@@ -150,14 +103,6 @@ export function OverviewSection({
         />
       )}
 
-      {userIsOwner && (
-        <ActionRequiredPanel
-          id={WAITING_TARGET.document}
-          recordId={record.id}
-          onChanged={onDocumentsChanged}
-        />
-      )}
-
       {record.workflow_state === "rejected" && (
         <div className="rounded-card border border-stone-300 bg-surface p-4">
           <p className="text-sm font-bold text-brand-dark flex items-center gap-2">
@@ -171,7 +116,8 @@ export function OverviewSection({
       )}
 
       {/* Reading sections are separated by space. */}
-      <div className="space-y-8">
+      <div className={cn(inReview && "grid items-start gap-8 overview-wide:grid-cols-[minmax(0,1fr)_clamp(17rem,25cqw,22rem)]")}>
+      <div className="min-w-0 space-y-8">
       {/* The abstract shares the reading column with its heading and actions. */}
       <section>
         <SectionHeading>Abstract</SectionHeading>
@@ -189,7 +135,8 @@ export function OverviewSection({
         </div>
       </section>
 
-      <PaperAiOverview record={record} />
+      {/* Only once the offices have decided: a draft, a paper in review or an archived one has no overview. */}
+      {OVERVIEW_STATUSES.has(record.pipeline_status) && <PaperAiOverview record={record} />}
 
       {can.has("tag_ip") && (
         <IpTagger
@@ -205,12 +152,14 @@ export function OverviewSection({
         <RelatedPublishedResearch recordId={record.id} />
       )}
 
-      <RelatedWorks recordId={record.id} />
+      {record.pipeline_status !== PIPELINE_STATUS.IN_REVIEW && <RelatedWorks recordId={record.id} />}
 
       {/* Public comments belong to published papers' Overview only. */}
       {record.pipeline_status === "published" && (
         <CommentsSection recordId={record.id} viewerId={viewerId} viewerName={viewerName} />
       )}
+      </div>
+      {inReview && details}
       </div>
     </>
   );

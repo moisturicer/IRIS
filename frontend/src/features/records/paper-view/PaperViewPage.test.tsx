@@ -718,9 +718,9 @@ describe("the new-version control follows revision requests", () => {
     signInAs(OWNER_ID, "Student");
     renderPaperView();
 
-    const banner = await screen.findByRole("region", { name: "Revision requested" });
-    expect(banner).toHaveTextContent("IERC asked for changes · on v2");
-    expect(banner).toHaveTextContent("Add the assent form for participants under 18.");
+    const review = await screen.findByRole("region", { name: "Review & Routing" });
+    expect(review).toHaveTextContent("Asked for changes · on v2");
+    expect(review).toHaveTextContent("Add the assent form for participants under 18.");
     expect(screen.queryByRole("button", RESUBMIT)).not.toBeInTheDocument();
   });
 
@@ -746,8 +746,8 @@ describe("the new-version control follows revision requests", () => {
     signInAs(OWNER_ID, "Student");
     renderPaperView();
 
-    const banner = await screen.findByRole("region", { name: "Revision requested" });
-    expect(banner).toHaveTextContent("IERC will review v3. ITSO's clearance is kept.");
+    const panel = await screen.findByRole("region", { name: "Your new version" });
+    expect(panel).toHaveTextContent("IERC will review v3. ITSO's clearance is kept.");
     expect(screen.queryByRole("button", RESUBMIT)).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Submit new version" }));
@@ -760,9 +760,9 @@ describe("the new-version control follows revision requests", () => {
     signInAs(OWNER_ID, "Student");
     renderPaperView();
 
-    const banner = await screen.findByRole("region", { name: "Revision requested" });
-    expect(within(banner).getByLabelText("Replace revised manuscript")).toBeInTheDocument();
-    expect(banner).toHaveTextContent("Revised manuscript ready, not yet submitted");
+    const panel = await screen.findByRole("region", { name: "Your new version" });
+    expect(within(panel).getByRole("button", { name: /Upload a different manuscript/ })).toBeInTheDocument();
+    expect(panel).toHaveTextContent("Ready, not yet submitted");
   });
 
   it("offers no manuscript upload in the card without the replace_manuscript capability (IR-1046)", async () => {
@@ -770,8 +770,8 @@ describe("the new-version control follows revision requests", () => {
     signInAs(OWNER_ID, "Student");
     renderPaperView();
 
-    const banner = await screen.findByRole("region", { name: "Revision requested" });
-    expect(within(banner).queryByLabelText(/revised manuscript/i)).not.toBeInTheDocument();
+    const panel = await screen.findByRole("region", { name: "Your new version" });
+    expect(within(panel).queryByRole("button", { name: /revised manuscript/i })).not.toBeInTheDocument();
   });
 
   it("holds the new version, saying why, until something has changed (IR-273)", async () => {
@@ -925,14 +925,15 @@ describe("document requests (IR-262)", () => {
     }],
   };
 
-  it("shows the owner an Action required panel for an open request", async () => {
+  it("shows the owner the files an open request asks for, and its message", async () => {
     documentRequests.mockResolvedValueOnce({ data: [openRequest] });
     shownRecord = { ...inReview, workflow_state: "awaiting_document", workflow_state_label: "Awaiting document" };
     signInAs(OWNER_ID, "Student");
     renderPaperView();
 
-    const panel = await screen.findByRole("region", { name: "Action required" });
-    expect(panel).toHaveTextContent("The signed consent forms are missing.");
+    const panel = await screen.findByRole("region", { name: "Your documents" });
+    expect(within(panel).getByRole("button", { name: /^Upload Ethics Clearance/ })).toBeInTheDocument();
+    expect(screen.getByText("The signed consent forms are missing.")).toBeInTheDocument();
   });
 
   it("does not load requests for a viewer who does not own the record", async () => {
@@ -1012,7 +1013,10 @@ describe("the submitter's own status (IR-625)", () => {
     id: 1, party: "adviser", label: "Adviser", state: "open", state_label: "Open",
     message: "The signed form, please.", requested_by: null,
     created_at: "2026-09-20T02:00:00Z", closed_at: null, can_manage: false,
-    items: [],
+    items: [{
+      id: 11, slot: null, label: "Signed form", state: "missing",
+      state_label: "Missing", upload: null, uploaded_at: null, rejection_reason: null, decided_at: null,
+    }],
   };
 
   const waitingOwner: RecordDetail = {
@@ -1057,7 +1061,7 @@ describe("the submitter's own status (IR-625)", () => {
     signInAs(OWNER_ID, "Student");
     renderPaper(`/records/${RECORD_ID}?section=overview#documents-requested`);
 
-    const panel = await screen.findByRole("region", { name: "Action required" });
+    const panel = await screen.findByRole("region", { name: "Your documents" });
     await waitFor(() => expect(panel).toHaveFocus());
   });
 });
@@ -1915,6 +1919,64 @@ describe("the Review section (IR-412)", () => {
 
     // Changed on purpose by IR-1203: Documents is the author's second tab, and
     // Readiness no longer carries a Documents button.
+    it("opens the tab a link names, on that party's request, and spends the link", async () => {
+      vi.mocked(recordsApi.tracker).mockResolvedValue({ data: { ...trackerPayload, resubmissions: [{
+        id: 3, party: "ierc", label: "IERC", state: "open", state_label: "Open", reason: "Add the assent form.",
+        review: 99, version: 1, requested_by: "Ivy Ethics", created_at: "2026-10-08T02:00:00Z", resolved_at: null, resolved_by: null,
+      }], document_requests: [{
+        // Earlier, and the same party's: the link is to the revision, not to this.
+        id: 8, party: "ierc", label: "IERC", state: "open", state_label: "Open", message: "Forms, please.", requested_by: "Ivy Ethics",
+        created_at: "2026-10-07T02:00:00Z", closed_at: null, can_manage: false, items: [],
+      }] } } as never);
+      shownRecord = inReview;
+      signInAs(OWNER_ID, "Student");
+      renderWithProbe(`/records/${RECORD_ID}?section=review&tab=conversation&party=ierc`);
+
+      expect(await screen.findByRole("tab", { name: "Conversation", selected: true })).toBeInTheDocument();
+      const entry = (await screen.findByText("“Add the assent form.”")).closest("li");
+      await waitFor(() => expect(entry).toHaveFocus());
+      const location = screen.getByRole("status", { name: "Location" });
+      expect(location).toHaveTextContent("section=review");
+      expect(location).not.toHaveTextContent("tab=");
+      expect(location).not.toHaveTextContent("party=");
+      // The tab is the reader's to change afterwards.
+      await userEvent.click(screen.getByRole("tab", { name: "Details" }));
+      expect(screen.getByRole("tab", { name: "Details", selected: true })).toBeInTheDocument();
+    });
+
+    it("shows one party's threads from a link, and ignores a tab it does not have", async () => {
+      shownRecord = inReview;
+      signInAs(OWNER_ID, "Student");
+      const visit = renderPaper(`/records/${RECORD_ID}?section=review&tab=threads&party=ierc`);
+      expect(await screen.findByRole("tab", { name: "Threads", selected: true })).toBeInTheDocument();
+      expect(screen.getByText(/Showing ierc's threads/)).toBeInTheDocument();
+      visit.unmount();
+
+      renderPaper(`/records/${RECORD_ID}?section=review&tab=changes`);
+      expect(await screen.findByRole("tab", { name: "Readiness", selected: true })).toBeInTheDocument();
+    });
+
+    it("goes from the Overview's request to Review, and back to where the new version is sent", async () => {
+      shownRecord = {
+        ...inReview, workflow_state: "awaiting_resubmission", workflow_state_label: "Awaiting resubmission",
+        capabilities: ["create_version", "replace_manuscript", "edit_details"],
+        revision: {
+          ...inReview.revision,
+          open: [{ id: 3, party: "ierc", label: "IERC", reason: "Add the assent form.", requested_by: "Ivy Ethics", version: 1, created_at: "2026-10-08T02:00:00Z" }],
+          new_version: { number: 2, rereview: ["IERC"], kept: [], blocked: "Nothing has changed since IERC asked for a revision." },
+        },
+      };
+      signInAs(OWNER_ID, "Student");
+      renderPaper(`/records/${RECORD_ID}?section=overview`);
+
+      await userEvent.click(await screen.findByRole("button", { name: "Read IERC's request in Review" }));
+      expect(await screen.findByRole("tab", { name: "Conversation", selected: true })).toBeInTheDocument();
+      const foot = screen.getByRole("contentinfo", { name: "Your actions" });
+      expect(foot).toHaveTextContent("Nothing has changed since IERC asked for a revision.");
+      await userEvent.click(within(foot).getByRole("button", { name: "Go to Overview" }));
+      expect(await screen.findByRole("button", { name: "Submit new version" })).toBeInTheDocument();
+    });
+
     it("opens on Readiness, with the status at its top, then Documents, Conversation, Threads and Details", async () => {
       workspaceAt(1600);
       shownRecord = authorReview;
@@ -3827,7 +3889,7 @@ describe("the Overview's header (IR-569)", () => {
     expect(within(header).queryByText(record.workflow_state_label!)).not.toBeInTheDocument();
   });
 
-  it("states the status once, in Review & routing, to the owner, with every row (IR-1264)", async () => {
+  it("states the status once, in Review & routing, to the owner, and leaves out the rows that say nothing while in review", async () => {
     shownRecord = inReview;
     signInAs(OWNER_ID, "Student");
     renderPaperView();
@@ -3836,11 +3898,39 @@ describe("the Overview's header (IR-569)", () => {
     const header = screen.getByRole("heading", { level: 1 }).closest("header") as HTMLElement;
     expect(within(header).queryByText(inReview.workflow_state_label!)).not.toBeInTheDocument();
     const routing = screen.getByRole("region", { name: /review & routing/i });
-    expect(within(routing).getByText("Status", { selector: "span" })).toBeInTheDocument();
     expect(within(routing).getByText(inReview.workflow_state_label!)).toBeInTheDocument();
+    expect(screen.getAllByRole("region", { name: /review & routing/i })).toHaveLength(1);
+    const details = screen.getByRole("complementary", { name: "Record details" });
+    expect(within(details).queryByText("IP Status")).not.toBeInTheDocument();
+    expect(within(details).queryByText("Commercialization")).not.toBeInTheDocument();
+  });
+
+  it("gives the owner every row once review is over (IR-1264)", async () => {
+    shownRecord = { ...inReview, pipeline_status: "completed", workflow_state_label: "Completed" };
+    signInAs(OWNER_ID, "Student");
+    renderPaperView();
+    await waitForRecord(inReview.title);
+
     const details = screen.getByRole("complementary", { name: "Record details" });
     expect(within(details).getByText("IP Status").parentElement).toHaveTextContent("Not declared");
     expect(within(details).getByText("Commercialization").parentElement).toHaveTextContent("Not flagged");
+  });
+
+  it("leaves Related works and Notes off the Overview until review is over", async () => {
+    vi.mocked(recordsApi.similar).mockClear();
+    shownRecord = inReview;
+    signInAs(OWNER_ID, "Student");
+    const visit = renderPaperView();
+    await waitForRecord(inReview.title);
+    expect(recordsApi.similar).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "Notes" })).not.toBeInTheDocument();
+    visit.unmount();
+
+    shownRecord = { ...inReview, pipeline_status: "published" };
+    renderPaperView();
+    await waitForRecord(inReview.title);
+    expect(await screen.findByRole("button", { name: "Notes" })).toBeInTheDocument();
+    await waitFor(() => expect(recordsApi.similar).toHaveBeenCalled());
   });
 
   it("gives office staff outside the review the status as a row, and the rows a reader sees (IR-1264)", async () => {

@@ -9,7 +9,7 @@ accepted, and a blocker item for every refusal the decision block names.
 from apps.documents.models import DocumentRequest
 from apps.reviews import seats
 from apps.reviews.models import RecordAssignment, Turnaround
-from core.enums import AssignmentState, Party
+from core.enums import AssignmentState, DocumentRequestState, Party
 from core.permissions import may_read_review
 
 from .test_decisions import COMMENT, DecisionTestBase
@@ -201,6 +201,48 @@ class PartiesReviewingAndUnclaimedPoolsTests(ReadinessTestBase):
         # The decider's own wording, not the owner's.
         self.assertTrue(rdco_cards[Party.IERC].startswith("IERC is reviewing."))
         self.assertNotIn("waiting for your revision", rdco_cards[Party.IERC])
+
+    def test_the_owner_is_told_a_revision_request_waits_on_them(self):
+        record, _ = self.rdco_with_ierc_asking()
+        readiness = self.readiness(record, self.owner)
+        self.assertEqual(readiness["verdict"], "waiting_on_you")
+        self.assertEqual(readiness["headline"], "IERC asked you for a revision.")
+
+    def test_the_owner_is_told_a_document_request_waits_on_them_until_it_closes(self):
+        record = self.routed(Party.ITSO, Party.IERC)
+        self.opened_seat(record, Party.IERC, self.ierc)
+        request = DocumentRequest.objects.create(
+            record=record, party=Party.IERC, assignment=self.assignment(record, Party.IERC),
+            requested_by=self.ierc, message="Signed consent forms, please.",
+        )
+        readiness = self.readiness(record, self.owner)
+        self.assertEqual(readiness["verdict"], "waiting_on_you")
+        self.assertEqual(readiness["headline"], "IERC asked you for a document.")
+
+        request.state = DocumentRequestState.WITHDRAWN
+        request.save()
+        readiness = self.readiness(record, self.owner)
+        self.assertEqual((readiness["verdict"], readiness["headline"]), ("none", "Nothing here waits on you."))
+
+    def test_the_owner_is_told_of_both_kinds_and_each_party_once(self):
+        record, _ = self.rdco_with_ierc_asking()
+        for _ in range(2):
+            DocumentRequest.objects.create(
+                record=record, party=Party.IERC, assignment=self.assignment(record, Party.IERC),
+                requested_by=self.ierc, message="Forms, please.",
+            )
+        readiness = self.readiness(record, self.owner)
+        self.assertEqual(
+            readiness["headline"], "IERC asked you for a revision and a document.",
+        )
+        DocumentRequest.objects.create(
+            record=record, party=Party.RDCO, assignment=self.assignment(record, Party.RDCO),
+            requested_by=self.rdco, message="A form, please.",
+        )
+        self.assertEqual(
+            self.readiness(record, self.owner)["headline"],
+            "IERC asked you for a revision, and IERC and RDCO Final for a document.",
+        )
 
     def test_claim_is_offered_only_to_an_ierc_member(self):
         # Beside `test_an_unclaimed_pool_is_information_with_claim_for_its_members`,

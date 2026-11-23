@@ -64,6 +64,8 @@ export interface TimelineEntry {
    * is shown rather than an invented "v1" (spec §4.11).
    */
   version: number | null;
+  /** The party whose open revision request this is: where a link to it lands. A document request's link opens Documents. */
+  openRequest?: string;
   /** A comment entry's own: the comment, and its replies, oldest first. */
   comment?: { root: ReviewComment; replies: ReviewComment[] };
   /**
@@ -129,6 +131,7 @@ export function timelineEntries(tracker: RecordTracker): TimelineEntry[] {
       note: r.comment || null,
       details: round ? [`Sent ${roundSent(round)}`] : [],
       version: r.version ?? null,
+      ...(request?.state === "open" ? { openRequest: request.party } : {}),
       ...(round ? { toThreads: { name: `${r.reviewed_by_name ?? r.label}'s threads` } } : {}),
     });
   }
@@ -146,6 +149,7 @@ export function timelineEntries(tracker: RecordTracker): TimelineEntry[] {
       note: r.reason || null,
       details: [],
       version: null,
+      ...(r.state === "open" ? { openRequest: r.party } : {}),
     });
   }
 
