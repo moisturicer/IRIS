@@ -1217,6 +1217,30 @@ describe("closing", () => {
       expect(within(question).getByRole("button", { name: "Keep editing" })).toBeInTheDocument();
     });
 
+    it("asks in its own popup over the form, and steps aside while the deletion is confirmed", async () => {
+      const user = await closeDraft();
+
+      const question = screen.getByRole("alertdialog", { name: "Leave this submission?" });
+      expect(screen.getByRole("dialog", { name: "Publish your research" })).not.toContainElement(question);
+
+      await user.click(screen.getByRole("button", { name: "Delete draft" }));
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+
+      await user.click(within(screen.getByRole("dialog", { name: "Delete this draft?" })).getByRole("button", { name: "Cancel" }));
+      const back = screen.getByRole("alertdialog", { name: "Leave this submission?" });
+      await waitFor(() => expect(within(back).getByRole("button", { name: "Keep as draft" })).toHaveFocus());
+    });
+
+    it("keeps editing when the popup is dismissed with Escape", async () => {
+      const user = await closeDraft();
+
+      await user.keyboard("{Escape}");
+
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+      expect(screen.getByRole("dialog", { name: "Publish your research" })).toBeInTheDocument();
+      expect(recordsApi.delete).not.toHaveBeenCalled();
+    });
+
     it("leaves the reader on the page it opened over, query and all (IR-1258)", async () => {
       const user = userEvent.setup();
       renderScreen(<><PublishDialog /><Address /></>, { route: "/records/mine?section=research&publish=42" });
