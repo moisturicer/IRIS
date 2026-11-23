@@ -29,7 +29,7 @@ export function EditQuestion({ question, onCancel, onSend, compact = false }: {
   };
   return (
     <div className="flex justify-end">
-      <div className={cn("w-full rounded-card border border-brand/40 bg-surface p-2 ring-4 ring-brand/10", compact ? "max-w-full" : "max-w-[85%]")}>
+      <div className={cn("w-full rounded-card border border-brand/40 bg-surface p-2 ring-4 ring-brand/15", compact ? "max-w-full" : "max-w-[85%]")}>
         <textarea ref={field} value={text} onChange={e => setText(e.target.value)} onKeyDown={onKeyDown}
           aria-label="Edit your question" rows={2} maxLength={4000}
           className="block max-h-48 min-h-[3rem] w-full resize-none bg-transparent px-2 py-1 text-body text-stone-900 caret-brand outline-none [field-sizing:content]" />
