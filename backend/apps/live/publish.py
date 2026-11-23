@@ -44,13 +44,18 @@ def _send(channel: str, topics: list[str]) -> None:
         logger.warning("live: could not publish to %s", channel, exc_info=True)
 
 
+def enabled() -> bool:
+    """Whether a hint would be sent at all: on, or a test recording them."""
+    return settings.LIVE_ENABLED or _override is not None
+
+
 def publish(channels: Iterable[str], topics: Iterable[str]) -> None:
     """Send `topics` to `channels` once the current transaction commits."""
     channels = sorted(set(channels))
     topics = sorted(set(topics))
     if not channels or not topics:
         return
-    if not (settings.LIVE_ENABLED or _override is not None):
+    if not enabled():
         return
 
     def send_all():

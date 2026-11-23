@@ -137,6 +137,18 @@ All three were left open in the first draft and decided by Ashlee Sean on 2026-1
 - **No new service, no new port and no migration.** It needs Redis, which is already running.
 - **nginx:** none beyond the existing response header. Caddy already streams Ask IRIS.
 
+## Amendment 2026-11-23 (b): the person who asked (IR-1289)
+
+**Status: Proposed.** Drafted by an AI agent at Lee Jasmin Adolfo's request; it is a proposal until a person accepts it.
+
+**Why.** Decision 3 tells RDCO's queues when a role or call request changes, but not the person who made it. An approved user's open app kept its old role, and the pending-approval screen stayed up. Because the server picks a stream's role channel when the stream opens, a new role was not heard until a reload. A Call's poster didn't see RDCO's decision either.
+
+**Two new topics, each on one person's own channel only:**
+- **`account`.** A saved `RoleRequest` (asked, approved or declined) and any role change through `User.assign_role` tell that user. Their tabs read `/auth/me` again, on the hint and when the tab is shown. When the role has changed, the tab reopens its stream (`restartLive`), so the new role's channel is heard. A generation counter stops the replaced loop from reconnecting.
+- **`calls`.** A saved or deleted `Opportunity` tells its poster. **My Calls** and **Calls and conferences** refetch quietly on it and when the tab is shown.
+
+**Not covered.** A newly confirmed Call has no reader list to tell, so other people's boards catch up when their tab is shown again.
+
 ## Amendment 2026-11-23: the review discussion (IR-1284)
 
 **Status: Proposed.** Drafted by an AI agent at Lee Jasmin Adolfo's request; it is a proposal until a person accepts it.
@@ -154,6 +166,12 @@ All three were left open in the first draft and decided by Ashlee Sean on 2026-1
 
 **Cost.** One `may_read_review` check per candidate per committed comment write. Bursts are coalesced per tab (decision 8).
 
+**Extended to the rest of the paper page (IR-1287).**
+- These writes now tell the same readers in the same way: a saved `Review`, `RecordClearance`, `RecordAssignment`, `ReviewerSeat`, `Extension`, `RoutingEvent`, `ResubmissionRequest`, `ReviewRound`, `ResponseLetter`, `RecordUpload`, `UploadReview`, `RecordFile`, `DocumentRequest`, `DocumentRequestItem` or `DocumentRejection`, and a deleted upload or file. They refresh the tracker, the timeline, the documents tab and the response letter.
+- **Once per act.** Each write queues a send, and only the send queued last for that record goes out, so a routing act that writes ten rows tells each reader once. One case is missed: a savepoint that rolls back inside a transaction that still commits can leave that commit unannounced. Decision 6 covers this, since the page catches up on focus.
+- **Drafts.** An unsubmitted draft's readers are its creator alone (`hides_draft`, IR-1227), never a co-owner it names.
+- **Public comments get no hint.** Anyone signed in may read a published paper, so there is no list of readers to tell. That panel catches up on focus and reconnect, and on any hint the viewer gets as a review reader.
+
 ## Related Requirements
 
 NFR labels only: none. Relates to IR-1033 (refetch on focus), IR-1138 (queue counts), IR-1208 (My Reviews count), IR-166 and ADR-072 (sessions), ADR-017 (ASGI), and IR-504 and IR-634 (streaming).
@@ -162,4 +180,5 @@ NFR labels only: none. Relates to IR-1033 (refetch on focus), IR-1138 (queue cou
 
 - IR-1213: the spec, which builds this after acceptance.
 - IR-1284: the review discussion (Amendment 2026-11-23).
+- IR-1287: the rest of the paper page (same amendment).
 - IR-1033.

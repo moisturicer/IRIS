@@ -21,7 +21,7 @@ const MAIN_ID = "main-content";
  * The menu button, the IRIS mark and the bell, for phones (IR-519). The mark
  * links to Discover, so the phone has a brand and a way home (audit RES-04).
  *
- * There is no app header any more: on a desktop the bell sits at the top of
+ * There is no app header any more: on a desktop Notifications is a link in
  * the sidebar, which is always on screen. Below `md` the sidebar is a hidden
  * drawer, so this bar carries the two things that would otherwise be out of
  * reach. It scrolls away with the page rather than sticking, so it costs no

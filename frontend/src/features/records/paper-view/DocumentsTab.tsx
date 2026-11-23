@@ -32,6 +32,7 @@ import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { UploadDropzone } from "@/components/shared/UploadDropzone";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { FOCUS_RING } from "@/components/ui/interaction";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { cn, downloadBlob, formatDate } from "@/lib/utils";
 import type { RecordFile, RecordUpload, SlotWithUploads } from "@/types/documents";
@@ -164,7 +165,8 @@ export function DocumentsTab({
     }
   };
 
-  const load = useCallback(async () => {
+  /** `quiet`: a live re-read (ADR-073, IR-1287), which keeps what is shown if it fails. */
+  const load = useCallback(async (quiet = false) => {
     try {
       const [slotsRes, filesRes] = await Promise.all([
         documentsApi.slotsForRecord(record.id),
@@ -175,7 +177,7 @@ export function DocumentsTab({
       setFiles(Array.isArray(list) ? list : list.results ?? []);
       setFailed(false);
     } catch {
-      setFailed(true);
+      if (!quiet) setFailed(true);
     }
     // Only participants may read requests (IR-349); for anyone else this
     // refuses, and there is simply nothing asked for to show.
@@ -184,7 +186,7 @@ export function DocumentsTab({
         const { data } = await recordsApi.documentRequests(record.id);
         setRequests(data);
       } catch {
-        setRequests([]);
+        if (!quiet) setRequests([]);
       }
     }
   }, [record.id, owner, reviewing]);
@@ -192,6 +194,7 @@ export function DocumentsTab({
   useEffect(() => {
     void load();
   }, [load]);
+  useLiveRefresh([`record:${record.id}`], () => { void load(true); });
 
   const changed = async () => {
     await load();

@@ -4,7 +4,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
-  backoffMs, emitLiveHint, isLiveRunning, onLiveHint, onLiveResync, parseEvents, startLive, stopLive,
+  backoffMs, emitLiveHint, isLiveRunning, onLiveHint, onLiveResync, parseEvents, restartLive, startLive, stopLive,
 } from "./live";
 
 function streamOf(...chunks: string[]): ReadableStream<Uint8Array> {
@@ -92,6 +92,27 @@ describe("the stream", () => {
     await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(3));
     expect(resyncs).toHaveBeenCalledTimes(1);
     off();
+  });
+
+  it("restarting opens one new stream, and the replaced loop never reconnects (IR-1289)", async () => {
+    let firstSignal: AbortSignal | undefined;
+    const first = vi.fn((_url: string, init: RequestInit) => {
+      firstSignal = init.signal ?? undefined;
+      return new Promise<Response>(() => {});
+    });
+    const sleep = vi.fn(() => Promise.resolve());
+    startLive({ token: () => "access-1", refresh: vi.fn(), fetchImpl: first as unknown as typeof fetch, sleep });
+    await vi.waitFor(() => expect(first).toHaveBeenCalledTimes(1));
+
+    const second = vi.fn(() => new Promise<Response>(() => {}));
+    restartLive({ token: () => "access-2", refresh: vi.fn(), fetchImpl: second as unknown as typeof fetch, sleep });
+
+    expect(firstSignal?.aborted).toBe(true);
+    await vi.waitFor(() => expect(second).toHaveBeenCalledTimes(1));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(first).toHaveBeenCalledTimes(1);
+    expect(second).toHaveBeenCalledTimes(1);
+    expect(isLiveRunning()).toBe(true);
   });
 
   it("does not open without a token, and stopping aborts an open stream", async () => {

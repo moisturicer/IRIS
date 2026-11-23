@@ -1,8 +1,9 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
 import { recordsApi } from "@/api/records";
 import { isRequestTimeout } from "@/api/requestPolicy";
 import { FOCUS_RING } from "@/components/ui/interaction";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { cn } from "@/lib/utils";
 import type {
   RecordTracker,
@@ -70,23 +71,36 @@ export function ReviewRoutingTracker({ recordId, status, onOpenHistory }: Review
   /** Why the read failed (IR-906): a timeout is worded as one, and both offer a retry. */
   const [failed, setFailed] = useState<"failed" | "interrupted" | null>(null);
   const [attempt, setAttempt] = useState(0);
+  /** A live re-read (ADR-073, IR-1287): keeps the rail on screen, and keeps it if the read fails. */
+  const quiet = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
-    setData(null);
-    setFailed(null);
+    const isQuiet = quiet.current;
+    quiet.current = false;
+    if (!isQuiet) {
+      setData(null);
+      setFailed(null);
+    }
     recordsApi
       .tracker(recordId)
       .then(({ data: payload }) => {
-        if (!cancelled) setData(payload);
+        if (cancelled) return;
+        setData(payload);
+        setFailed(null);
       })
       .catch((error: unknown) => {
-        if (!cancelled) setFailed(isRequestTimeout(error) ? "interrupted" : "failed");
+        if (!cancelled && !isQuiet) setFailed(isRequestTimeout(error) ? "interrupted" : "failed");
       });
     return () => {
       cancelled = true;
     };
   }, [recordId, attempt]);
+  const reloadQuietly = useCallback(() => {
+    quiet.current = true;
+    setAttempt((n) => n + 1);
+  }, []);
+  useLiveRefresh([`record:${recordId}`], reloadQuietly);
 
   return (
     <section

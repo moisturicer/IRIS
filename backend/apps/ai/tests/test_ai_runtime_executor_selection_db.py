@@ -49,6 +49,7 @@ AGENT = dict(
     RUNS_AGENT_MODEL=MODEL,
     RUNS_AGENT_RESERVES=json.dumps(dict(output_tokens=60, reasoning_tokens=40, next_result_tokens=300,
                                         repair_tokens=100)),
+    RUNS_AGENT_PROVIDER_RETRIES="1",
     AGENT_LLM_ENDPOINT=ENDPOINT,
     AGENT_LLM_API_KEY="sk-test-never-sent",
     AGENT_LLM_MODELS=MODEL,

@@ -82,6 +82,8 @@ export interface LiveDeps {
 
 let controller: AbortController | null = null;
 let running = false;
+/** Bumped by every start, so a loop a restart replaced stops instead of reconnecting (IR-1289). */
+let generation = 0;
 
 const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -89,7 +91,17 @@ const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(r
 export function startLive(deps: LiveDeps): void {
   if (running) return;
   running = true;
-  void run(deps);
+  generation += 1;
+  void run(deps, generation);
+}
+
+/**
+ * Close the stream and open a new one: the server picks a stream's channels
+ * when it opens, so a changed role is heard only on a new stream (IR-1289).
+ */
+export function restartLive(deps: LiveDeps): void {
+  stopLive();
+  startLive(deps);
 }
 
 /** Close the stream for good: sign-out, or the session ended. */
@@ -103,10 +115,14 @@ export function isLiveRunning(): boolean {
   return running;
 }
 
-async function run({ token, refresh, fetchImpl = fetch, sleep = defaultSleep }: LiveDeps): Promise<void> {
+async function run(
+  { token, refresh, fetchImpl = fetch, sleep = defaultSleep }: LiveDeps,
+  mine: number,
+): Promise<void> {
   let attempt = 0;
   let connectedBefore = false;
-  while (running) {
+  const current = () => running && mine === generation;
+  while (current()) {
     const access = token();
     if (!access) { running = false; return; }
     controller = new AbortController();
@@ -120,7 +136,7 @@ async function run({ token, refresh, fetchImpl = fetch, sleep = defaultSleep }: 
       if (response.status === 401) {
         // The token expired, normally at the end of a stream: refresh and go
         // round again. A failed refresh has ended the session already.
-        if (!(await refresh())) { running = false; return; }
+        if (!(await refresh())) { if (current()) running = false; return; }
         continue;
       }
       if (!response.ok || !response.body) throw new Error(`live: ${response.status}`);
@@ -129,9 +145,9 @@ async function run({ token, refresh, fetchImpl = fetch, sleep = defaultSleep }: 
       connectedBefore = true;
       await read(response.body);
     } catch {
-      if (!running) return; // stopped on purpose: the abort lands here
+      if (!current()) return; // stopped or replaced on purpose: the abort lands here
     }
-    if (!running) return;
+    if (!current()) return;
     await sleep(backoffMs(attempt));
     attempt += 1;
   }
