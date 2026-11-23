@@ -391,7 +391,7 @@ export const DIALOGS: DialogCase[] = [
   },
   {
     id: "delete a draft", screen: "my-library", path: "/records/mine?section=research",
-    sources: ["features/library/DeleteDraft.tsx"],
+    sources: ["features/library/DeleteRecord.tsx"],
     override: (api) => api.on("GET", "/records/mine/", [{
       id: 12, title: "Community Water Monitoring", authors: [{ id: 1, name: "Lee Cruz", role: null }],
       adviser_name: "Dr Santos", record_type_name: "Thesis / Research", pipeline_status: "draft",
