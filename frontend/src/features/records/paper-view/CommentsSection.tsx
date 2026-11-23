@@ -6,6 +6,7 @@ import { RdcoNoteDialog } from "@/features/admin/RdcoNoteDialog";
 import { Modal } from "@/components/ui/Modal";
 import { Select } from "@/components/ui/Select";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { errorDetail } from "@/lib/errorDetail";
 import { queueCountsChanged } from "@/lib/queueCounts";
 import { REPORT_REASON_LABELS, type PublicComment, type PublicCommentReportReason } from "@/types/records";
@@ -96,11 +97,15 @@ export function CommentsSection({
     return map;
   }, [threads]);
 
-  /** `quiet` keeps the list on screen while it is fetched again after a change. */
+  /**
+   * `quiet` keeps the list on screen while it is fetched again after a change;
+   * `live` is a re-read nobody asked for (ADR-073, IR-1287), whose failure
+   * keeps the list and says nothing.
+   */
   const refresh = useCallback(
-    async (quiet = false) => {
+    async (quiet = false, live = false) => {
       if (!quiet) setLoading(true);
-      setLoadError(null);
+      if (!live) setLoadError(null);
       try {
         const { data } = await recordsApi.publicComments(recordId);
         if (!data || !Array.isArray(data.comments) || typeof data.count !== "number") {
@@ -108,8 +113,9 @@ export function CommentsSection({
         }
         setComments(data.comments);
         setCount(data.count);
+        setLoadError(null);
       } catch (err) {
-        setLoadError(commentError(err, "Comments could not be loaded. Please try again."));
+        if (!live) setLoadError(commentError(err, "Comments could not be loaded. Please try again."));
       } finally {
         setLoading(false);
       }
@@ -120,6 +126,9 @@ export function CommentsSection({
   useEffect(() => {
     void refresh();
   }, [refresh]);
+  // Anyone may read a published paper, so no hint names its readers: this
+  // catches up on focus and reconnect, and on a hint a review reader gets.
+  useLiveRefresh([`record:${recordId}`], () => { void refresh(true, true); });
 
   // Focus goes back to the control that opened what just closed.
   useEffect(() => {
