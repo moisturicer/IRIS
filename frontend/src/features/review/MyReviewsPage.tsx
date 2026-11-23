@@ -497,7 +497,12 @@ function ReviewRow({ row, tab, busy, error, onClaim, onAssign }: ReviewRowProps)
       <span className="font-semibold text-stone-800">{holderLine(row, stripNamesHolder(row))}</span>
       {row.waiting_on && tab !== "done" && <Badge variant="warning">{WAITING_ON_LABEL[row.waiting_on]}</Badge>}
       {/* Overdue is said in words; the badge's tone only repeats it (IR-622). */}
-      {row.is_overdue && <Badge variant="danger">{overdueLabel(row.overdue_days)}</Badge>}
+      {row.is_overdue && (
+        <Badge variant="danger">
+          <i className="fas fa-triangle-exclamation mr-1.5 text-3xs" aria-hidden />
+          {overdueLabel(row.overdue_days)}
+        </Badge>
+      )}
       {tab === "done" && (
         <Badge variant={row.outcome == null ? "default" : "success"}>
           {row.outcome_label ?? "Completed by your office"}
@@ -510,7 +515,9 @@ function ReviewRow({ row, tab, busy, error, onClaim, onAssign }: ReviewRowProps)
   // it may wrap on a phone, as the prototype has it.
   const meta = tab === "done" && row.decided_at ? <span>{formatDate(row.decided_at)}</span> : undefined;
   const due = tab !== "done" && row.due_at ? (
-    <span className={cn("inline-flex items-center gap-1.5", row.is_overdue && "font-semibold text-brand")}>
+    // Stone even when overdue: the overdue badge says it, and maroon here would
+    // be a second maroon beside the card's one action (IR-1290).
+    <span className={cn("inline-flex items-center gap-1.5", row.is_overdue && "font-semibold text-stone-800")}>
       <i className="far fa-calendar" aria-hidden />
       {dueLabel(row.due_at)}
       {row.clock_paused && " · clock paused"}
@@ -569,7 +576,7 @@ function ReviewRow({ row, tab, busy, error, onClaim, onAssign }: ReviewRowProps)
           </>
         }
         meta={meta}
-        byline={byline || undefined}
+        byline={byline ? <span className="text-stone-600">{byline}</span> : undefined}
         status={status}
         footer={hasStrip(row.clearance_strip) ? <ClearanceStrip entries={row.clearance_strip} /> : undefined}
         actions={actions ?? undefined}

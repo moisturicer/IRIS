@@ -28,8 +28,9 @@ interface ReviewRoutingTrackerProps {
  * decision made here is that the retired Intake is never a step (`RETIRED_PARTY`).
  */
 const STATE_META: Record<TrackerPartyState, { glyph: string; tone: string; muted: boolean }> = {
-  completed:     { glyph: "✓", tone: "text-stone-900", muted: false },
-  active:        { glyph: "●", tone: "text-brand",       muted: false },
+  // Green done, amber in progress, as on the clearance strip (IR-1290).
+  completed:     { glyph: "✓", tone: "text-cleared",     muted: false },
+  active:        { glyph: "●", tone: "text-review",      muted: false },
   withdrawn:     { glyph: "–", tone: "text-stone-500",   muted: true },
   awaiting:      { glyph: "○", tone: "text-stone-500",   muted: true },
   not_requested: { glyph: "○", tone: "text-stone-500",   muted: true },
@@ -40,8 +41,8 @@ const STATE_META: Record<TrackerPartyState, { glyph: string; tone: string; muted
 /** Outcome colour. Exhaustive, so an unstyled outcome fails `tsc`. */
 const OUTCOME_TONE: Record<TrackerOutcome, string> = {
   pending: "text-stone-700",
-  cleared: "text-stone-900",
-  approved: "text-stone-900",
+  cleared: "text-cleared",
+  approved: "text-cleared",
   declined: "text-brand",
   not_cleared: "text-brand",
   negative_finding: "text-brand",
@@ -204,7 +205,7 @@ const AWAITING_DOCUMENT_META = { glyph: "◐", tone: "text-brand", muted: false 
  * ui-ux/16's ◌: an active office whose pool nobody has claimed yet (ADR-032
  * §4). Overrides the glyph only.
  */
-const IN_POOL_META = { glyph: "◌", tone: "text-brand", muted: false };
+const IN_POOL_META = { glyph: "◌", tone: "text-stone-700", muted: false };
 
 function PartyRow({ row }: { row: TrackerPartyRow }) {
   const meta = row.awaiting_document
@@ -245,7 +246,7 @@ function PartyRow({ row }: { row: TrackerPartyRow }) {
               · {row.outcome_label}
             </span>
           )}
-          {row.in_pool && <span className="font-semibold text-brand">· Unassigned</span>}
+          {row.in_pool && <span className="font-semibold text-stone-700">· Unassigned</span>}
           {row.changes_requested && (
             <span className="font-semibold text-brand">· Changes requested</span>
           )}
@@ -257,7 +258,7 @@ function PartyRow({ row }: { row: TrackerPartyRow }) {
           )}
           {row.preserved && (
             <span
-              className="px-1.5 py-0.5 rounded-control bg-stone-100 text-stone-900 border border-stone-300 text-2xs font-bold flex items-center gap-1"
+              className="px-1.5 py-0.5 rounded-control bg-surface text-cleared border border-cleared-line text-2xs font-bold flex items-center gap-1"
               title="Cleared before the current submission and carried over — this office will not review again"
             >
               <i className="fas fa-shield-halved text-2xs" aria-hidden />

@@ -118,6 +118,26 @@ export default {
           now:     "#F5D5D6",
         },
 
+        // Status hues (IR-1290; DESIGN.md "Colors"). Two, and for status only,
+        // so that a state that needs someone (maroon outline) never looks like
+        // the action to take (solid maroon). `cleared` is an office that
+        // cleared or kept its clearance; `review` is a review in progress,
+        // including one a new version reset. DEFAULT is the text (6.5:1 and
+        // 6.3:1 on white), `line` the outline or glyph (4.2:1, 3.7:1) and
+        // `wash` a fill that text still reads on (5.7:1, 5.6:1). Amber is
+        // always an outline, a glyph and a word, never a flat fill behind
+        // text, so it is never mistaken for the match yellow (`hl`).
+        cleared: {
+          DEFAULT: "#1E6B3F",
+          line:    "#3F8A5A",
+          wash:    "#EAF3EC",
+        },
+        review: {
+          DEFAULT: "#8A5300",
+          line:    "#B07A1E",
+          wash:    "#FBF0DA",
+        },
+
         // Primary brand color -- deep maroon. `brand-50`, `brand-100` and
         // `brand-200` are retired as fills, outlines and text (palette.test.ts):
         // Maroon Wash did fifteen jobs. The scale itself is unchanged; the
