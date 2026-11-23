@@ -16,14 +16,16 @@ import { Panel } from "./settingsParts";
 import { AiAnswerPanel } from "./AiAnswerPanel";
 import { CurrentNoticePanel } from "./CurrentNoticePanel";
 import { DeleteAccountPanel, DownloadMyDataPanel } from "./YourDataPanels";
+import { ProfileTab } from "./ProfileTab";
 import { HERE } from "@/components/ui/highlightRoles";
 import { HelpGuide } from "@/features/help/HelpGuide";
 
 /**
- * Settings: the account. Who you are on IRIS (name, photo, bio, interests)
- * is the Profile, a page of its own since IR-933.
+ * Settings: the account. Who you are on IRIS (name, photo, bio, interests) is
+ * edited in the first section, Profile (IR-1304); the Profile page (IR-933) only
+ * shows what others see, and links here to change it.
  *
- * Three sections, not the six the mockup drew. The two that are missing were cut
+ * Below it, the account sections: fewer than the six the mockup drew. Two are missing, cut
  * because nothing backs them, and shipping a panel that cannot persist is the
  * dead-end IR-86's acceptance criteria forbid:
  *
@@ -40,9 +42,10 @@ import { HelpGuide } from "@/features/help/HelpGuide";
  * Both are filed rather than faked.
  */
 
-type TabId = "security" | "privacy" | "role" | "help";
+type TabId = "profile" | "security" | "privacy" | "role" | "help";
 
 const TABS: { id: TabId; label: string; icon: string }[] = [
+  { id: "profile",  label: "Profile",                icon: "fa-user"          },
   { id: "security", label: "Account & security",     icon: "fa-shield-halved" },
   { id: "privacy",  label: "Data privacy & consent", icon: "fa-lock"         },
   { id: "role",     label: "Role & access",          icon: "fa-id-badge"     },
@@ -56,7 +59,7 @@ const TABS: { id: TabId; label: string; icon: string }[] = [
  * to and survives a reload. A missing or unknown value is the first tab.
  */
 function readTab(raw: string | null): TabId {
-  return TABS.find((t) => t.id === raw)?.id ?? "security";
+  return TABS.find((t) => t.id === raw)?.id ?? TABS[0].id;
 }
 
 export default function SettingsPage() {
@@ -78,7 +81,7 @@ export default function SettingsPage() {
     <div className="space-y-4">
       <PageHeader
         title="Settings"
-        description="Your sign-in, your data and what your role lets you do."
+        description="Your profile, your sign-in, your data and what your role lets you do."
         actions={<ButtonLink to={pathFor("profile")} variant="outline" size="page">Your profile</ButtonLink>}
       />
 
@@ -114,6 +117,14 @@ export default function SettingsPage() {
         </nav>
 
         <div className="flex-1 min-w-0 w-full">
+          {tab === "profile"  && (
+            <Panel
+              title="Profile"
+              caption="What you add here appears on your Profile, which anyone signed in to IRIS can open. Leave an optional field empty to keep it off."
+            >
+              <ProfileTab />
+            </Panel>
+          )}
           {tab === "security" && <SecurityTab email={user.email} isVerified={user.is_verified} />}
           {tab === "privacy"  && <PrivacyTab user={user} />}
           {tab === "role"     && <RoleTab user={user} />}

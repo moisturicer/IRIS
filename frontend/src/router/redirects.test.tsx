@@ -52,6 +52,16 @@ describe("an old link into Help", () => {
   });
 });
 
+// IR-1304: editing your profile moved from its own page into Settings, so a
+// bookmark or an old Help link to /profile/edit lands on Settings' Profile tab.
+describe("an old link to Edit profile", () => {
+  it("lands on Settings' Profile tab", async () => {
+    renderScreen(<App />, { route: "/profile/edit" });
+
+    expect(await screen.findByText("Landed on /settings?tab=profile")).toBeInTheDocument();
+  });
+});
+
 // ADR-063 decision 9 (IR-972): the Notices page became Setup's Notice section,
 // which is RDCO's. The System Admin, who reads publications in the Audit Log,
 // lands there instead, filtered to them.

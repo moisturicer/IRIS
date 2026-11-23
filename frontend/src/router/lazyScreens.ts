@@ -72,7 +72,6 @@ export const MyCallsPage = screen(
 export const NotificationsPage = screen(() => import("@/features/notifications/NotificationsPage"), pathFor("notifications"));
 export const SettingsPage = screen(() => import("@/features/settings/SettingsPage"), pathFor("settings"));
 export const ProfilePage = screen(() => import("@/features/profile/ProfilePage"), pathFor("profile"));
-export const EditProfilePage = screen(() => import("@/features/profile/EditProfilePage"), pathFor("profileEdit"));
 export const PersonProfilePage = screen(() => import("@/features/profile/PersonProfilePage"));
 export const GuidelinesPage = screen(() => import("@/features/guidelines/GuidelinesPage"), pathFor("guidelines"));
 export const RAGChatPage = screen(() => import("@/features/ai/RAGChatPage"), pathFor("ai"));

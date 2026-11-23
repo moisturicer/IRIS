@@ -409,7 +409,7 @@ export default function PaperViewPage() {
     </button>
   );
   const saveCiteShare = (
-    <SaveCiteShare record={record} savePrimary={primary === "save"} onCite={() => setCiteOpen(true)}
+    <SaveCiteShare record={record} savePrimary={primary === "save"} canCite={can.has("cite")} onCite={() => setCiteOpen(true)}
       shareState={shareState} onShare={share} />
   );
 

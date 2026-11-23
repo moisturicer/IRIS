@@ -16,8 +16,8 @@ const STEP = 10;
 
 /**
  * Frame a chosen photo inside a circle (IR-699). Confirming hands the framing
- * back to the Edit profile page, which uploads it only when Save is pressed,
- * so Cancel on that page leaves the old photo in place.
+ * back to Settings' Profile section, which uploads it only when Save is pressed,
+ * so Discard changes there leaves the old photo in place.
  *
  * The circle is the preview: what shows inside it is what the Profile will
  * show. The person drags the photo or moves it with the arrow keys, and zooms

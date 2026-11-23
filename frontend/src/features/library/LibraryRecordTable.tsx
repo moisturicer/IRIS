@@ -9,6 +9,7 @@ import {
   recordYearLabel,
 } from "@/features/discover/discoverUtils";
 import { cn } from "@/lib/utils";
+import { PIPELINE_STATUS } from "@/lib/constants";
 import type { ReadingStatus } from "@/api/library";
 import { READING_STATUSES, readingStatusLabel } from "@/store/library.store";
 
@@ -69,15 +70,20 @@ export function LibraryRecordTable({
 
   const actions = (record: RecordListItem) => (
     <div className="flex items-center gap-0.5">
-      <button
-        type="button"
-        onClick={() => onCite(record)}
-        aria-label={`Cite ${record.title}`}
-        title="Cite"
-        className="p-1.5 rounded-control text-stone-400 hover:text-brand hover:bg-stone-100 transition-colors"
-      >
-        <i className="fas fa-quote-right text-label" aria-hidden />
-      </button>
+      {/* Only a published paper is cited (IR-1305). A list item carries no
+          `capabilities`, so this mirrors the server's `cite` rule, which
+          Paper View reads. */}
+      {record.pipeline_status === PIPELINE_STATUS.PUBLISHED && (
+        <button
+          type="button"
+          onClick={() => onCite(record)}
+          aria-label={`Cite ${record.title}`}
+          title="Cite"
+          className="p-1.5 rounded-control text-stone-400 hover:text-brand hover:bg-stone-100 transition-colors"
+        >
+          <i className="fas fa-quote-right text-label" aria-hidden />
+        </button>
+      )}
       {onRemove && (
         <button
           type="button"
