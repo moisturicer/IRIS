@@ -17,8 +17,10 @@ import { layoutUsecase } from './usecase.mjs';
 import { layoutColumns } from './grid.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const SRC = path.join(HERE, '..', 'src');
-const OUT = path.join(HERE, '..', 'png');
+// DIAGRAM_SRC / DIAGRAM_OUT let another diagram set reuse this renderer and its style
+// (docs/diagrams/srs-sdd-v2, IR-1275). Unset, it renders Section D as before.
+const SRC = process.env.DIAGRAM_SRC ? path.resolve(process.env.DIAGRAM_SRC) : path.join(HERE, '..', 'src');
+const OUT = process.env.DIAGRAM_OUT ? path.resolve(process.env.DIAGRAM_OUT) : path.join(HERE, '..', 'png');
 const FONT_DIR = path.join(HERE, 'node_modules', '@expo-google-fonts', 'inter');
 const FONT_FILES = ['Inter_400Regular.ttf', 'Inter_600SemiBold.ttf'].map((f) => path.join(FONT_DIR, f));
 const toAB = (b) => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
@@ -536,7 +538,7 @@ async function main() {
   const args = process.argv.slice(2);
   const keepSvg = args.includes('--svg');
   const only = args.filter((a) => !a.startsWith('--'));
-  const files = fs.readdirSync(SRC).filter((f) => /^D-\d+.*\.(mjs|json)$/.test(f)).sort();
+  const files = fs.readdirSync(SRC).filter((f) => /^[A-Z]-\d+.*\.(mjs|json)$/.test(f)).sort();
   fs.mkdirSync(OUT, { recursive: true });
   let bad = 0;
   for (const f of files) {
