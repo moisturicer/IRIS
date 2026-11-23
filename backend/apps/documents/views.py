@@ -157,6 +157,9 @@ class SubmitDocumentView(APIView):
                         The slot is then taken from the item. Owners only:
                         the party that asked cannot answer its own request
                         (§Amendment 2, IR-263), so any other caller is a 403.
+        replaces      — with request_item, the RecordUpload PK this file
+                        replaces: an owner corrects a file the requesting
+                        party has not decided (§Amendment 8).
         file          — PDF file
 
     Response 201:
@@ -195,7 +198,8 @@ class SubmitDocumentView(APIView):
             # it uploaded, with the item locked, so two uploads cannot both
             # answer it and the request cannot close in between.
             from .requests import (
-                DocumentRequestError, fulfil_item, may_fulfil, resolve_item_for_upload,
+                DocumentRequestError, fulfil_item, may_fulfil, replace_item_upload,
+                resolve_item_for_upload,
             )
 
             # §Amendment 2: staff pass `authorize_record_documents` on every
@@ -214,9 +218,13 @@ class SubmitDocumentView(APIView):
                 return Response({"file": [problem], "detail": problem}, status=400)
             try:
                 with transaction.atomic():
-                    item, slot = resolve_item_for_upload(record, item_id, slot_id)
-                    upload = create_upload(record, slot, file, uploaded_by=request.user)
-                    fulfil_item(item, upload, uploaded_by=request.user)
+                    if request.data.get("replaces"):
+                        upload = replace_item_upload(
+                            record, item_id, request.data["replaces"], file, uploaded_by=request.user)
+                    else:
+                        item, slot = resolve_item_for_upload(record, item_id, slot_id)
+                        upload = create_upload(record, slot, file, uploaded_by=request.user)
+                        fulfil_item(item, upload, uploaded_by=request.user)
             except DocumentRequestError as exc:
                 return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         else:
@@ -740,10 +748,52 @@ class DocumentRequestDecisionView(APIView):
         )
 
 
+class DocumentRequestItemUploadView(APIView):
+    """
+    DELETE /api/v1/document-request-items/<id>/upload/?upload=<upload id>
+
+    An owner takes back a file the requesting party has not decided, and the
+    document is asked for again (ADR-022 §Amendment 8). Answers with the whole
+    request. 404 off a visible Record, 403 to a visible reader who does not own
+    it, 400 when the file was decided, replaced or removed meanwhile.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, pk):
+        from .models import DocumentRequestItem
+        from .request_serializers import serialize_request
+        from .requests import (
+            DocumentRequestError, may_fulfil, remove_item_upload, request_on_visible_record,
+            requests_for,
+        )
+
+        item = DocumentRequestItem.objects.filter(pk=pk).first()
+        document_request = request_on_visible_record(item.request_id if item else None, request.user)
+        if document_request is None:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        record = document_request.record
+        if not may_fulfil(record, request.user):
+            return Response(
+                {"detail": "Only the record's owners can remove a requested document."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        try:
+            remove_item_upload(
+                record, pk, request.query_params.get("upload"), removed_by=request.user)
+        except DocumentRequestError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(serialize_request(
+            requests_for(record).get(pk=document_request.pk), request.user
+        ))
+
+
 class DocumentRequestItemDecisionView(APIView):
     """
     PATCH /api/v1/document-request-items/<id>/
           {"action": "accept"} | {"action": "reject", "reason": str}
+
+    Either may name `upload`, the file that was read: refused (400) when the
+    owner has replaced it since (§Amendment 8).
 
     The requesting party's verdict on one upload (ADR-022 §3.4). Refusals as
     `_managed_request` says. Answers with the whole request, since a
@@ -765,9 +815,9 @@ class DocumentRequestItemDecisionView(APIView):
 
         def decide(data):
             if data["action"] == "accept":
-                accept_item(item, request.user)
+                accept_item(item, request.user, upload_id=data["upload"])
             else:
-                reject_item(item, request.user, reason=data["reason"])
+                reject_item(item, request.user, reason=data["reason"], upload_id=data["upload"])
 
         return _apply(
             document_request, request.user, ItemDecisionSerializer(data=request.data), decide

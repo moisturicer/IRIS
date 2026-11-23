@@ -206,16 +206,15 @@ class UploadVersionTests(NewVersionTestBase):
 
     def test_the_owner_may_replace_the_manuscript_only_while_a_revision_is_asked_for(self):
         """
-        Still a 400, but since IR-507 it is the record update's own "not now"
-        (`detail`, naming the status), answered before the body is read --
-        not the manuscript lock's `abstract_file` error. An owner may edit
-        nothing in review until a revision is asked for, the file included.
+        The manuscript lock's `abstract_file` error, naming the status. From
+        IR-507 until the 2026-11-24 amendment it was the update's own "not
+        now"; an owner now edits details in review, never the file.
         """
         record = self.thesis(Party.IERC)
 
         refused = self.upload_manuscript(record)
         self.assertEqual(refused.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("in_review", refused.data["detail"])
+        self.assertIn("in_review", str(refused.data["abstract_file"]))
         record.refresh_from_db()
         self.assertEqual(record.abstract_file.name, self.versions(record)[0].manuscript.name)
 
@@ -379,11 +378,8 @@ class NothingChangedTests(NewVersionTestBase):
 
     def test_an_edit_made_before_the_request_does_not_answer_it(self):
         """
-        The edit is made while the record is still a draft. It used to be made
-        in review before the request was opened, which IR-507 now refuses: an
-        owner edits only a draft or a record awaiting their revision. A draft
-        edit stamps `details_edited_at` just the same, so the question this
-        asks -- does an earlier stamp answer a later request? -- is unchanged.
+        The edit is made while the record is still a draft: does an earlier
+        `details_edited_at` stamp answer a later request?
         """
         record = self.make_record(abstract_file=_pdf(V1))
         self.edit_title(record)

@@ -8,7 +8,8 @@ staff member as the one who gave the student's Data Privacy Act consent, and an
 owner could edit in every state. Settled with the project lead:
 
 1. only an owner edits details or submits -- any owner, not only the primary;
-2. an owner edits only a `draft`, or a record awaiting their revision;
+2. an owner edits in every state -- settled as a draft or a record awaiting
+   their revision until the amendment of 2026-11-24 (proposed);
 3. once submitted, `versions.SUBMISSION_FIXED_FIELDS` stay as submitted -- an
    unchanged value is accepted, a change is one 400 naming every field.
 
@@ -18,6 +19,7 @@ Refusals follow ADR-022 §Amendment 4: 403 for a record the caller can see.
 from django.urls import reverse
 from rest_framework import status
 
+from apps.audit.models import AuditEvent
 from apps.records.models import Record, RecordOwner, RecordType
 from apps.records.testing import released_embargo
 from apps.records.versions import SUBMISSION_FIXED_FIELDS
@@ -155,37 +157,50 @@ class WhenAnOwnerEditsTests(EditPolicyTestBase):
         record.refresh_from_db()
         self.assertEqual(record.title, "The revised title")
 
-    def test_an_owner_does_not_edit_a_record_in_review_with_no_revision_asked_for(self):
-        record = self.at_adviser()
-        title = record.title
+    def test_an_owner_edits_in_review_with_no_revision_asked_for_and_once_published(self):
+        """
+        Reversed deliberately by the 2026-11-24 amendment, not to make a red
+        test green: both were refused as "not now" (IR-507).
+        """
+        for state in ("at_adviser", "published"):
+            with self.subTest(state=state):
+                record = getattr(self, state)()
 
-        response = self.edit(record, self.owner, {"title": "Changed under the reviewer"})
+                response = self.edit(record, self.owner, {"title": f"A better title, {state}"})
 
-        # A 400, not a 403: the right person at the wrong moment (settled
-        # 2026-10-11), said as `detail` and naming the status, as submit/ does.
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
-        self.assertEqual(set(response.data), {"detail"})
-        self.assertIn(PipelineStatus.IN_REVIEW, response.data["detail"])
-        record.refresh_from_db()
-        self.assertEqual(record.title, title)
+                self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+                record.refresh_from_db()
+                self.assertEqual(record.title, f"A better title, {state}")
 
-    def test_an_owner_does_not_edit_a_published_record(self):
-        """Post-publication correction is deferred, not built (ADR-032 §10 Amendment)."""
+    def test_what_changed_past_draft_is_audited_by_field_and_never_by_text(self):
         record = self.published()
 
-        response = self.edit(record, self.owner, {"title": "Changed after acceptance"})
+        self.edit(record, self.owner, {"title": "A corrected title", "abstract": record.abstract})
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
-        self.assertIn(PipelineStatus.PUBLISHED, response.data["detail"])
+        [event] = AuditEvent.objects.filter(event_type=AuditEvent.DETAILS_EDITED, record=record)
+        self.assertEqual(event.user, self.owner)
+        self.assertEqual(event.metadata["fields"], ["title"])
+        self.assertEqual(event.metadata["status"], PipelineStatus.PUBLISHED)
+        self.assertNotIn("A corrected title", str(event.metadata))
 
-    def test_not_now_is_said_before_anything_about_the_body(self):
-        """A body the serializer would also refuse still hears "not now" first."""
-        record = self.published()
+    def test_a_draft_s_edits_and_a_save_that_changes_nothing_are_not_audited(self):
+        draft, published = self.make_record(), self.published()
 
-        response = self.edit(record, self.owner, {"title": "", "adviser": self.other_adviser.pk})
+        self.edit(draft, self.owner, {"title": "A draft's better title"})
+        self.edit(published, self.owner, {"title": published.title})
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
-        self.assertEqual(set(response.data), {"detail"})
+        self.assertFalse(AuditEvent.objects.filter(event_type=AuditEvent.DETAILS_EDITED).exists())
+
+    def test_the_fixed_fields_and_the_manuscript_stay_fixed_in_every_state(self):
+        for state in ("at_adviser", "published"):
+            with self.subTest(state=state):
+                record = getattr(self, state)()
+
+                response = self.edit(record, self.owner, {"adviser": self.other_adviser.pk, "abstract_file": None})
+
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+                record.refresh_from_db()
+                self.assertEqual(record.adviser, self.adviser)
 
 
 # --- what -----------------------------------------------------------------------------

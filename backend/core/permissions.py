@@ -629,8 +629,10 @@ def record_capabilities(record, user, *, workflow, my_seats, routing, office_rev
 
         if continuable(record):
             offered.append("continue_as")
+        # An owner edits details in every state (ADR-032 §10, 2026-11-24).
+        offered.append("edit_details")
         if workflow["workflow_state"] == PipelineStatus.DRAFT:
-            offered.extend(["continue_draft", "edit_details"])
+            offered.append("continue_draft")
         elif workflow["workflow_state"] == WorkflowState.AWAITING_RESUBMISSION:
             if revision["new_version"] is not None:
                 offered.extend(["create_version", "replace_manuscript"])
@@ -639,7 +641,6 @@ def record_capabilities(record, user, *, workflow, my_seats, routing, office_rev
 
                 if manuscript_unsubmitted(record, user):
                     offered.append("discard_revised_manuscript")
-            offered.append("edit_details")
         delete_act = DELETE_CAPABILITY.get(record.pipeline_status)
         if delete_act is not None:
             offered.append(delete_act)

@@ -15,6 +15,8 @@
 
 > **Amended 2026-11-18 ([IR-1226](https://citiris.atlassian.net/browse/IR-1226); accepted 2026-11-18 with PR #895's merge; security review approved verbally by Ashlee Sean, relayed by Hermoine Zozobrado).** Creating, deciding and withdrawing a request takes a seat on the requesting party, not membership of it. See *Amendment 7*.
 
+> **Amended 2026-11-24 (Proposed; PR #994): an owner reads, replaces and removes a requested document until it is decided.** See *Amendment 8*.
+
 **Accepted** — 2026-09-15 · **amended 2026-09-24, §Amendment (fulfilment, who may read request data, refusals)**. Settled as a business decision by **Lee Jasmin Adolfo** (project lead);
 takes effect when [PR #81](https://github.com/moisturicer/IRIS/pull/81) merges. Tracked on
 [IR-254](https://citiris.atlassian.net/browse/IR-254); implemented by
@@ -366,6 +368,30 @@ requester, so there is nothing for a fulfilment to link to.
 
 **Block the record while a request is open.** Rejected. That is a decline under another name,
 and it breaks parallel review.
+
+
+## Amendment 8 — 2026-11-24 (Proposed): an owner corrects a requested document until it is decided
+
+Asked for by Jive Tyler I. Revalde on PR #994, built there, and **awaiting the project lead's acceptance and a security review**. It amends §3 and ADR-058 §2's amendment, point 3.
+
+**The problem.** An owner could upload a requested document and then do nothing more with it. A wrong file had to wait for the office to reject it, because the server answered *"That document has already been uploaded."* An ordinary upload into the same slot made a newer version the request did not point at, so the office judged the old one.
+
+**The rule.** While an item is `uploaded`, its request is not withdrawn and its party's assignment is active, an owner may:
+
+- **Read it.** The owner downloads what they sent, from the Overview or Documents.
+- **Replace it.** `POST documents/submit/` with `request_item` and `replaces` (the upload it corrects). The new file is the slot's next version and the request's state does not move. The file it replaces is deleted as a removed one is. Every undecided item the same file answered moves with it.
+- **Remove it.** `DELETE document-request-items/<id>/upload/?upload=<id>`. The item is `missing` again and its request reopens. The file is deleted, unless a version or a thread names it, it was rejected, it was reviewed, or another item points at it. Then it is only unlinked.
+
+**Safeguards.**
+
+- `accepted` ends it: nothing decided can be replaced or removed.
+- Both name the file the owner saw, so two co-owners cannot undo each other (400).
+- A verdict names the file the reviewer saw (`upload`). One on a file replaced since is refused (400), so an office never accepts a file it has not read.
+- Owners only: 404 off a visible Record, 403 to anyone else who can see it, the party that asked included.
+- Audited as `DOCUMENT_REQUEST_REPLACED` and `DOCUMENT_REQUEST_REMOVED`. Nobody is notified of a replacement; a removed document's request tells its party again once it is whole.
+- The wire adds `can_replace` to each item: the viewer owns the paper and the rule above holds.
+
+**What this changes in ADR-058.** Its point 3 kept every file that answered a request "because the requesting party accepted or rejected it". An undecided file is neither, so it may be deleted. A decided one is kept as before.
 
 ## Decision Rationale
 

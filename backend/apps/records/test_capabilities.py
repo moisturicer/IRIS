@@ -355,8 +355,9 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
     NAMES_CONTACT = {"change_contact_person"}
     # An owner is offered the one delete its record's status names (IR-508).
     OWNER_TALK = {"comment_review", "start_thread"}
-    OWNER_IN_REVIEW = {"withdraw_submission"} | OWNER_TALK | NAMES_CONTACT
-    OWNER_AFTER_REVIEW = {"request_deletion"} | OWNER_TALK | NAMES_CONTACT
+    # An owner edits details in every state (ADR-032 §10, 2026-11-24).
+    OWNER_IN_REVIEW = {"withdraw_submission", "edit_details"} | OWNER_TALK | NAMES_CONTACT
+    OWNER_AFTER_REVIEW = {"request_deletion", "edit_details"} | OWNER_TALK | NAMES_CONTACT
     # RDCO publishes only a released paper (ADR-052 §14 as amended), so while
     # these are held it keeps them unlisted or rejects them. Record detail still
     # offers *publish* to the seated RDCO, held with the embargo's reason, so the
@@ -402,14 +403,14 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
         },
         # ITSO asked once, so it is offered the withdrawal, not a second ask.
         "revision_asked_by_itso": {
-            "owner": OWNER_IN_REVIEW | {"create_version", "replace_manuscript", "edit_details"},
+            "owner": OWNER_IN_REVIEW | {"create_version", "replace_manuscript"},
             "adviser": ADVISER_TAKES_PART, "itso": ITSO_SEATED | {"withdraw_revision"},
             "ierc": OFFICE, "rdco": RDCO_SEATED, "stranger": None,
         },
         # The owner has an upload waiting, so only they may throw it away (IR-1047).
         "revision_asked_and_revised": {
             "owner": OWNER_IN_REVIEW | {
-                "create_version", "replace_manuscript", "edit_details", "discard_revised_manuscript",
+                "create_version", "replace_manuscript", "discard_revised_manuscript",
             },
             "adviser": ADVISER_TAKES_PART, "itso": ITSO_SEATED | {"withdraw_revision"},
             "ierc": OFFICE, "rdco": RDCO_SEATED, "stranger": None,

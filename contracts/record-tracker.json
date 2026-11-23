@@ -11,13 +11,13 @@
       {
         "party": "rdco",
         "label": "RDCO Final",
-        "opened_at": "2026-11-06T14:34:53.035792+00:00",
+        "opened_at": "2026-11-23T22:34:35.117850+00:00",
         "opened_by": "Ana Adviser"
       },
       {
         "party": "itso",
         "label": "ITSO",
-        "opened_at": "2026-11-06T14:34:53.072654+00:00",
+        "opened_at": "2026-11-23T22:34:35.148596+00:00",
         "opened_by": "Test User"
       }
     ],
@@ -50,8 +50,8 @@
         "party": "adviser",
         "label": "Adviser",
         "state": "completed",
-        "opened_at": "2026-11-06T14:34:52.617208+00:00",
-        "clock_started_at": "2026-11-06T14:34:52.617208+00:00",
+        "opened_at": "2026-11-23T22:34:35.021889+00:00",
+        "clock_started_at": "2026-11-23T22:34:35.021889+00:00",
         "due_at": null,
         "original_due_at": null,
         "is_overdue": false,
@@ -64,8 +64,8 @@
         "party": "rdco",
         "label": "RDCO Final",
         "state": "active",
-        "opened_at": "2026-11-06T14:34:53.035792+00:00",
-        "clock_started_at": "2026-11-06T14:34:53.035792+00:00",
+        "opened_at": "2026-11-23T22:34:35.117850+00:00",
+        "clock_started_at": "2026-11-23T22:34:35.117850+00:00",
         "due_at": null,
         "original_due_at": null,
         "is_overdue": false,
@@ -78,8 +78,8 @@
         "party": "itso",
         "label": "ITSO",
         "state": "active",
-        "opened_at": "2026-11-06T14:34:53.072654+00:00",
-        "clock_started_at": "2026-11-06T14:34:53.072654+00:00",
+        "opened_at": "2026-11-23T22:34:35.148596+00:00",
+        "clock_started_at": "2026-11-23T22:34:35.148596+00:00",
         "due_at": null,
         "original_due_at": null,
         "is_overdue": false,
@@ -117,7 +117,7 @@
             "verdict_label": "Approved"
           }
         ],
-        "at": "2026-11-06T14:34:52.983006+00:00",
+        "at": "2026-11-23T22:34:35.113379+00:00",
         "withdrawn_by_decision": null,
         "preserved": false,
         "carryover": null,
@@ -152,7 +152,7 @@
             "verdict_label": null
           }
         ],
-        "at": "2026-11-06T14:34:53.072654+00:00",
+        "at": "2026-11-23T22:34:35.148596+00:00",
         "withdrawn_by_decision": null,
         "preserved": false,
         "carryover": null,
@@ -191,14 +191,14 @@
         "party": "itso",
         "label": "ITSO",
         "kind": "reviewing",
-        "text": "Reviewing",
+        "text": "Reviewing v1",
         "note": null,
-        "version": null
+        "version": 1
       }
     ],
     "routing_history": [
       {
-        "group_id": "83a0ea29-5896-46e8-87fc-82ea1407bda7",
+        "group_id": "f69f220e-b27d-426c-b519-55efda552bc4",
         "from": null,
         "from_label": null,
         "to": [
@@ -210,10 +210,10 @@
         "actor": "Sam Student",
         "reason": "",
         "suggested_offices": [],
-        "at": "2026-11-06T14:34:52.617208+00:00"
+        "at": "2026-11-23T22:34:35.021889+00:00"
       },
       {
-        "group_id": "7a0930fd-0a19-4739-8862-2de53125aa54",
+        "group_id": "33847724-1056-4295-a407-f45aac3f4d09",
         "from": "adviser",
         "from_label": "Adviser",
         "to": [
@@ -225,10 +225,10 @@
         "actor": "Ana Adviser",
         "reason": "Institutional review.",
         "suggested_offices": [],
-        "at": "2026-11-06T14:34:53.035792+00:00"
+        "at": "2026-11-23T22:34:35.117850+00:00"
       },
       {
-        "group_id": "89437d2c-8b6f-4d02-b5f4-74dfe1869ed9",
+        "group_id": "6bf27657-19ef-4aff-99fa-74a12c0d463a",
         "from": "rdco",
         "from_label": "RDCO Final",
         "to": [
@@ -240,10 +240,10 @@
         "actor": "Test User",
         "reason": "The method may be patentable.",
         "suggested_offices": [],
-        "at": "2026-11-06T14:34:53.072654+00:00"
+        "at": "2026-11-23T22:34:35.148596+00:00"
       }
     ],
-    "routing_recorded_from": "2026-11-06T14:34:28.309098+00:00",
+    "routing_recorded_from": "2026-11-23T22:34:17.294103+00:00",
     "reviews": [
       {
         "id": 1,
@@ -253,7 +253,7 @@
         "status_label": "Approved",
         "comment": "Institutional review.",
         "reviewed_by_name": "Ana Adviser",
-        "created_at": "2026-11-06T14:34:52.966941+00:00",
+        "created_at": "2026-11-23T22:34:35.103613+00:00",
         "version": 1
       }
     ],
@@ -262,7 +262,7 @@
         "number": 1,
         "cause": "submission",
         "cause_label": "Submission",
-        "created_at": "2026-11-06T14:34:52.683035+00:00",
+        "created_at": "2026-11-23T22:34:35.041342+00:00",
         "created_by_name": "Sam Student",
         "manuscript_url": "/api/v1/records/1/versions/1/manuscript/",
         "documents": [],
@@ -271,8 +271,9 @@
             "upload_id": 1,
             "slot": "Endorsement",
             "version": 1,
-            "uploaded_at": "2026-11-06T14:34:53.107527+00:00",
-            "download_url": "/api/v1/documents/uploads/1/download/"
+            "uploaded_at": "2026-11-23T22:34:35.190979+00:00",
+            "download_url": "/api/v1/documents/uploads/1/download/",
+            "rejections": []
           }
         ],
         "documents_reconstructed": false,
@@ -287,20 +288,28 @@
     "review_comments": [
       {
         "id": 1,
+        "kind": "thread",
         "author": 1,
         "author_name": "Sam Student",
         "body": "Is the endorsement enough?",
         "version": 1,
         "reply_to": null,
-        "created_at": "2026-11-06T14:34:53.381062+00:00",
+        "created_at": "2026-11-23T22:34:35.245754+00:00",
         "edited_at": null,
         "can_edit": true,
+        "mentions": [],
         "party": null,
         "party_label": "The authors",
         "severity": null,
         "is_draft": false,
         "round": null,
         "anchor": null,
+        "document": null,
+        "suggestion": "",
+        "place": null,
+        "outdated_since": null,
+        "wording_check": null,
+        "not_followed": null,
         "state": "open",
         "resolved_by": null,
         "resolved_at": null,
@@ -309,6 +318,7 @@
         "answer": null,
         "events": [],
         "can_delete": false,
+        "can_post": false,
         "can_change_severity": false,
         "can_resolve": true,
         "can_reopen": false,
@@ -316,20 +326,28 @@
       },
       {
         "id": 2,
+        "kind": "thread",
         "author": 4,
         "author_name": "Ivan Santos",
         "body": "Cite the prior-art search.",
         "version": 1,
         "reply_to": null,
-        "created_at": "2026-11-06T14:34:53.389412+00:00",
+        "created_at": "2026-11-23T22:34:35.247278+00:00",
         "edited_at": null,
         "can_edit": false,
+        "mentions": [],
         "party": "itso",
         "party_label": "ITSO",
         "severity": "must_fix",
         "is_draft": false,
         "round": null,
         "anchor": null,
+        "document": null,
+        "suggestion": "",
+        "place": null,
+        "outdated_since": null,
+        "wording_check": null,
+        "not_followed": null,
         "state": "open",
         "resolved_by": null,
         "resolved_at": null,
@@ -338,6 +356,7 @@
         "answer": null,
         "events": [],
         "can_delete": false,
+        "can_post": false,
         "can_change_severity": false,
         "can_resolve": false,
         "can_reopen": false,
@@ -346,6 +365,7 @@
     ],
     "review_rounds": [],
     "resubmissions": [],
+    "published_later": null,
     "reassignments": [],
     "document_requests": [
       {
@@ -356,7 +376,7 @@
         "state_label": "Open",
         "message": "Please attach the signed endorsement.",
         "requested_by": "Ivan Santos",
-        "created_at": "2026-11-06T14:34:53.341437+00:00",
+        "created_at": "2026-11-23T22:34:35.222217+00:00",
         "closed_at": null,
         "can_manage": false,
         "items": [
@@ -369,7 +389,8 @@
             "upload": null,
             "uploaded_at": null,
             "rejection_reason": null,
-            "decided_at": null
+            "decided_at": null,
+            "can_replace": false
           }
         ]
       }
@@ -382,7 +403,7 @@
         "status_label": "Pending",
         "comment": "",
         "reviewed_by_name": null,
-        "updated_at": "2026-11-06T14:34:53.077679+00:00",
+        "updated_at": "2026-11-23T22:34:35.151930+00:00",
         "preserved": false,
         "carryover": null,
         "carryover_version": null,

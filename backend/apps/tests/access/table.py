@@ -620,6 +620,14 @@ DOCUMENTS_APP: dict[str, Entry | Shadowed] = {
             kwargs={"pk": Ref("document_request_item")}, data={"action": "accept"},
         ),
     }),
+    # An owner takes back an undecided upload (§Amendment 8); the item here has
+    # none, so the owner's answer is the 400 of nothing to remove.
+    "document-request-item-upload": Entry({
+        "DELETE": _case(
+            row(ANON, HIDE, OK, DENY, DENY, DENY, DENY, DENY, HIDE, HIDE),
+            kwargs={"pk": Ref("document_request_item")},
+        ),
+    }),
 }
 
 REVIEW_DEADLINES: dict[str, Entry | Shadowed] = {

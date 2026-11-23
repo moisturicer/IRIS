@@ -8,11 +8,15 @@ id, as the ADR names them. Mounted at `/api/v1/`.
 
 from django.urls import path
 
-from .views import DocumentRequestDecisionView, DocumentRequestItemDecisionView
+from .views import (
+    DocumentRequestDecisionView, DocumentRequestItemDecisionView, DocumentRequestItemUploadView,
+)
 
 urlpatterns = [
     path("document-requests/<int:pk>/", DocumentRequestDecisionView.as_view(),
          name="document-request-detail"),
     path("document-request-items/<int:pk>/", DocumentRequestItemDecisionView.as_view(),
          name="document-request-item-detail"),
+    path("document-request-items/<int:pk>/upload/", DocumentRequestItemUploadView.as_view(),
+         name="document-request-item-upload"),
 ]

@@ -9,7 +9,8 @@ from open requests by `apps.reviews.tracker` and never stored.
 
 Who does what (§Amendment 2): the requesting party creates, decides and
 withdraws; only the Record's owners fulfil -- against a `request_item`, or by
-an ordinary upload into a requested slot (§Amendment 1, IR-346). A decision
+an ordinary upload into a requested slot (§Amendment 1, IR-346) -- and may
+replace or remove that file until it is decided (§Amendment 8). A decision
 closing open requests (§3) is IR-270's.
 
 The wire shape is `request_serializers`; this module builds no payload.
@@ -17,6 +18,7 @@ The wire shape is `request_serializers`; this module builds no payload.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Optional
 
@@ -27,6 +29,8 @@ from apps.audit import workflow as audit
 from core.enums import DocumentRequestItemState, DocumentRequestState
 
 from .models import DocumentRejection, DocumentRequest, DocumentRequestItem, UploadSlot
+
+logger = logging.getLogger(__name__)
 
 
 class DocumentRequestError(Exception):
@@ -233,6 +237,137 @@ def fulfil_by_slot_upload(record, slot: UploadSlot, upload, *, uploaded_by) -> l
     return answered
 
 
+def item_replaceable(item: DocumentRequestItem) -> bool:
+    """
+    May an owner still replace or remove the file `item` points at
+    (ADR-022 §Amendment 8)? Only until the requesting party has decided it,
+    and while that party still has the paper.
+    """
+    from core.enums import AssignmentState
+
+    request = item.request
+    return (
+        item.state == DocumentRequestItemState.UPLOADED
+        and item.upload_id is not None
+        and request.state != DocumentRequestState.WITHDRAWN
+        and request.assignment.state == AssignmentState.ACTIVE
+    )
+
+
+_CHANGED = "That document changed since you opened this page. Reload to see the latest."
+
+
+def _lock_replaceable(record, item_id, upload_id) -> tuple[DocumentRequestItem, list[DocumentRequestItem]]:
+    """
+    The item, and every item that the same file answers and that an owner may
+    still change: one slot upload can answer several (§Amendment 1). Locks as
+    `resolve_item_for_upload` does. `upload_id` is the file the owner saw, so
+    two co-owners cannot overwrite each other's. **Call inside a transaction.**
+    """
+    from apps.records.models import Record
+
+    Record.objects.select_for_update().get(pk=record.pk)
+    try:
+        item = DocumentRequestItem.objects.select_for_update(of=("self",)).get(
+            pk=int(item_id), request__record=record,
+        )
+        seen = int(upload_id)
+    except (DocumentRequestItem.DoesNotExist, TypeError, ValueError):
+        raise DocumentRequestError("That requested document does not exist.")
+    if item.state == DocumentRequestItemState.ACCEPTED:
+        raise DocumentRequestError("That document has been accepted, so it can't be changed.")
+    if item.state != DocumentRequestItemState.UPLOADED or item.upload_id != seen:
+        raise DocumentRequestError(_CHANGED)
+
+    same_file = []
+    for other in (
+        DocumentRequestItem.objects.select_for_update(of=("self",))
+        .filter(request__record=record, upload_id=seen, state=DocumentRequestItemState.UPLOADED)
+        .order_by("request_id", "pk")
+    ):
+        other.request = (
+            DocumentRequest.objects.select_for_update(of=("self",))
+            .select_related("assignment").get(pk=other.request_id)
+        )
+        if item_replaceable(other):
+            same_file.append(other)
+    if item.pk not in {other.pk for other in same_file}:
+        raise DocumentRequestError("That request is closed.")
+    return item, same_file
+
+
+def replace_item_upload(record, item_id, upload_id, file, *, uploaded_by):
+    """
+    The owner sends a corrected file before the requesting party decides
+    (§Amendment 8). The request's state does not move. The file it replaces is
+    deleted unless the review keeps it. **Call inside a transaction.**
+    """
+    from .services import create_upload
+
+    item, same_file = _lock_replaceable(record, item_id, upload_id)
+    replaced = item.upload
+    upload = create_upload(record, replaced.slot, file, uploaded_by=uploaded_by)
+    for other in same_file:
+        other.upload = upload
+        other.save(update_fields=["upload"])
+        audit.document_replaced(other.request, other, uploaded_by, upload=upload)
+    _delete_unless_kept(replaced)
+    return upload
+
+
+def remove_item_upload(record, item_id, upload_id, *, removed_by) -> None:
+    """
+    The owner takes back a file the requesting party has not decided
+    (§Amendment 8): the item is asked for again and its request reopens. The
+    file is deleted unless the review keeps it.
+    """
+    with transaction.atomic():
+        item, same_file = _lock_replaceable(record, item_id, upload_id)
+        upload = item.upload
+        for other in same_file:
+            request = other.request
+            other.state = DocumentRequestItemState.MISSING
+            other.upload = None
+            other.save(update_fields=["state", "upload"])
+            if request.state != DocumentRequestState.OPEN:
+                # As a rejection does (ADR-069): what ended is stamped first.
+                from apps.notifications.settling import settle_record
+
+                settle_record(record)
+                request.state = DocumentRequestState.OPEN
+                request.closed_at = None
+                request.save(update_fields=["state", "closed_at"])
+            audit.document_removed(request, other, removed_by, upload=upload)
+
+        _delete_unless_kept(upload)
+
+
+def _delete_unless_kept(upload) -> None:
+    """
+    Delete a file no item points at any more, unless the review keeps it: a
+    version or a thread names it, it was rejected or reviewed, or another item
+    still points at it (`deletion_refused_reason`). Call in a transaction.
+    """
+    from apps.records.versions import deletion_refused_reason
+
+    if deletion_refused_reason(upload) is not None or upload.reviews.exists():
+        return
+    slot, storage, name = upload.slot, upload.file.storage, upload.file.name
+    upload.delete()
+    # An "Other" document's own slot goes with its last file.
+    if slot.record_id is not None and not slot.uploads.exists():
+        slot.delete()
+    transaction.on_commit(lambda: _delete_stored(storage, name))
+
+
+def _delete_stored(storage, name) -> None:
+    """Best-effort, after the row is gone: a failure leaves a file nobody reaches."""
+    try:
+        storage.delete(name)
+    except Exception:
+        logger.exception("could not delete a removed requested document's file")
+
+
 def may_read_requests(record, user) -> bool:
     """
     May `user` read `record`'s document requests? (IR-349, ADR-022 §Amendment 5)
@@ -310,11 +445,17 @@ def request_on_visible_record(request_id, user) -> Optional[DocumentRequest]:
     return request
 
 
-def _lock_decidable(item: DocumentRequestItem) -> tuple[DocumentRequestItem, DocumentRequest]:
+def _lock_decidable(
+    item: DocumentRequestItem, upload_id=None,
+) -> tuple[DocumentRequestItem, DocumentRequest]:
     """
     Lock the item, then its request -- the order the upload path locks them,
     so a decision and an upload cannot interleave -- and confirm the item is
     an upload awaiting the requesting party's verdict. Call in a transaction.
+
+    `upload_id` is the file the reviewer saw, when the caller says: the owner
+    may replace it until it is decided (§Amendment 8), and a verdict on the
+    earlier file must not land on the new one.
     """
     from apps.records.models import Record
 
@@ -325,17 +466,21 @@ def _lock_decidable(item: DocumentRequestItem) -> tuple[DocumentRequestItem, Doc
         raise DocumentRequestError("That request was withdrawn.")
     if item.state != DocumentRequestItemState.UPLOADED:
         raise DocumentRequestError("Only an uploaded document can be accepted or rejected.")
+    if upload_id is not None and item.upload_id != upload_id:
+        raise DocumentRequestError(
+            "The owner replaced this document. Read the new file before deciding."
+        )
     return item, request
 
 
-def accept_item(item: DocumentRequestItem, user) -> DocumentRequest:
+def accept_item(item: DocumentRequestItem, user, *, upload_id=None) -> DocumentRequest:
     """
     The upload satisfies the request (ADR-022 §3.4). A request whose items
     were all uploaded is already fulfilled, so it stays closed. The caller has
     checked `is_requester`; `user` is who accepted, for the audit log.
     """
     with transaction.atomic():
-        item, request = _lock_decidable(item)
+        item, request = _lock_decidable(item, upload_id)
         item.state = DocumentRequestItemState.ACCEPTED
         item.decided_at = timezone.now()
         item.save(update_fields=["state", "decided_at"])
@@ -343,7 +488,7 @@ def accept_item(item: DocumentRequestItem, user) -> DocumentRequest:
     return request
 
 
-def reject_item(item: DocumentRequestItem, user, *, reason: str) -> DocumentRequest:
+def reject_item(item: DocumentRequestItem, user, *, reason: str, upload_id=None) -> DocumentRequest:
     """
     The upload does not satisfy the request (ADR-022 §3.4). The item goes
     back to `missing` with `reason` and forgets the upload -- the file version
@@ -351,7 +496,7 @@ def reject_item(item: DocumentRequestItem, user, *, reason: str) -> DocumentRequ
     once the transaction commits. The caller has checked `is_requester`.
     """
     with transaction.atomic():
-        item, request = _lock_decidable(item)
+        item, request = _lock_decidable(item, upload_id)
         now = timezone.now()
         # The history (IR-1201): the item forgets its upload below, so this
         # row is what remembers which file was rejected and why. An uploaded
@@ -413,7 +558,7 @@ def requests_for(record):
     """Every request on `record`, oldest first, ready for `payload`."""
     return (
         DocumentRequest.objects.filter(record=record)
-        .select_related("requested_by")
+        .select_related("requested_by", "assignment")
         .prefetch_related("items__upload")
         .order_by("created_at", "pk")
     )

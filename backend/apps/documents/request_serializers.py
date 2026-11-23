@@ -46,14 +46,21 @@ class DocumentRequestItemSerializer(serializers.ModelSerializer):
     uploaded_at      = serializers.SerializerMethodField()
     rejection_reason = BlankAsNullField()
     decided_at       = IsoDateTimeField()
+    can_replace      = serializers.SerializerMethodField()
 
     class Meta:
         model  = DocumentRequestItem
         fields = [
             "id", "slot", "label", "state", "state_label", "upload", "uploaded_at",
-            "rejection_reason", "decided_at",
+            "rejection_reason", "decided_at", "can_replace",
         ]
         read_only_fields = fields
+
+    def get_can_replace(self, item):
+        """The viewer owns the paper and may still replace or remove this file (§Amendment 8)."""
+        from .requests import item_replaceable
+
+        return bool(self.context.get("owns")) and item_replaceable(item)
 
     def get_uploaded_at(self, item):
         return item.upload.created_at.isoformat() if item.upload else None
@@ -94,9 +101,12 @@ def request_context(record, user) -> dict:
     from apps.reviews.tracker import is_staff_viewer
     from core.permissions import acting_parties
 
+    from .requests import may_fulfil
+
     return {
         "staff_viewer": is_staff_viewer(user),
         "acting_parties": acting_parties(user, record),
+        "owns": may_fulfil(record, user),
     }
 
 
@@ -195,6 +205,8 @@ class ItemDecisionSerializer(serializers.Serializer):
         choices=["accept", "reject"],
         error_messages={"invalid_choice": "The action is accept or reject."},
     )
+    #: The file the reviewer saw, so a verdict never lands on one replaced since.
+    upload = serializers.IntegerField(required=False, allow_null=True, default=None)
     reason = serializers.CharField(
         required=False, allow_blank=True, default="", max_length=FREE_TEXT_MAX_LENGTH,
         error_messages={"max_length": too_long_message("A reason")},

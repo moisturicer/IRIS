@@ -67,6 +67,11 @@ class AuditEvent(models.Model):
     DOCUMENT_REQUEST_ACCEPTED  = "DOCUMENT_REQUEST_ACCEPTED"
     DOCUMENT_REQUEST_REJECTED  = "DOCUMENT_REQUEST_REJECTED"
     DOCUMENT_REQUEST_WITHDRAWN = "DOCUMENT_REQUEST_WITHDRAWN"
+    # An owner corrects or takes back an undecided upload (ADR-022 §Amendment 8).
+    DOCUMENT_REQUEST_REPLACED  = "DOCUMENT_REQUEST_REPLACED"
+    DOCUMENT_REQUEST_REMOVED   = "DOCUMENT_REQUEST_REMOVED"
+    # An owner edits details past draft (ADR-032 §10). Metadata: `fields`, never a value.
+    DETAILS_EDITED             = "DETAILS_EDITED"
     # Review threads (ADR-032 §7, 2026-11-04; IR-874). No thread text is copied.
     REVIEW_FINISHED                = "REVIEW_FINISHED"
     REVIEW_THREAD_RESOLVED         = "REVIEW_THREAD_RESOLVED"
@@ -244,6 +249,9 @@ class AuditEvent(models.Model):
         (DOCUMENT_REQUEST_ACCEPTED,  "Requested Document Accepted"),
         (DOCUMENT_REQUEST_REJECTED,  "Requested Document Rejected"),
         (DOCUMENT_REQUEST_WITHDRAWN, "Document Request Withdrawn"),
+        (DOCUMENT_REQUEST_REPLACED,  "Requested Document Replaced"),
+        (DOCUMENT_REQUEST_REMOVED,   "Requested Document Removed"),
+        (DETAILS_EDITED,             "Details Edited"),
         (REVIEW_FINISHED,                "Review Finished"),
         (REVIEW_THREAD_RESOLVED,         "Review Thread Resolved"),
         (REVIEW_THREAD_REOPENED,         "Review Thread Reopened"),
