@@ -277,7 +277,7 @@ def test_recovered_evidence_whose_source_changed_is_rebuilt_from_the_question(ru
 
     def cite_fresh(payload):
         found = tool_messages(payload)["again"]
-        # The default pin, research-12, quotes paper text as research-11 began to (IR-1196, IR-581).
+        # The default pin, research-13, quotes paper text as research-11 began to (IR-1196, IR-581, IR-1278).
         assert found["passages"][0]["text"] == quoted(revised)
         return reply(f"«Flood forecasting» forecasts floods from rainfall gauges [{found['passages'][0]['passage']}].")
 

@@ -35,6 +35,8 @@ DEFINER_FUNCTIONS = (
     "lock_processing_source()",
     "pending_manuscript_work(integer, uuid)",
     "manuscript_invalidations(integer, uuid)",
+    # A readable paper's Adviser, by name only (IR-1278).
+    "research_advisers(bigint[])",
 )
 HELPER_FUNCTIONS = ("hmac_sha256(bytea, bytea)", "b64url_encode(bytea)", "b64url_decode(text)")
 RUNTIME_FUNCTIONS = (
@@ -60,11 +62,13 @@ RUNTIME_METADATA_TABLES = (
 #: Columns the verifier reads, and nothing else (no password hashes).
 VERIFIER_COLUMNS = {
     # deleted_at: reader_status() reads a deleted account as `gone` (ai/0043, IR-785).
-    "accounts_user": "id, is_active, is_locked, credential_version, role_id, deleted_at",
+    # first_name, middle_initial, last_name: research_advisers() names a readable paper's Adviser (IR-1278).
+    "accounts_user": "id, is_active, is_locked, credential_version, role_id, deleted_at,"
+                     " first_name, middle_initial, last_name",
     "accounts_role": "id, name",
     # added_by_id: research_record_ids() gives a draft to its creator alone (ai/0049, IR-1227).
     "records_record": "id, is_deleted, pipeline_status, adviser_id, added_by_id, abstract_file, title, abstract, dpa_accepted_at, ai_consent, is_ip, ip_released_at, "
-                      "is_embargoed, embargo_answered_at, embargo_released_at, embargoed_until",
+                      "is_embargoed, embargo_answered_at, embargo_released_at, embargoed_until, adviser_name",
     "publication_manuscriptwork": "id, record_id, revision, source_file, operation, revoked_at,"
                                   " created_at, grant_token, grant_expires_at, authority_generation",
     "publication_manuscriptinvalidation": "id, record_id, work_id, reason, authority_generation",
@@ -254,6 +258,10 @@ class Command(BaseCommand):
         # The AI runtime fences a departed reader's runs (IR-722).
         cursor.execute(
             "GRANT EXECUTE ON FUNCTION iris_authz.reader_status(bigint) TO iris_ai_runtime"
+        )
+        # paper_details names a readable paper's Adviser (IR-1278); Django never asks.
+        cursor.execute(
+            "GRANT EXECUTE ON FUNCTION iris_authz.research_advisers(bigint[]) TO iris_ai_runtime"
         )
         cursor.execute("GRANT EXECUTE ON FUNCTION iris_authz.processing_source(),"
                        " iris_authz.pending_manuscript_work(integer, uuid),"

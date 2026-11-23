@@ -22,7 +22,8 @@ from ai.agent.prompts import TOOL_DESCRIPTIONS as _SAYS, quoted
 from ai.agent.protocol import ToolCall, ToolSpec
 from ai.research import metadata
 from ai.research.tools import (
-    OK, PARTIAL, UNAVAILABLE, Count, PassageRef, Reading, ToolResult as Evidence, valid_filters,
+    MAX_DETAILS_PAPERS, OK, PARTIAL, UNAVAILABLE, Count, PaperDetails, PassageRef, Reading, ToolResult as Evidence,
+    valid_filters,
 )
 
 log = logging.getLogger(__name__)
@@ -111,10 +112,16 @@ READ_MANUSCRIPT = ToolSpec(
 RECOVER_TURN = ToolSpec(
     "recover_turn", _SAYS["recover_turn"], _object({"turn": {"type": "integer", "minimum": 1}}, ["turn"]))
 
+#: What the Publish form recorded for named papers, under the research-13 tool version (IR-1278).
+PAPER_DETAILS = ToolSpec(
+    "paper_details", _SAYS["paper_details"], _object({
+        "papers": {"type": "array", "minItems": 1, "maxItems": MAX_DETAILS_PAPERS, "items": _HANDLE},
+    }, ["papers"]))
+
 #: Read-only calls a tool group may fetch together (IR-1003). Not `read_manuscript`,
 #: whose room depends on the results before it, nor plan, focus or clarification.
 PREFETCHABLE = (SEARCH, HYBRID_SEARCH, OPEN_PASSAGE, READ_PAGE, OUTLINE, RESOLVE_PAPERS,
-                COUNT_RECORDS, LIST_RECORDS, RECOVER_TURN)
+                COUNT_RECORDS, LIST_RECORDS, RECOVER_TURN, PAPER_DETAILS)
 
 RESEARCH = (SEARCH, OPEN_PASSAGE, READ_PAGE, OUTLINE)
 #: Named papers and exact counts, offered only under the research-2 tool version (IR-750).
@@ -152,6 +159,27 @@ def _str(value) -> bool:
 
 def _int(value) -> bool:
     return type(value) is int
+
+
+def _handles(value) -> list[str]:
+    """`paper_details`' paper handles, each once and in order; anything else is invalid (IR-1278)."""
+    if not isinstance(value, list) or not 0 < len(value) <= MAX_DETAILS_PAPERS or not all(_str(h) for h in value):
+        raise InvalidArguments
+    return list(dict.fromkeys(value))
+
+
+def shown_details(found: PaperDetails) -> dict:
+    """One paper's recorded details as the model reads them (IR-1278)."""
+    return {
+        "paper": found.handle, "title": found.title, "authors": list(found.authors), "adviser": found.adviser,
+        "year_completed": found.year_completed, "year_accomplished": found.year_accomplished,
+        "publication_year": found.publication_year, "record_type": found.record_type,
+        "classification": found.classification, "psced": found.psced, "keywords": list(found.keywords),
+        "abstract": found.abstract or None, "origin": found.origin, "is_ip": found.is_ip, "ip_type": found.ip_type,
+        "for_commercialization": found.for_commercialization, "community_extension": found.community_extension,
+        "requires_ethics_review": found.requires_ethics_review,
+        "requested_offices": list(found.requested_offices),
+    }
 
 
 def _arguments(call: ToolCall, spec: ToolSpec) -> dict:
@@ -276,11 +304,14 @@ class Investigation:
     recalled_sources: frozenset = frozenset()
     #: Wrap paper text in the paper-text markers (the research-11 tool version, IR-1196).
     delimit: bool = False
+    #: Offer paper_details (the research-13 tool version, IR-1278).
+    details: bool = False
 
     def specs(self) -> tuple[ToolSpec, ...]:
         extra = (ASK_CLARIFICATION,) if self.clarify else ()
         research = (HYBRID_SEARCH, *RESEARCH[1:]) if self.hybrid else RESEARCH
         return (*research, *(METADATA if self.metadata else ()), *((LIST_RECORDS,) if self.listing else ()),
+                *((PAPER_DETAILS,) if self.details else ()),
                 *(MANUSCRIPTS if self.manuscripts else ()), *(RECOVERY if self.recovery else ()),
                 UPDATE_PLAN, UPDATE_FOCUS, *extra)
 
@@ -341,6 +372,8 @@ class Investigation:
             if not _int(args["turn"]):
                 raise InvalidArguments
             return await self.research.recover_turn(args["turn"])
+        if spec is PAPER_DETAILS:
+            return await self.research.details(_handles(args["papers"]))
         return await self._research(spec, args)
 
     async def execute(self, call: ToolCall, *, room: int = 0, fetched=None) -> Outcome:
@@ -361,6 +394,8 @@ class Investigation:
                     return self._counted(raw)
                 if spec is LIST_RECORDS:
                     return self._listed(raw)
+                if spec is PAPER_DETAILS:
+                    return self._detailed(raw, _handles(args["papers"]))
                 return self._evidence(raw)
             if spec is UPDATE_PLAN:
                 return await self._plan(args["steps"])
@@ -380,6 +415,9 @@ class Investigation:
                     raise InvalidArguments
                 filters = {k: v for k, v in args.items() if k != "offset"}
                 return self._listed(await self.research.list_records(filters, offset=offset))
+            if spec is PAPER_DETAILS:
+                papers = _handles(args["papers"])
+                return self._detailed(await self.research.details(papers), papers)
             if spec is READ_MANUSCRIPT:
                 return self._evidence(await self._read(args, room), call.id)
             if spec is RECOVER_TURN:
@@ -591,6 +629,32 @@ class Investigation:
         }
         return Outcome(self._dump(body), progress=new, metadata_only=True)
 
+    def _detailed(self, result: Evidence, requested: list[str]) -> Outcome:
+        """What the submitter recorded for each readable paper: Record metadata, never Manuscript text (IR-1278).
+
+        Its years may then be stated without a passage handle; they are kept in `figures`, so a
+        resumed run (IR-724) allows the same. A number in the abstract still needs a cited passage.
+        """
+        body, _ = self._status(result)
+        new = False
+        for found in result.details:
+            self.papers.setdefault(found.record_id, (found.handle, found.title))
+            new = new or ("details", found.record_id) not in self.seen
+            self.seen.add(("details", found.record_id))
+            self.figures.update(str(year) for year in found.years)
+            # Catalogue names an answer may quote like titles (IR-750).
+            self.terms.update(v.casefold() for v in (found.record_type, found.classification, found.psced) if v)
+        if result.details:
+            body["details"] = [shown_details(found) for found in result.details]
+            body["recorded_by"] = "submitter"
+        returned = {found.handle for found in result.details}
+        missing = [h for h in requested if h not in returned]
+        if missing:
+            body["not_found"] = missing
+        if not result.details:
+            return Outcome(json.dumps(body), control_only=True)
+        return Outcome(self._dump(body), progress=new, metadata_only=True)
+
     def _status(self, result: Evidence) -> tuple[dict, Optional[Count]]:
         self._ended(result)
         body: dict = {"status": result.status}
@@ -672,7 +736,10 @@ class Investigation:
 
 
 #: Fields that carry text from a paper, or derived from one, wherever they appear (IR-1196).
-_PAPER_TEXT = frozenset({"text", "title", "heading", "question", "answer"})
+#: A paper's abstract and Adviser came from its submitter, like its title (IR-1278).
+_PAPER_TEXT = frozenset({"text", "title", "heading", "question", "answer", "abstract", "adviser"})
+#: Lists whose every string a submitter typed: each item is quoted (IR-1278).
+_PAPER_TEXT_LISTS = frozenset({"authors", "keywords"})
 
 
 def _framed(value, key=None, within=None):
@@ -681,6 +748,7 @@ def _framed(value, key=None, within=None):
         return {k: _framed(v, k, key or within) for k, v in value.items()}
     if isinstance(value, list):
         return [_framed(v, None, key) for v in value]
-    if isinstance(value, str) and (key in _PAPER_TEXT or (key == "section" and within == "passages")):
+    if isinstance(value, str) and (key in _PAPER_TEXT or (key == "section" and within == "passages")
+                                   or (key is None and within in _PAPER_TEXT_LISTS)):
         return quoted(value)
     return value

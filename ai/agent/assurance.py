@@ -171,6 +171,7 @@ _STEPS = {
     "search": "searching passages", "open_passage": "rereading a passage", "read_page": "reading a page",
     "outline": "listing a paper's sections", "resolve_papers": "finding a named paper",
     "count_records": "counting records", "recover_turn": "rereading an earlier answer", "update_plan": "updating the research plan",
+    "paper_details": "reading paper details",
 }
 
 

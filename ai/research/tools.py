@@ -55,6 +55,10 @@ FORMULA, CAPTION = "formula", "caption"
 CANDIDATES = 20
 #: Records the paper-first vector read keeps before ranking their Passages.
 PAPER_FIRST_RECORDS = 20
+#: Papers one details call may name: an abstract is up to 10,000 characters (IR-1278).
+MAX_DETAILS_PAPERS = 5
+#: Offices a submitter may hint a paper needs, in the order the Publish form shows them (ADR-018).
+REQUESTED_OFFICES = (("requested_itso", "ITSO"), ("requested_ierc", "IERC"), ("requested_ktto", "KTTO"))
 
 OK, NO_MATCH, PARTIAL, UNAVAILABLE = "ok", "no_match", "partial", "unavailable"
 #: A search signal that is not configured, as opposed to one that failed (IR-886).
@@ -231,6 +235,42 @@ class RecoveredTurn:
 
 
 @dataclass(frozen=True)
+class PaperDetails:
+    """What the Publish form recorded for one readable Record, plus its IP type (IR-1278).
+
+    Entered by the submitter, never read from the Manuscript. None is not recorded.
+    """
+
+    handle: str
+    record_id: int
+    title: str
+    #: Names in the order they were entered.
+    authors: tuple[str, ...] = ()
+    #: The Adviser's full name, or the name kept for a deleted one; never an email.
+    adviser: str | None = None
+    year_completed: int | None = None
+    year_accomplished: int | None = None
+    publication_year: int | None = None
+    record_type: str | None = None
+    classification: str | None = None
+    psced: str | None = None
+    keywords: tuple[str, ...] = ()
+    abstract: str = ""
+    origin: str | None = None
+    is_ip: bool = False
+    ip_type: str | None = None
+    for_commercialization: bool = False
+    community_extension: bool = False
+    requires_ethics_review: bool = False
+    #: Offices the submitter hinted the paper needs (ADR-018).
+    requested_offices: tuple[str, ...] = ()
+
+    @property
+    def years(self) -> set[int]:
+        return {y for y in (self.year_completed, self.year_accomplished, self.publication_year) if y is not None}
+
+
+@dataclass(frozen=True)
 class ToolResult:
     status: str
     reason: str | None = None
@@ -247,6 +287,8 @@ class ToolResult:
     provider_operations: tuple[str, ...] = ()
     #: (signal, "ok" or why not) for each part of a combined search (IR-886).
     signals: tuple[tuple[str, str], ...] = ()
+    #: Recorded details of the papers a details call could read (IR-1278).
+    details: tuple[PaperDetails, ...] = ()
 
     @classmethod
     def unavailable(cls, reason: str, **kw) -> "ToolResult":
@@ -375,6 +417,41 @@ def _hit(row) -> Hit:
 def shown_bytes(text: str) -> int:
     """What `text` costs once JSON-encoded in a tool result and again as message content."""
     return len(json.dumps(json.dumps(text, ensure_ascii=False), ensure_ascii=False).encode("utf-8"))
+
+
+#: $1 Record ids. Every table here is read under the row policy; the Adviser's name only
+#: through `research_advisers`, which answers for Records this grant may read (IR-1278).
+DETAILS_SQL = """
+    SELECT r.id, r.title, r.year_completed, r.year_accomplished, r.publication_year, r.abstract,
+           r.keywords, r.origin, r.is_ip, r.ip_type, r.for_commercialization, r.community_extension,
+           r.requires_ethics_review, r.requested_itso, r.requested_ierc, r.requested_ktto,
+           c.name AS classification, p.name AS psced, t.name AS record_type,
+           ARRAY(SELECT a.name FROM public.records_author a WHERE a.record_id = r.id ORDER BY a.id) AS authors,
+           adv.name AS adviser
+      FROM public.records_record r
+      LEFT JOIN public.records_classification c ON c.id = r.classification_id
+      LEFT JOIN public.records_pscedclassification p ON p.id = r.psced_id
+      LEFT JOIN public.records_recordtype t ON t.id = r.record_type_id
+      LEFT JOIN iris_authz.research_advisers($1::bigint[]) adv ON adv.record_id = r.id
+     WHERE r.id = ANY($1::bigint[])"""
+
+
+def _paper_details_from_row(handle: str, row) -> PaperDetails:
+    keywords = row["keywords"]
+    return PaperDetails(
+        handle=handle, record_id=row["id"], title=row["title"],
+        authors=tuple(name for name in row["authors"] if name and name.strip()),
+        adviser=row["adviser"] or None,
+        year_completed=row["year_completed"], year_accomplished=row["year_accomplished"],
+        publication_year=row["publication_year"],
+        record_type=row["record_type"], classification=row["classification"], psced=row["psced"],
+        keywords=tuple(k for k in keywords if isinstance(k, str) and k.strip()) if isinstance(keywords, list) else (),
+        abstract=row["abstract"] or "", origin=row["origin"] or None,
+        is_ip=row["is_ip"], ip_type=row["ip_type"] or None,
+        for_commercialization=row["for_commercialization"], community_extension=row["community_extension"],
+        requires_ethics_review=row["requires_ethics_review"],
+        requested_offices=tuple(office for column, office in REQUESTED_OFFICES if row[column]),
+    )
 
 
 def _span(rows, first: int, last: int) -> Span:
@@ -929,6 +1006,38 @@ class ResearchTools:
                               coverage=Coverage(len(records), len(rows), offset + len(records) < len(rows)))
 
         return await self._call("list_records", body)
+
+    async def details(self, handles) -> ToolResult:
+        """What was recorded for papers this run named, by paper handle (IR-1278).
+
+        Read under the grant like every tool, so a Record the reader may not read
+        now, or one outside a Paper Chat's scope, is the same unknown handle as one
+        never issued. A handle that does not read is left out, and coverage counts it.
+        """
+        if (not isinstance(handles, (list, tuple)) or not 0 < len(handles) <= MAX_DETAILS_PAPERS
+                or not all(isinstance(h, str) for h in handles)):
+            return ToolResult.unavailable("invalid_argument")
+        wanted = list(dict.fromkeys(handles))
+
+        async def body(conn):
+            bound = await conn.fetch(
+                """SELECT h.handle, h.record_id FROM iris_ai.research_handle h
+                     JOIN public.records_record r ON r.id = h.record_id
+                    WHERE h.handle = ANY($1::text[]) AND left(h.handle, 1) = 'R' AND h.run_id = $2
+                      AND h.expires_at > now() AND ($3::bigint IS NULL OR r.id = $3)""",
+                wanted, self.run_id, self.scope,
+            )
+            record_of = {row["handle"]: row["record_id"] for row in bound}
+            rows = {row["id"]: row for row in await conn.fetch(DETAILS_SQL, sorted(set(record_of.values())))
+                    } if record_of else {}
+            found = tuple(_paper_details_from_row(h, rows[record_of[h]]) for h in wanted if record_of.get(h) in rows)
+            coverage = Coverage(len(found), len(wanted))
+            if not found:
+                # Unreadable now is indistinguishable from never issued.
+                return ToolResult.unavailable("unknown_handle", coverage=coverage)
+            return ToolResult(OK if len(found) == len(wanted) else PARTIAL, details=found, coverage=coverage)
+
+        return await self._call("paper_details", body)
 
     async def _filters(self, conn, filters: dict) -> tuple[list, list]:
         """The six `_filter_sql` parameters and the filters as applied, or raise _Refused.
