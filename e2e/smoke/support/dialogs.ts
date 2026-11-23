@@ -236,6 +236,8 @@ export const DIALOGS: DialogCase[] = [
   },
   {
     id: "notifications", screen: "help", sources: ["components/layout/NotificationBell.tsx"],
+    // The bell is the phone bar's since IR-1288; from md the sidebar has a link instead.
+    viewport: { width: 390, height: 844 },
     open: press(/^Notifications/), dialog: (page) => page.getByRole("dialog", { name: "Notifications" }),
   },
   {

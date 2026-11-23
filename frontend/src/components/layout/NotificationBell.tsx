@@ -13,8 +13,9 @@ import { cn } from "@/lib/utils";
 const PREVIEW_LIMIT = 3;
 
 /**
- * The notification bell: at the top of the sidebar, and in the phone bar
- * below `md`. There is no app header any more (IR-519).
+ * The notification bell, for phones: in the phone bar below `md`, and in Ask
+ * IRIS's toolbar, which has no phone bar. From `md` the sidebar's
+ * Notifications link carries the same count instead.
  *
  * Complements NotificationsPage rather than replacing it: the page answers
  * "what has happened to my records?" (full history, filterable), the bell
@@ -34,21 +35,7 @@ const PREVIEW_LIMIT = 3;
  * Backend needed no changes: /notifications/?unread=true, mark-read and
  * mark-all-read all already existed.
  */
-interface NotificationBellProps {
-  /**
-   * Which edge of the bell the dropdown lines up with. "end" (the default)
-   * opens leftward, for a bell near the right of the screen; the sidebar's
-   * bell sits at the left of the screen, so it opens rightward with "start".
-   */
-  align?: "start" | "end";
-  /**
-   * The native hover title. A caller that wraps the bell in its own `Tooltip`
-   * (the sidebar's rail, IR-1086) turns it off so two tips do not stack.
-   */
-  showTitle?: boolean;
-}
-
-export function NotificationBell({ align = "end", showTitle = true }: NotificationBellProps) {
+export function NotificationBell() {
   // AppShell owns the fetch (IR-370); the bell only reads the store.
   const unreadCount = useNotificationsStore((s) => s.unreadCount);
   const items = useNotificationsStore((s) => s.items);
@@ -137,7 +124,7 @@ export function NotificationBell({ align = "end", showTitle = true }: Notificati
         aria-label={unreadCount > 0 ? `Notifications, ${unreadBadge} unread` : "Notifications"}
         aria-expanded={open}
         aria-haspopup="dialog"
-        title={showTitle ? "Notifications" : undefined}
+        title="Notifications"
         className="relative w-11 h-11 md:w-[34px] md:h-[34px] touch:w-11 touch:h-11 rounded-control border border-stone-200 flex items-center justify-center text-stone-600 hover:bg-stone-50 transition-colors"
       >
         <i className="fas fa-bell text-body" aria-hidden />
@@ -152,10 +139,7 @@ export function NotificationBell({ align = "end", showTitle = true }: Notificati
         <div
           role="dialog"
           aria-label="Notifications"
-          className={cn(
-            "absolute top-full mt-2 w-[380px] max-w-[calc(100vw-2rem)] max-h-[60vh] flex flex-col bg-overlay rounded-card border border-stone-200 shadow-card-md z-50 overflow-hidden",
-            align === "start" ? "left-0" : "right-0",
-          )}
+          className="absolute right-0 top-full mt-2 w-[380px] max-w-[calc(100vw-2rem)] max-h-[60vh] flex flex-col bg-overlay rounded-card border border-stone-200 shadow-card-md z-50 overflow-hidden"
         >
           <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-stone-100">
             <p className="text-body font-semibold text-stone-900">Notifications</p>

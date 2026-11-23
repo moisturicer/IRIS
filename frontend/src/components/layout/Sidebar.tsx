@@ -9,7 +9,7 @@ import { selectSidebarCollapsed, useUIStore } from "@/store/ui.store";
 import { cn } from "@/lib/utils";
 import { ASK_PATH } from "@/lib/askHandoff";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
-import { NotificationBell } from "./NotificationBell";
+import { useNotificationsStore } from "@/store/notifications.store";
 import { AccountMenu } from "./AccountMenu";
 import { ASK_IRIS_ICON, navFor, canAccess, NAV_SECTION_ORDER, type NavEntry, type NavSectionName } from "@/lib/access";
 import { AskIrisGlyph, IrisMark, IrisWordmark } from "@/components/brand/IrisBrand";
@@ -24,6 +24,8 @@ interface NavItem {
   label:  string;
   icon:   string;
   badge?: number;
+  /** What a screen reader hears after the badge's number: "pending" unless set. */
+  badgeWord?: string;
   /**
    * An attention dot with no number, for something that is waiting on the
    * user rather than a count worth reading (IR-534). The string is what a
@@ -102,7 +104,7 @@ function NavItemLink({ item, collapsed, onNavigate, nested }: { item: NavItem; c
                 )}
               >
                 <span aria-hidden>{badge > 9 ? "9+" : badge}</span>
-                <span className="sr-only">, {badge} pending</span>
+                <span className="sr-only">, {badge} {item.badgeWord ?? "pending"}</span>
               </span>
             )}
             {dot != null && (
@@ -237,14 +239,15 @@ interface SidebarProps {
  * Discover and research links, RDCO's coordination group, and the System
  * Admin's Administration group. My Reviews carries the Office Console under
  * it for coordinators (IR-1085, D5); Workflow Analytics is RDCO's (IR-1216). The
- * bell is at the top (IR-519); the account menu is at the bottom, and Help is
+ * Notifications is a link of its own with the unread count, not a bell in the
+ * header; the account menu is at the bottom, and Help is
  * in Settings (IR-1217). Below `md` it is a
  * drawer `AppShell` opens and closes. From 768 to 1023 px it is the 76 px icon
  * rail, and the sidebar button opens the full sidebar over the page (IR-1086).
  * From 1024 px it is at full width, or as the rail if the user chooses (stored
  * per browser; the choice is not read below 1024 px).
  *
- * The sidebar button (IR-1260) is a visible control beside the bell, and `[`
+ * The sidebar button (IR-1260) is a visible control beside the wordmark, and `[`
  * does the same. On the rail the IRIS mark is the expand button: the logo at
  * rest, the sidebar icon on hover or focus, so it shows what it does before
  * it is pressed. On the full sidebar the mark is the logo, a link home.
@@ -289,6 +292,7 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [mode]);
+  const unreadCount = useNotificationsStore((s) => s.unreadCount);
   const [queueCounts, setQueueCounts] = useState<QueueCounts>(NO_QUEUES);
   const [needsAction, setNeedsAction] = useState(false);
   /** My Reviews' To review count, from the same stats read (IR-1208). */
@@ -363,6 +367,9 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
     deleteRequests: queueCounts.delete_requests,
     reportedComments: queueCounts.reported_comments,
     adminReportedComments: queueCounts.reported_comments,
+    // Unread notifications, from the store AppShell fills (IR-370), so the
+    // count and the phone bar's bell always agree.
+    notifications: unreadCount,
   };
   // A dot, not a count: what matters is that something waits (spec §4.2).
   const DOTS: Partial<Record<NavEntry["key"], string | undefined>> = {
@@ -374,6 +381,7 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
     return {
       to: entry.to, label: entry.label, icon: entry.icon,
       badge: BADGES[entry.key], dot: DOTS[entry.key],
+      ...(entry.key === "notifications" ? { badgeWord: "unread" } : {}),
       ...(children.length > 0 ? { children } : {}),
     };
   };
@@ -464,12 +472,9 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
             <IrisWordmark className="h-4 w-auto" />
             <span className="sr-only">IRIS</span>
           </p>
-          {/* From md only: below it the phone bar carries the bell, and a
-              second one in the drawer would put two on screen at once. The
-              phone's drawer has Close menu instead of the sidebar button. */}
+          {/* From md only: the phone's drawer has Close menu instead. */}
           {!collapsed && (
-            <div className="hidden flex-shrink-0 items-center gap-1 md:flex">
-              <NotificationBell align="start" />
+            <div className="hidden flex-shrink-0 items-center md:flex">
               <Tooltip label={toggleLabel} shortcut={SIDEBAR_KEY} className="block">
                 <button
                   type="button"
@@ -507,17 +512,9 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
             <i className="fas fa-xmark text-base" aria-hidden />
           </button>
         </div>
-        {/* Its own line, under the wordmark, so it never wraps beside the bell. */}
         <p className={cn("mt-1.5 break-words pl-12 text-3xs text-stone-500", collapsed && "md:hidden")}>
           Research-to-IP Platform
         </p>
-        {collapsed && (
-          <div className="mt-2.5 hidden justify-center md:flex">
-            <Tooltip label="Notifications">
-              <NotificationBell align="start" showTitle={false} />
-            </Tooltip>
-          </div>
-        )}
       </div>
 
       {/* ── Navigation ─────────────────────────────────────────────────── */}

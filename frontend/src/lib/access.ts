@@ -128,9 +128,11 @@ export const SCREEN_ACCESS = {
                    nav: { label: "Ask IRIS", icon: ASK_IRIS_ICON, section: "Main", onlyFor: RESEARCH_ROLES } },
   library:       { path: "/records/mine",  roles: EVERYONE,
                    nav: { label: "My Library", icon: "fa-bookmark", section: "Main", onlyFor: RESEARCH_ROLES } },
-  // The bell at the top of the sidebar is the entry; its "View all" opens the
-  // page, so a sidebar link would say the same thing twice (IR-519).
-  notifications: { path: "/notifications", roles: EVERYONE },
+  // A link of its own with the unread count, for every role. It replaced the
+  // bell that shared the sidebar's header with the logo and the collapse
+  // button. Phones keep the bell in their top bar, where the drawer is hidden.
+  notifications: { path: "/notifications", roles: EVERYONE,
+                   nav: { label: "Notifications", icon: "fa-bell", section: "Main" } },
   // Profile and Settings live in the account menu in the sidebar's user block
   // (IR-413, spec §4.2), not in the nav list. Profile (who you are) and
   // Settings (your account) are separate pages since IR-933. Help is a section
