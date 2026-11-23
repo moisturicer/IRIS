@@ -77,15 +77,15 @@ function CitationPlaceholder() {
  * way a reader would cite a page, instead of an 8px digit in a dot.
  */
 /**
- * One citation mark for chat and the AI Overview alike (IR-1306): white figures
- * on the binding maroon at 70%, which darkens to Binding Maroon Dark under the
- * pointer or focus. 70% keeps white text at about 5.5:1; a lighter wash would not.
- * `min-w`: a marker can run to three digits, or "p12" in the Overview.
+ * One citation mark for chat and the AI Overview alike (IR-1306): a small
+ * superscript in Binding Maroon, like a reference in a printed paper, with no
+ * fill. Pointer or focus underlines it on a faint maroon wash. "p12" in the
+ * Overview, a number in chat.
  */
 const CITATION_CHIP =
-  "inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-control mx-0.5 px-1 align-text-bottom " +
-  "bg-brand/70 text-2xs font-semibold leading-none tabular-nums text-white no-underline " +
-  "transition-colors duration-150 hover:bg-brand-dark focus-visible:bg-brand-dark motion-reduce:transition-none";
+  "relative mx-px rounded-control px-0.5 align-super text-[0.68em] font-semibold leading-none tabular-nums " +
+  "text-brand no-underline decoration-brand/50 underline-offset-2 " +
+  "transition-colors duration-150 hover:bg-brand/[0.07] hover:underline focus-visible:underline motion-reduce:transition-none";
 
 function CitationChip({ citation, page = false }: { citation: ChatCitation; page?: boolean }) {
   const { to, state, pageContext } = useCitationLink(citation);

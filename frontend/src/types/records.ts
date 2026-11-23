@@ -153,7 +153,7 @@ export interface WaitingItem {
  * `awaiting_document`. Carries no reviewer's name or words.
  */
 export interface SubmitterStatus {
-  /** "With your Adviser", "In specialist review: ITSO, IERC", … */
+  /** "Adviser review", "Office review · ITSO, IERC", "Revision requested · IERC", … (IR-1306) */
   line:           string;
   waiting_on_you: WaitingItem[];
 }

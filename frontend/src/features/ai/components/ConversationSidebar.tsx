@@ -5,6 +5,7 @@ import { TITLE_MAX, TITLE_TOO_LONG, type ReaderConversationSummary } from "@/api
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { HERE } from "@/components/ui/highlightRoles";
 import { Tooltip } from "@/components/ui/Tooltip";
+import { isControl } from "@/components/ui/isControl";
 import { RowMenu, type RowMenuItem } from "@/features/accounts/RowMenu";
 import { PanelLeftIcon } from "./AskIrisIcons";
 import { IrisLoader } from "@/components/brand/IrisBrand";
@@ -127,9 +128,12 @@ export function ConversationSidebar({
       style={{ width: open ? width : STRIP_WIDTH }}
       className={cn(
         "relative shrink-0 flex flex-col bg-stone-50 border-l border-stone-200",
+        !open && "cursor-w-resize",
         easing && "transition-[width] duration-200 ease-out motion-reduce:transition-none",
       )}
       aria-label="Conversations"
+      // Closed, a press on the strip's empty space opens the pane (IR-1306).
+      onClick={open ? undefined : (e) => { if (!isControl(e.target)) onToggle(); }}
     >
       <div className="h-full min-h-0 w-full overflow-hidden">
         {/* Fixed width, so the list does not reflow while the column animates. */}

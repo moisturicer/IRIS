@@ -23,24 +23,24 @@ class StatusLineTests(MyResearchListTestBase):
         return self.mine()[record.pk]["submitter_status"]["line"]
 
     def test_a_submitted_record_is_with_the_adviser(self):
-        self.assertEqual(self.line(self.submitted(RecordTypeName.THESIS_RESEARCH)), "With your Adviser")
+        self.assertEqual(self.line(self.submitted(RecordTypeName.THESIS_RESEARCH)), "Adviser review")
 
     def test_a_record_in_parallel_review_names_the_offices_still_reviewing(self):
-        self.assertEqual(self.line(self.at_parallel_review()), "In specialist review: IERC, KTTO")
+        self.assertEqual(self.line(self.at_parallel_review()), "Office review · IERC, KTTO")
 
     def test_a_revision_request_names_who_asked_and_says_it_is_on_the_owner(self):
         self.assertEqual(
-            self.line(self.revision_requested()), "Revision requested by IERC: action needed",
+            self.line(self.revision_requested()), "Revision requested · IERC",
         )
 
     def test_a_document_request_names_who_asked(self):
         self.assertEqual(
-            self.line(self.document_requested()), "Documents requested by Adviser: action needed",
+            self.line(self.document_requested()), "Documents requested · Adviser",
         )
 
     def test_a_draft_says_it_is_not_submitted(self):
         self.assertEqual(
-            self.line(self.make_record(RecordTypeName.THESIS_RESEARCH)), "Draft: not yet submitted",
+            self.line(self.make_record(RecordTypeName.THESIS_RESEARCH)), "Draft",
         )
 
     def test_rdco_holding_the_record_is_a_decision(self):
@@ -48,7 +48,7 @@ class StatusLineTests(MyResearchListTestBase):
             record=None, workflow_state=WorkflowState.FINAL_REVIEW, holders=[Party.RDCO],
             revision_parties=[], document_parties=[],
         )
-        self.assertEqual(line, "With RDCO for a decision")
+        self.assertEqual(line, "RDCO decision")
 
     def test_the_list_and_detail_say_the_same_thing(self):
         records = self.one_of_each()
