@@ -65,7 +65,7 @@ function NavItemLink({ item, collapsed, onNavigate, nested }: { item: NavItem; c
           cn(
             // 44px on the phone drawer; compact from md, where a pointer is (IR-1092).
             // A nested row gives up some padding and gap so a name like "Workflow
-            // analytics" fits at 240px without being cut short (IR-1180).
+            // analytics" fits without being cut short (IR-1180).
             "group relative flex min-h-11 md:min-h-0 touch:min-h-11 items-center rounded-control py-2 text-sm",
             nested ? "gap-2 px-2" : "gap-3 px-3",
             collapsed && "md:h-10 md:justify-center md:px-0",
@@ -398,14 +398,16 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
       // React 18 has no `inert` prop; an empty string sets the attribute.
       {...(inert ? { inert: "" } : {})}
       className={cn(
-        // Below md: a 240px drawer over the page. From md: 240px, or the 76px
+        // Below md: a 256px drawer over the page. From md: 256px, or the 76px
         // rail when collapsed. AppShell's left margin follows the same widths,
         // except that an opened tablet sidebar overlaps the page instead.
-        "fixed left-0 top-0 z-50 flex h-screen w-60 flex-col border-r border-stone-200 bg-surface",
+        // 256, not 240 (IR-1276): at 240 "Download requests" and "Reported
+        // comments" wrapped to two lines beside their count badge.
+        "fixed left-0 top-0 z-50 flex h-screen w-64 flex-col border-r border-stone-200 bg-surface",
         // `shell` carries transform (the drawer's slide) and width (the rail)
         // together; AppShell sets the translate classes, not a transition.
         "transition-shell duration-200 ease-out motion-reduce:transition-none",
-        collapsed ? "md:w-rail" : "md:w-60",
+        collapsed ? "md:w-rail" : "md:w-64",
         mode === "rail" && !collapsed && "shadow-card-md",
         className,
       )}

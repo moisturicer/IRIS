@@ -909,8 +909,8 @@ describe.each([768, 1023])("the tablet icon rail at %i px (IR-1086)", (width) =>
     const content = screen.getByRole("main").parentElement!;
     expect(content).toHaveClass("md:ml-rail");
     // The full sidebar's margin starts at lg (1024 px), not at md.
-    expect(content).toHaveClass("lg:ml-60");
-    expect(content).not.toHaveClass("md:ml-60");
+    expect(content).toHaveClass("lg:ml-64");
+    expect(content).not.toHaveClass("md:ml-64");
   });
 
   it("shows a tooltip naming each link on hover and on keyboard focus", async () => {
@@ -980,7 +980,7 @@ describe.each([768, 1023])("the tablet icon rail at %i px (IR-1086)", (width) =>
     await user.click(screen.getByRole("button", { name: "Expand sidebar" }));
 
     const sidebar = screen.getByRole("complementary", { name: "Sidebar" });
-    expect(sidebar).toHaveClass("md:w-60");
+    expect(sidebar).toHaveClass("md:w-64");
     const nav = within(sidebar).getByRole("navigation", { name: "Main" });
     for (const label of within(nav).getAllByText(LABELS)) {
       expect(label).not.toHaveClass("md:sr-only");
@@ -1045,9 +1045,9 @@ describe("the full sidebar from 1024 px (IR-1086)", () => {
 
     await screen.findByRole("heading", { name: "My Library" });
     const sidebar = screen.getByRole("complementary", { name: "Sidebar" });
-    expect(sidebar).toHaveClass("md:w-60");
+    expect(sidebar).toHaveClass("md:w-64");
     expect(screen.getByRole("button", { name: "Collapse sidebar" })).toBeInTheDocument();
-    expect(screen.getByRole("main").parentElement).toHaveClass("lg:ml-60");
+    expect(screen.getByRole("main").parentElement).toHaveClass("lg:ml-64");
   });
 
   it("still collapses to the rail when the reader chose that", async () => {
@@ -1058,7 +1058,7 @@ describe("the full sidebar from 1024 px (IR-1086)", () => {
 
     await screen.findByRole("heading", { name: "My Library" });
     expect(screen.getByRole("complementary", { name: "Sidebar" })).toHaveClass("md:w-rail");
-    expect(screen.getByRole("main").parentElement).not.toHaveClass("lg:ml-60");
+    expect(screen.getByRole("main").parentElement).not.toHaveClass("lg:ml-64");
   });
 });
 
