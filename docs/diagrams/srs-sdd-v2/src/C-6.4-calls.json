@@ -1,0 +1,110 @@
+{
+ "kind": "columns",
+ "format": "portrait",
+ "title": "C-6.4  Classes: Calls & Conferences",
+ "caption": "SDD v2 §3.6.4. From apps/opportunities (models.py, review.py, services.py), ADR-050 at a46d7fc4 (IR-1275).",
+ "gutter": 60,
+ "vgap": 30,
+ "nodes": [
+  {
+   "id": "OpportunityViewSet",
+   "shape": "class",
+   "label": "OpportunityViewSet",
+   "sections": [
+    [],
+    [
+     "create()",
+     "confirm()",
+     "reject()",
+     "remove()",
+     "save()",
+     "calendar()"
+    ]
+   ],
+   "stereotype": "view"
+  },
+  {
+   "id": "Opportunity",
+   "shape": "class",
+   "label": "Opportunity",
+   "sections": [
+    [
+     "opportunity_type",
+     "title",
+     "due_date",
+     "start_date / end_date",
+     "status",
+     "is_featured",
+     "posted_by"
+    ]
+   ]
+  },
+  {
+   "id": "SavedCall",
+   "shape": "class",
+   "label": "SavedCall",
+   "sections": [
+    [
+     "owner → User",
+     "call → Opportunity"
+    ]
+   ]
+  },
+  {
+   "id": "services",
+   "shape": "class",
+   "label": "services",
+   "sections": [
+    [],
+    [
+     "build_ics()"
+    ]
+   ],
+   "stereotype": "module"
+  }
+ ],
+ "columns": [
+  [
+   "OpportunityViewSet",
+   "services"
+  ],
+  [
+   "Opportunity",
+   "SavedCall"
+  ]
+ ],
+ "edges": [
+  {
+   "from": "OpportunityViewSet",
+   "to": "Opportunity",
+   "dash": true
+  },
+  {
+   "from": "Opportunity",
+   "to": "SavedCall",
+   "tail": "diamond",
+   "head": "none",
+   "mFrom": "1",
+   "mTo": "0..*"
+  },
+  {
+   "from": "OpportunityViewSet",
+   "to": "services",
+   "dash": true
+  }
+ ],
+ "legend": [
+  {
+   "line": "diamond",
+   "text": "composition (owner at the diamond)"
+  },
+  {
+   "line": "arrow",
+   "text": "association"
+  },
+  {
+   "line": "dash arrow",
+   "text": "uses / calls"
+  }
+ ]
+}

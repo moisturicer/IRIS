@@ -1,0 +1,134 @@
+{
+ "title": "E-5.6  Schema: overviews, briefs and index jobs",
+ "caption": "SDD v2 §3.5.6, 3.5.8. Generated from backend/apps/*/models*.py at a46d7fc4; all keys and up to four other fields per table; the full schema is D-8 to D-15.",
+ "kind": "erd",
+ "format": "portrait",
+ "nodes": [
+  {
+   "id": "ai_EmbeddingJob",
+   "shape": "table",
+   "label": "EmbeddingJob",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record",
+      "v": "FK → Record (D-10)"
+     },
+     {
+      "k": "status",
+      "v": "Char"
+     },
+     {
+      "k": "celery_task_id",
+      "v": "Char"
+     },
+     {
+      "k": "error",
+      "v": "Text"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     },
+     "… 1 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "ai_PaperBrief",
+   "shape": "table",
+   "label": "PaperBrief",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record",
+      "v": "FK → Record (D-10)"
+     },
+     {
+      "k": "chunk_set",
+      "v": "FK → ChunkSet (D-13)"
+     },
+     {
+      "k": "requested_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "content_hash",
+      "v": "Char"
+     },
+     {
+      "k": "prompt_version",
+      "v": "PositiveSmallInteger"
+     },
+     {
+      "k": "profile_hash",
+      "v": "Char"
+     },
+     {
+      "k": "model_id",
+      "v": "Char"
+     },
+     "… 10 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "ai_RecordOverview",
+   "shape": "table",
+   "label": "RecordOverview",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record",
+      "v": "FK unique → Record (D-10)"
+     },
+     {
+      "k": "state",
+      "v": "Char"
+     },
+     {
+      "k": "text",
+      "v": "Text"
+     },
+     {
+      "k": "citations",
+      "v": "JSON"
+     },
+     {
+      "k": "degraded",
+      "v": "Boolean"
+     },
+     "… 6 more fields"
+    ]
+   ]
+  }
+ ],
+ "edges": [],
+ "legend": [
+  {
+   "line": "many",
+   "text": "many (zero or more) to exactly one"
+  },
+  "circle at an end: zero allowed",
+  "bold: primary key",
+  "FK → Name (D-n): drawn in full on figure D-n"
+ ]
+}

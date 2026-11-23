@@ -1,0 +1,104 @@
+{
+ "kind": "columns",
+ "format": "portrait",
+ "title": "C-6.5  Classes: personal discovery",
+ "caption": "SDD v2 §3.6.5. From apps/records (models.py, discovery.py), ADR-062 at a46d7fc4 (IR-1275).",
+ "gutter": 60,
+ "vgap": 30,
+ "nodes": [
+  {
+   "id": "discovery",
+   "shape": "class",
+   "label": "discovery",
+   "sections": [
+    [],
+    [
+     "get_interests()",
+     "put_interests()",
+     "get_feed()",
+     "dismiss()",
+     "undo_dismissal()"
+    ]
+   ],
+   "stereotype": "module"
+  },
+  {
+   "id": "DiscoveryInterests",
+   "shape": "class",
+   "label": "DiscoveryInterests",
+   "sections": [
+    [
+     "user → User",
+     "classifications",
+     "psced",
+     "revision"
+    ]
+   ]
+  },
+  {
+   "id": "DiscoveryDismissal",
+   "shape": "class",
+   "label": "DiscoveryDismissal",
+   "sections": [
+    [
+     "user",
+     "record"
+    ]
+   ]
+  },
+  {
+   "id": "DiscoveryFeedSnapshot",
+   "shape": "class",
+   "label": "DiscoveryFeedSnapshot",
+   "sections": [
+    [
+     "user",
+     "recipe_version",
+     "mode",
+     "entries"
+    ]
+   ]
+  }
+ ],
+ "columns": [
+  [
+   "discovery"
+  ],
+  [
+   "DiscoveryInterests",
+   "DiscoveryDismissal",
+   "DiscoveryFeedSnapshot"
+  ]
+ ],
+ "edges": [
+  {
+   "from": "discovery",
+   "to": "DiscoveryInterests",
+   "dash": true
+  },
+  {
+   "from": "discovery",
+   "to": "DiscoveryDismissal",
+   "dash": true
+  },
+  {
+   "from": "discovery",
+   "to": "DiscoveryFeedSnapshot",
+   "dash": true
+  }
+ ],
+ "legend": [
+  {
+   "line": "diamond",
+   "text": "composition (owner at the diamond)"
+  },
+  {
+   "line": "arrow",
+   "text": "association"
+  },
+  {
+   "line": "dash arrow",
+   "text": "uses / calls"
+  }
+ ]
+}

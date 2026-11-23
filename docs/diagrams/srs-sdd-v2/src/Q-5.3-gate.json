@@ -1,0 +1,68 @@
+{
+ "kind": "sequence",
+ "format": "portrait",
+ "title": "Q-5.3  Sequence: release an embargo, then publish",
+ "caption": "SDD v2 §3.5.3. From records/embargo.py, decisions.py, policy/disclosure.py at a46d7fc4 (IR-1275).",
+ "participants": [
+  {
+   "id": "adv",
+   "label": "Adviser or RDCO",
+   "tone": "plain"
+  },
+  {
+   "id": "rdco",
+   "label": "RDCO",
+   "tone": "plain"
+  },
+  {
+   "id": "dj",
+   "label": "Django",
+   "sub": "RecordViewSet"
+  },
+  {
+   "id": "db",
+   "label": "PostgreSQL"
+  },
+  {
+   "id": "cx",
+   "label": "celery-extraction"
+  }
+ ],
+ "steps": [
+  {
+   "from": "adv",
+   "to": "dj",
+   "label": "POST /records/<id>/embargo-release/"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "embargo_released_at/by; audit"
+  },
+  {
+   "from": "rdco",
+   "to": "dj",
+   "label": "POST /records/<id>/decide/ (publish)"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "published"
+  },
+  {
+   "from": "dj",
+   "to": "cx",
+   "label": "on_commit: queue the read (gate rechecked there)"
+  }
+ ],
+ "legend": [
+  {
+   "line": "arrow",
+   "text": "request or write"
+  },
+  {
+   "line": "dash arrow",
+   "text": "response or notice"
+  }
+ ]
+}

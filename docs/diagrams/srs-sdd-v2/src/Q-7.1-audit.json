@@ -1,0 +1,69 @@
+{
+ "kind": "sequence",
+ "format": "portrait",
+ "title": "Q-7.1  Sequence: write and read audit events",
+ "caption": "SDD v2 §3.7.1. From apps/audit/workflow.py, views.py at a46d7fc4 (IR-1275).",
+ "participants": [
+  {
+   "id": "act",
+   "label": "Workflow service"
+  },
+  {
+   "id": "db",
+   "label": "PostgreSQL"
+  },
+  {
+   "id": "sa",
+   "label": "System Admin",
+   "tone": "plain"
+  },
+  {
+   "id": "dj",
+   "label": "Django",
+   "sub": "AuditEventListView"
+  }
+ ],
+ "steps": [
+  {
+   "from": "act",
+   "to": "db",
+   "label": "BEGIN; change rows"
+  },
+  {
+   "from": "act",
+   "to": "db",
+   "label": "audit.workflow.<event>(...): AuditEvent"
+  },
+  {
+   "from": "act",
+   "to": "db",
+   "label": "COMMIT (both or neither)"
+  },
+  {
+   "from": "sa",
+   "to": "dj",
+   "label": "GET /audit/?event_type=&actor=&from=&to="
+  },
+  {
+   "from": "dj",
+   "to": "sa",
+   "label": "events (read-only)",
+   "dash": true
+  },
+  {
+   "from": "sa",
+   "to": "dj",
+   "label": "GET /audit/export/"
+  }
+ ],
+ "legend": [
+  {
+   "line": "arrow",
+   "text": "request or write"
+  },
+  {
+   "line": "dash arrow",
+   "text": "response or notice"
+  }
+ ]
+}

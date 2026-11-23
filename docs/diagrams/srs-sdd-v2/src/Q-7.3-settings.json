@@ -1,0 +1,55 @@
+{
+ "kind": "sequence",
+ "format": "portrait",
+ "title": "Q-7.3  Sequence: change the AI answer",
+ "caption": "SDD v2 §3.7.3. From AiAnswerView, features/settings at a46d7fc4 (IR-1275).",
+ "participants": [
+  {
+   "id": "p",
+   "label": "Person",
+   "tone": "plain"
+  },
+  {
+   "id": "spa",
+   "label": "React",
+   "sub": "SettingsPage"
+  },
+  {
+   "id": "dj",
+   "label": "Django",
+   "sub": "AiAnswerView"
+  },
+  {
+   "id": "db",
+   "label": "PostgreSQL"
+  }
+ ],
+ "steps": [
+  {
+   "from": "spa",
+   "to": "dj",
+   "label": "PATCH /users/me/ai-answer/ (No)"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "User.ai_consent; NoticeAnswer; audit"
+  },
+  {
+   "from": "dj",
+   "to": "spa",
+   "label": "applies to papers from now on",
+   "dash": true
+  }
+ ],
+ "legend": [
+  {
+   "line": "arrow",
+   "text": "request or write"
+  },
+  {
+   "line": "dash arrow",
+   "text": "response or notice"
+  }
+ ]
+}

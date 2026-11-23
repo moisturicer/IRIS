@@ -1,0 +1,202 @@
+{
+ "title": "E-3.7  Schema: turnaround",
+ "caption": "SDD v2 §3.3.7. Generated from backend/apps/*/models*.py at a46d7fc4; all keys and up to four other fields per table; the full schema is D-8 to D-15.",
+ "kind": "erd",
+ "format": "portrait",
+ "nodes": [
+  {
+   "id": "reviews_DeadlineMoment",
+   "shape": "table",
+   "label": "DeadlineMoment",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "assignment",
+      "v": "FK → RecordAssignment"
+     },
+     {
+      "k": "due_at",
+      "v": "DateTime"
+     },
+     {
+      "k": "kind",
+      "v": "Char"
+     },
+     {
+      "k": "step",
+      "v": "PositiveInteger"
+     },
+     {
+      "k": "sent_at",
+      "v": "DateTime"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "reviews_Extension",
+   "shape": "table",
+   "label": "Extension",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "assignment",
+      "v": "FK → RecordAssignment"
+     },
+     {
+      "k": "actor",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "previous_due_at",
+      "v": "DateTime"
+     },
+     {
+      "k": "due_at",
+      "v": "DateTime"
+     },
+     {
+      "k": "reason",
+      "v": "Text"
+     },
+     {
+      "k": "system",
+      "v": "Boolean"
+     },
+     "… 1 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "reviews_Holiday",
+   "shape": "table",
+   "label": "Holiday",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "date",
+      "v": "Date"
+     },
+     {
+      "k": "name",
+      "v": "Char"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "reviews_RecordAssignment",
+   "shape": "table",
+   "label": "RecordAssignment",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record",
+      "v": "FK → Record (D-10)"
+     },
+     {
+      "k": "opened_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "closed_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "closed_by_decision",
+      "v": "FK → Review (D-11)"
+     },
+     {
+      "k": "party",
+      "v": "Char"
+     },
+     {
+      "k": "state",
+      "v": "Char"
+     },
+     {
+      "k": "opened_at",
+      "v": "DateTime"
+     },
+     {
+      "k": "closed_at",
+      "v": "DateTime"
+     },
+     "… 5 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "reviews_Turnaround",
+   "shape": "table",
+   "label": "Turnaround",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "party",
+      "v": "Char"
+     },
+     {
+      "k": "working_days",
+      "v": "PositiveInteger"
+     }
+    ]
+   ]
+  }
+ ],
+ "edges": [
+  {
+   "from": "reviews_DeadlineMoment",
+   "to": "reviews_RecordAssignment",
+   "field": "assignment",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "reviews_Extension",
+   "to": "reviews_RecordAssignment",
+   "field": "assignment",
+   "tail": "zero-many",
+   "head": "one"
+  }
+ ],
+ "legend": [
+  {
+   "line": "many",
+   "text": "many (zero or more) to exactly one"
+  },
+  "circle at an end: zero allowed",
+  "bold: primary key",
+  "FK → Name (D-n): drawn in full on figure D-n"
+ ]
+}

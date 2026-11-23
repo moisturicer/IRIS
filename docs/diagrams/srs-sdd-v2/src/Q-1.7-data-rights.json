@@ -1,0 +1,81 @@
+{
+ "kind": "sequence",
+ "format": "portrait",
+ "title": "Q-1.7  Sequence: export data and delete an account",
+ "caption": "SDD v2 §3.1.7. From apps/accounts/personal_data, apps/accounts/deletion at a46d7fc4 (IR-1275).",
+ "participants": [
+  {
+   "id": "p",
+   "label": "Person",
+   "tone": "plain"
+  },
+  {
+   "id": "sa",
+   "label": "System Admin",
+   "tone": "plain"
+  },
+  {
+   "id": "dj",
+   "label": "Django",
+   "sub": "accounts"
+  },
+  {
+   "id": "db",
+   "label": "PostgreSQL"
+  }
+ ],
+ "steps": [
+  {
+   "from": "p",
+   "to": "dj",
+   "label": "GET /users/me/data/"
+  },
+  {
+   "from": "dj",
+   "to": "p",
+   "label": "personal data export",
+   "dash": true
+  },
+  {
+   "from": "p",
+   "to": "dj",
+   "label": "POST /users/me/deletion-request/"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "AccountDeletionRequest"
+  },
+  {
+   "from": "sa",
+   "to": "dj",
+   "label": "GET /users/deletion-requests/ (with blockers)"
+  },
+  {
+   "from": "sa",
+   "to": "dj",
+   "label": "POST .../<id>/confirm/"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "refuse if blocked; else delete personal data, end sessions, audit"
+  },
+  {
+   "from": "dj",
+   "to": "sa",
+   "label": "200 or 409 naming each blocker",
+   "dash": true
+  }
+ ],
+ "legend": [
+  {
+   "line": "arrow",
+   "text": "request or write"
+  },
+  {
+   "line": "dash arrow",
+   "text": "response or notice"
+  }
+ ]
+}

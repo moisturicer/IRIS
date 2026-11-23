@@ -1,0 +1,90 @@
+{
+ "kind": "sequence",
+ "format": "portrait",
+ "title": "Q-3.2  Sequence: RDCO routes, then decides",
+ "caption": "SDD v2 §3.3.2. From apps/reviews/routing.py, decisions.py, ADR-047 at a46d7fc4 (IR-1275).",
+ "participants": [
+  {
+   "id": "rdco",
+   "label": "RDCO",
+   "tone": "plain"
+  },
+  {
+   "id": "dj",
+   "label": "Django",
+   "sub": "RecordViewSet"
+  },
+  {
+   "id": "dec",
+   "label": "routing · decisions"
+  },
+  {
+   "id": "db",
+   "label": "PostgreSQL"
+  },
+  {
+   "id": "off",
+   "label": "Offices",
+   "tone": "plain"
+  }
+ ],
+ "steps": [
+  {
+   "from": "rdco",
+   "to": "dj",
+   "label": "POST /records/<id>/route/ (offices, reason)"
+  },
+  {
+   "from": "dj",
+   "to": "dec",
+   "label": "route()"
+  },
+  {
+   "from": "dec",
+   "to": "db",
+   "label": "assignment per office; RoutingEvent; audit"
+  },
+  {
+   "from": "dec",
+   "to": "off",
+   "label": "notify each office",
+   "dash": true
+  },
+  {
+   "from": "rdco",
+   "to": "dj",
+   "label": "POST /records/<id>/decide/ (publish)"
+  },
+  {
+   "from": "dj",
+   "to": "dec",
+   "label": "decide()"
+  },
+  {
+   "from": "dec",
+   "to": "db",
+   "label": "lock record + assignments; refuse if embargoed"
+  },
+  {
+   "from": "dec",
+   "to": "db",
+   "label": "Review; status published; withdraw open work (closed_by_decision)"
+  },
+  {
+   "from": "dec",
+   "to": "off",
+   "label": "each closed Seat: your review is closed",
+   "dash": true
+  }
+ ],
+ "legend": [
+  {
+   "line": "arrow",
+   "text": "request or write"
+  },
+  {
+   "line": "dash arrow",
+   "text": "response or notice"
+  }
+ ]
+}

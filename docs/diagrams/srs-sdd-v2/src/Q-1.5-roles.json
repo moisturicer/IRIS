@@ -1,0 +1,80 @@
+{
+ "kind": "sequence",
+ "format": "portrait",
+ "title": "Q-1.5  Sequence: a role request",
+ "caption": "SDD v2 §3.1.5. From apps/accounts/views.py, core/permissions.py at a46d7fc4 (IR-1275).",
+ "participants": [
+  {
+   "id": "p",
+   "label": "Person",
+   "tone": "plain"
+  },
+  {
+   "id": "rdco",
+   "label": "RDCO",
+   "tone": "plain"
+  },
+  {
+   "id": "dj",
+   "label": "Django",
+   "sub": "RoleRequestDetailView"
+  },
+  {
+   "id": "db",
+   "label": "PostgreSQL"
+  },
+  {
+   "id": "live",
+   "label": "Redis",
+   "sub": "live:role:rdco"
+  }
+ ],
+ "steps": [
+  {
+   "from": "p",
+   "to": "dj",
+   "label": "submit a role request"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "RoleRequest (pending)"
+  },
+  {
+   "from": "dj",
+   "to": "live",
+   "label": "hint: queues"
+  },
+  {
+   "from": "rdco",
+   "to": "dj",
+   "label": "PATCH /users/role-requests/<id>/ approve"
+  },
+  {
+   "from": "dj",
+   "to": "dj",
+   "label": "role_change_refusal: Student/Adviser only, outside the offices"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "set the role; audit; notify"
+  },
+  {
+   "from": "dj",
+   "to": "rdco",
+   "label": "200",
+   "dash": true
+  }
+ ],
+ "legend": [
+  {
+   "line": "arrow",
+   "text": "request or write"
+  },
+  {
+   "line": "dash arrow",
+   "text": "response or notice"
+  }
+ ]
+}

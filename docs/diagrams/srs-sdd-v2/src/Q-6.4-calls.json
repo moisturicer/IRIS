@@ -1,0 +1,65 @@
+{
+ "kind": "sequence",
+ "format": "portrait",
+ "title": "Q-6.4  Sequence: post and confirm a call",
+ "caption": "SDD v2 §3.6.4. From apps/opportunities, ADR-050 at a46d7fc4 (IR-1275).",
+ "participants": [
+  {
+   "id": "adv",
+   "label": "Adviser",
+   "tone": "plain"
+  },
+  {
+   "id": "dj",
+   "label": "Django",
+   "sub": "OpportunityViewSet"
+  },
+  {
+   "id": "db",
+   "label": "PostgreSQL"
+  },
+  {
+   "id": "rdco",
+   "label": "RDCO",
+   "tone": "plain"
+  }
+ ],
+ "steps": [
+  {
+   "from": "adv",
+   "to": "dj",
+   "label": "POST /opportunities/"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "Opportunity (pending); audit"
+  },
+  {
+   "from": "rdco",
+   "to": "dj",
+   "label": "POST /opportunities/<id>/confirm/"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "confirmed; audit"
+  },
+  {
+   "from": "dj",
+   "to": "adv",
+   "label": "notification",
+   "dash": true
+  }
+ ],
+ "legend": [
+  {
+   "line": "arrow",
+   "text": "request or write"
+  },
+  {
+   "line": "dash arrow",
+   "text": "response or notice"
+  }
+ ]
+}

@@ -1,0 +1,236 @@
+{
+ "title": "E-1.5  Schema: roles, requests, deletion and settings",
+ "caption": "SDD v2 §3.1.5–3.1.7. Generated from backend/apps/*/models*.py at a46d7fc4; all keys and up to four other fields per table; the full schema is D-8 to D-15.",
+ "kind": "erd",
+ "format": "portrait",
+ "nodes": [
+  {
+   "id": "accounts_AccountDeletionRequest",
+   "shape": "table",
+   "label": "AccountDeletionRequest",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "user",
+      "v": "FK → User"
+     },
+     {
+      "k": "decided_by",
+      "v": "FK → User"
+     },
+     {
+      "k": "status",
+      "v": "Char"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     },
+     {
+      "k": "decided_at",
+      "v": "DateTime"
+     },
+     {
+      "k": "reason",
+      "v": "Text"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "accounts_Role",
+   "shape": "table",
+   "label": "Role",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "name",
+      "v": "Char"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "accounts_RoleRequest",
+   "shape": "table",
+   "label": "RoleRequest",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "user",
+      "v": "FK → User"
+     },
+     {
+      "k": "requested_role",
+      "v": "FK → Role"
+     },
+     {
+      "k": "reviewed_by",
+      "v": "FK → User"
+     },
+     {
+      "k": "status",
+      "v": "Char"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     },
+     {
+      "k": "reviewed_at",
+      "v": "DateTime"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "accounts_SystemSetting",
+   "shape": "table",
+   "label": "SystemSetting",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "updated_by",
+      "v": "FK → User"
+     },
+     {
+      "k": "key",
+      "v": "Char"
+     },
+     {
+      "k": "value",
+      "v": "Text"
+     },
+     {
+      "k": "updated_at",
+      "v": "DateTime"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "accounts_User",
+   "shape": "table",
+   "label": "User",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "role",
+      "v": "FK → Role"
+     },
+     {
+      "k": "research_interests",
+      "v": "M2M → ResearchInterest (D-9)"
+     },
+     {
+      "k": "email",
+      "v": "Email"
+     },
+     {
+      "k": "first_name",
+      "v": "Char"
+     },
+     {
+      "k": "middle_initial",
+      "v": "Char"
+     },
+     {
+      "k": "last_name",
+      "v": "Char"
+     },
+     "… 15 more fields"
+    ]
+   ]
+  }
+ ],
+ "edges": [
+  {
+   "from": "accounts_AccountDeletionRequest",
+   "to": "accounts_User",
+   "field": "user",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "accounts_AccountDeletionRequest",
+   "to": "accounts_User",
+   "field": "decided_by",
+   "tail": "zero-many",
+   "head": "zero-one"
+  },
+  {
+   "from": "accounts_RoleRequest",
+   "to": "accounts_User",
+   "field": "user",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "accounts_RoleRequest",
+   "to": "accounts_Role",
+   "field": "requested_role",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "accounts_RoleRequest",
+   "to": "accounts_User",
+   "field": "reviewed_by",
+   "tail": "zero-many",
+   "head": "zero-one"
+  },
+  {
+   "from": "accounts_SystemSetting",
+   "to": "accounts_User",
+   "field": "updated_by",
+   "tail": "zero-many",
+   "head": "zero-one"
+  },
+  {
+   "from": "accounts_User",
+   "to": "accounts_Role",
+   "field": "role",
+   "tail": "zero-many",
+   "head": "zero-one"
+  }
+ ],
+ "legend": [
+  {
+   "line": "many",
+   "text": "many (zero or more) to exactly one"
+  },
+  "circle at an end: zero allowed",
+  "bold: primary key",
+  "FK → Name (D-n): drawn in full on figure D-n"
+ ]
+}

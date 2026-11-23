@@ -1,0 +1,112 @@
+{
+ "title": "E-6.5  Schema: personal discovery",
+ "caption": "SDD v2 §3.6.5. Generated from backend/apps/*/models*.py at a46d7fc4; all keys and up to four other fields per table; the full schema is D-8 to D-15.",
+ "kind": "erd",
+ "format": "portrait",
+ "nodes": [
+  {
+   "id": "records_DiscoveryDismissal",
+   "shape": "table",
+   "label": "DiscoveryDismissal",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "user",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "record",
+      "v": "FK → Record (D-10)"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "records_DiscoveryFeedSnapshot",
+   "shape": "table",
+   "label": "DiscoveryFeedSnapshot",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "user",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "interest_revision",
+      "v": "PositiveBigInteger"
+     },
+     {
+      "k": "recipe_version",
+      "v": "PositiveSmallInteger"
+     },
+     {
+      "k": "mode",
+      "v": "Char"
+     },
+     {
+      "k": "entries",
+      "v": "JSON"
+     },
+     "… 1 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "records_DiscoveryInterests",
+   "shape": "table",
+   "label": "DiscoveryInterests",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "user",
+      "v": "FK unique → User (D-9)"
+     },
+     {
+      "k": "classifications",
+      "v": "M2M → Classification (D-10)"
+     },
+     {
+      "k": "psced",
+      "v": "M2M → PSCEDClassification (D-10)"
+     },
+     {
+      "k": "revision",
+      "v": "PositiveBigInteger"
+     }
+    ]
+   ]
+  }
+ ],
+ "edges": [],
+ "legend": [
+  {
+   "line": "many",
+   "text": "many (zero or more) to exactly one"
+  },
+  "circle at an end: zero allowed",
+  "bold: primary key",
+  "FK → Name (D-n): drawn in full on figure D-n"
+ ]
+}

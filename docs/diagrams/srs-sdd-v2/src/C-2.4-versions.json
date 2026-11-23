@@ -1,0 +1,128 @@
+{
+ "kind": "columns",
+ "format": "portrait",
+ "title": "C-2.4  Classes: Versions and review text",
+ "caption": "SDD v2 §3.2.4. From apps/records (models.py, review_text/), apps/reviews/version_comparison.py, ADR-058 at a46d7fc4 (IR-1275).",
+ "gutter": 60,
+ "vgap": 30,
+ "nodes": [
+  {
+   "id": "RecordVersion",
+   "shape": "class",
+   "label": "RecordVersion",
+   "sections": [
+    [
+     "number",
+     "manuscript",
+     "manuscript_sha256",
+     "cause",
+     "review_text → ReviewText"
+    ]
+   ]
+  },
+  {
+   "id": "RecordVersionDocument",
+   "shape": "class",
+   "label": "RecordVersionDocument",
+   "sections": [
+    [
+     "version → RecordVersion",
+     "upload → RecordUpload"
+    ]
+   ]
+  },
+  {
+   "id": "ReviewText",
+   "shape": "class",
+   "label": "ReviewText",
+   "sections": [
+    [
+     "manuscript_sha256",
+     "state",
+     "reader",
+     "page_count"
+    ]
+   ]
+  },
+  {
+   "id": "ReviewTextSection",
+   "shape": "class",
+   "label": "ReviewTextSection",
+   "sections": [
+    [
+     "ordinal",
+     "key",
+     "heading",
+     "page",
+     "text_hash"
+    ]
+   ]
+  },
+  {
+   "id": "version_comparison",
+   "shape": "class",
+   "label": "version_comparison",
+   "sections": [
+    [],
+    [
+     "compare(a, b)"
+    ]
+   ],
+   "stereotype": "module"
+  }
+ ],
+ "columns": [
+  [
+   "RecordVersion",
+   "RecordVersionDocument"
+  ],
+  [
+   "ReviewText",
+   "ReviewTextSection"
+  ],
+  [
+   "version_comparison"
+  ]
+ ],
+ "edges": [
+  {
+   "from": "RecordVersion",
+   "to": "RecordVersionDocument",
+   "tail": "diamond",
+   "head": "none",
+   "mFrom": "1",
+   "mTo": "0..*"
+  },
+  {
+   "from": "RecordVersion",
+   "to": "ReviewText"
+  },
+  {
+   "from": "ReviewText",
+   "to": "ReviewTextSection",
+   "tail": "diamond",
+   "head": "none",
+   "mFrom": "1",
+   "mTo": "0..*"
+  },
+  {
+   "from": "version_comparison",
+   "to": "ReviewText",
+   "dash": true
+  }
+ ],
+ "legend": [
+  {
+   "line": "diamond",
+   "text": "composition (owner at the diamond)"
+  },
+  {
+   "line": "arrow",
+   "text": "association"
+  },
+  {
+   "line": "dash arrow",
+   "text": "uses / calls"
+  }
+ ]
+}

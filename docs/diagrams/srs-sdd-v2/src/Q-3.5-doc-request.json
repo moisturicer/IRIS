@@ -1,0 +1,70 @@
+{
+ "kind": "sequence",
+ "format": "portrait",
+ "title": "Q-3.5  Sequence: a document request",
+ "caption": "SDD v2 §3.3.5. From apps/documents/requests.py, ADR-022 at a46d7fc4 (IR-1275).",
+ "participants": [
+  {
+   "id": "rv",
+   "label": "Reviewer",
+   "tone": "plain"
+  },
+  {
+   "id": "dj",
+   "label": "Django",
+   "sub": "document requests"
+  },
+  {
+   "id": "db",
+   "label": "PostgreSQL"
+  },
+  {
+   "id": "o",
+   "label": "Owner",
+   "tone": "plain"
+  }
+ ],
+ "steps": [
+  {
+   "from": "rv",
+   "to": "dj",
+   "label": "POST /records/<id>/document-requests/ (items)"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "DocumentRequest (open); pause the party's clock"
+  },
+  {
+   "from": "dj",
+   "to": "o",
+   "label": "notification",
+   "dash": true
+  },
+  {
+   "from": "o",
+   "to": "dj",
+   "label": "upload against each item"
+  },
+  {
+   "from": "rv",
+   "to": "dj",
+   "label": "PATCH /document-request-items/<id>/ (accept / reject + reason)"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "all accepted: fulfilled; restart the clock"
+  }
+ ],
+ "legend": [
+  {
+   "line": "arrow",
+   "text": "request or write"
+  },
+  {
+   "line": "dash arrow",
+   "text": "response or notice"
+  }
+ ]
+}

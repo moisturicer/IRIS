@@ -1,0 +1,82 @@
+{
+ "kind": "sequence",
+ "format": "portrait",
+ "title": "Q-1.3  Sequence: lockout and throttling",
+ "caption": "SDD v2 §3.1.3. From config/settings/base.py, apps/accounts/lockout.py at a46d7fc4 (IR-1275).",
+ "participants": [
+  {
+   "id": "p",
+   "label": "Person",
+   "tone": "plain"
+  },
+  {
+   "id": "dj",
+   "label": "Django",
+   "sub": "LoginView"
+  },
+  {
+   "id": "thr",
+   "label": "DRF throttles",
+   "sub": "cache in Redis"
+  },
+  {
+   "id": "axes",
+   "label": "django-axes",
+   "sub": "AccessAttempt"
+  },
+  {
+   "id": "db",
+   "label": "PostgreSQL"
+  }
+ ],
+ "steps": [
+  {
+   "from": "p",
+   "to": "dj",
+   "label": "POST /auth/login/"
+  },
+  {
+   "from": "dj",
+   "to": "thr",
+   "label": "auth_login, auth_login_burst"
+  },
+  {
+   "from": "thr",
+   "to": "dj",
+   "label": "over the limit: 429",
+   "dash": true
+  },
+  {
+   "from": "dj",
+   "to": "axes",
+   "label": "authenticate (username + address)"
+  },
+  {
+   "from": "axes",
+   "to": "db",
+   "label": "count the failure"
+  },
+  {
+   "from": "axes",
+   "to": "dj",
+   "label": "failures >= AXES_FAILURE_LIMIT: locked",
+   "dash": true
+  },
+  {
+   "from": "dj",
+   "to": "p",
+   "label": "429 with the time of the next allowed attempt",
+   "dash": true
+  }
+ ],
+ "legend": [
+  {
+   "line": "arrow",
+   "text": "request or write"
+  },
+  {
+   "line": "dash arrow",
+   "text": "response or notice"
+  }
+ ]
+}

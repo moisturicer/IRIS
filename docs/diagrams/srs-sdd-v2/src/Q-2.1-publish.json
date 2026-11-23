@@ -1,0 +1,85 @@
+{
+ "kind": "sequence",
+ "format": "portrait",
+ "title": "Q-2.1  Sequence: create and submit a record",
+ "caption": "SDD v2 §3.2.1. From RecordViewSet, serializers.py, versions.py at a46d7fc4 (IR-1275).",
+ "participants": [
+  {
+   "id": "a",
+   "label": "Author",
+   "tone": "plain"
+  },
+  {
+   "id": "spa",
+   "label": "React",
+   "sub": "PublishDialog"
+  },
+  {
+   "id": "dj",
+   "label": "Django",
+   "sub": "RecordViewSet"
+  },
+  {
+   "id": "db",
+   "label": "PostgreSQL"
+  },
+  {
+   "id": "adv",
+   "label": "Adviser",
+   "tone": "plain"
+  }
+ ],
+ "steps": [
+  {
+   "from": "spa",
+   "to": "dj",
+   "label": "POST /records/ (draft)"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "Record (draft, embargoed); creator is primary owner"
+  },
+  {
+   "from": "spa",
+   "to": "dj",
+   "label": "upload the manuscript (A-2.3 checks)"
+  },
+  {
+   "from": "spa",
+   "to": "dj",
+   "label": "PATCH /records/<id>/ (metadata, owners, Adviser)"
+  },
+  {
+   "from": "spa",
+   "to": "dj",
+   "label": "POST /records/<id>/submit/"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "lock; Adviser not an owner; write Version 1; in_review"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "open the Adviser's RecordAssignment; audit"
+  },
+  {
+   "from": "dj",
+   "to": "adv",
+   "label": "after commit: notification + live hint",
+   "dash": true
+  }
+ ],
+ "legend": [
+  {
+   "line": "arrow",
+   "text": "request or write"
+  },
+  {
+   "line": "dash arrow",
+   "text": "response or notice"
+  }
+ ]
+}

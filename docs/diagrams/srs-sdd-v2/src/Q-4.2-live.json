@@ -1,0 +1,72 @@
+{
+ "kind": "sequence",
+ "format": "portrait",
+ "title": "Q-4.2  Sequence: a live hint",
+ "caption": "SDD v2 §3.4.2. From apps/live, frontend/src/lib/live.ts, ADR-073 at a46d7fc4 (IR-1275).",
+ "participants": [
+  {
+   "id": "tab",
+   "label": "React tab",
+   "sub": "lib/live.ts"
+  },
+  {
+   "id": "st",
+   "label": "Django ASGI",
+   "sub": "GET /live/"
+  },
+  {
+   "id": "redis",
+   "label": "Redis",
+   "sub": "live:*"
+  },
+  {
+   "id": "act",
+   "label": "Django",
+   "sub": "an act"
+  }
+ ],
+ "steps": [
+  {
+   "from": "tab",
+   "to": "st",
+   "label": "open the stream (Authorization)"
+  },
+  {
+   "from": "st",
+   "to": "redis",
+   "label": "subscribe: user, offices, role"
+  },
+  {
+   "from": "act",
+   "to": "redis",
+   "label": "on_commit: publish {topics}"
+  },
+  {
+   "from": "redis",
+   "to": "st",
+   "label": "fan out",
+   "dash": true
+  },
+  {
+   "from": "st",
+   "to": "tab",
+   "label": "event: hint",
+   "dash": true
+  },
+  {
+   "from": "tab",
+   "to": "act",
+   "label": "refetch through the API"
+  }
+ ],
+ "legend": [
+  {
+   "line": "arrow",
+   "text": "request or write"
+  },
+  {
+   "line": "dash arrow",
+   "text": "response or notice"
+  }
+ ]
+}

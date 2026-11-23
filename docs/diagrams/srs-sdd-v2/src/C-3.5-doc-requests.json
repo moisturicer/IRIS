@@ -1,0 +1,93 @@
+{
+ "kind": "columns",
+ "format": "portrait",
+ "title": "C-3.5  Classes: document requests",
+ "caption": "SDD v2 §3.3.5. From apps/documents (models.py, requests.py), ADR-022 at a46d7fc4 (IR-1275).",
+ "gutter": 60,
+ "vgap": 30,
+ "nodes": [
+  {
+   "id": "requests",
+   "shape": "class",
+   "label": "requests",
+   "sections": [
+    [],
+    [
+     "create_request()",
+     "accept_item()",
+     "reject_item()",
+     "withdraw_request()"
+    ]
+   ],
+   "stereotype": "module"
+  },
+  {
+   "id": "DocumentRequest",
+   "shape": "class",
+   "label": "DocumentRequest",
+   "sections": [
+    [
+     "record → Record",
+     "assignment → RecordAssignment",
+     "party",
+     "state",
+     "closed_by_decision"
+    ]
+   ]
+  },
+  {
+   "id": "DocumentRequestItem",
+   "shape": "class",
+   "label": "DocumentRequestItem",
+   "sections": [
+    [
+     "request → DocumentRequest",
+     "slot → UploadSlot",
+     "upload",
+     "state",
+     "rejection_reason"
+    ]
+   ]
+  }
+ ],
+ "columns": [
+  [
+   "requests"
+  ],
+  [
+   "DocumentRequest"
+  ],
+  [
+   "DocumentRequestItem"
+  ]
+ ],
+ "edges": [
+  {
+   "from": "requests",
+   "to": "DocumentRequest",
+   "dash": true
+  },
+  {
+   "from": "DocumentRequest",
+   "to": "DocumentRequestItem",
+   "tail": "diamond",
+   "head": "none",
+   "mFrom": "1",
+   "mTo": "1..*"
+  }
+ ],
+ "legend": [
+  {
+   "line": "diamond",
+   "text": "composition (owner at the diamond)"
+  },
+  {
+   "line": "arrow",
+   "text": "association"
+  },
+  {
+   "line": "dash arrow",
+   "text": "uses / calls"
+  }
+ ]
+}

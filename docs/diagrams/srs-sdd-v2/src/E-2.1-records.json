@@ -1,0 +1,340 @@
+{
+ "title": "E-2.1  Schema: records and Versions",
+ "caption": "SDD v2 §3.2.1, 3.2.4. Generated from backend/apps/*/models*.py at a46d7fc4; all keys and up to four other fields per table; the full schema is D-8 to D-15.",
+ "kind": "erd",
+ "format": "landscape",
+ "nodes": [
+  {
+   "id": "records_Author",
+   "shape": "table",
+   "label": "Author",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record",
+      "v": "FK → Record"
+     },
+     {
+      "k": "role",
+      "v": "FK → AuthorRole (D-10)"
+     },
+     {
+      "k": "name",
+      "v": "Char"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "records_Record",
+   "shape": "table",
+   "label": "Record",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "classification",
+      "v": "FK → Classification (D-10)"
+     },
+     {
+      "k": "psced",
+      "v": "FK → PSCEDClassification (D-10)"
+     },
+     {
+      "k": "record_type",
+      "v": "FK → RecordType"
+     },
+     {
+      "k": "adviser",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "added_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "dpa_accepted_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "embargo_date_set_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "embargo_released_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "ip_released_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "deleted_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "derived_from",
+      "v": "FK → Record"
+     },
+     {
+      "k": "title",
+      "v": "Char"
+     },
+     {
+      "k": "origin",
+      "v": "Char"
+     },
+     {
+      "k": "publication_year",
+      "v": "PositiveInteger"
+     },
+     {
+      "k": "year_accomplished",
+      "v": "PositiveInteger"
+     },
+     "… 36 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "records_RecordOwner",
+   "shape": "table",
+   "label": "RecordOwner",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record",
+      "v": "FK → Record"
+     },
+     {
+      "k": "user",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "is_primary",
+      "v": "Boolean"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "records_RecordType",
+   "shape": "table",
+   "label": "RecordType",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "name",
+      "v": "Char"
+     },
+     {
+      "k": "description",
+      "v": "Text"
+     },
+     {
+      "k": "manuscript_description",
+      "v": "Text"
+     },
+     {
+      "k": "manuscript_template",
+      "v": "File"
+     },
+     "… 1 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "records_RecordVersion",
+   "shape": "table",
+   "label": "RecordVersion",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record",
+      "v": "FK → Record"
+     },
+     {
+      "k": "created_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "review_text",
+      "v": "FK → ReviewText"
+     },
+     {
+      "k": "number",
+      "v": "PositiveInteger"
+     },
+     {
+      "k": "manuscript",
+      "v": "File"
+     },
+     {
+      "k": "manuscript_revision",
+      "v": "UUID"
+     },
+     {
+      "k": "manuscript_sha256",
+      "v": "Char"
+     },
+     "… 4 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "records_RecordVersionDocument",
+   "shape": "table",
+   "label": "RecordVersionDocument",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "version",
+      "v": "FK → RecordVersion"
+     },
+     {
+      "k": "upload",
+      "v": "FK → RecordUpload (D-12)"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "records_ReviewText",
+   "shape": "table",
+   "label": "ReviewText",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record",
+      "v": "FK → Record"
+     },
+     {
+      "k": "source_file",
+      "v": "Char"
+     },
+     {
+      "k": "manuscript_sha256",
+      "v": "Char"
+     },
+     {
+      "k": "state",
+      "v": "Char"
+     },
+     {
+      "k": "reason",
+      "v": "Char"
+     },
+     "… 7 more fields"
+    ]
+   ]
+  }
+ ],
+ "edges": [
+  {
+   "from": "records_Author",
+   "to": "records_Record",
+   "field": "record",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "records_Record",
+   "to": "records_RecordType",
+   "field": "record_type",
+   "tail": "zero-many",
+   "head": "zero-one"
+  },
+  {
+   "from": "records_Record",
+   "to": "records_Record",
+   "field": "derived_from",
+   "tail": "zero-many",
+   "head": "zero-one"
+  },
+  {
+   "from": "records_RecordOwner",
+   "to": "records_Record",
+   "field": "record",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "records_RecordVersion",
+   "to": "records_Record",
+   "field": "record",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "records_RecordVersion",
+   "to": "records_ReviewText",
+   "field": "review_text",
+   "tail": "zero-many",
+   "head": "zero-one"
+  },
+  {
+   "from": "records_RecordVersionDocument",
+   "to": "records_RecordVersion",
+   "field": "version",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "records_ReviewText",
+   "to": "records_Record",
+   "field": "record",
+   "tail": "zero-many",
+   "head": "one"
+  }
+ ],
+ "legend": [
+  {
+   "line": "many",
+   "text": "many (zero or more) to exactly one"
+  },
+  "circle at an end: zero allowed",
+  "bold: primary key",
+  "FK → Name (D-n): drawn in full on figure D-n"
+ ]
+}

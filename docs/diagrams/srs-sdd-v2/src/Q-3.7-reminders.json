@@ -1,0 +1,71 @@
+{
+ "kind": "sequence",
+ "format": "portrait",
+ "title": "Q-3.7  Sequence: reminders and escalation",
+ "caption": "SDD v2 §3.3.7. From apps/reviews/tasks.py send_deadline_notifications, reminders.py at a46d7fc4 (IR-1275).",
+ "participants": [
+  {
+   "id": "beat",
+   "label": "celery-beat",
+   "sub": "hourly"
+  },
+  {
+   "id": "task",
+   "label": "celery-default",
+   "sub": "reminders"
+  },
+  {
+   "id": "db",
+   "label": "PostgreSQL"
+  },
+  {
+   "id": "coord",
+   "label": "Coordinators",
+   "tone": "plain"
+  },
+  {
+   "id": "seat",
+   "label": "Seat holders",
+   "tone": "plain"
+  }
+ ],
+ "steps": [
+  {
+   "from": "beat",
+   "to": "task",
+   "label": "send_deadline_notifications"
+  },
+  {
+   "from": "task",
+   "to": "db",
+   "label": "assignments with due dates; DeadlineMoment sent?"
+  },
+  {
+   "from": "task",
+   "to": "seat",
+   "label": "2 working days before / on the due date",
+   "dash": true
+  },
+  {
+   "from": "task",
+   "to": "coord",
+   "label": "overdue: escalation, then every 5 working days",
+   "dash": true
+  },
+  {
+   "from": "task",
+   "to": "db",
+   "label": "record each moment once"
+  }
+ ],
+ "legend": [
+  {
+   "line": "arrow",
+   "text": "request or write"
+  },
+  {
+   "line": "dash arrow",
+   "text": "response or notice"
+  }
+ ]
+}

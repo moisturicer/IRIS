@@ -1,0 +1,107 @@
+{
+ "kind": "columns",
+ "format": "portrait",
+ "title": "C-2.2  Classes: requirements and templates",
+ "caption": "SDD v2 §3.2.2. From apps/documents (models.py, setup.py, adviser_templates.py) at a46d7fc4 (IR-1275).",
+ "gutter": 60,
+ "vgap": 30,
+ "nodes": [
+  {
+   "id": "setup",
+   "shape": "class",
+   "label": "setup",
+   "sections": [
+    [],
+    [
+     "add_requirement()",
+     "edit_requirement()",
+     "reorder_requirements()",
+     "remove_requirement()",
+     "set_requirement_template()"
+    ]
+   ],
+   "stereotype": "module"
+  },
+  {
+   "id": "RecordType",
+   "shape": "class",
+   "label": "RecordType",
+   "sections": [
+    [
+     "name",
+     "manuscript_description",
+     "manuscript_template"
+    ]
+   ]
+  },
+  {
+   "id": "UploadSlot",
+   "shape": "class",
+   "label": "UploadSlot",
+   "sections": [
+    [
+     "name",
+     "record_type → RecordType",
+     "is_required",
+     "position",
+     "template",
+     "hidden_at"
+    ]
+   ]
+  },
+  {
+   "id": "AdviserTemplate",
+   "shape": "class",
+   "label": "AdviserTemplate",
+   "sections": [
+    [
+     "owner → User",
+     "title",
+     "file",
+     "position"
+    ]
+   ]
+  }
+ ],
+ "columns": [
+  [
+   "setup"
+  ],
+  [
+   "RecordType",
+   "UploadSlot"
+  ],
+  [
+   "AdviserTemplate"
+  ]
+ ],
+ "edges": [
+  {
+   "from": "setup",
+   "to": "UploadSlot",
+   "dash": true
+  },
+  {
+   "from": "RecordType",
+   "to": "UploadSlot",
+   "tail": "diamond",
+   "head": "none",
+   "mFrom": "1",
+   "mTo": "0..*"
+  }
+ ],
+ "legend": [
+  {
+   "line": "diamond",
+   "text": "composition (owner at the diamond)"
+  },
+  {
+   "line": "arrow",
+   "text": "association"
+  },
+  {
+   "line": "dash arrow",
+   "text": "uses / calls"
+  }
+ ]
+}

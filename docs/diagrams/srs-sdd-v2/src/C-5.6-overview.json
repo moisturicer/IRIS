@@ -1,0 +1,99 @@
+{
+ "kind": "columns",
+ "format": "portrait",
+ "title": "C-5.6  Classes: AI Overview, paper brief and index jobs",
+ "caption": "SDD v2 §3.5.6, 3.5.8. From apps/ai (models/summary.py, overview/service.py, briefs/, views/embedding.py) at a46d7fc4 (IR-1275).",
+ "gutter": 60,
+ "vgap": 30,
+ "nodes": [
+  {
+   "id": "overview.service",
+   "shape": "class",
+   "label": "overview.service",
+   "sections": [
+    [],
+    [
+     "overview_for()",
+     "queue_overview_for_chunk_set()",
+     "generate_overview()"
+    ]
+   ],
+   "stereotype": "module"
+  },
+  {
+   "id": "RecordOverview",
+   "shape": "class",
+   "label": "RecordOverview",
+   "sections": [
+    [
+     "record → Record",
+     "state",
+     "text",
+     "citations",
+     "model_id",
+     "content_hash"
+    ]
+   ]
+  },
+  {
+   "id": "PaperBrief",
+   "shape": "class",
+   "label": "PaperBrief",
+   "sections": [
+    [
+     "record → Record",
+     "chunk_set",
+     "state",
+     "fields",
+     "section_briefs"
+    ]
+   ]
+  },
+  {
+   "id": "EmbeddingJob",
+   "shape": "class",
+   "label": "EmbeddingJob",
+   "sections": [
+    [
+     "record → Record",
+     "status",
+     "celery_task_id",
+     "error"
+    ]
+   ]
+  }
+ ],
+ "columns": [
+  [
+   "overview.service"
+  ],
+  [
+   "RecordOverview",
+   "PaperBrief"
+  ],
+  [
+   "EmbeddingJob"
+  ]
+ ],
+ "edges": [
+  {
+   "from": "overview.service",
+   "to": "RecordOverview",
+   "dash": true
+  }
+ ],
+ "legend": [
+  {
+   "line": "diamond",
+   "text": "composition (owner at the diamond)"
+  },
+  {
+   "line": "arrow",
+   "text": "association"
+  },
+  {
+   "line": "dash arrow",
+   "text": "uses / calls"
+  }
+ ]
+}

@@ -1,0 +1,68 @@
+{
+ "kind": "sequence",
+ "format": "portrait",
+ "title": "Q-5.6  Sequence: the AI Overview",
+ "caption": "SDD v2 §3.5.6. From apps/ai/tasks.py generate_record_overview, apps/ai/overview at a46d7fc4 (IR-1275).",
+ "participants": [
+  {
+   "id": "ce",
+   "label": "celery-embedding"
+  },
+  {
+   "id": "llm",
+   "label": "Language model",
+   "tone": "ext"
+  },
+  {
+   "id": "db",
+   "label": "PostgreSQL"
+  },
+  {
+   "id": "spa",
+   "label": "React",
+   "sub": "PaperAiOverview"
+  }
+ ],
+ "steps": [
+  {
+   "from": "ce",
+   "to": "db",
+   "label": "passages of the paper"
+  },
+  {
+   "from": "ce",
+   "to": "llm",
+   "label": "generate_cited (admitted)"
+  },
+  {
+   "from": "llm",
+   "to": "ce",
+   "label": "summary with citations",
+   "dash": true
+  },
+  {
+   "from": "ce",
+   "to": "db",
+   "label": "RecordOverview (state, text, citations)"
+  },
+  {
+   "from": "spa",
+   "to": "db",
+   "label": "GET /ai/records/<id>/overview/ (via Django)"
+  }
+ ],
+ "legend": [
+  {
+   "line": "arrow",
+   "text": "request or write"
+  },
+  {
+   "line": "dash arrow",
+   "text": "response or notice"
+  },
+  {
+   "tone": "ext",
+   "text": "external service"
+  }
+ ]
+}

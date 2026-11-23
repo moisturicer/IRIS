@@ -1,0 +1,84 @@
+{
+ "kind": "sequence",
+ "format": "portrait",
+ "title": "Q-5.2  Sequence: chunk and embed",
+ "caption": "SDD v2 §3.5.2. From apps/ai/tasks.py, chunking/, repositories.py, indexing.py at a46d7fc4 (IR-1275).",
+ "participants": [
+  {
+   "id": "cd",
+   "label": "celery-default",
+   "sub": "chunk_extraction"
+  },
+  {
+   "id": "ce",
+   "label": "celery-embedding",
+   "sub": "embed_chunk_set"
+  },
+  {
+   "id": "voy",
+   "label": "Voyage AI",
+   "tone": "ext"
+  },
+  {
+   "id": "db",
+   "label": "PostgreSQL"
+  }
+ ],
+ "steps": [
+  {
+   "from": "cd",
+   "to": "db",
+   "label": "read PdfExtraction"
+  },
+  {
+   "from": "cd",
+   "to": "cd",
+   "label": "build chunks (700-token target)"
+  },
+  {
+   "from": "cd",
+   "to": "db",
+   "label": "swap the ChunkSet atomically"
+  },
+  {
+   "from": "cd",
+   "to": "ce",
+   "label": "queue embed_chunk_set"
+  },
+  {
+   "from": "ce",
+   "to": "db",
+   "label": "chunks whose text_hash changed"
+  },
+  {
+   "from": "ce",
+   "to": "voy",
+   "label": "/contextualizedembeddings (gate checked)"
+  },
+  {
+   "from": "voy",
+   "to": "ce",
+   "label": "1024-d vectors",
+   "dash": true
+  },
+  {
+   "from": "ce",
+   "to": "db",
+   "label": "ChunkEmbedding (HNSW)"
+  }
+ ],
+ "legend": [
+  {
+   "line": "arrow",
+   "text": "request or write"
+  },
+  {
+   "line": "dash arrow",
+   "text": "response or notice"
+  },
+  {
+   "tone": "ext",
+   "text": "external service"
+  }
+ ]
+}

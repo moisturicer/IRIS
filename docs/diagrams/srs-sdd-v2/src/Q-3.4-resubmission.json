@@ -1,0 +1,91 @@
+{
+ "kind": "sequence",
+ "format": "portrait",
+ "title": "Q-3.4  Sequence: clearance-aware resubmission",
+ "caption": "SDD v2 §3.3.4. From apps/reviews/revisions.py, new_version.py, ADR-003 at a46d7fc4 (IR-1275).",
+ "participants": [
+  {
+   "id": "rv",
+   "label": "Reviewer (ITSO)",
+   "tone": "plain"
+  },
+  {
+   "id": "o",
+   "label": "Owner",
+   "tone": "plain"
+  },
+  {
+   "id": "dj",
+   "label": "Django",
+   "sub": "new_version"
+  },
+  {
+   "id": "db",
+   "label": "PostgreSQL"
+  },
+  {
+   "id": "peers",
+   "label": "IERC, KTTO (cleared)",
+   "tone": "plain"
+  }
+ ],
+ "steps": [
+  {
+   "from": "rv",
+   "to": "dj",
+   "label": "POST /records/<id>/request-revision/"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "ResubmissionRequest (itso); clearances untouched"
+  },
+  {
+   "from": "o",
+   "to": "dj",
+   "label": "POST /records/<id>/new-version/"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "lock; changed? Must fix answered?"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "write Version n+1; resolve requests"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "reset ONLY ITSO's clearance to pending"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "reopen ITSO's Seats; audit (preserved offices)"
+  },
+  {
+   "from": "dj",
+   "to": "rv",
+   "label": "after commit: review the new Version",
+   "dash": true
+  },
+  {
+   "from": "dj",
+   "to": "peers",
+   "label": "nothing: their clearances stand",
+   "dash": true
+  }
+ ],
+ "legend": [
+  {
+   "line": "arrow",
+   "text": "request or write"
+  },
+  {
+   "line": "dash arrow",
+   "text": "response or notice"
+  }
+ ]
+}

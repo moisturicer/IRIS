@@ -1,0 +1,63 @@
+{
+ "kind": "sequence",
+ "format": "portrait",
+ "title": "Q-5.8  Sequence: re-embed records",
+ "caption": "SDD v2 §3.5.8. From apps/ai/views/embedding.py, tasks.embed_record at a46d7fc4 (IR-1275).",
+ "participants": [
+  {
+   "id": "s",
+   "label": "Office staff",
+   "tone": "plain"
+  },
+  {
+   "id": "dj",
+   "label": "Django",
+   "sub": "EmbedRecordView"
+  },
+  {
+   "id": "db",
+   "label": "PostgreSQL"
+  },
+  {
+   "id": "ce",
+   "label": "celery-embedding"
+  }
+ ],
+ "steps": [
+  {
+   "from": "s",
+   "to": "dj",
+   "label": "POST /ai/embed/<id>/ or /ai/embed/all/"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "EmbeddingJob (queued)"
+  },
+  {
+   "from": "dj",
+   "to": "ce",
+   "label": "embed_record"
+  },
+  {
+   "from": "ce",
+   "to": "db",
+   "label": "done / failed with the error"
+  },
+  {
+   "from": "s",
+   "to": "dj",
+   "label": "GET /ai/embed/jobs/"
+  }
+ ],
+ "legend": [
+  {
+   "line": "arrow",
+   "text": "request or write"
+  },
+  {
+   "line": "dash arrow",
+   "text": "response or notice"
+  }
+ ]
+}

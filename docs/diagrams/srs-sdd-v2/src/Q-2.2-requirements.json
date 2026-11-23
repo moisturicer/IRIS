@@ -1,0 +1,83 @@
+{
+ "kind": "sequence",
+ "format": "portrait",
+ "title": "Q-2.2  Sequence: set requirements and templates",
+ "caption": "SDD v2 §3.2.2. From apps/documents/setup_views.py, template_files.py at a46d7fc4 (IR-1275).",
+ "participants": [
+  {
+   "id": "r",
+   "label": "RDCO",
+   "tone": "plain"
+  },
+  {
+   "id": "spa",
+   "label": "React",
+   "sub": "SetupPage"
+  },
+  {
+   "id": "dj",
+   "label": "Django",
+   "sub": "setup_views"
+  },
+  {
+   "id": "db",
+   "label": "PostgreSQL"
+  },
+  {
+   "id": "clam",
+   "label": "ClamAV",
+   "tone": "ext"
+  }
+ ],
+ "steps": [
+  {
+   "from": "spa",
+   "to": "dj",
+   "label": "POST /documents/setup/record-types/<id>/requirements/"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "UploadSlot (label, description, order)"
+  },
+  {
+   "from": "spa",
+   "to": "dj",
+   "label": "PUT /documents/setup/requirements/<id>/template/"
+  },
+  {
+   "from": "dj",
+   "to": "clam",
+   "label": "scan the template"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "store the current Template"
+  },
+  {
+   "from": "spa",
+   "to": "dj",
+   "label": "DELETE /documents/setup/requirements/<id>/"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "hide if any upload uses it; else delete"
+  }
+ ],
+ "legend": [
+  {
+   "line": "arrow",
+   "text": "request or write"
+  },
+  {
+   "line": "dash arrow",
+   "text": "response or notice"
+  },
+  {
+   "tone": "ext",
+   "text": "external service"
+  }
+ ]
+}

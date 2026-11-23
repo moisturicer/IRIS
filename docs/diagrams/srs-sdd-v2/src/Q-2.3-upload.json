@@ -1,0 +1,92 @@
+{
+ "kind": "sequence",
+ "format": "portrait",
+ "title": "Q-2.3  Sequence: check and store an upload",
+ "caption": "SDD v2 §3.2.3. From apps/documents/validators.py, scanning.py, ADR-074 at a46d7fc4 (IR-1275).",
+ "participants": [
+  {
+   "id": "p",
+   "label": "Person",
+   "tone": "plain"
+  },
+  {
+   "id": "dj",
+   "label": "Django",
+   "sub": "upload view"
+  },
+  {
+   "id": "val",
+   "label": "validators",
+   "sub": "pdf_upload_problem"
+  },
+  {
+   "id": "clam",
+   "label": "ClamAV",
+   "sub": "clamd :3310",
+   "tone": "ext"
+  },
+  {
+   "id": "db",
+   "label": "PostgreSQL"
+  }
+ ],
+ "steps": [
+  {
+   "from": "p",
+   "to": "dj",
+   "label": "multipart upload"
+  },
+  {
+   "from": "dj",
+   "to": "val",
+   "label": "signature, pages, 50 MB"
+  },
+  {
+   "from": "val",
+   "to": "dj",
+   "label": "problem or none",
+   "dash": true
+  },
+  {
+   "from": "dj",
+   "to": "clam",
+   "label": "INSTREAM bytes"
+  },
+  {
+   "from": "clam",
+   "to": "dj",
+   "label": "OK / FOUND <signature> / no answer",
+   "dash": true
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "flagged: audit UPLOAD_REFUSED_UNSAFE; store nothing"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "clean: save the file and row"
+  },
+  {
+   "from": "dj",
+   "to": "p",
+   "label": "201, or 400 with the reason",
+   "dash": true
+  }
+ ],
+ "legend": [
+  {
+   "line": "arrow",
+   "text": "request or write"
+  },
+  {
+   "line": "dash arrow",
+   "text": "response or notice"
+  },
+  {
+   "tone": "ext",
+   "text": "external service"
+  }
+ ]
+}

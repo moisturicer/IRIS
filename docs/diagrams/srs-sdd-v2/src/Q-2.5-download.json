@@ -1,0 +1,89 @@
+{
+ "kind": "sequence",
+ "format": "portrait",
+ "title": "Q-2.5  Sequence: request and download a copy",
+ "caption": "SDD v2 §3.2.5. From DownloadRequestViewSet, download_service.py, watermark.py at a46d7fc4 (IR-1275).",
+ "participants": [
+  {
+   "id": "rd",
+   "label": "Reader",
+   "tone": "plain"
+  },
+  {
+   "id": "dj",
+   "label": "Django",
+   "sub": "DownloadRequestViewSet"
+  },
+  {
+   "id": "rdco",
+   "label": "RDCO",
+   "tone": "plain"
+  },
+  {
+   "id": "svc",
+   "label": "download_service"
+  },
+  {
+   "id": "db",
+   "label": "PostgreSQL"
+  }
+ ],
+ "steps": [
+  {
+   "from": "rd",
+   "to": "dj",
+   "label": "POST /records/download-requests/ (note)"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "DownloadRequest (pending); notify RDCO"
+  },
+  {
+   "from": "rdco",
+   "to": "dj",
+   "label": "POST .../<id>/approve/"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "grant_expires_at = now + 30 days; notify the reader"
+  },
+  {
+   "from": "rd",
+   "to": "dj",
+   "label": "GET /records/<id>/download/"
+  },
+  {
+   "from": "dj",
+   "to": "svc",
+   "label": "exempt? or a live grant?"
+  },
+  {
+   "from": "svc",
+   "to": "svc",
+   "label": "watermark each page (reportlab + pypdf)"
+  },
+  {
+   "from": "svc",
+   "to": "db",
+   "label": "audit DOWNLOAD (grant or exempt)"
+  },
+  {
+   "from": "dj",
+   "to": "rd",
+   "label": "watermarked PDF",
+   "dash": true
+  }
+ ],
+ "legend": [
+  {
+   "line": "arrow",
+   "text": "request or write"
+  },
+  {
+   "line": "dash arrow",
+   "text": "response or notice"
+  }
+ ]
+}

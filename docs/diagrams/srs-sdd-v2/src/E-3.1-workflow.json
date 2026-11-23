@@ -1,0 +1,409 @@
+{
+ "title": "E-3.1  Schema: assignments, Seats, clearances and revision requests",
+ "caption": "SDD v2 §3.3.1–3.3.4. Generated from backend/apps/*/models*.py at a46d7fc4; all keys and up to four other fields per table; the full schema is D-8 to D-15.",
+ "kind": "erd",
+ "format": "landscape",
+ "nodes": [
+  {
+   "id": "records_RecordVersion",
+   "shape": "table",
+   "label": "RecordVersion",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record",
+      "v": "FK → Record (D-10)"
+     },
+     {
+      "k": "created_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "review_text",
+      "v": "FK → ReviewText (D-10)"
+     },
+     {
+      "k": "number",
+      "v": "PositiveInteger"
+     },
+     {
+      "k": "manuscript",
+      "v": "File"
+     },
+     {
+      "k": "manuscript_revision",
+      "v": "UUID"
+     },
+     {
+      "k": "manuscript_sha256",
+      "v": "Char"
+     },
+     "… 4 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "reviews_RecordAssignment",
+   "shape": "table",
+   "label": "RecordAssignment",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record",
+      "v": "FK → Record (D-10)"
+     },
+     {
+      "k": "opened_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "closed_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "closed_by_decision",
+      "v": "FK → Review"
+     },
+     {
+      "k": "party",
+      "v": "Char"
+     },
+     {
+      "k": "state",
+      "v": "Char"
+     },
+     {
+      "k": "opened_at",
+      "v": "DateTime"
+     },
+     {
+      "k": "closed_at",
+      "v": "DateTime"
+     },
+     "… 5 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "reviews_RecordClearance",
+   "shape": "table",
+   "label": "RecordClearance",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record",
+      "v": "FK → Record (D-10)"
+     },
+     {
+      "k": "reviewed_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "office",
+      "v": "Char"
+     },
+     {
+      "k": "status",
+      "v": "Char"
+     },
+     {
+      "k": "comment",
+      "v": "Text"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     },
+     "… 1 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "reviews_ResubmissionRequest",
+   "shape": "table",
+   "label": "ResubmissionRequest",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record",
+      "v": "FK → Record (D-10)"
+     },
+     {
+      "k": "assignment",
+      "v": "FK → RecordAssignment"
+     },
+     {
+      "k": "review",
+      "v": "FK → Review"
+     },
+     {
+      "k": "requested_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "resolved_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "closed_by_decision",
+      "v": "FK → Review"
+     },
+     {
+      "k": "party",
+      "v": "Char"
+     },
+     {
+      "k": "reason",
+      "v": "Text"
+     },
+     {
+      "k": "state",
+      "v": "Char"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     },
+     "… 1 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "reviews_Review",
+   "shape": "table",
+   "label": "Review",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record",
+      "v": "FK → Record (D-10)"
+     },
+     {
+      "k": "reviewed_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "assignment",
+      "v": "FK → RecordAssignment"
+     },
+     {
+      "k": "version",
+      "v": "FK → RecordVersion"
+     },
+     {
+      "k": "stage",
+      "v": "Char"
+     },
+     {
+      "k": "status",
+      "v": "Char"
+     },
+     {
+      "k": "comment",
+      "v": "Text"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "reviews_ReviewerSeat",
+   "shape": "table",
+   "label": "ReviewerSeat",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "assignment",
+      "v": "FK → RecordAssignment"
+     },
+     {
+      "k": "reviewer",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "assigned_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "closed_by_decision",
+      "v": "FK → Review"
+     },
+     {
+      "k": "reassigned_from",
+      "v": "FK → ReviewerSeat"
+     },
+     {
+      "k": "state",
+      "v": "Char"
+     },
+     {
+      "k": "source",
+      "v": "Char"
+     },
+     {
+      "k": "assigned_at",
+      "v": "DateTime"
+     },
+     {
+      "k": "opened_at",
+      "v": "DateTime"
+     },
+     "… 2 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "reviews_RoutingEvent",
+   "shape": "table",
+   "label": "RoutingEvent",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record",
+      "v": "FK → Record (D-10)"
+     },
+     {
+      "k": "actor",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "from_party",
+      "v": "Char"
+     },
+     {
+      "k": "to_party",
+      "v": "Char"
+     },
+     {
+      "k": "reason",
+      "v": "Text"
+     },
+     {
+      "k": "suggested_offices",
+      "v": "JSON"
+     },
+     "… 2 more fields"
+    ]
+   ]
+  }
+ ],
+ "edges": [
+  {
+   "from": "reviews_RecordAssignment",
+   "to": "reviews_Review",
+   "field": "closed_by_decision",
+   "tail": "zero-many",
+   "head": "zero-one"
+  },
+  {
+   "from": "reviews_ResubmissionRequest",
+   "to": "reviews_RecordAssignment",
+   "field": "assignment",
+   "tail": "zero-many",
+   "head": "zero-one"
+  },
+  {
+   "from": "reviews_ResubmissionRequest",
+   "to": "reviews_Review",
+   "field": "review",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "reviews_ResubmissionRequest",
+   "to": "reviews_Review",
+   "field": "closed_by_decision",
+   "tail": "zero-many",
+   "head": "zero-one"
+  },
+  {
+   "from": "reviews_Review",
+   "to": "reviews_RecordAssignment",
+   "field": "assignment",
+   "tail": "zero-many",
+   "head": "zero-one"
+  },
+  {
+   "from": "reviews_Review",
+   "to": "records_RecordVersion",
+   "field": "version",
+   "tail": "zero-many",
+   "head": "zero-one"
+  },
+  {
+   "from": "reviews_ReviewerSeat",
+   "to": "reviews_RecordAssignment",
+   "field": "assignment",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "reviews_ReviewerSeat",
+   "to": "reviews_Review",
+   "field": "closed_by_decision",
+   "tail": "zero-many",
+   "head": "zero-one"
+  },
+  {
+   "from": "reviews_ReviewerSeat",
+   "to": "reviews_ReviewerSeat",
+   "field": "reassigned_from",
+   "tail": "zero-many",
+   "head": "zero-one"
+  }
+ ],
+ "legend": [
+  {
+   "line": "many",
+   "text": "many (zero or more) to exactly one"
+  },
+  "circle at an end: zero allowed",
+  "bold: primary key",
+  "FK → Name (D-n): drawn in full on figure D-n"
+ ]
+}

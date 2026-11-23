@@ -1,0 +1,111 @@
+{
+ "kind": "columns",
+ "format": "portrait",
+ "title": "C-2.5  Classes: download requests and watermarks",
+ "caption": "SDD v2 §3.2.5. From apps/records (models.py, download_service.py, watermark.py), ADR-048 at a46d7fc4 (IR-1275).",
+ "gutter": 60,
+ "vgap": 30,
+ "nodes": [
+  {
+   "id": "DownloadRequestViewSet",
+   "shape": "class",
+   "label": "DownloadRequestViewSet",
+   "sections": [
+    [],
+    [
+     "create()",
+     "approve()",
+     "decline()",
+     "revoke()",
+     "cancel()"
+    ]
+   ],
+   "stereotype": "view"
+  },
+  {
+   "id": "DownloadRequest",
+   "shape": "class",
+   "label": "DownloadRequest",
+   "sections": [
+    [
+     "record → Record",
+     "requested_by → User",
+     "status",
+     "grant_expires_at",
+     "note",
+     "rdco_note"
+    ]
+   ]
+  },
+  {
+   "id": "download_service",
+   "shape": "class",
+   "label": "download_service",
+   "sections": [
+    [],
+    [
+     "download_exemption()",
+     "grant_is_live()",
+     "decide_download_request()",
+     "revoke_download_grant()"
+    ]
+   ],
+   "stereotype": "module"
+  },
+  {
+   "id": "watermark",
+   "shape": "class",
+   "label": "watermark",
+   "sections": [
+    [],
+    [
+     "watermark_pdf()"
+    ]
+   ],
+   "stereotype": "module"
+  }
+ ],
+ "columns": [
+  [
+   "DownloadRequestViewSet"
+  ],
+  [
+   "download_service",
+   "watermark"
+  ],
+  [
+   "DownloadRequest"
+  ]
+ ],
+ "edges": [
+  {
+   "from": "DownloadRequestViewSet",
+   "to": "download_service",
+   "dash": true
+  },
+  {
+   "from": "download_service",
+   "to": "DownloadRequest",
+   "dash": true
+  },
+  {
+   "from": "download_service",
+   "to": "watermark",
+   "dash": true
+  }
+ ],
+ "legend": [
+  {
+   "line": "diamond",
+   "text": "composition (owner at the diamond)"
+  },
+  {
+   "line": "arrow",
+   "text": "association"
+  },
+  {
+   "line": "dash arrow",
+   "text": "uses / calls"
+  }
+ ]
+}

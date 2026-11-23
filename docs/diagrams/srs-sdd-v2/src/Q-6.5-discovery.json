@@ -1,0 +1,60 @@
+{
+ "kind": "sequence",
+ "format": "portrait",
+ "title": "Q-6.5  Sequence: personal discovery",
+ "caption": "SDD v2 §3.6.5. From RecordViewSet.for_you, discovery.py, library/feeds.py at a46d7fc4 (IR-1275).",
+ "participants": [
+  {
+   "id": "r",
+   "label": "Reader",
+   "tone": "plain"
+  },
+  {
+   "id": "dj",
+   "label": "Django",
+   "sub": "RecordViewSet"
+  },
+  {
+   "id": "db",
+   "label": "PostgreSQL"
+  }
+ ],
+ "steps": [
+  {
+   "from": "r",
+   "to": "dj",
+   "label": "GET /records/for-you/"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "interests + Areas of readable saves"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "rank by the recipe; freeze a snapshot"
+  },
+  {
+   "from": "dj",
+   "to": "r",
+   "label": "records, each with why",
+   "dash": true
+  },
+  {
+   "from": "r",
+   "to": "dj",
+   "label": "POST /records/<id>/not-interested/"
+  }
+ ],
+ "legend": [
+  {
+   "line": "arrow",
+   "text": "request or write"
+  },
+  {
+   "line": "dash arrow",
+   "text": "response or notice"
+  }
+ ]
+}

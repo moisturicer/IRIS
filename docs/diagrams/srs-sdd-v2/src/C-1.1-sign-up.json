@@ -1,0 +1,174 @@
+{
+ "kind": "columns",
+ "format": "portrait",
+ "title": "C-1.1  Classes: sign-up, notice and recovery",
+ "caption": "SDD v2 §3.1.1, 3.1.4. From apps/accounts (models.py, views.py, notice.py, recovery/) at a46d7fc4 (IR-1275).",
+ "gutter": 60,
+ "vgap": 30,
+ "nodes": [
+  {
+   "id": "RegisterView",
+   "shape": "class",
+   "label": "RegisterView",
+   "sections": [
+    [],
+    [
+     "post(request)"
+    ]
+   ],
+   "stereotype": "view"
+  },
+  {
+   "id": "User",
+   "shape": "class",
+   "label": "User",
+   "sections": [
+    [
+     "email",
+     "role → Role",
+     "is_verified",
+     "ai_consent",
+     "answered_notice_version",
+     "credential_version"
+    ]
+   ]
+  },
+  {
+   "id": "DataNotice",
+   "shape": "class",
+   "label": "DataNotice",
+   "sections": [
+    [
+     "number",
+     "title",
+     "sections",
+     "published_at"
+    ]
+   ]
+  },
+  {
+   "id": "NoticeAnswer",
+   "shape": "class",
+   "label": "NoticeAnswer",
+   "sections": [
+    [
+     "user → User",
+     "notice → DataNotice",
+     "agreed_dpa",
+     "ai_consent",
+     "answered_at"
+    ]
+   ]
+  },
+  {
+   "id": "recovery.service",
+   "shape": "class",
+   "label": "recovery.service",
+   "sections": [
+    [],
+    [
+     "admit_request()",
+     "enqueue()",
+     "confirm_verification()",
+     "confirm_reset()"
+    ]
+   ],
+   "stereotype": "module"
+  },
+  {
+   "id": "RecoveryToken",
+   "shape": "class",
+   "label": "RecoveryToken",
+   "sections": [
+    [
+     "digest",
+     "user → User",
+     "purpose",
+     "expires_at",
+     "consumed_at"
+    ]
+   ]
+  },
+  {
+   "id": "RecoveryIntent",
+   "shape": "class",
+   "label": "RecoveryIntent",
+   "sections": [
+    [
+     "purpose",
+     "recipient",
+     "status",
+     "attempts",
+     "next_attempt_at"
+    ]
+   ]
+  }
+ ],
+ "columns": [
+  [
+   "RegisterView",
+   "recovery.service"
+  ],
+  [
+   "User",
+   "RecoveryToken"
+  ],
+  [
+   "NoticeAnswer",
+   "DataNotice",
+   "RecoveryIntent"
+  ]
+ ],
+ "edges": [
+  {
+   "from": "RegisterView",
+   "to": "User",
+   "dash": true
+  },
+  {
+   "from": "RegisterView",
+   "to": "NoticeAnswer",
+   "dash": true
+  },
+  {
+   "from": "User",
+   "to": "NoticeAnswer",
+   "tail": "diamond",
+   "head": "none",
+   "mFrom": "1",
+   "mTo": "0..*"
+  },
+  {
+   "from": "NoticeAnswer",
+   "to": "DataNotice"
+  },
+  {
+   "from": "recovery.service",
+   "to": "RecoveryToken",
+   "dash": true
+  },
+  {
+   "from": "recovery.service",
+   "to": "RecoveryIntent",
+   "dash": true
+  },
+  {
+   "from": "RecoveryToken",
+   "to": "User"
+  }
+ ],
+ "legend": [
+  {
+   "line": "diamond",
+   "text": "composition (owner at the diamond)"
+  },
+  {
+   "line": "arrow",
+   "text": "association"
+  },
+  {
+   "line": "dash arrow",
+   "text": "uses / calls"
+  }
+ ]
+}

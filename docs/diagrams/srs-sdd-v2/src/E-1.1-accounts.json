@@ -1,0 +1,317 @@
+{
+ "title": "E-1.1  Schema: accounts, notice and recovery",
+ "caption": "SDD v2 §3.1.1–3.1.4. Generated from backend/apps/*/models*.py at a46d7fc4; all keys and up to four other fields per table; the full schema is D-8 to D-15.",
+ "kind": "erd",
+ "format": "portrait",
+ "nodes": [
+  {
+   "id": "accounts_DataNotice",
+   "shape": "table",
+   "label": "DataNotice",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "published_by",
+      "v": "FK → User"
+     },
+     {
+      "k": "number",
+      "v": "PositiveInteger"
+     },
+     {
+      "k": "title",
+      "v": "Char"
+     },
+     {
+      "k": "subtitle",
+      "v": "Char"
+     },
+     {
+      "k": "sections",
+      "v": "JSON"
+     },
+     "… 2 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "accounts_NoticeAnswer",
+   "shape": "table",
+   "label": "NoticeAnswer",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "user",
+      "v": "FK → User"
+     },
+     {
+      "k": "notice",
+      "v": "FK → DataNotice"
+     },
+     {
+      "k": "agreed_dpa",
+      "v": "Boolean"
+     },
+     {
+      "k": "ai_consent",
+      "v": "Boolean"
+     },
+     {
+      "k": "answered_at",
+      "v": "DateTime"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "accounts_RecoveryIntent",
+   "shape": "table",
+   "label": "RecoveryIntent",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "user",
+      "v": "FK → User"
+     },
+     {
+      "k": "purpose",
+      "v": "Char"
+     },
+     {
+      "k": "recipient",
+      "v": "Char"
+     },
+     {
+      "k": "generation",
+      "v": "PositiveInteger"
+     },
+     {
+      "k": "address_encrypted",
+      "v": "Text"
+     },
+     "… 9 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "accounts_RecoveryToken",
+   "shape": "table",
+   "label": "RecoveryToken",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "user",
+      "v": "FK → User"
+     },
+     {
+      "k": "intent",
+      "v": "FK unique → RecoveryIntent"
+     },
+     {
+      "k": "digest",
+      "v": "Char"
+     },
+     {
+      "k": "purpose",
+      "v": "Char"
+     },
+     {
+      "k": "email",
+      "v": "Email"
+     },
+     {
+      "k": "credential_version",
+      "v": "PositiveInteger"
+     },
+     "… 4 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "accounts_Role",
+   "shape": "table",
+   "label": "Role",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "name",
+      "v": "Char"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "accounts_User",
+   "shape": "table",
+   "label": "User",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "role",
+      "v": "FK → Role"
+     },
+     {
+      "k": "research_interests",
+      "v": "M2M → ResearchInterest (D-9)"
+     },
+     {
+      "k": "email",
+      "v": "Email"
+     },
+     {
+      "k": "first_name",
+      "v": "Char"
+     },
+     {
+      "k": "middle_initial",
+      "v": "Char"
+     },
+     {
+      "k": "last_name",
+      "v": "Char"
+     },
+     "… 15 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "accounts_UserSession",
+   "shape": "table",
+   "label": "UserSession",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "user",
+      "v": "FK → User"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     },
+     {
+      "k": "last_activity_at",
+      "v": "DateTime"
+     },
+     {
+      "k": "ended_at",
+      "v": "DateTime"
+     },
+     {
+      "k": "ended_reason",
+      "v": "Char"
+     },
+     "… 2 more fields"
+    ]
+   ]
+  }
+ ],
+ "edges": [
+  {
+   "from": "accounts_DataNotice",
+   "to": "accounts_User",
+   "field": "published_by",
+   "tail": "zero-many",
+   "head": "zero-one"
+  },
+  {
+   "from": "accounts_NoticeAnswer",
+   "to": "accounts_User",
+   "field": "user",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "accounts_NoticeAnswer",
+   "to": "accounts_DataNotice",
+   "field": "notice",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "accounts_RecoveryIntent",
+   "to": "accounts_User",
+   "field": "user",
+   "tail": "zero-many",
+   "head": "zero-one"
+  },
+  {
+   "from": "accounts_RecoveryToken",
+   "to": "accounts_User",
+   "field": "user",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "accounts_RecoveryToken",
+   "to": "accounts_RecoveryIntent",
+   "field": "intent",
+   "tail": "zero-one",
+   "head": "zero-one"
+  },
+  {
+   "from": "accounts_User",
+   "to": "accounts_Role",
+   "field": "role",
+   "tail": "zero-many",
+   "head": "zero-one"
+  },
+  {
+   "from": "accounts_UserSession",
+   "to": "accounts_User",
+   "field": "user",
+   "tail": "zero-many",
+   "head": "one"
+  }
+ ],
+ "legend": [
+  {
+   "line": "many",
+   "text": "many (zero or more) to exactly one"
+  },
+  "circle at an end: zero allowed",
+  "bold: primary key",
+  "FK → Name (D-n): drawn in full on figure D-n"
+ ]
+}

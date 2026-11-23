@@ -1,0 +1,70 @@
+{
+ "kind": "sequence",
+ "format": "portrait",
+ "title": "Q-3.6  Sequence: a review thread",
+ "caption": "SDD v2 §3.3.6. From apps/reviews/threads.py, comments.py, mentions.py at a46d7fc4 (IR-1275).",
+ "participants": [
+  {
+   "id": "rv",
+   "label": "Reviewer",
+   "tone": "plain"
+  },
+  {
+   "id": "dj",
+   "label": "Django",
+   "sub": "review-comments"
+  },
+  {
+   "id": "db",
+   "label": "PostgreSQL"
+  },
+  {
+   "id": "o",
+   "label": "Owner",
+   "tone": "plain"
+  }
+ ],
+ "steps": [
+  {
+   "from": "rv",
+   "to": "dj",
+   "label": "POST /records/<id>/review-comments/ (thread, Must fix, anchor)"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "ReviewComment + ThreadPlace; mentions"
+  },
+  {
+   "from": "dj",
+   "to": "o",
+   "label": "notification",
+   "dash": true
+  },
+  {
+   "from": "o",
+   "to": "dj",
+   "label": "POST …/<comment_id>/answer/ (addressed or declined)"
+  },
+  {
+   "from": "rv",
+   "to": "dj",
+   "label": "POST …/<comment_id>/resolve/"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "ReviewThreadEvent"
+  }
+ ],
+ "legend": [
+  {
+   "line": "arrow",
+   "text": "request or write"
+  },
+  {
+   "line": "dash arrow",
+   "text": "response or notice"
+  }
+ ]
+}

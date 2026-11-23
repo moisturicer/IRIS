@@ -1,0 +1,119 @@
+{
+ "kind": "columns",
+ "format": "portrait",
+ "title": "C-7.1  Classes: audit and administration",
+ "caption": "SDD v2 §3.7.1–3.7.3. From apps/audit (models.py, workflow.py, services.py, views.py), apps/accounts SystemSetting at a46d7fc4 (IR-1275).",
+ "gutter": 60,
+ "vgap": 30,
+ "nodes": [
+  {
+   "id": "audit.workflow",
+   "shape": "class",
+   "label": "audit.workflow",
+   "sections": [
+    [],
+    [
+     "submitted()",
+     "routed()",
+     "assignment_closed()",
+     "…"
+    ]
+   ],
+   "stereotype": "module"
+  },
+  {
+   "id": "create_audit_event",
+   "shape": "class",
+   "label": "create_audit_event",
+   "sections": [
+    [],
+    [
+     "(event_type, user, record, metadata)"
+    ]
+   ],
+   "stereotype": "module"
+  },
+  {
+   "id": "AuditEvent",
+   "shape": "class",
+   "label": "AuditEvent",
+   "sections": [
+    [
+     "event_type",
+     "user → User",
+     "record → Record",
+     "metadata",
+     "created_at"
+    ]
+   ]
+  },
+  {
+   "id": "AuditEventListView",
+   "shape": "class",
+   "label": "AuditEventListView",
+   "sections": [
+    [],
+    [
+     "get()  IsSystemAdmin"
+    ]
+   ],
+   "stereotype": "view"
+  },
+  {
+   "id": "SystemSetting",
+   "shape": "class",
+   "label": "SystemSetting",
+   "sections": [
+    [
+     "key",
+     "value",
+     "updated_by"
+    ]
+   ]
+  }
+ ],
+ "columns": [
+  [
+   "audit.workflow",
+   "create_audit_event"
+  ],
+  [
+   "AuditEvent"
+  ],
+  [
+   "AuditEventListView",
+   "SystemSetting"
+  ]
+ ],
+ "edges": [
+  {
+   "from": "audit.workflow",
+   "to": "AuditEvent",
+   "dash": true
+  },
+  {
+   "from": "create_audit_event",
+   "to": "AuditEvent",
+   "dash": true
+  },
+  {
+   "from": "AuditEventListView",
+   "to": "AuditEvent",
+   "dash": true
+  }
+ ],
+ "legend": [
+  {
+   "line": "diamond",
+   "text": "composition (owner at the diamond)"
+  },
+  {
+   "line": "arrow",
+   "text": "association"
+  },
+  {
+   "line": "dash arrow",
+   "text": "uses / calls"
+  }
+ ]
+}

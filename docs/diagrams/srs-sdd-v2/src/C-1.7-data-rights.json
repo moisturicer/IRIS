@@ -1,0 +1,115 @@
+{
+ "kind": "columns",
+ "format": "portrait",
+ "title": "C-1.7  Classes: personal data rights",
+ "caption": "SDD v2 §3.1.7. From apps/accounts (deletion/, personal_data/), apps/audit/retention.py at a46d7fc4 (IR-1275).",
+ "gutter": 60,
+ "vgap": 30,
+ "nodes": [
+  {
+   "id": "AccountDeletionRequest",
+   "shape": "class",
+   "label": "AccountDeletionRequest",
+   "sections": [
+    [
+     "user → User",
+     "status",
+     "decided_by",
+     "reason"
+    ]
+   ]
+  },
+  {
+   "id": "deletion.service",
+   "shape": "class",
+   "label": "deletion.service",
+   "sections": [
+    [],
+    [
+     "request_deletion()",
+     "confirm_deletion()",
+     "reject_deletion()"
+    ]
+   ],
+   "stereotype": "module"
+  },
+  {
+   "id": "deletion.blockers",
+   "shape": "class",
+   "label": "deletion.blockers",
+   "sections": [
+    [],
+    [
+     "blockers_for()"
+    ]
+   ],
+   "stereotype": "module"
+  },
+  {
+   "id": "personal_data.export",
+   "shape": "class",
+   "label": "personal_data.export",
+   "sections": [
+    [],
+    [
+     "account()",
+     "papers_owned()",
+     "reading_notes()",
+     "…"
+    ]
+   ],
+   "stereotype": "module"
+  },
+  {
+   "id": "SystemSetting",
+   "shape": "class",
+   "label": "SystemSetting",
+   "sections": [
+    [
+     "key",
+     "value",
+     "updated_by"
+    ]
+   ]
+  }
+ ],
+ "columns": [
+  [
+   "deletion.service",
+   "deletion.blockers"
+  ],
+  [
+   "AccountDeletionRequest",
+   "personal_data.export"
+  ],
+  [
+   "SystemSetting"
+  ]
+ ],
+ "edges": [
+  {
+   "from": "deletion.service",
+   "to": "AccountDeletionRequest",
+   "dash": true
+  },
+  {
+   "from": "deletion.service",
+   "to": "deletion.blockers",
+   "dash": true
+  }
+ ],
+ "legend": [
+  {
+   "line": "diamond",
+   "text": "composition (owner at the diamond)"
+  },
+  {
+   "line": "arrow",
+   "text": "association"
+  },
+  {
+   "line": "dash arrow",
+   "text": "uses / calls"
+  }
+ ]
+}

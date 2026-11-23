@@ -1,0 +1,152 @@
+{
+ "title": "E-5.1  Schema: extraction",
+ "caption": "SDD v2 §3.5.1. Generated from backend/apps/*/models*.py at a46d7fc4; all keys and up to four other fields per table; the full schema is D-8 to D-15.",
+ "kind": "erd",
+ "format": "portrait",
+ "nodes": [
+  {
+   "id": "documents_ExtractionFigure",
+   "shape": "table",
+   "label": "ExtractionFigure",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "extraction",
+      "v": "FK → PdfExtraction"
+     },
+     {
+      "k": "source_revision",
+      "v": "UUID"
+     },
+     {
+      "k": "page",
+      "v": "PositiveInteger"
+     },
+     {
+      "k": "bbox",
+      "v": "JSON"
+     },
+     {
+      "k": "caption",
+      "v": "Text"
+     },
+     "… 5 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "documents_PdfExtraction",
+   "shape": "table",
+   "label": "PdfExtraction",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "upload",
+      "v": "FK unique → RecordUpload"
+     },
+     {
+      "k": "record",
+      "v": "FK unique → Record (D-10)"
+     },
+     {
+      "k": "status",
+      "v": "Char"
+     },
+     {
+      "k": "source_revision",
+      "v": "UUID"
+     },
+     {
+      "k": "source_file",
+      "v": "Char"
+     },
+     {
+      "k": "attempt",
+      "v": "UUID"
+     },
+     "… 17 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "documents_RecordUpload",
+   "shape": "table",
+   "label": "RecordUpload",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record",
+      "v": "FK → Record (D-10)"
+     },
+     {
+      "k": "slot",
+      "v": "FK → UploadSlot (D-12)"
+     },
+     {
+      "k": "status",
+      "v": "FK → UploadStatus (D-12)"
+     },
+     {
+      "k": "uploaded_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "file",
+      "v": "File"
+     },
+     {
+      "k": "version",
+      "v": "PositiveInteger"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     }
+    ]
+   ]
+  }
+ ],
+ "edges": [
+  {
+   "from": "documents_ExtractionFigure",
+   "to": "documents_PdfExtraction",
+   "field": "extraction",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "documents_PdfExtraction",
+   "to": "documents_RecordUpload",
+   "field": "upload",
+   "tail": "zero-one",
+   "head": "zero-one"
+  }
+ ],
+ "legend": [
+  {
+   "line": "many",
+   "text": "many (zero or more) to exactly one"
+  },
+  "circle at an end: zero allowed",
+  "bold: primary key",
+  "FK → Name (D-n): drawn in full on figure D-n"
+ ]
+}

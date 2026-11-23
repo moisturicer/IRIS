@@ -1,0 +1,55 @@
+{
+ "kind": "sequence",
+ "format": "portrait",
+ "title": "Q-7.2  Sequence: a System Admin setting",
+ "caption": "SDD v2 §3.7.2. From SystemSettingView, RetentionPreviewView at a46d7fc4 (IR-1275).",
+ "participants": [
+  {
+   "id": "sa",
+   "label": "System Admin",
+   "tone": "plain"
+  },
+  {
+   "id": "dj",
+   "label": "Django",
+   "sub": "SystemSettingView"
+  },
+  {
+   "id": "db",
+   "label": "PostgreSQL"
+  }
+ ],
+ "steps": [
+  {
+   "from": "sa",
+   "to": "dj",
+   "label": "GET /settings/<key>/erasure-preview/"
+  },
+  {
+   "from": "dj",
+   "to": "sa",
+   "label": "what a period would erase",
+   "dash": true
+  },
+  {
+   "from": "sa",
+   "to": "dj",
+   "label": "PATCH /settings/<key>/"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "update (no new keys); audit"
+  }
+ ],
+ "legend": [
+  {
+   "line": "arrow",
+   "text": "request or write"
+  },
+  {
+   "line": "dash arrow",
+   "text": "response or notice"
+  }
+ ]
+}

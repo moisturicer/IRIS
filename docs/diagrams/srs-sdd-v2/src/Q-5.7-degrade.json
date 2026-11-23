@@ -1,0 +1,65 @@
+{
+ "kind": "sequence",
+ "format": "portrait",
+ "title": "Q-5.7  Sequence: when AI is unavailable",
+ "caption": "SDD v2 §3.5.7. From GET /ai/status/, apps/ai/resilience at a46d7fc4 (IR-1275).",
+ "participants": [
+  {
+   "id": "spa",
+   "label": "React"
+  },
+  {
+   "id": "dj",
+   "label": "Django",
+   "sub": "ai status"
+  },
+  {
+   "id": "gw",
+   "label": "AI runtime",
+   "tone": "ai"
+  }
+ ],
+ "steps": [
+  {
+   "from": "spa",
+   "to": "dj",
+   "label": "GET /ai/status/"
+  },
+  {
+   "from": "dj",
+   "to": "spa",
+   "label": "unavailable",
+   "dash": true
+  },
+  {
+   "from": "spa",
+   "to": "spa",
+   "label": "show 'AI is unavailable'"
+  },
+  {
+   "from": "spa",
+   "to": "dj",
+   "label": "GET /records/?search=… (FTS still works)"
+  },
+  {
+   "from": "gw",
+   "to": "spa",
+   "label": "busy: 503, retry later",
+   "dash": true
+  }
+ ],
+ "legend": [
+  {
+   "line": "arrow",
+   "text": "request or write"
+  },
+  {
+   "line": "dash arrow",
+   "text": "response or notice"
+  },
+  {
+   "tone": "ai",
+   "text": "AI runtime"
+  }
+ ]
+}

@@ -1,0 +1,223 @@
+{
+ "title": "E-2.2  Schema: requirements and uploads",
+ "caption": "SDD v2 §3.2.2, 3.2.3. Generated from backend/apps/*/models*.py at a46d7fc4; all keys and up to four other fields per table; the full schema is D-8 to D-15.",
+ "kind": "erd",
+ "format": "portrait",
+ "nodes": [
+  {
+   "id": "documents_AdviserTemplate",
+   "shape": "table",
+   "label": "AdviserTemplate",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "owner",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "title",
+      "v": "Char"
+     },
+     {
+      "k": "description",
+      "v": "Text"
+     },
+     {
+      "k": "file",
+      "v": "File"
+     },
+     {
+      "k": "file_name",
+      "v": "Char"
+     },
+     "… 3 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "documents_RecordFile",
+   "shape": "table",
+   "label": "RecordFile",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record",
+      "v": "FK → Record (D-10)"
+     },
+     {
+      "k": "uploaded_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "file",
+      "v": "File"
+     },
+     {
+      "k": "filename",
+      "v": "Char"
+     },
+     {
+      "k": "party",
+      "v": "Char"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "documents_RecordUpload",
+   "shape": "table",
+   "label": "RecordUpload",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record",
+      "v": "FK → Record (D-10)"
+     },
+     {
+      "k": "slot",
+      "v": "FK → UploadSlot"
+     },
+     {
+      "k": "status",
+      "v": "FK → UploadStatus (D-12)"
+     },
+     {
+      "k": "uploaded_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "file",
+      "v": "File"
+     },
+     {
+      "k": "version",
+      "v": "PositiveInteger"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "documents_UploadSlot",
+   "shape": "table",
+   "label": "UploadSlot",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record_type",
+      "v": "FK → RecordType"
+     },
+     {
+      "k": "record",
+      "v": "FK → Record (D-10)"
+     },
+     {
+      "k": "name",
+      "v": "Char"
+     },
+     {
+      "k": "is_required",
+      "v": "Boolean"
+     },
+     {
+      "k": "description",
+      "v": "Text"
+     },
+     {
+      "k": "position",
+      "v": "PositiveInteger"
+     },
+     "… 3 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "records_RecordType",
+   "shape": "table",
+   "label": "RecordType",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "name",
+      "v": "Char"
+     },
+     {
+      "k": "description",
+      "v": "Text"
+     },
+     {
+      "k": "manuscript_description",
+      "v": "Text"
+     },
+     {
+      "k": "manuscript_template",
+      "v": "File"
+     },
+     "… 1 more fields"
+    ]
+   ]
+  }
+ ],
+ "edges": [
+  {
+   "from": "documents_RecordUpload",
+   "to": "documents_UploadSlot",
+   "field": "slot",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "documents_UploadSlot",
+   "to": "records_RecordType",
+   "field": "record_type",
+   "tail": "zero-many",
+   "head": "one"
+  }
+ ],
+ "legend": [
+  {
+   "line": "many",
+   "text": "many (zero or more) to exactly one"
+  },
+  "circle at an end: zero allowed",
+  "bold: primary key",
+  "FK → Name (D-n): drawn in full on figure D-n"
+ ]
+}

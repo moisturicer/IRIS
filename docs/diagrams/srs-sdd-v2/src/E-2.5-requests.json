@@ -1,0 +1,208 @@
+{
+ "title": "E-2.5  Schema: download and delete requests",
+ "caption": "SDD v2 §3.2.5, 3.2.6. Generated from backend/apps/*/models*.py at a46d7fc4; all keys and up to four other fields per table; the full schema is D-8 to D-15.",
+ "kind": "erd",
+ "format": "portrait",
+ "nodes": [
+  {
+   "id": "records_DeleteRequest",
+   "shape": "table",
+   "label": "DeleteRequest",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record",
+      "v": "FK → Record"
+     },
+     {
+      "k": "requested_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "reviewed_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "reason",
+      "v": "Text"
+     },
+     {
+      "k": "status",
+      "v": "Char"
+     },
+     {
+      "k": "previous_pipeline_status",
+      "v": "Char"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     },
+     "… 2 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "records_DownloadRequest",
+   "shape": "table",
+   "label": "DownloadRequest",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record",
+      "v": "FK → Record"
+     },
+     {
+      "k": "requested_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "reviewed_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "revoked_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "status",
+      "v": "Char"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     },
+     {
+      "k": "reviewed_at",
+      "v": "DateTime"
+     },
+     {
+      "k": "grant_expires_at",
+      "v": "DateTime"
+     },
+     "… 4 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "records_Record",
+   "shape": "table",
+   "label": "Record",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "classification",
+      "v": "FK → Classification (D-10)"
+     },
+     {
+      "k": "psced",
+      "v": "FK → PSCEDClassification (D-10)"
+     },
+     {
+      "k": "record_type",
+      "v": "FK → RecordType (D-10)"
+     },
+     {
+      "k": "adviser",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "added_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "dpa_accepted_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "embargo_date_set_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "embargo_released_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "ip_released_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "deleted_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "derived_from",
+      "v": "FK → Record"
+     },
+     {
+      "k": "title",
+      "v": "Char"
+     },
+     {
+      "k": "origin",
+      "v": "Char"
+     },
+     {
+      "k": "publication_year",
+      "v": "PositiveInteger"
+     },
+     {
+      "k": "year_accomplished",
+      "v": "PositiveInteger"
+     },
+     "… 36 more fields"
+    ]
+   ]
+  }
+ ],
+ "edges": [
+  {
+   "from": "records_DeleteRequest",
+   "to": "records_Record",
+   "field": "record",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "records_DownloadRequest",
+   "to": "records_Record",
+   "field": "record",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "records_Record",
+   "to": "records_Record",
+   "field": "derived_from",
+   "tail": "zero-many",
+   "head": "zero-one"
+  }
+ ],
+ "legend": [
+  {
+   "line": "many",
+   "text": "many (zero or more) to exactly one"
+  },
+  "circle at an end: zero allowed",
+  "bold: primary key",
+  "FK → Name (D-n): drawn in full on figure D-n"
+ ]
+}

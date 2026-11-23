@@ -1,0 +1,66 @@
+{
+ "kind": "sequence",
+ "format": "portrait",
+ "title": "Q-5.5  Sequence: Paper Chat",
+ "caption": "SDD v2 §3.5.5. From PaperChatDock.tsx, apps/ai/grants at a46d7fc4 (IR-1275).",
+ "participants": [
+  {
+   "id": "spa",
+   "label": "React",
+   "sub": "PaperChatDock"
+  },
+  {
+   "id": "dj",
+   "label": "Django",
+   "sub": "grants"
+  },
+  {
+   "id": "gw",
+   "label": "AI runtime",
+   "tone": "ai"
+  }
+ ],
+ "steps": [
+  {
+   "from": "spa",
+   "to": "dj",
+   "label": "grant scoped to record <id>"
+  },
+  {
+   "from": "dj",
+   "to": "dj",
+   "label": "visible_to + gate for this paper"
+  },
+  {
+   "from": "dj",
+   "to": "spa",
+   "label": "grant, or the consent reason",
+   "dash": true
+  },
+  {
+   "from": "spa",
+   "to": "gw",
+   "label": "run with the scoped grant"
+  },
+  {
+   "from": "gw",
+   "to": "spa",
+   "label": "answer from this paper only",
+   "dash": true
+  }
+ ],
+ "legend": [
+  {
+   "line": "arrow",
+   "text": "request or write"
+  },
+  {
+   "line": "dash arrow",
+   "text": "response or notice"
+  },
+  {
+   "tone": "ai",
+   "text": "AI runtime"
+  }
+ ]
+}
