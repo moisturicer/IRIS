@@ -911,6 +911,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
       title="Publish your research"
       displayTitle
       sheet
+      tall={phase.kind === "form" && step === 2}
       size={phase.kind === "form" && step === 2 ? "xl" : "lg"}
       footer={footer}
     >

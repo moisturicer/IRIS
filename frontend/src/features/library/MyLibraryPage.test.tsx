@@ -247,7 +247,7 @@ describe("My Library: an author's research", () => {
     expect(screen.getByRole("link", { name: "Community Water Monitoring" })).toBeInTheDocument();
   });
 
-  it("puts what waits on the author first: the first request is the row's one action, any other is in its ⋯ menu", async () => {
+  it("puts what waits on the author first, with no button for a request: it is answered on the paper's Overview", async () => {
     const revision = { kind: "revision", party: "ierc", label: "Revision requested by IERC", action_label: "Submit a new version" } as const;
     const document = { kind: "document", party: "adviser", label: "Documents requested by Adviser", action_label: "Upload the documents" } as const;
     mine([
@@ -263,14 +263,11 @@ describe("My Library: an author's research", () => {
 
     const waiting = group("Needs your action");
     expect(within(waiting).getByText("Revision requested by IERC: action needed")).toBeInTheDocument();
-    expect(within(waiting).getByRole("link", { name: "Submit a new version (Revision requested by IERC)" }))
-      .toHaveAttribute("href", "/records/14?section=overview#revision-requested");
-    expect(within(waiting).getByRole("link", { name: "Upload the documents (Documents requested by Adviser)" }))
-      .toHaveAttribute("href", "/records/15?section=overview#documents-requested");
-    // Record 14's second request is in its menu, not a second button.
-    await userEvent.click(within(waiting).getByRole("button", { name: "Actions for Asked to revise" }));
-    expect(screen.getByRole("menuitem", { name: "Upload the documents (Documents requested by Adviser)" })).toBeInTheDocument();
-    await userEvent.keyboard("{Escape}");
+    // The requests are answered on the paper's Overview, which the title opens: no button, no menu.
+    expect(within(waiting).queryByRole("link", { name: /^Submit a new version/ })).not.toBeInTheDocument();
+    expect(within(waiting).queryByRole("link", { name: /^Upload the documents/ })).not.toBeInTheDocument();
+    expect(within(waiting).queryByRole("button", { name: "Actions for Asked to revise" })).not.toBeInTheDocument();
+    expect(within(waiting).getByRole("link", { name: "Asked to revise" })).toHaveAttribute("href", "/records/14");
 
     expect(within(waiting).queryByRole("link", { name: "Still with the offices" })).not.toBeInTheDocument();
     expect(within(group("In review")).getByText("In specialist review: IERC")).toBeInTheDocument();
@@ -356,8 +353,8 @@ describe("My Library: an author's research", () => {
     ]);
     const { container } = renderScreen(<MyLibraryPage />, { route: "/records/mine" });
 
-    expect(await screen.findByRole("link", { name: /^Upload the documents/ }))
-      .toHaveAttribute("href", "/records/15?section=overview#documents-requested");
+    expect(await screen.findByRole("link", { name: "Asked for a form" })).toHaveAttribute("href", "/records/15");
+    expect(screen.queryByRole("link", { name: /^Upload the documents/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
     expect(railItem("All research")).toHaveAttribute("aria-current", "page");
     expect(railItem("Needs your action")).toHaveTextContent("1");
@@ -472,7 +469,30 @@ describe("My Library: what each paper waits on (IR-1084, IR-1306)", () => {
     expect(screen.queryByText(/Nothing to do yet|Nothing is waiting/)).not.toBeInTheDocument();
   });
 
-  it("offers what the author owes as its one action, in the server's words, where a request is open", async () => {
+  it("folds its pane to icons that keep their names, and remembers it in this browser", async () => {
+    localStorage.removeItem("iris-library-pane");
+    mine([inReview({ id: 14, title: "Folding" })]);
+    const { container, unmount } = renderScreen(<MyLibraryPage />, SUBMISSIONS);
+    await screen.findByRole("link", { name: "Folding" });
+
+    const toggle = screen.getByRole("button", { name: "Hide My Library lists" });
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await userEvent.click(toggle);
+    expect(screen.getByRole("button", { name: "Show My Library lists" })).toHaveAttribute("aria-expanded", "false");
+    expect(railItem("In review")).toBeInTheDocument();
+    await expectNoBlockingA11yViolations(container);
+    unmount();
+
+    renderScreen(<MyLibraryPage />, SUBMISSIONS);
+    await screen.findByRole("link", { name: "Folding" });
+    // New folder needs the width, so it opens the pane and asks for the name there.
+    await userEvent.click(screen.getByRole("button", { name: "New folder" }));
+    expect(screen.getByRole("textbox", { name: "New folder name" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Hide My Library lists" })).toBeInTheDocument();
+    localStorage.removeItem("iris-library-pane");
+  });
+
+  it("says what the author owes in the server's words, with no button for it", async () => {
     const revision = { kind: "revision", party: "ierc", label: "Revision requested by IERC", action_label: "Submit a new version" } as const;
     mine([inReview({ id: 14, title: "Asked to revise", workflow_state: "awaiting_resubmission",
       submitter_status: { line: "Revision requested by IERC: action needed", waiting_on_you: [revision] } })]);
@@ -481,8 +501,8 @@ describe("My Library: what each paper waits on (IR-1084, IR-1306)", () => {
     await screen.findByRole("link", { name: "Asked to revise" });
     expect(screen.getByText("Revision requested by IERC: action needed")).toBeInTheDocument();
     expect(screen.queryByText(/^Waiting on you:/)).not.toBeInTheDocument();
-    // Its own act stays the one action; "Open review" is not added beside it, and no menu either.
-    expect(screen.getByRole("link", { name: "Submit a new version (Revision requested by IERC)" })).toBeInTheDocument();
+    // The act is on the paper's Overview, so the row has no button for it, no "Open review" and no menu.
+    expect(screen.queryByRole("link", { name: /^Submit a new version/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /^Open review/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Actions for Asked to revise" })).not.toBeInTheDocument();
   });
@@ -629,12 +649,15 @@ describe("My Library: saves follow the account (IR-566)", () => {
     await screen.findByRole("link", { name: water.title });
 
     await userEvent.click(screen.getByRole("button", { name: `Actions for ${water.title}` }));
+    // Reading status opens as a flyout beside its item.
+    await userEvent.click(screen.getByRole("menuitem", { name: "Reading status" }));
     expect(screen.getByRole("menuitemradio", { name: "Want to read" })).toHaveAttribute("aria-checked", "true");
     expect(screen.getByRole("menuitemradio", { name: "Reading" })).toHaveAttribute("aria-checked", "false");
     await userEvent.click(screen.getByRole("menuitemradio", { name: "Reading" }));
     expect(libraryApi.save).toHaveBeenLastCalledWith(water.id, { reading_status: "reading" });
 
     await userEvent.click(screen.getByRole("button", { name: `Actions for ${water.title}` }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Reading status" }));
     await userEvent.click(screen.getByRole("menuitemradio", { name: "Reading" }));
     expect(libraryApi.save).toHaveBeenLastCalledWith(water.id, { reading_status: null });
     // Clearing a status never unsaves.

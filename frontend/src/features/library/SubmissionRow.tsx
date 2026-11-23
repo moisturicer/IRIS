@@ -1,13 +1,11 @@
 import { useState, type ReactNode } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 
 import { ClearanceStrip } from "@/components/shared/ClearanceStrip";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
-import { PILL_PRIMARY } from "@/components/ui/pillStyles";
 import { RowMenu, type RowMenuItem } from "@/features/accounts/RowMenu";
 import { ContinueProposal } from "@/features/records/ContinueProposal";
-import { waitingHref } from "@/features/records/waitingOnYou";
 import { usePublishHref } from "@/features/publish/publishLink";
 import { cn, formatDate } from "@/lib/utils";
 import type { MyResearchItem } from "@/types/records";
@@ -33,85 +31,61 @@ interface SubmissionRowProps {
 /**
  * One of the owner's records as a row in a ruled list (IR-410). The title is
  * the row's link, stretched over the row (`rowHref`). The status words are the
- * server's (`submitter_status.line`). One filled action at most: the first
- * open request, straight to the act on Paper View (IR-625), or Continue on an
- * accepted Proposal. Everything else a row can do is in its ⋯ menu (IR-1311):
- * Delete draft, and any further open request.
+ * server's (`submitter_status.line`). One action at most: Continue on an accepted Proposal. Open requests are
+ * answered on the paper's Overview, so the row carries no button for them;
+ * Delete draft is in its menu (IR-1311).
  */
 export function SubmissionRow({ item, onDeleted }: SubmissionRowProps) {
   const publishHref = usePublishHref();
-  const navigate = useNavigate();
   const [deleting, setDeleting] = useState(false);
-  const authors = item.authors.map((author) => author.name).join(", ");
-  const [first, ...more] = item.pipeline_status === "draft" ? [] : item.submitter_status.waiting_on_you;
-
-  const menu: RowMenuItem[] = [
-    ...more.map((request) => ({
-      key: `${request.kind}-${request.party}`,
-      label: `${request.action_label} (${request.label})`,
-      onSelect: () => navigate(waitingHref(item.id, request)),
-    })),
-    ...(item.pipeline_status === "draft" && onDeleted
-      ? [{ key: "delete", label: "Delete draft", danger: true, onSelect: () => setDeleting(true) }]
-      : []),
-  ];
-
-  let action: ReactNode = null;
-  if (item.can_continue) action = <ContinueProposal recordId={item.id} />;
-  else if (first) {
-    action = (
-      <Link to={waitingHref(item.id, first)} className={cn(PILL_PRIMARY, "min-h-9 px-4", FOCUS_RING)}>
-        {first.action_label} <span className="sr-only">({first.label})</span>
-      </Link>
-    );
-  }
+  // Open requests are answered on the paper's Overview, which the row opens;
+  // the row offers only what is not there: Continue on a Proposal, Delete on a draft.
+  const menu: RowMenuItem[] = item.pipeline_status === "draft" && onDeleted
+    ? [{ key: "delete", label: "Delete draft", danger: true, onSelect: () => setDeleting(true) }]
+    : [];
+  const action: ReactNode = item.can_continue ? <ContinueProposal recordId={item.id} /> : null;
 
   return (
-    <li className={cn("group relative px-4 py-4 hover:bg-stone-50 sm:px-5", COLOUR_TRANSITION)}>
-      <div className="flex items-start gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-col gap-x-6 gap-y-2 md:flex-row md:items-start md:justify-between">
-            <div className="min-w-0">
-              <p className="text-label text-stone-600">{item.record_type_name ?? "Research"}</p>
-              <h3 className="mt-0.5 font-display text-title font-semibold leading-snug text-stone-900">
-                <Link
-                  to={rowHref(item, publishHref)}
-                  className={cn(
-                    "rounded-control group-hover:text-brand",
-                    COLOUR_TRANSITION,
-                    FOCUS_RING,
-                    "after:absolute after:inset-0 after:content-['']",
-                  )}
-                >
-                  {item.title}
-                </Link>
-              </h3>
-              {(authors || item.adviser_name) && (
-                <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 break-words text-small text-stone-600">
-                  {authors && <span>{authors}</span>}
-                  {item.adviser_name && (
-                    <span className="inline-flex items-center gap-1.5">
-                      <i aria-hidden className="fas fa-user-tie text-label text-stone-400" />
-                      <span className="sr-only">Adviser: </span>{item.adviser_name}
-                    </span>
-                  )}
-                </p>
+    <li className={cn("group relative px-4 py-3 hover:bg-stone-50 sm:px-5", COLOUR_TRANSITION)}>
+      <div className="flex items-center gap-3">
+        <div className="flex min-w-0 flex-1 flex-col gap-x-6 gap-y-2 md:flex-row md:items-center md:justify-between">
+          <div className="min-w-0">
+            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-label text-stone-600">
+              <span className="font-medium">{item.record_type_name ?? "Research"}</span>
+              {item.adviser_name && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-stone-100 py-0.5 pl-1.5 pr-2.5 font-medium text-stone-700">
+                  <i aria-hidden className="fas fa-user-tie text-3xs text-stone-500" />
+                  <span className="sr-only">Adviser: </span>{item.adviser_name}
+                </span>
               )}
-            </div>
-            <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 md:flex-col md:items-end">
-              <StatusBadge state={item.workflow_state} label={item.submitter_status.line} />
-              <span className="text-label tabular-nums text-stone-500">Updated {formatDate(item.updated_at)}</span>
-            </div>
+              <span className="tabular-nums">Updated {formatDate(item.updated_at)}</span>
+            </p>
+            <h3 className="mt-0.5 font-display text-title font-semibold leading-snug text-stone-900">
+              <Link
+                to={rowHref(item, publishHref)}
+                className={cn(
+                  "rounded-control group-hover:text-brand",
+                  COLOUR_TRANSITION,
+                  FOCUS_RING,
+                  "after:absolute after:inset-0 after:content-['']",
+                )}
+              >
+                {item.title}
+              </Link>
+            </h3>
+            <ClearanceStrip entries={item.clearance_strip} className="mt-1.5" />
           </div>
-
-          <ClearanceStrip entries={item.clearance_strip} className="mt-2" />
-          {action && <div className="relative z-10 mt-3 flex flex-wrap items-center gap-2">{action}</div>}
+          <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1.5 md:justify-end">
+            <StatusBadge state={item.workflow_state} label={item.submitter_status.line} />
+            {/* Above the row's link, as the menu is. */}
+            {action && <div className="relative z-10">{action}</div>}
+          </div>
         </div>
 
         {/* Above the row's link, so a press opens the menu rather than the record. */}
         {menu.length > 0 && (
-          <div className="relative z-10 -mr-2 -mt-1">
-            <RowMenu small label={`Actions for ${item.title}`} items={menu} />
+          <div className="relative z-10 -mr-2 shrink-0">
+            <RowMenu small vertical label={`Actions for ${item.title}`} items={menu} />
           </div>
         )}
       </div>

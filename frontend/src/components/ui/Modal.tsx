@@ -32,6 +32,8 @@ interface ModalProps {
   sheet?:   boolean;
   /** Pinned under the scrolling body, so the step's actions never scroll away. */
   footer?:  ReactNode;
+  /** A tall sheet for a task that should not scroll: up to 97% of the screen's height. */
+  tall?:    boolean;
   /** The title in the display face, as a content title (01-design-system §0). */
   displayTitle?: boolean;
   /** "alertdialog" for a question that interrupts the task (Leave this submission?). Defaults to "dialog". */
@@ -47,6 +49,7 @@ export function Modal({
   children,
   size = "md",
   sheet = false,
+  tall = false,
   footer,
   displayTitle = false,
   role = "dialog",
@@ -77,7 +80,7 @@ export function Modal({
         tabIndex={-1}
         className={
           sheet
-            ? `relative bg-overlay shadow-xl w-full h-full md:h-auto md:rounded-dialog ${SIZE_CLASS[size].sheet} md:max-h-[90vh] flex flex-col outline-none`
+            ? `relative bg-overlay shadow-xl w-full h-full md:rounded-dialog ${SIZE_CLASS[size].sheet} ${tall ? "md:h-[min(97vh,66rem)]" : "md:h-auto md:max-h-[90vh]"} flex flex-col outline-none`
             : `relative bg-overlay rounded-dialog shadow-xl w-full ${SIZE_CLASS[size].dialog} max-h-[90vh] flex flex-col outline-none`
         }
         role={role}
@@ -103,7 +106,7 @@ export function Modal({
             </button>
           </div>
         )}
-        <div className="overflow-y-auto flex-1 p-5">
+        <div className={`overflow-y-auto flex-1 p-5 ${tall ? "md:overflow-hidden" : ""}`}>
           {children}
         </div>
         {footer && <div className="border-t border-stone-200 px-5 py-3">{footer}</div>}

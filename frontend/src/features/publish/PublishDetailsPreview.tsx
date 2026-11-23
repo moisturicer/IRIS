@@ -110,7 +110,7 @@ export function PublishDetailsPreview({
           </button>
         </div>
 
-        <div className="lg:grid lg:grid-cols-[minmax(0,1.08fr)_minmax(22rem,0.92fr)] lg:items-start lg:gap-section">
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(24rem,1fr)] lg:items-start lg:gap-section">
           <section
             id="publish-preview-panel"
             ref={previewRef}
@@ -120,18 +120,12 @@ export function PublishDetailsPreview({
             className={cn(
               "min-w-0 flex-col overflow-hidden rounded-card border border-stone-200 bg-surface outline-none",
               "focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2",
-              "h-[calc(100dvh-13rem)] min-h-[20rem] max-h-[44rem]",
+              "h-[calc(100dvh-13rem)] min-h-[20rem]",
               pane === "preview" ? "flex" : "hidden",
-              "lg:order-1 lg:flex lg:h-[min(68vh,44rem)]",
+              "lg:order-1 lg:flex lg:h-[calc(min(97vh,66rem)-14rem)] lg:max-h-none",
             )}
           >
-            <div className="shrink-0 border-b border-stone-200 px-4 py-3">
-              <h3 className="text-heading font-semibold text-stone-900">Manuscript preview</h3>
-              <p className="mt-0.5 text-small text-stone-600">
-                This is the file IRIS accepted from the server.
-              </p>
-            </div>
-            <div className="flex min-h-0 flex-1 [container-type:inline-size] [container-name:reading]">
+            <div className="flex min-h-0 min-w-0 flex-1 [container-type:inline-size] [container-name:reading] [&>*]:min-w-0">
               <Suspense fallback={<Skeleton rows={8} label="Loading the reader…" />}>
                 <PaperPdfReader
                   key={`publish:${recordId}:${sourceKey}`}
@@ -150,7 +144,7 @@ export function PublishDetailsPreview({
             id="publish-details-panel"
             ref={detailsRef}
             aria-label="Details"
-            className={cn("min-w-0", pane === "details" ? "block" : "hidden", "lg:order-2 lg:block")}
+            className={cn("min-w-0", pane === "details" ? "block" : "hidden", "lg:order-2 lg:block lg:max-h-[calc(min(97vh,66rem)-14rem)] lg:overflow-y-auto lg:overflow-x-hidden lg:pr-1")}
           >
             {children}
           </section>

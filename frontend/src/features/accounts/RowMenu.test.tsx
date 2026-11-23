@@ -107,7 +107,30 @@ describe("the row menu", () => {
     await userEvent.click(trigger());
 
     const lock = screen.getByRole("menuitem", { name: "Lock" });
-    expect(lock.className).not.toMatch(/\bbg-(brand|red|danger)/);
+    // Only a resting fill counts: the low-opacity maroon hover is a `hover:` variant.
+    expect(lock.className).not.toMatch(/(^|\s)bg-(brand|red|danger)/);
+  });
+
+  it("opens a flyout from the keyboard, and Left or Escape returns to its item", async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    renderScreen(<RowMenu label="Actions for a paper" items={[
+      { key: "s", label: "Reading status", onSelect: () => undefined, submenu: [
+        { key: "a", label: "Want to read", checked: false, onSelect },
+        { key: "b", label: "Reading", checked: true, onSelect: () => undefined },
+      ] },
+    ]} />);
+    await user.click(screen.getByRole("button", { name: "Actions for a paper" }));
+    const item = screen.getByRole("menuitem", { name: "Reading status" });
+    expect(item).toHaveFocus();
+
+    await user.keyboard("{ArrowRight}");
+    expect(screen.getByRole("menuitemradio", { name: "Want to read" })).toHaveFocus();
+    await user.keyboard("{ArrowLeft}");
+    expect(item).toHaveFocus();
+    expect(item).toHaveAttribute("aria-expanded", "false");
+    await user.keyboard("{ArrowRight}{Enter}");
+    expect(onSelect).toHaveBeenCalledOnce();
   });
 
   it("renders nothing at all when there is no item to offer", () => {

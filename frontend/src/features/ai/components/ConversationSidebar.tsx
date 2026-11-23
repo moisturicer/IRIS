@@ -7,6 +7,7 @@ import { HERE } from "@/components/ui/highlightRoles";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { isControl } from "@/components/ui/isControl";
 import { RowMenu, type RowMenuItem } from "@/features/accounts/RowMenu";
+import { PANE_TITLE } from "@/components/layout/paneTitle";
 import { PanelLeftIcon } from "./AskIrisIcons";
 import { IrisLoader } from "@/components/brand/IrisBrand";
 import { usePinnedConversations, type Pin } from "../hooks/usePinnedConversations";
@@ -96,8 +97,8 @@ export function ConversationsToggle({ open, onClick, controls, asDialog = false 
     <button type="button" onClick={onClick} aria-label={label} aria-expanded={open}
       aria-controls={controls} aria-haspopup={asDialog ? "dialog" : undefined}
       className={cn(ICON_BUTTON, asDialog && "size-11")}>
-      {/* The pane sits on the right (IR-1306), so the panel glyph faces it. */}
-      <PanelLeftIcon className="size-5 -scale-x-100" />
+      {/* The pane sits on the left, so the panel glyph faces it. */}
+      <PanelLeftIcon className="size-5" />
     </button>
   </Tooltip>;
 }
@@ -127,8 +128,8 @@ export function ConversationSidebar({
       id={id}
       style={{ width: open ? width : STRIP_WIDTH }}
       className={cn(
-        "relative shrink-0 flex flex-col bg-stone-50 border-l border-stone-200",
-        !open && "cursor-w-resize",
+        "relative shrink-0 flex flex-col bg-stone-50 border-r border-stone-200",
+        !open && "cursor-e-resize",
         easing && "transition-[width] duration-200 ease-out motion-reduce:transition-none",
       )}
       aria-label="Conversations"
@@ -140,7 +141,7 @@ export function ConversationSidebar({
         <div className="relative flex h-full min-h-0 flex-col" style={{ width: Math.max(width, STRIP_WIDTH) }}>
           <div className="flex h-14 shrink-0 items-center gap-1 border-b border-stone-200/80 px-2.5">
             <ConversationsToggle open={open} onClick={onToggle} controls={id} />
-            {open && <h2 className="min-w-0 px-1 text-control font-semibold text-stone-800">Conversations</h2>}
+            {open && <h2 className={cn("min-w-0 px-1", PANE_TITLE)}>Conversations</h2>}
           </div>
 
           {/* Hidden, not unmounted, so a search and the scroll position survive a close. */}
@@ -169,7 +170,7 @@ export function ConversationSidebar({
   );
 }
 
-/** The column's left edge, toward the chat (IR-1306): drag, or arrow keys; double-click resets. */
+/** The column's right edge, toward the chat: drag, or arrow keys; double-click resets. */
 function SidebarResizer({ width, onChange }: { width: number; onChange: (width: number) => void }) {
   const clamp = (n: number) => Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, Math.round(n)));
   return <div
@@ -178,21 +179,21 @@ function SidebarResizer({ width, onChange }: { width: number; onChange: (width: 
     onPointerDown={e => e.currentTarget.setPointerCapture?.(e.pointerId)}
     onPointerMove={e => {
       if (!e.currentTarget.hasPointerCapture?.(e.pointerId)) return;
-      const right = e.currentTarget.parentElement?.getBoundingClientRect().right ?? 0;
-      onChange(clamp(right - e.clientX));
+      const left = e.currentTarget.parentElement?.getBoundingClientRect().left ?? 0;
+      onChange(clamp(e.clientX - left));
     }}
     onDoubleClick={() => onChange(SIDEBAR_DEFAULT)}
     onKeyDown={e => {
       const step = e.shiftKey ? 80 : 24;
-      // The edge is on the left: moving it left widens the pane.
-      if (e.key === "ArrowLeft") onChange(clamp(width + step));
-      else if (e.key === "ArrowRight") onChange(clamp(width - step));
+      // The edge is on the right: moving it right widens the pane.
+      if (e.key === "ArrowRight") onChange(clamp(width + step));
+      else if (e.key === "ArrowLeft") onChange(clamp(width - step));
       else if (e.key === "Home") onChange(SIDEBAR_MIN);
       else if (e.key === "End") onChange(SIDEBAR_MAX);
       else return;
       e.preventDefault();
     }}
-    className="absolute inset-y-0 -left-1 z-10 w-2 cursor-col-resize touch-none
+    className="absolute inset-y-0 -right-1 z-10 w-2 cursor-col-resize touch-none
       after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-transparent after:transition-colors
       hover:after:bg-brand/40 focus-visible:outline-none focus-visible:after:w-0.5 focus-visible:after:bg-brand"
   />;

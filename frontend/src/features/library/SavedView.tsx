@@ -173,18 +173,18 @@ export function SavedView({
   const menu: RowMenuItem[] = [];
   if (!historyView && shownRecords.length > 0) {
     menu.push(selecting
-      ? { key: "select", label: "Stop selecting", onSelect: stopSelecting }
-      : { key: "select", label: "Select papers", onSelect: () => setSelecting(true) });
+      ? { key: "select", label: "Stop selecting", icon: "fa-xmark", onSelect: stopSelecting }
+      : { key: "select", label: "Select papers", icon: "fa-square-check", onSelect: () => setSelecting(true) });
   }
   if (folder) {
-    menu.push({ key: "rename", label: "Rename folder", onSelect: () => setRenaming(true) });
+    menu.push({ key: "rename", label: "Rename folder", icon: "fa-pen", onSelect: () => setRenaming(true) });
     menu.push({ key: "delete", label: "Delete folder", danger: true, onSelect: () => onDelete(folder.id) });
   }
   if (historyView) {
     if (historyStore.keepHistory !== null) {
       menu.push(paused
-        ? { key: "keep", label: "Resume history", onSelect: () => void historyStore.setKeepHistory(true) }
-        : { key: "keep", label: "Pause history", onSelect: () => void historyStore.setKeepHistory(false) });
+        ? { key: "keep", label: "Resume history", icon: "fa-play", onSelect: () => void historyStore.setKeepHistory(true) }
+        : { key: "keep", label: "Pause history", icon: "fa-pause", onSelect: () => void historyStore.setKeepHistory(false) });
     }
     if (historyStore.items.length > 0) {
       menu.push({ key: "clear", label: "Clear history", danger: true, onSelect: () => void historyStore.clear() });

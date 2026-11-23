@@ -69,7 +69,7 @@ function NavItemLink({ item, collapsed, onNavigate, nested }: { item: NavItem; c
             // hovered row can never be mistaken for the page you are on (IR-1097).
             isActive
               ? HERE
-              : "font-medium text-stone-700 hover:bg-stone-100 hover:text-stone-900",
+              : "font-medium text-stone-700 hover:bg-brand/[0.07] hover:text-brand-dark",
             COLOUR_TRANSITION,
             FOCUS_RING,
           )
@@ -408,7 +408,7 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
         // except that an opened tablet sidebar overlaps the page instead.
         // 256, not 240 (IR-1276): at 240 "Download Requests" and "Reported
         // Comments" wrapped to two lines beside their count badge.
-        "fixed left-0 top-0 z-50 flex h-screen w-64 flex-col border-r border-stone-200 bg-surface",
+        "fixed left-0 top-0 z-50 flex h-screen w-64 flex-col border-r border-stone-200 bg-stone-50",
         // `shell` carries transform (the drawer's slide) and width (the rail)
         // together; AppShell sets the translate classes, not a transition.
         "transition-shell duration-200 ease-out motion-reduce:transition-none",
@@ -435,7 +435,7 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
                 // closes.
                 data-sidebar-toggle
                 className={cn(
-                  "group relative flex h-9 w-9 touch:h-11 touch:w-11 items-center justify-center rounded-control text-stone-600 hover:bg-stone-100 hover:text-stone-900 focus-visible:bg-stone-100 active:bg-stone-200",
+                  "group relative flex h-9 w-9 touch:h-11 touch:w-11 items-center justify-center rounded-control text-stone-600 hover:bg-brand/[0.07] hover:text-brand-dark focus-visible:bg-brand/[0.07] active:bg-stone-200",
                   COLOUR_TRANSITION,
                   FOCUS_RING,
                 )}
@@ -484,7 +484,7 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
                   data-sidebar-toggle
                   {...(mode === "rail" ? { "data-drawer-focus": "" } : {})}
                   className={cn(
-                    "flex h-9 w-9 touch:h-11 touch:w-11 items-center justify-center rounded-control text-stone-600 hover:bg-stone-100 hover:text-stone-900 active:bg-stone-200",
+                    "flex h-9 w-9 touch:h-11 touch:w-11 items-center justify-center rounded-control text-stone-600 hover:bg-brand/[0.07] hover:text-brand-dark active:bg-stone-200",
                     COLOUR_TRANSITION,
                     FOCUS_RING,
                   )}

@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 
 import { recordsApi } from "@/api/records";
 import { isRequestTimeout } from "@/api/requestPolicy";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { FOCUS_RING } from "@/components/ui/interaction";
-import { PILL_PRIMARY } from "@/components/ui/pillStyles";
 import { SavedCallsSection } from "@/features/opportunities/SavedCallsSection";
 import { PUBLISH_PARAM, usePublishHref } from "@/features/publish/publishLink";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
@@ -31,6 +29,16 @@ const RESEARCH_HEADINGS: Record<ResearchFilter, { title: string; note: string }>
   drafts:   { title: "Drafts", note: "Not yet submitted." },
   finished: { title: "Finished", note: "Accepted, published, kept unlisted or archived." },
 };
+
+const PANE_KEY = "iris-library-pane";
+
+function readPaneOpen(): boolean {
+  try { return localStorage.getItem(PANE_KEY) !== "closed"; } catch { return true; }
+}
+
+function savePaneOpen(open: boolean) {
+  try { localStorage.setItem(PANE_KEY, open ? "open" : "closed"); } catch { /* per-browser convenience */ }
+}
 
 /**
  * My Library (IR-410; spec §4.9 as amended 2026-10-11; IR-1311): an author's
@@ -108,6 +116,12 @@ export default function MyLibraryPage() {
     [research],
   );
 
+  const [paneOpen, setPaneOpen] = useState(readPaneOpen);
+  const togglePane = () => {
+    setPaneOpen(!paneOpen);
+    savePaneOpen(!paneOpen);
+  };
+
   const select = (next: LibraryView) => setSearchParams(paramsForView(searchParams, next, mayAuthor), { replace: true });
 
   const removeFromView = (ids: number[]) => {
@@ -173,35 +187,37 @@ export default function MyLibraryPage() {
 
   return (
     <div className="[container-type:inline-size] [container-name:library]">
-      <PageHeader
-        title="My Library"
-        description={mayAuthor ? "Keep your research moving, from submission to the shelf." : "Papers you saved and opened, and your download requests."}
-        actions={mayAuthor && (
-          <Link to={publishHref("new")} className={cn(PILL_PRIMARY, FOCUS_RING)}>
-            <i className="fas fa-plus text-label" aria-hidden />
-            Publish
-          </Link>
+      <div
+        className={cn(
+          "grid library-wide:min-h-screen library-wide:transition-[grid-template-columns] library-wide:duration-200 library-wide:ease-out motion-reduce:transition-none",
+          paneOpen ? "library-wide:grid-cols-[17.5rem_minmax(0,1fr)]" : "library-wide:grid-cols-[3.75rem_minmax(0,1fr)]",
         )}
-      />
+      >
+        {/* Docked like Ask IRIS's conversations: the page's name, what it is for, then its lists. */}
+        <aside className="min-w-0 overflow-hidden border-b border-stone-200 bg-stone-50 library-wide:sticky library-wide:top-0 library-wide:h-screen library-wide:border-b-0 library-wide:border-r">
+          {/* Its own width, so the lists do not reflow while the column animates. */}
+          <div className={cn("flex h-full min-h-0 flex-col", paneOpen ? "library-wide:w-[17.5rem]" : "library-wide:w-[calc(3.75rem-1px)]")}>
+            <LibraryRail
+              view={view}
+              onSelect={select}
+              mayAuthor={mayAuthor}
+              waiting={waiting}
+              folders={folders}
+              folderLimit={folderLimit}
+              publishHref={mayAuthor ? publishHref("new") : undefined}
+              title="My Library"
+              collapsed={!paneOpen}
+              onToggle={togglePane}
+              onCreateFolder={(name) => {
+                void createFolder(name).then((made) => {
+                  if (made) select({ kind: "folder", id: made.id });
+                });
+              }}
+            />
+          </div>
+        </aside>
 
-      <div className="grid gap-section library-wide:grid-cols-[14rem_minmax(0,1fr)] library-wide:gap-x-10">
-        <div className="library-wide:sticky library-wide:top-6 library-wide:self-start">
-          <LibraryRail
-            view={view}
-            onSelect={select}
-            mayAuthor={mayAuthor}
-            waiting={waiting}
-            folders={folders}
-            folderLimit={folderLimit}
-            onCreateFolder={(name) => {
-              void createFolder(name).then((made) => {
-                if (made) select({ kind: "folder", id: made.id });
-              });
-            }}
-          />
-        </div>
-
-        <div className="min-w-0">
+        <div className="min-w-0 p-4 sm:p-7">
           {failure && (
             <p role="alert" className="mb-section flex flex-wrap items-center gap-x-2 rounded-card border border-stone-300 bg-surface px-3 py-2 text-small text-brand">
               {failure.message}
