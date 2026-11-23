@@ -17,7 +17,7 @@ Automatic compaction now starts at **200,000** tokens of context (`RUNS_AGENT_CO
 
 **Largest context per call.** Compaction is checked before each gathering step, so within one run the context can keep growing past 200K, up to the window minus the reserves: 272,000 − 41,500 = **230,500**. The worst cases below use 230K.
 
-**Prices** (`AI_ADMISSION_PRICES`, `openai/gpt-6-luna:floor`): US$0.10 per million input tokens and US$0.50 per million output tokens.
+**Prices** (`AI_ADMISSION_PRICES`, `openai/gpt-6-luna`; `:floor` until IR-1296): US$0.10 per million input tokens and US$0.50 per million output tokens.
 
 | Depth | Worst-case input | Worst-case output | Worst-case cost |
 |---|---|---|---|
@@ -64,7 +64,7 @@ Only one allowance exists. `RunLimits.allowance()` is the same for both depths, 
 
 | Name | Development | Proposed | Guards |
 |---|---|---|---|
-| `RUNS_AGENT_MODEL` | `openai/gpt-6-luna:floor` | | The pinned model |
+| `RUNS_AGENT_MODEL` | `openai/gpt-6-luna` (`:floor` dropped 2026-11-23, IR-1296) | | The pinned model |
 | `RUNS_AGENT_BOUNDS` | ordinary 4 steps / 4 calls, deep 10 / 10, history 6 turns | | Research length per depth |
 | `RUNS_AGENT_RESERVES` | answer 16,000, reasoning 16,000, next result 9,000, repair 1,500 | | Room held back in every request |
 | `RUNS_AGENT_PROVIDER_RETRIES` | 1 | | Resends of a model call that failed in transit; each is admitted and charged (IR-1286) |
