@@ -271,8 +271,9 @@ export default function LoginPage() {
   }
 
   return (
+    // No Help in the header (IR-1281): Forgot password? and Create an account
+    // sit on the form. Register keeps its Help.
     <EntryFrame
-      help
       lede={{
         headline: <>Your research has <span className="text-brand">a place.</span></>,
         sentence:

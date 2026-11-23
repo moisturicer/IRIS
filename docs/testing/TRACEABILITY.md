@@ -417,6 +417,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-1276** | The sidebar is 256 px (`w-64`, page margin `lg:ml-64`), so *Download Requests* and *Reported Comments* stay on one line beside their count badge, and every sidebar item is in Title Case — no FR- id | [details](traceability/IR-1276.md) | **IMPLEMENTED** |
 | **IR-1277** | Record types keep one order in every list (Publish, Setup, Guidelines, filters): Proposal, Thesis / Research, Project, then any other type, however often a type is saved — no FR- id | [details](traceability/IR-1277.md) | **IMPLEMENTED** |
 | **IR-1279** | A draft's row in My Library has a red trash can again, rightmost under its *Updated* date (the row itself continues the draft); the trash can asks once, in the *Delete this draft?* dialog, with no "⋯" menu before it — no FR- id | [details](traceability/IR-1279.md) | **IMPLEMENTED** |
+| **IR-1281** | The sign-in page's header has no *Help* link; *Forgot password?* and *Create an account* stay on the form, and Register keeps its Help — no FR- id | [details](traceability/IR-1281.md) | **IMPLEMENTED** |
 | NFR-U3 | Responsive at 360 px, no horizontal scroll | [details](traceability/NFR-U3.md) | **PARTIAL** |
 | NFR-A1 | WCAG 2.1 AA on interactive controls | [details](traceability/NFR-A1.md) | **PARTIAL** |
 
