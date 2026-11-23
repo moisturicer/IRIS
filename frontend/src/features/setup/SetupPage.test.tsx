@@ -95,50 +95,13 @@ describe("the list RDCO keeps", () => {
     expect(requirement("Thesis Revision Form")).toBeInTheDocument();
   });
 
-  it("adds a requirement with its label and description, then shows the saved list", async () => {
-    const read = load();
-    const add = vi.spyOn(setupApi, "addRequirement").mockResolvedValue({ data: {} } as never);
-    const { user } = await openPage();
-
-    await user.click(screen.getByRole("button", { name: "Add a requirement" }));
-    const form = screen.getByRole("form", { name: "Add a requirement to Thesis / Research" });
-    await user.type(within(form).getByRole("textbox", { name: "Name" }), "Adviser's Endorsement");
-    await user.click(within(form).getByRole("radio", { name: "Required" }));
-    await user.type(within(form).getByRole("textbox", { name: "Description" }), "Signed by the Adviser.");
-    await user.click(within(form).getByRole("button", { name: "Add requirement" }));
-
-    expect(add).toHaveBeenCalledWith(2, {
-      name: "Adviser's Endorsement", is_required: true, description: "Signed by the Adviser.",
-    });
-    expect(await screen.findByRole("status")).toHaveTextContent("Adviser's Endorsement is added to Thesis / Research.");
-    expect(read).toHaveBeenCalledTimes(2);
-  });
-
-  it("refuses a requirement named Manuscript or after one it already has, before sending", async () => {
-    load();
-    const add = vi.spyOn(setupApi, "addRequirement");
-    const { user } = await openPage();
-
-    await user.click(screen.getByRole("button", { name: "Add a requirement" }));
-    const name = screen.getByRole("textbox", { name: "Name" });
-    await user.type(name, "manuscript");
-    await user.click(screen.getByRole("button", { name: "Add requirement" }));
-    expect(screen.getByText("The Manuscript is always the first requirement.")).toBeInTheDocument();
-    expect(name).toHaveAttribute("aria-invalid", "true");
-
-    await user.clear(name);
-    await user.type(name, "release form");
-    await user.click(screen.getByRole("button", { name: "Add requirement" }));
-    expect(screen.getByText("This record type already has a requirement with that name.")).toBeInTheDocument();
-    expect(add).not.toHaveBeenCalled();
-  });
-
-  it("edits a requirement's label", async () => {
+  it("edits a requirement's label in place, not in a popup", async () => {
     load();
     const edit = vi.spyOn(setupApi, "editRequirement").mockResolvedValue({ data: {} } as never);
     const { user } = await openPage();
 
     await user.click(within(requirement("Ethics Clearance")).getByRole("button", { name: "Edit" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     const form = screen.getByRole("form", { name: "Edit Ethics Clearance" });
     await user.click(within(form).getByRole("radio", { name: "Required" }));
     await user.click(within(form).getByRole("button", { name: "Save" }));
@@ -156,6 +119,138 @@ describe("the list RDCO keeps", () => {
     await user.click(screen.getByRole("button", { name: "Move up Ethics Clearance" }));
 
     expect(reorder).toHaveBeenCalledWith(2, [12, 11]);
+  });
+});
+
+describe("adding a requirement (IR-1315)", () => {
+  const ADD_DIALOG = "Add a requirement to Thesis / Research";
+  const openAdd = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.click(screen.getByRole("button", { name: "Add a requirement" }));
+    return screen.getByRole("dialog", { name: ADD_DIALOG });
+  };
+
+  it("starts from the section's heading, above the list, and nothing is left below it", async () => {
+    load();
+    await openPage();
+
+    const heading = screen.getByRole("heading", { level: 2, name: "Requirements & Templates" });
+    const button = screen.getByRole("button", { name: "Add a requirement" });
+    const list = screen.getByRole("list", { name: "Thesis / Research requirements" });
+    expect(heading.parentElement).toContainElement(button);
+    expect(button.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: "Add a requirement" })).toHaveLength(1);
+  });
+
+  it("opens a popup named for the record type, with Name focused and the actions in it", async () => {
+    load();
+    const { user } = await openPage();
+
+    const dialog = await openAdd(user);
+    await waitFor(() => expect(within(dialog).getByRole("textbox", { name: "Name" })).toHaveFocus());
+    expect(within(dialog).getByRole("radio", { name: "Optional" })).toBeChecked();
+    expect(within(dialog).getByRole("textbox", { name: "Description" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Add requirement" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+    await expectNoBlockingA11yViolations(document.body);
+  });
+
+  it("throws away what was typed on Cancel or Escape, with no question, and focus goes back", async () => {
+    load();
+    const add = vi.spyOn(setupApi, "addRequirement");
+    const { user } = await openPage();
+    const trigger = screen.getByRole("button", { name: "Add a requirement" });
+
+    let dialog = await openAdd(user);
+    await user.type(within(dialog).getByRole("textbox", { name: "Name" }), "Half typed");
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+
+    dialog = await openAdd(user);
+    expect(within(dialog).getByRole("textbox", { name: "Name" })).toHaveValue("");
+    await user.type(within(dialog).getByRole("textbox", { name: "Description" }), "Also half typed");
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    dialog = await openAdd(user);
+    expect(within(dialog).getByRole("textbox", { name: "Description" })).toHaveValue("");
+    await user.click(within(dialog).getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(add).not.toHaveBeenCalled();
+  });
+
+  it("adds a requirement with its label and description, closes, and shows the saved list with it last", async () => {
+    const saved = thesis({
+      requirements: [
+        ...thesis().requirements,
+        { id: 13, name: "Adviser's Endorsement", is_required: true, description: "Signed by the Adviser.",
+          position: 3, template_name: "", in_use: false },
+      ],
+    });
+    const read = load();
+    read.mockResolvedValueOnce({ data: [thesis(), PROPOSAL] } as never)
+      .mockResolvedValueOnce({ data: [saved, PROPOSAL] } as never);
+    const add = vi.spyOn(setupApi, "addRequirement").mockResolvedValue({ data: {} } as never);
+    const { user } = await openPage();
+
+    const dialog = await openAdd(user);
+    await user.type(within(dialog).getByRole("textbox", { name: "Name" }), "Adviser's Endorsement");
+    await user.click(within(dialog).getByRole("radio", { name: "Required" }));
+    await user.type(within(dialog).getByRole("textbox", { name: "Description" }), "Signed by the Adviser.");
+    await user.click(within(dialog).getByRole("button", { name: "Add requirement" }));
+
+    expect(add).toHaveBeenCalledWith(2, {
+      name: "Adviser's Endorsement", is_required: true, description: "Signed by the Adviser.",
+    });
+    expect(await screen.findByRole("status")).toHaveTextContent("Adviser's Endorsement is added to Thesis / Research.");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(read).toHaveBeenCalledTimes(2);
+    const rows = within(screen.getByRole("list", { name: "Thesis / Research requirements" })).getAllByRole("listitem");
+    expect(rows.map((r) => within(r).getByRole("heading", { level: 3 }).textContent))
+      .toEqual(["Manuscript", "Release Form", "Ethics Clearance", "Adviser's Endorsement"]);
+  });
+
+  it("stays open with the fields kept and says why when the server refuses", async () => {
+    load();
+    vi.spyOn(setupApi, "addRequirement").mockRejectedValue(new Error("network"));
+    const { user } = await openPage();
+
+    const dialog = await openAdd(user);
+    await user.type(within(dialog).getByRole("textbox", { name: "Name" }), "Adviser's Endorsement");
+    await user.type(within(dialog).getByRole("textbox", { name: "Description" }), "Signed by the Adviser.");
+    await user.click(within(dialog).getByRole("button", { name: "Add requirement" }));
+
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("The requirement wasn't added. Try again.");
+    expect(screen.getByRole("dialog", { name: ADD_DIALOG })).toBe(dialog);
+    expect(within(dialog).getByRole("textbox", { name: "Name" })).toHaveValue("Adviser's Endorsement");
+    expect(within(dialog).getByRole("textbox", { name: "Description" })).toHaveValue("Signed by the Adviser.");
+    await expectNoBlockingA11yViolations(document.body);
+
+    // Closing after a refusal leaves no stale warning on the page behind it.
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("refuses a requirement named Manuscript or after one it already has, before sending", async () => {
+    load();
+    const add = vi.spyOn(setupApi, "addRequirement");
+    const { user } = await openPage();
+
+    const dialog = await openAdd(user);
+    const name = within(dialog).getByRole("textbox", { name: "Name" });
+    await user.click(within(dialog).getByRole("button", { name: "Add requirement" }));
+    expect(within(dialog).getByText("Give the requirement a name.")).toBeInTheDocument();
+
+    await user.type(name, "manuscript");
+    await user.click(within(dialog).getByRole("button", { name: "Add requirement" }));
+    expect(within(dialog).getByText("The Manuscript is always the first requirement.")).toBeInTheDocument();
+    expect(name).toHaveAttribute("aria-invalid", "true");
+
+    await user.clear(name);
+    await user.type(name, "release form");
+    await user.click(within(dialog).getByRole("button", { name: "Add requirement" }));
+    expect(within(dialog).getByText("This record type already has a requirement with that name.")).toBeInTheDocument();
+    expect(add).not.toHaveBeenCalled();
   });
 });
 
