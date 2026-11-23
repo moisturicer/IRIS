@@ -27,12 +27,6 @@ interface NavItem {
   /** What a screen reader hears after the badge's number: "pending" unless set. */
   badgeWord?: string;
   /**
-   * An attention dot with no number, for something that is waiting on the
-   * user rather than a count worth reading (IR-534). The string is what a
-   * screen reader hears in its place.
-   */
-  dot?: string;
-  /**
    * Pages listed under this row (IR-1085, D5): My Reviews' Office Console
    * (Workflow Analytics moved to the RDCO group, IR-1216). A list inside the
    * row, so it reads as part of it.
@@ -48,7 +42,6 @@ interface NavItem {
 
 function NavItemLink({ item, collapsed, onNavigate, nested }: { item: NavItem; collapsed: boolean; onNavigate?: () => void; nested?: boolean }) {
   const badge = item.badge != null && item.badge > 0 ? item.badge : null;
-  const dot = badge == null ? item.dot : undefined;
   return (
     <li>
       {/* A tooltip for the rail, on hover and focus. Not the accessible name:
@@ -107,18 +100,9 @@ function NavItemLink({ item, collapsed, onNavigate, nested }: { item: NavItem; c
                 <span className="sr-only">, {badge} {item.badgeWord ?? "pending"}</span>
               </span>
             )}
-            {dot != null && (
-              <>
-                <span
-                  aria-hidden
-                  className={cn("h-2 w-2 flex-shrink-0 rounded-full bg-brand", collapsed && "md:hidden")}
-                />
-                <span className="sr-only">, {dot}</span>
-              </>
-            )}
             {/* The rail has no room for the number, so a dot marks it; the
                 count itself is still read out from the sr-only badge above. */}
-            {collapsed && (badge != null || dot != null) && (
+            {collapsed && badge != null && (
               <span aria-hidden className="absolute right-2 top-1.5 hidden h-2 w-2 rounded-full bg-brand ring-2 ring-white md:block" />
             )}
           </>
@@ -294,7 +278,8 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
   }, [mode]);
   const unreadCount = useNotificationsStore((s) => s.unreadCount);
   const [queueCounts, setQueueCounts] = useState<QueueCounts>(NO_QUEUES);
-  const [needsAction, setNeedsAction] = useState(false);
+  /** My Library's count: the user's records waiting on them (IR-1310). */
+  const [needsAction, setNeedsAction] = useState<number | undefined>(undefined);
   /** My Reviews' To review count, from the same stats read (IR-1208). */
   const [reviewsWaiting, setReviewsWaiting] = useState<number | undefined>(undefined);
   const { pathname, search } = useLocation();
@@ -309,7 +294,7 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
 
   // The queues' counts, in one call (IR-1138): RDCO's three and the Reported
   // comments queue RDCO shares with the System Admin (IR-693). Read again when
-  // the address changes, as the Library dot is, and when a decision is made on
+  // the address changes, as the Library count is, and when a decision is made on
   // a queue page. Only those two roles ask; a failed read shows no count
   // rather than a stale one.
   const showsQueues = canAccess(roleName as never, "roleRequests")
@@ -333,26 +318,26 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
     return () => { live = false; off(); };
   }, [showsQueues, pathname, search, queuesTick]);
 
-  // My Library's dot: some record of the user's waits on them -- a revision or
-  // a document was asked for (B2, `needs_action_mine`). The same read carries
+  // My Library's count: the user's records waiting on them -- a revision or
+  // a document was asked for (B2, `needs_action_mine`; a dot until IR-1310). The same read carries
   // My Reviews' count, the reviews waiting on the user (IR-1208, the To review
   // tab's own number, `reviews_waiting_mine`). Asked again whenever
   // the address changes, query string included -- Paper View's sections are
   // `?section=` -- so answering the request clears it without a reload.
-  // A failed read shows no dot rather than a stale one.
+  // A failed read shows no count rather than a stale one.
   const showsLibrary = nav.some((entry) => entry.key === "library");
   useEffect(() => {
-    if (!showsLibrary) { setNeedsAction(false); setReviewsWaiting(undefined); return; }
+    if (!showsLibrary) { setNeedsAction(undefined); setReviewsWaiting(undefined); return; }
     let live = true;
     dashboardApi
       .stats()
       .then(({ data }) => {
         if (!live) return;
-        setNeedsAction((data.needs_action_mine ?? 0) > 0);
+        setNeedsAction(data.needs_action_mine);
         // The same number as My Reviews' To review tab (IR-1208).
         setReviewsWaiting(data.reviews_waiting_mine);
       })
-      .catch(() => { if (live) { setNeedsAction(false); setReviewsWaiting(undefined); } });
+      .catch(() => { if (live) { setNeedsAction(undefined); setReviewsWaiting(undefined); } });
     return () => { live = false; };
   }, [pathname, search, showsLibrary, statsTick]);
 
@@ -362,6 +347,8 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
   const BADGES: Partial<Record<NavEntry["key"], number | undefined>> = {
     // Reviews waiting on the user, for every reviewer with work (IR-1208).
     reviewQueue: reviewsWaiting,
+    // The user's records waiting on them (IR-1310), a number like the others.
+    library: needsAction,
     roleRequests: queueCounts.role_change_requests,
     downloadRequests: queueCounts.download_requests,
     deleteRequests: queueCounts.delete_requests,
@@ -371,17 +358,14 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
     // count and the phone bar's bell always agree.
     notifications: unreadCount,
   };
-  // A dot, not a count: what matters is that something waits (spec §4.2).
-  const DOTS: Partial<Record<NavEntry["key"], string | undefined>> = {
-    library: needsAction ? "something needs your action" : undefined,
-  };
 
   const toItem = (entry: NavEntry): NavItem => {
     const children = nav.filter((child) => child.parent === entry.key).map(toItem);
     return {
       to: entry.to, label: entry.label, icon: entry.icon,
-      badge: BADGES[entry.key], dot: DOTS[entry.key],
+      badge: BADGES[entry.key],
       ...(entry.key === "notifications" ? { badgeWord: "unread" } : {}),
+      ...(entry.key === "library" ? { badgeWord: "waiting on you" } : {}),
       ...(children.length > 0 ? { children } : {}),
     };
   };

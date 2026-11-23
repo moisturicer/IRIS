@@ -502,17 +502,26 @@ describe("the My Reviews count (IR-1208)", () => {
   });
 });
 
-describe("the My Library dot (IR-534, B2)", () => {
-  it("appears when a record waits on you, and says so to a screen reader", async () => {
+describe("the My Library count (IR-1310; a dot until then, IR-534 B2)", () => {
+  it("shows how many records wait on you, and says so to a screen reader", async () => {
     waitingOnYou(2);
     signIn(ROLES.STUDENT);
     renderAt("/");
 
     await screen.findByRole("heading", { name: "Discover" });
     const nav = screen.getByRole("navigation", { name: "Main" });
-    expect(
-      await within(nav).findByRole("link", { name: "My Library, something needs your action" }),
-    ).toBeInTheDocument();
+    const link = await within(nav).findByRole("link", { name: "My Library, 2 waiting on you" });
+    expect(within(link).getByText("2")).toBeInTheDocument();
+  });
+
+  it("caps the number shown at 9+, while the screen reader hears the real count", async () => {
+    waitingOnYou(14);
+    signIn(ROLES.STUDENT);
+    renderAt("/");
+
+    const nav = screen.getByRole("navigation", { name: "Main" });
+    const link = await within(nav).findByRole("link", { name: "My Library, 14 waiting on you" });
+    expect(within(link).getByText("9+")).toBeInTheDocument();
   });
 
   it("is absent when nothing waits on you", async () => {
@@ -526,7 +535,7 @@ describe("the My Library dot (IR-534, B2)", () => {
     expect(within(nav).getByRole("link", { name: "My Library" })).toBeInTheDocument();
   });
 
-  it("stays named on the collapsed rail", async () => {
+  it("stays named with the count on the collapsed rail", async () => {
     useUIStore.setState({ sidebarCollapsed: true });
     waitingOnYou(1);
     signIn(ROLES.STUDENT);
@@ -535,7 +544,7 @@ describe("the My Library dot (IR-534, B2)", () => {
     await screen.findByRole("heading", { name: "Discover" });
     const nav = screen.getByRole("navigation", { name: "Main" });
     expect(
-      await within(nav).findByRole("link", { name: "My Library, something needs your action" }),
+      await within(nav).findByRole("link", { name: "My Library, 1 waiting on you" }),
     ).toBeInTheDocument();
   });
 });
