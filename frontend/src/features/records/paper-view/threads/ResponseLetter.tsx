@@ -1,6 +1,7 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { recordsApi } from "@/api/records";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { cn } from "@/lib/utils";
 import type { ResponseLetter, ResponseLetterEntry } from "@/types/records";
 
@@ -54,9 +55,18 @@ export function ResponseLetterPanel({ letter }: { letter: ResponseLetter }) {
 /** The newest response letter on a record, or null; read once the review is readable. */
 export function useNewestResponseLetter(recordId: number, enabled: boolean): ResponseLetter | null {
   const [letter, setLetter] = useState<ResponseLetter | null>(null);
+  // A new Version writes a letter: read again on a live hint (ADR-073, IR-1287).
+  const [attempt, setAttempt] = useState(0);
+  const quiet = useRef(false);
+  useLiveRefresh([`record:${recordId}`], () => {
+    quiet.current = true;
+    setAttempt((n) => n + 1);
+  }, enabled);
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
+    const isQuiet = quiet.current;
+    quiet.current = false;
     Promise.resolve()
       .then(() => recordsApi.responseLetters(recordId))
       .then(({ data }) => {
@@ -66,11 +76,11 @@ export function useNewestResponseLetter(recordId: number, enabled: boolean): Res
         setLetter(newest && Array.isArray(newest.entries) && typeof newest.version === "number" ? newest : null);
       })
       .catch(() => {
-        if (!cancelled) setLetter(null);
+        if (!cancelled && !isQuiet) setLetter(null);
       });
     return () => {
       cancelled = true;
     };
-  }, [recordId, enabled]);
+  }, [recordId, enabled, attempt]);
   return letter;
 }

@@ -154,6 +154,12 @@ All three were left open in the first draft and decided by Ashlee Sean on 2026-1
 
 **Cost.** One `may_read_review` check per candidate per committed comment write. Bursts are coalesced per tab (decision 8).
 
+**Extended to the rest of the paper page (IR-1287).**
+- These writes now tell the same readers in the same way: a saved `Review`, `RecordClearance`, `RecordAssignment`, `ReviewerSeat`, `Extension`, `RoutingEvent`, `ResubmissionRequest`, `ReviewRound`, `ResponseLetter`, `RecordUpload`, `UploadReview`, `RecordFile`, `DocumentRequest`, `DocumentRequestItem` or `DocumentRejection`, and a deleted upload or file. They refresh the tracker, the timeline, the documents tab and the response letter.
+- **Once per act.** Each write queues a send, and only the send queued last for that record goes out, so a routing act that writes ten rows tells each reader once. One case is missed: a savepoint that rolls back inside a transaction that still commits can leave that commit unannounced. Decision 6 covers this, since the page catches up on focus.
+- **Drafts.** An unsubmitted draft's readers are its creator alone (`hides_draft`, IR-1227), never a co-owner it names.
+- **Public comments get no hint.** Anyone signed in may read a published paper, so there is no list of readers to tell. That panel catches up on focus and reconnect, and on any hint the viewer gets as a review reader.
+
 ## Related Requirements
 
 NFR labels only: none. Relates to IR-1033 (refetch on focus), IR-1138 (queue counts), IR-1208 (My Reviews count), IR-166 and ADR-072 (sessions), ADR-017 (ASGI), and IR-504 and IR-634 (streaming).
@@ -162,4 +168,5 @@ NFR labels only: none. Relates to IR-1033 (refetch on focus), IR-1138 (queue cou
 
 - IR-1213: the spec, which builds this after acceptance.
 - IR-1284: the review discussion (Amendment 2026-11-23).
+- IR-1287: the rest of the paper page (same amendment).
 - IR-1033.
