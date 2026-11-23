@@ -592,7 +592,10 @@ def record_capabilities(record, user, *, workflow, my_seats, routing, office_rev
     from apps.documents.attachments import filing_party
     from apps.reviews.seats import add_reviewer_assignment
 
-    offered = ["cite"]
+    # A citation points readers at published work they can find (IR-1305), so
+    # only a published paper offers one: never a Proposal, a draft or a paper
+    # still in review or kept unlisted.
+    offered = ["cite"] if record.pipeline_status == PipelineStatus.PUBLISHED else []
     if not user or not getattr(user, "is_authenticated", False):
         return offered
 
