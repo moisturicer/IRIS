@@ -78,13 +78,15 @@ def test_0044_numbers_the_types_by_name_not_by_id():
     executor.migrate(before)
     try:
         old = MigrationExecutor(connection).loader.project_state(before).apps.get_model("records", "RecordType")
-        # Recreate the three types newest-first, so id order is the reverse of the workflow.
-        rows = {row.name: row for row in old.objects.filter(name__in=WORKFLOW)}
+        # Create the three types newest-first, so id order is the reverse of the
+        # workflow. A seeded copy may or may not be here (an earlier
+        # transactional test can leave the table empty), so set it aside by
+        # renaming it rather than relying on it.
+        for row in old.objects.filter(name__in=WORKFLOW):
+            row.name = f"{row.name} (set aside)"
+            row.save()
         for name in reversed(WORKFLOW):
-            rows[name].name = f"{name} (old)"
-            rows[name].save()
             old.objects.create(name=name)
-        old.objects.filter(name__endswith=" (old)").delete()
 
         MigrationExecutor(connection).migrate(after)
         new = MigrationExecutor(connection).loader.project_state(after).apps.get_model("records", "RecordType")
