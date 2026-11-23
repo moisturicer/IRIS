@@ -37,7 +37,7 @@ from django.dispatch import receiver
 from core.enums import RoleName
 
 from . import channels as ch
-from .publish import publish
+from .publish import enabled, publish
 
 
 @receiver(post_save, sender="notifications.Notification")
@@ -126,6 +126,10 @@ def review_changed(record_id) -> None:
         if _latest.__dict__.get(record_id) != token:
             return
         del _latest.__dict__[record_id]
+        # Off, nobody is told, so the readers are not looked up: a migration
+        # test that rewinds the schema saves rows a current Record can't read.
+        if not enabled():
+            return
         publish(_review_readers(record_id), [ch.record_topic(record_id)])
 
     transaction.on_commit(send)
