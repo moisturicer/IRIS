@@ -376,6 +376,17 @@ export const DIALOGS: DialogCase[] = [
     dialog: (page) => page.getByRole("dialog"),
   },
   {
+    // A failed sign-in is said in a dialog in front of the form (IR-1303).
+    id: "sign-in failed", screen: "login", sources: ["components/auth/EntryErrorDialog.tsx"],
+    override: (api) => api.on("POST", "/auth/login/", { detail: "Invalid credentials." }, 401),
+    open: async (page) => {
+      await page.getByLabel("Email Address").fill("student@cit.edu");
+      await page.getByLabel("Password", { exact: true }).fill("not-the-password");
+      await page.getByRole("button", { name: "Sign In" }).click();
+    },
+    dialog: (page) => page.getByRole("alertdialog", { name: "Invalid email or password" }),
+  },
+  {
     // Why the session ended opens by itself on arrival (IR-1197).
     id: "session ended on arrival at sign-in", screen: "login", path: "/login?reason=session_expired&code=session_idle",
     sources: ["components/auth/SessionNoticeDialog.tsx"],
