@@ -678,9 +678,9 @@ describe("the account menu", () => {
     expect(screen.queryByRole("link", { name: "Settings & Profile" })).not.toBeInTheDocument();
     // Help is in Settings since IR-1217: not in this menu, nor anywhere in the sidebar.
     const menu = document.getElementById(trigger.getAttribute("aria-controls")!)!;
-    // IR-1137: Notifications is reachable from the account menu too.
-    expect(within(menu).getAllByRole("link").map((l) => l.textContent)).toEqual(["Profile", "Settings", "Notifications"]);
-    expect(within(menu).getByRole("link", { name: "Notifications" })).toHaveAttribute("href", "/notifications");
+    // Notifications left this menu for the sidebar's list (IR-1288; it was
+    // added here by IR-1137), so it is not reachable twice.
+    expect(within(menu).getAllByRole("link").map((l) => l.textContent)).toEqual(["Profile", "Settings"]);
     expect(within(menu).queryByRole("link", { name: "Help" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Help" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
@@ -812,13 +812,12 @@ describe("touch targets in the phone drawer (IR-1092)", () => {
 
     const trigger = within(sidebar).getByRole("button", { name: /account menu/ });
     await user.click(trigger);
-    // The account menu's own links: the nav has a Notifications link as well.
+    // The account menu's own links, not the nav's.
     const menu = within(document.getElementById(trigger.getAttribute("aria-controls")!)!);
 
     for (const item of [
       menu.getByRole("link", { name: "Profile" }),
       menu.getByRole("link", { name: "Settings" }),
-      menu.getByRole("link", { name: "Notifications" }),
       screen.getByRole("button", { name: "Sign out" }),
     ]) {
       expect(item).toHaveClass("min-h-11", "md:min-h-0", "touch:min-h-11");

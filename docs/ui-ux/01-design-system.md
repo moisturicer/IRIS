@@ -295,7 +295,7 @@ Font Awesome 6 via CDN, `<i className="fas fa-…" />`, 95 usages.
 **The sidebar (IR-413, 2026-10-12).** Redesigned with impeccable's *Quiet white* direction, inside these tokens:
 
 - **Brand:** the Folio Ribbon mark, the outlined **IRIS** wordmark (16 px tall, `text-brand`; IR-744) and the collapse button, nothing else. The tagline *Research-to-IP Platform* is on its own line under the wordmark at `text-3xs` (11 px) `stone-500`. It was 9 px and wrapped onto three lines beside the bell, below this file's 11 px floor.
-- **Notifications** is a row in the main list, after My Library (2026-11-23), with the unread count as its badge; it opens the Notifications page. It replaced the bell in the brand row, which crowded the logo, the wordmark and the collapse button. Below `md` the bell stays in the phone bar and in Ask IRIS's toolbar, where the drawer is hidden.
+- **Notifications** is a row in the main list, after My Library (2026-11-23), with the unread count as its badge; it opens the Notifications page. It replaced the bell in the brand row, which crowded the logo, the wordmark and the collapse button. Below `md` the bell stays in the phone bar and in Ask IRIS's toolbar, where the drawer is hidden. The account menu no longer repeats it (IR-1137 had added it there while the bell was the only entry).
 - **Nav:** one unlabelled main list, plus RDCO's labelled *Administration* group (`text-3xs`, uppercase, `tracking-wider`, `stone-500`). Rows are `text-sm`, `rounded-control`, `px-3 py-2`, with a `w-5` icon.
   - **Active** is *here* (IR-1097): a `stone-200` fill, `stone-900` text, semibold, with the icon in brand. The 4 px maroon left bar is gone.
   - **Hover** is neutral, `bg-stone-100`, so it is never mistaken for the active row.
