@@ -52,8 +52,8 @@ export function ChatToolbar({
 
 
       {/* Phones only: Ask IRIS fills the window, so AppShell draws no phone bar
-          here, and this is where the bell goes instead. On a desktop the bell
-          is at the top of the sidebar (IR-519). Same component, same store. */}
+          here, and this is where the bell goes instead. On a desktop the
+          sidebar's Notifications link carries the count. Same store. */}
       <div className="md:hidden">
         <NotificationBell />
       </div>
