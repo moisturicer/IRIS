@@ -4,7 +4,7 @@
  */
 import userEvent from "@testing-library/user-event";
 import { Route, Routes } from "react-router-dom";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { RequestTimeoutError } from "@/api/requestPolicy";
 import { expectNoBlockingA11yViolations } from "@/test/axe";
@@ -320,5 +320,127 @@ describe("OfficeConsolePage", () => {
     const warning = within(dialog).getByRole("region", { name: "What Maria Reyes leaves" });
     expect(warning).toHaveTextContent("2 document requests they made stay open.");
     await expectNoBlockingA11yViolations(dialog);
+  });
+});
+
+/**
+ * On a phone (IR-1291): below 768px each review is a stacked card, not a table
+ * row. jsdom has no layout, so these pin what a card holds and which one is
+ * drawn; the width itself is checked in a browser.
+ */
+describe("OfficeConsolePage on a phone", () => {
+  function atPhoneWidth() {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query.includes("max-width: 767"),
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+  }
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  const cardOf = (title: string) =>
+    within(screen.getByRole("list", { name: /ITSO open reviews/ }))
+      .getByRole("link", { name: title })
+      .closest("li") as HTMLElement;
+
+  it("draws a list of cards and no table", async () => {
+    atPhoneWidth();
+    show();
+
+    const list = await screen.findByRole("list", { name: /ITSO open reviews/ });
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    expect(within(list).getAllByRole("listitem")).toHaveLength(2);
+  });
+
+  it("keeps the table from 768px up", async () => {
+    show();
+    expect(await screen.findByRole("table", { name: /ITSO open reviews/ })).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: /ITSO open reviews/ })).not.toBeInTheDocument();
+  });
+
+  it("shows on each card what its table row shows, in the server's words", async () => {
+    atPhoneWidth();
+    office.mockResolvedValue(payload({ rows: [row({ clearance_strip: [KEPT, RESET] }), POOL] }));
+    show();
+    await screen.findByRole("list", { name: /ITSO open reviews/ });
+
+    const held = cardOf("Smart Campus Energy Monitor");
+    expect(within(held).getByRole("heading", { level: 3 })).toHaveTextContent("Smart Campus Energy Monitor");
+    expect(within(held).getByRole("link", { name: "Smart Campus Energy Monitor" }))
+      .toHaveAttribute("href", "/records/7?section=review");
+    expect(held).toHaveTextContent("Ada Lovelace · v2");
+    expect(held).toHaveTextContent("Maria Reyes");
+    expect(held).toHaveTextContent("Due");
+    expect(held).toHaveTextContent("Overdue by 3 days");
+    const strip = within(held).getByRole("list", { name: "Clearances" });
+    expect(strip).toHaveTextContent("ITSO: Cleared · Kept from v1");
+    expect(strip).toHaveTextContent("IERC: Reviewing v2 · Reset by v2");
+
+    const unclaimed = cardOf("AI-Based Medical Imaging");
+    expect(unclaimed).toHaveTextContent("Nobody yet");
+    expect(unclaimed).toHaveTextContent("Unassigned");
+    expect(within(unclaimed).queryByRole("list", { name: "Clearances" })).not.toBeInTheDocument();
+  });
+
+  it("puts one primary Assign on an unassigned card, with the other acts in the menu", async () => {
+    atPhoneWidth();
+    show();
+    await screen.findByRole("list", { name: /ITSO open reviews/ });
+
+    const unclaimed = cardOf("AI-Based Medical Imaging");
+    await userEvent.click(within(unclaimed).getByRole("button", { name: "Assign reviewer: AI-Based Medical Imaging" }));
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("offers a held card only the More actions menu, as a labelled button", async () => {
+    atPhoneWidth();
+    show();
+    await screen.findByRole("list", { name: /ITSO open reviews/ });
+
+    const held = cardOf("Smart Campus Energy Monitor");
+    expect(within(held).queryByRole("button", { name: /^Assign reviewer/ })).not.toBeInTheDocument();
+    const more = within(held).getByRole("button", { name: "More actions: Smart Campus Energy Monitor" });
+    expect(more).toHaveTextContent("More actions");
+    await userEvent.click(more);
+    expect(within(await screen.findByRole("menu")).getAllByRole("menuitem").map((i) => i.textContent))
+      .toEqual(["Reassign…", "Extend due date…"]);
+  });
+
+  it("draws no action area on a card the server offers nothing on", async () => {
+    atPhoneWidth();
+    office.mockResolvedValue(payload({ rows: [row({ actions: [] })] }));
+    show();
+    await screen.findByRole("list", { name: /ITSO open reviews/ });
+
+    expect(within(cardOf("Smart Campus Energy Monitor")).queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("stacks the clearances one per line only where a note is present", async () => {
+    atPhoneWidth();
+    const plain: ClearanceStripEntry = { party: "ktto", label: "KTTO", kind: "cleared", text: "Cleared", note: null, version: 2 };
+    office.mockResolvedValue(payload({
+      rows: [
+        row({ clearance_strip: [KEPT, RESET] }),
+        row({ key: "seat:2", record: 9, title: "Rainwater Harvesting Survey", clearance_strip: [plain] }),
+      ],
+    }));
+    show();
+    await screen.findByRole("list", { name: /ITSO open reviews/ });
+
+    const noted = within(cardOf("Smart Campus Energy Monitor")).getByRole("list", { name: "Clearances" });
+    const unnoted = within(cardOf("Rainwater Harvesting Survey")).getByRole("list", { name: "Clearances" });
+    expect(noted).toHaveClass("flex-col");
+    expect(unnoted).not.toHaveClass("flex-col");
+  });
+
+  it("stays free of blocking accessibility violations", async () => {
+    atPhoneWidth();
+    office.mockResolvedValue(payload({ rows: [row({ clearance_strip: [KEPT, RESET] }), POOL] }));
+    const { container } = show();
+    await screen.findByRole("list", { name: /ITSO open reviews/ });
+
+    await expectNoBlockingA11yViolations(container);
   });
 });

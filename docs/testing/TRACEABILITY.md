@@ -423,6 +423,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-1279** | A draft's row in My Library has a red trash can again, rightmost under its *Updated* date (the row itself continues the draft); the trash can asks once, in the *Delete this draft?* dialog, with no "⋯" menu before it — no FR- id | [details](traceability/IR-1279.md) | **IMPLEMENTED** |
 | **IR-1280** | An Ask IRIS or Paper Chat answer delivered after failed repairs keeps its Markdown: paragraph breaks, list nesting, fenced code and table rows survive the qualifying pass — no FR- id | [details](traceability/IR-1280.md) | **VERIFIED** |
 | **IR-1289** | The person who asked sees it decided live: a role request or role change tells that account `account` and its open app takes the new role (reopening its stream), and a Call's confirm, reject or removal tells its poster `calls`, refreshing My Calls and Calls and conferences — ADR-073 amendment 2026-11-23 (b) (Proposed); no FR- id | [details](traceability/IR-1289.md) | **PARTIAL** |
+| **IR-1291** | The office console shows each review as a stacked card below 768 px (title, authors and Version, reviewer and due date, status, clearances, one full-width action) and keeps its table from 768 px — no FR- id | [details](traceability/IR-1291.md) | **PARTIAL** |
 | NFR-U3 | Responsive at 360 px, no horizontal scroll | [details](traceability/NFR-U3.md) | **PARTIAL** |
 | NFR-A1 | WCAG 2.1 AA on interactive controls | [details](traceability/NFR-A1.md) | **PARTIAL** |
 

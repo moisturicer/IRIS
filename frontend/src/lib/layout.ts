@@ -13,7 +13,8 @@ import { useMediaQuery } from "@/hooks/useMediaQuery";
  * 256 px (IR-1276), `md` and `lg` are 768 and 1024 px); only behaviour that has to follow
  * a breakpoint reads the queries below, and they must match those classes.
  */
-const PHONE_QUERY = "(max-width: 767.98px)";
+/** Below Tailwind's `md`: also what a list reads to draw cards instead of a table (IR-1291). */
+export const PHONE_QUERY = "(max-width: 767.98px)";
 const TABLET_QUERY = "(min-width: 768px) and (max-width: 1023.98px)";
 
 export type SidebarMode = "drawer" | "rail" | "desktop";
