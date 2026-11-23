@@ -352,18 +352,18 @@ def _delete_unless_kept(upload) -> None:
 
     if deletion_refused_reason(upload) is not None or upload.reviews.exists():
         return
-    slot, storage, name = upload.slot, upload.file.storage, upload.file.name
+    slot, file = upload.slot, upload.file
     upload.delete()
     # An "Other" document's own slot goes with its last file.
     if slot.record_id is not None and not slot.uploads.exists():
         slot.delete()
-    transaction.on_commit(lambda: _delete_stored(storage, name))
+    transaction.on_commit(lambda: _delete_stored(file))
 
 
-def _delete_stored(storage, name) -> None:
+def _delete_stored(file) -> None:
     """Best-effort, after the row is gone: a failure leaves a file nobody reaches."""
     try:
-        storage.delete(name)
+        file.delete(save=False)
     except Exception:
         logger.exception("could not delete a removed requested document's file")
 

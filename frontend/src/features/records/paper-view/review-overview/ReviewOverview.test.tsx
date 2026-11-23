@@ -158,9 +158,9 @@ describe("the branches", () => {
     expect(node("IERC")).toHaveTextContent("Add the assent form.");
     expect(node("ITSO")).toHaveTextContent("Asked for a document");
 
-    await userEvent.click(screen.getByRole("button", { name: "Read IERC's request in Review" }));
+    await userEvent.click(screen.getByRole("button", { name: "Read in Review: IERC's request" }));
     expect(onOpenReview).toHaveBeenLastCalledWith({ tab: "conversation", party: "ierc" });
-    await userEvent.click(screen.getByRole("button", { name: "See what ITSO asked for in Review" }));
+    await userEvent.click(screen.getByRole("button", { name: "Read in Review: what ITSO asked for" }));
     expect(onOpenReview).toHaveBeenLastCalledWith({ tab: "documents", party: null });
     await userEvent.click(screen.getByRole("button", { name: "See review history" }));
     expect(onOpenReview).toHaveBeenLastCalledWith();

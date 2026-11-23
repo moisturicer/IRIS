@@ -1981,7 +1981,7 @@ describe("the Review section (IR-412)", () => {
       signInAs(OWNER_ID, "Student");
       renderPaper(`/records/${RECORD_ID}?section=overview`);
 
-      await userEvent.click(await screen.findByRole("button", { name: "Read IERC's request in Review" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Read in Review: IERC's request" }));
       expect(await screen.findByRole("tab", { name: "Conversation", selected: true })).toBeInTheDocument();
       const foot = screen.getByRole("contentinfo", { name: "Your actions" });
       expect(foot).toHaveTextContent("Nothing has changed since IERC asked for a revision.");

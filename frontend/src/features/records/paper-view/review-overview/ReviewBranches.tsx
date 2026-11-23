@@ -74,7 +74,7 @@ function Node({ node, onOpenReview }: { node: BranchNode; onOpenReview: (target:
           <button
             type="button"
             onClick={() => onOpenReview(targetOf(node.party, ask))}
-            aria-label={ask.kind === "revision" ? `Read ${node.label}'s request in Review` : `See what ${node.label} asked for in Review`}
+            aria-label={ask.kind === "revision" ? `Read in Review: ${node.label}'s request` : `Read in Review: what ${node.label} asked for`}
             className={cn("group/go mt-1 inline-flex min-h-11 reading-split:min-h-8 items-center gap-1.5 rounded-control text-small font-semibold text-brand hover:underline underline-offset-[3px]", COLOUR_TRANSITION, FOCUS_RING)}
           >
             Read in Review
