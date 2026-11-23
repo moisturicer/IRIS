@@ -1,14 +1,21 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
+import { Fragment, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 
-const ITEM_SELECTOR = '[role="menuitem"]';
+const ITEM_SELECTOR = '[role="menuitem"], [role="menuitemradio"]';
 
 export interface RowMenuItem {
   key: string;
   label: string;
   /** A destructive item: Binding Maroon Dark text with a warning glyph, never a filled button (audit CMP-01, DESIGN.md). */
   danger?: boolean;
+  /**
+   * One of a set of choices (My Library's Reading status, IR-1311): drawn as
+   * a `menuitemradio` with a check when on.
+   */
+  checked?: boolean;
+  /** A hairline above the item, to set a group of choices apart (IR-1311). */
+  separatorBefore?: boolean;
   onSelect: () => void;
 }
 
@@ -144,22 +151,27 @@ export function RowMenu({ label, items, compact = false, small = false, wide = f
           className="fixed z-40 min-w-44 rounded-card border border-stone-200 bg-overlay p-1 shadow-card-md"
         >
           {items.map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                closeToTrigger();
-                item.onSelect();
-              }}
-              className={cn(
-                "flex min-h-11 w-full items-center gap-2 rounded-control px-3 text-left text-sm hover:bg-stone-100 focus-visible:bg-stone-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand",
-                item.danger ? "text-brand-dark" : "text-stone-800",
-              )}
-            >
-              {item.danger && <i className="fas fa-triangle-exclamation shrink-0" aria-hidden />}
-              {item.label}
-            </button>
+            <Fragment key={item.key}>
+              {item.separatorBefore && <div role="separator" className="mx-2 my-1 border-t border-stone-200" />}
+              <button
+                type="button"
+                role={item.checked === undefined ? "menuitem" : "menuitemradio"}
+                aria-checked={item.checked}
+                onClick={() => {
+                  closeToTrigger();
+                  item.onSelect();
+                }}
+                className={cn(
+                  "flex min-h-11 w-full items-center gap-2 rounded-control px-3 text-left text-sm hover:bg-stone-100 focus-visible:bg-stone-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand",
+                  item.danger ? "text-brand-dark" : "text-stone-800",
+                  item.checked && "font-semibold text-stone-900",
+                )}
+              >
+                {item.danger && <i className="fas fa-triangle-exclamation shrink-0" aria-hidden />}
+                <span className="min-w-0 flex-1">{item.label}</span>
+                {item.checked && <i className="fas fa-check shrink-0 text-label" aria-hidden />}
+              </button>
+            </Fragment>
           ))}
         </div>,
         document.body,
