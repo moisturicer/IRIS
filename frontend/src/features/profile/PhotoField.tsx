@@ -1,10 +1,9 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
-import { profileApi } from "@/api/profile";
 import { FieldError } from "@/components/ui/FieldError";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_SECONDARY } from "@/components/ui/pillStyles";
-import { errorDetail } from "@/lib/errorDetail";
+import type { CropRect, ImageSize } from "@/lib/photoCrop";
 import { cn } from "@/lib/utils";
 import type { User } from "@/types/auth";
 
@@ -13,18 +12,29 @@ import { useAuthedImage } from "./useAuthedImage";
 
 const PHOTO_MAX_BYTES = 2 * 1024 * 1024;
 const PHOTO_TYPES = ["image/jpeg", "image/png"];
+const AVATAR = 80;
 
 /**
- * The profile photo in Settings (IR-699): shown as a circle, or the person's
- * initials when there is none. Choosing a file opens the crop dialog; the
- * photo saves when the crop is confirmed, and Remove photo takes it off.
+ * A photo change not yet saved: a newly framed photo, or taking the photo off.
+ * The Edit profile page holds it and sends it with Save, so Cancel drops it.
  */
-export function PhotoField({ user, onSaved }: { user: User; onSaved: (u: User) => void }) {
+export type PhotoChange =
+  | { kind: "upload"; file: File; crop: CropRect; image: ImageSize }
+  | { kind: "remove" };
+
+/**
+ * The profile photo on Edit profile (IR-699): shown as a circle, or the
+ * person's initials when there is none. Choosing a file opens the crop dialog;
+ * the framed photo, or Remove photo, is shown here at once but saved only
+ * with the page's Save.
+ */
+export function PhotoField({
+  user, change, onChange,
+}: { user: User; change: PhotoChange | null; onChange: (next: PhotoChange | null) => void }) {
   const inputId = useId();
   const [chosen, setChosen] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [removing, setRemoving] = useState(false);
-  const photoSrc = useAuthedImage(user.photo_url ?? null);
+  const savedSrc = useAuthedImage(user.photo_url ?? null);
 
   const choose = (file: File | undefined) => {
     setError(null);
@@ -36,26 +46,23 @@ export function PhotoField({ user, onSaved }: { user: User; onSaved: (u: User) =
     setChosen(file);
   };
 
-  const remove = async () => {
+  // Removing a photo framed but not saved just drops it, back to the saved one;
+  // removing the saved photo is a change of its own.
+  const remove = () => {
     setError(null);
-    setRemoving(true);
-    try {
-      await profileApi.removePhoto();
-      onSaved({ ...user, photo_url: null });
-    } catch (err) {
-      setError(errorDetail(err, "Could not remove your photo. Please try again."));
-    } finally {
-      setRemoving(false);
-    }
+    onChange(change?.kind === "upload" || !user.photo_url ? null : { kind: "remove" });
   };
 
+  const showsPhoto = change?.kind === "upload" || (!change && !!user.photo_url);
   const initials = `${user.first_name.charAt(0)}${user.last_name.charAt(0)}`.toUpperCase();
 
   return (
     <div className="flex items-center gap-4 flex-wrap">
-      {photoSrc ? (
+      {change?.kind === "upload" ? (
+        <FramedPreview change={change} />
+      ) : !change && savedSrc ? (
         <img
-          src={photoSrc}
+          src={savedSrc}
           alt="Your profile photo"
           className="w-20 h-20 rounded-full object-cover ring-1 ring-stone-200"
         />
@@ -86,15 +93,15 @@ export function PhotoField({ user, onSaved }: { user: User; onSaved: (u: User) =
               "peer-focus-visible:ring-2 peer-focus-visible:ring-brand peer-focus-visible:ring-offset-2",
             )}
           >
-            {user.photo_url ? "Change photo" : "Upload photo"}
+            {showsPhoto ? "Change photo" : "Upload photo"}
           </label>
-          {user.photo_url && (
-            <button type="button" onClick={remove} disabled={removing} className={cn(PILL_SECONDARY, FOCUS_RING)}>
-              {removing ? "Removing..." : "Remove photo"}
+          {showsPhoto && (
+            <button type="button" onClick={remove} className={cn(PILL_SECONDARY, FOCUS_RING)}>
+              Remove photo
             </button>
           )}
         </div>
-        <p className="text-small text-stone-600">JPEG or PNG, up to 2 MB. Saved as soon as you crop it.</p>
+        <p className="text-small text-stone-600">JPEG or PNG, up to 2 MB. Saved when you press Save.</p>
         {error && <div role="alert"><FieldError>{error}</FieldError></div>}
       </div>
 
@@ -102,9 +109,42 @@ export function PhotoField({ user, onSaved }: { user: User; onSaved: (u: User) =
         <PhotoCropDialog
           file={chosen}
           onClose={() => setChosen(null)}
-          onUploaded={(photoUrl) => { onSaved({ ...user, photo_url: photoUrl }); setChosen(null); }}
+          onCropped={(crop, image) => {
+            onChange({ kind: "upload", file: chosen, crop, image });
+            setChosen(null);
+          }}
         />
       )}
     </div>
+  );
+}
+
+/** The framed photo, before it is saved: the same square the server will cut. */
+function FramedPreview({ change }: { change: Extract<PhotoChange, { kind: "upload" }> }) {
+  const [src, setSrc] = useState<string | null>(null);
+
+  useEffect(() => {
+    const url = URL.createObjectURL(change.file);
+    setSrc(url);
+    return () => URL.revokeObjectURL(url);
+  }, [change.file]);
+
+  const scale = AVATAR / change.crop.size;
+  return (
+    <span className="relative w-20 h-20 rounded-full overflow-hidden ring-1 ring-stone-200 shrink-0">
+      {src && (
+        <img
+          src={src}
+          alt="Your profile photo"
+          draggable={false}
+          className="absolute left-0 top-0 max-w-none"
+          style={{
+            width: change.image.width * scale,
+            height: change.image.height * scale,
+            transform: `translate(${-change.crop.x * scale}px, ${-change.crop.y * scale}px)`,
+          }}
+        />
+      )}
+    </span>
   );
 }

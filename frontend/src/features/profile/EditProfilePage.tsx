@@ -16,7 +16,7 @@ import { errorDetail, fieldError } from "@/lib/errorDetail";
 import { cn } from "@/lib/utils";
 
 import { affiliationOf } from "./names";
-import { PhotoField } from "./PhotoField";
+import { PhotoField, type PhotoChange } from "./PhotoField";
 
 /**
  * Edit profile (IR-933): the name and the optional Profile fields (IR-699:
@@ -25,9 +25,10 @@ import { PhotoField } from "./PhotoField";
  * Profile shows neither as a field of its own.
  *
  * Every optional field may be left empty, which is how a person keeps it off
- * their Profile: there is no privacy switch. The photo saves as soon as it is
- * cropped. The name and the text fields save together with Save, as the two
- * requests the API takes, and Save and Cancel both return to the Profile.
+ * their Profile: there is no privacy switch. A new or removed photo is shown at
+ * once but, like the name and the text fields, saved only by Save, which sends
+ * each changed part as the request the API takes for it. Cancel drops every
+ * change, the photo included. Save and Cancel both return to the Profile.
  */
 
 const HINT = "text-small text-stone-600 mt-1";
@@ -44,6 +45,7 @@ export default function EditProfilePage() {
   const [interests, setInterests] = useState<string[]>(user?.research_interests ?? []);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [photoChange, setPhotoChange] = useState<PhotoChange | null>(null);
 
   const firstId = useId();
   const lastId = useId();
@@ -65,7 +67,7 @@ export default function EditProfilePage() {
   );
 
   if (!user) return null;
-  const dirty = nameDirty || fieldsDirty;
+  const dirty = nameDirty || fieldsDirty || !!photoChange;
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,12 +77,16 @@ export default function EditProfilePage() {
       return;
     }
     setSaving(true);
+    // Each request answers with the account as it now is; the photo request
+    // answers with its URL only, so it is laid onto the latest of those.
+    let latest = user;
     try {
       if (nameDirty) {
         const { data } = await authApi.updateMe({
           first_name: firstName.trim(),
           last_name: lastName.trim(),
         });
+        latest = data;
         updateUser(data);
       }
       if (fieldsDirty) {
@@ -88,12 +94,22 @@ export default function EditProfilePage() {
           bio,
           research_interests: interests,
         });
+        latest = data;
         updateUser(data);
+      }
+      if (photoChange?.kind === "upload") {
+        const { data } = await profileApi.uploadPhoto(photoChange.file, photoChange.crop);
+        updateUser({ ...latest, photo_url: data.photo_url });
+        setPhotoChange(null);
+      } else if (photoChange?.kind === "remove") {
+        await profileApi.removePhoto();
+        updateUser({ ...latest, photo_url: null });
+        setPhotoChange(null);
       }
       navigate(pathFor("profile"), { state: { saved: true } });
     } catch (err) {
       setError(
-        fieldError(err, "bio", "research_interests") ??
+        fieldError(err, "bio", "research_interests", "photo", "crop_x", "crop_y", "crop_size") ??
           errorDetail(err, "Could not save your profile. Please try again."),
       );
     } finally {
@@ -111,7 +127,7 @@ export default function EditProfilePage() {
       />
 
       <Section id={nameSectionId} title="Photo and name" caption="Your name is attached to disclosures, paper citations and clearances.">
-        <PhotoField user={user} onSaved={updateUser} />
+        <PhotoField user={user} change={photoChange} onChange={setPhotoChange} />
 
         <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-1">

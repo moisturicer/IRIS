@@ -1,15 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 
-import { profileApi } from "@/api/profile";
 import { Modal } from "@/components/ui/Modal";
-import { FieldError } from "@/components/ui/FieldError";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
-import { errorDetail, fieldError } from "@/lib/errorDetail";
 import { cn } from "@/lib/utils";
 import {
   centredView, cropFromView, MAX_ZOOM, MIN_ZOOM, panView, scaleFor, zoomView,
-  type CropView, type ImageSize,
+  type CropRect, type CropView, type ImageSize,
 } from "@/lib/photoCrop";
 
 /** The square the photo is framed in, in screen pixels. */
@@ -18,21 +15,21 @@ const STAGE = 256;
 const STEP = 10;
 
 /**
- * Frame a chosen photo inside a circle, then upload it (IR-699).
+ * Frame a chosen photo inside a circle (IR-699). Confirming hands the framing
+ * back to the Edit profile page, which uploads it only when Save is pressed,
+ * so Cancel on that page leaves the old photo in place.
  *
  * The circle is the preview: what shows inside it is what the Profile will
  * show. The person drags the photo or moves it with the arrow keys, and zooms
- * with the slider. What is uploaded is the original file plus the framed
+ * with the slider. What is later uploaded is the original file plus the framed
  * square in its own pixels; the server does the cutting (IR-695).
  */
 export function PhotoCropDialog({
-  file, onClose, onUploaded,
-}: { file: File; onClose: () => void; onUploaded: (photoUrl: string) => void }) {
+  file, onClose, onCropped,
+}: { file: File; onClose: () => void; onCropped: (crop: CropRect, image: ImageSize) => void }) {
   const [src, setSrc] = useState<string | null>(null);
   const [image, setImage] = useState<ImageSize | null>(null);
   const [view, setView] = useState<CropView>({ zoom: 1, offsetX: 0, offsetY: 0 });
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const drag = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
@@ -58,20 +55,8 @@ export function PhotoCropDialog({
     pan(...move);
   };
 
-  const upload = async () => {
-    if (!image) return;
-    setError(null);
-    setUploading(true);
-    try {
-      const { data } = await profileApi.uploadPhoto(file, cropFromView(image, STAGE, view));
-      onUploaded(data.photo_url);
-    } catch (err) {
-      setError(
-        fieldError(err, "photo", "crop_x", "crop_y", "crop_size") ??
-          errorDetail(err, "Could not upload your photo. Please try again."),
-      );
-      setUploading(false);
-    }
+  const confirm = () => {
+    if (image) onCropped(cropFromView(image, STAGE, view), image);
   };
 
   return (
@@ -83,8 +68,8 @@ export function PhotoCropDialog({
       footer={
         <div className="flex justify-end gap-2">
           <button type="button" onClick={onClose} className={cn(PILL_SECONDARY, FOCUS_RING)}>Cancel</button>
-          <button type="button" onClick={upload} disabled={!image || uploading} className={cn(PILL_PRIMARY, FOCUS_RING)}>
-            {uploading ? "Uploading..." : "Use photo"}
+          <button type="button" onClick={confirm} disabled={!image} className={cn(PILL_PRIMARY, FOCUS_RING)}>
+            Use photo
           </button>
         </div>
       }
@@ -154,8 +139,6 @@ export function PhotoCropDialog({
           />
           <i className="fas fa-magnifying-glass-plus text-label" aria-hidden />
         </label>
-
-        {error && <div role="alert" className="self-start"><FieldError>{error}</FieldError></div>}
       </div>
     </Modal>
   );
