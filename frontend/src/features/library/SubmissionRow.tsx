@@ -17,7 +17,7 @@ import type { MyResearchItem } from "@/types/records";
  * Where the row itself leads: a draft opens Publish over this page, since a
  * draft has no paper page (IR-1227) and going through one would leave My
  * Library (IR-1258); anything else opens Paper View. The whole row is that
- * link, so it carries no separate "Continue draft" or "Open review" button.
+ * link (IR-1261), so it carries no "Continue draft" or "Open review" button.
  */
 function rowHref(item: MyResearchItem, publishHref: (target: number) => string) {
   return item.pipeline_status === "draft" ? publishHref(item.id) : `/records/${item.id}`;
@@ -61,7 +61,7 @@ interface SubmissionRowProps {
 /**
  * One of the owner's records as a row in a ruled list (IR-410). The title is
  * the row's one link, stretched over the row, so a click anywhere opens it
- * (`rowHref`); only the actions and a draft's "⋯" menu sit above it. The
+ * (`rowHref`); only the actions and a draft's trash can sit above it. The
  * status words are the server's (`submitter_status.line`); the sentence under
  * the title says what the record waits on (`waitingOn`, IR-1084).
  */
@@ -85,8 +85,7 @@ export function SubmissionRow({ item, brief = false, onDeleted }: SubmissionRowP
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-col gap-x-6 gap-y-2 md:flex-row md:items-start md:justify-between">
-          {/* Room on a narrow screen for the "⋯" pinned to the corner. */}
-          <div className={cn("min-w-0", deletable && "pr-10 md:pr-0")}>
+          <div className="min-w-0">
             <p className="text-label text-stone-600">{item.record_type_name ?? "Research"}</p>
             <h3 className="mt-0.5 font-display text-title font-semibold leading-snug text-stone-900">
               <Link
@@ -108,10 +107,12 @@ export function SubmissionRow({ item, brief = false, onDeleted }: SubmissionRowP
           <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 md:flex-col md:items-end">
             <StatusBadge state={item.workflow_state} label={item.submitter_status.line} />
             <span className="text-label tabular-nums text-stone-500">Updated {formatDate(item.updated_at)}</span>
-            {/* Under the date beside the chevron; in the row's top corner on a
-                narrow screen, where the chevron is hidden and the line wraps. */}
+            {/* The trash can alone, rightmost under the date and level with the
+                people line (IR-1279); the row itself continues the draft. Above
+                the row's link, so a press deletes rather than opens. The
+                negative margin lines its icon up with the date's right edge. */}
             {deletable && (
-              <div className="absolute right-2 top-2 z-10 md:relative md:right-auto md:top-auto md:-mr-1.5">
+              <div className="relative z-10 -mr-2 ml-auto md:ml-0">
                 <DeleteDraft recordId={item.id} title={item.title} onDeleted={onDeleted} />
               </div>
             )}
