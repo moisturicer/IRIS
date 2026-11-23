@@ -9,7 +9,8 @@ import { cn } from "@/lib/utils";
 import type { TourStep } from "./tourSteps";
 
 const MARGIN = 12;
-const CARD_WIDTH = 320;
+// Wide enough for a step's list of controls (IR-1309); a long step scrolls inside the card.
+const CARD_WIDTH = 360;
 
 interface Box { top: number; left: number; width: number; height: number }
 
@@ -125,13 +126,13 @@ export function GuidedTour({ steps, opener, onClose }: GuidedTourProps) {
       )}
       <div ref={panel} role="dialog" aria-label="Review workspace tour" tabIndex={-1}
         className="fixed z-[61] rounded-card bg-white ring-1 ring-stone-200 shadow-card-md p-4 text-stone-700"
-        style={{ top: place.top, left: place.left, width: place.width }}>
+        style={{ top: place.top, left: place.left, width: place.width, maxHeight: `calc(100vh - ${MARGIN * 2}px)`, overflowY: "auto" }}>
         <div aria-live="polite">
           <p className="text-2xs font-semibold text-stone-600">Step {at + 1} of {usable.length}</p>
           <h2 className="font-display text-lg font-semibold text-stone-900 mt-1">{step.title}</h2>
           <p className="mt-1.5 text-small">{step.body}</p>
           {step.items && (
-            <ul className="mt-2 space-y-1 text-small">
+            <ul className="mt-2 space-y-1.5 text-small">
               {step.items.map((item) => (
                 <li key={item.name}><strong className="font-semibold text-stone-900">{item.name}</strong>{" "}{item.text}</li>
               ))}

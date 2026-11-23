@@ -344,7 +344,7 @@ export function ReviewWorkspaceLayout({
     <div role="group" aria-label="Guided tour"
       className="flex w-full flex-wrap items-center gap-x-4 gap-y-2 rounded-control border border-stone-300 bg-white px-4 py-3">
       <p className="min-w-0 flex-1 basis-56 text-small text-stone-800">
-        New to the review workspace? A four-step tour shows where everything is.
+        New to the review workspace? A guided tour shows what each part is for and how a review goes, step by step.
       </p>
       <div className="ml-auto flex shrink-0 items-center gap-1">
         <button type="button" className={cn("review-control px-3 font-semibold text-stone-700 hover:text-stone-900", FOCUS_RING)}
@@ -500,7 +500,7 @@ export function ReviewWorkspaceLayout({
           aria-hidden={drawer && !open || undefined} {...(drawer && !open ? { inert: "" } : {})}
           className={cn("review-pane", open && "review-pane-open")}>
           {!drawer && reader && edge("mid", "Resize the review pane")}
-          <header className="review-pane-head">
+          <header id={target.head} className="review-pane-head">
             <div className="-mr-2 flex items-center gap-1">
               <h2 className="mr-auto font-display text-xl font-semibold text-stone-900">Review</h2>
               {!authorView && <button ref={tourButton} type="button"
@@ -532,7 +532,7 @@ export function ReviewWorkspaceLayout({
                 document.getElementById(`${ids}-tab-${next}`)?.focus();
               }}>
                 {tabs.map((name) => (
-                  <button key={name} type="button" role="tab" id={`${ids}-tab-${name}`}
+                  <button key={name} type="button" role="tab" id={target.tab(name)}
                     aria-selected={shown === name} aria-controls={`${ids}-${name}`} tabIndex={shown === name ? 0 : -1}
                     aria-describedby={name === "conversation" && commentCount > 0 ? `${ids}-comment-count` : undefined}
                     onClick={() => setTab(name)} className={cn("review-tab", FOCUS_RING)}>
@@ -548,7 +548,7 @@ export function ReviewWorkspaceLayout({
                   {commentCount} comment{commentCount === 1 ? "" : "s"}
                 </span>
               )}
-              {roomy && <TabBesideMenu choices={tabs.map((t) => ({ id: t, label: TAB_NAMES[t] }))}
+              {roomy && <TabBesideMenu buttonId={target.beside} choices={tabs.map((t) => ({ id: t, label: TAB_NAMES[t] }))}
                 onChoose={chooseSide} />}
             </div>
           </header>
@@ -580,7 +580,7 @@ export function ReviewWorkspaceLayout({
           )}
         </section>
         {sideTab && (
-          <aside aria-label={`${TAB_NAMES[sideTab]} on the right`} className="review-side">
+          <aside id={target.side} aria-label={`${TAB_NAMES[sideTab]} on the right`} className="review-side">
             {edge("side", "Resize the right column")}
             <header className="review-side-head">
               <h2 className="font-display text-xl font-semibold text-stone-900">{TAB_NAMES[sideTab]}</h2>
@@ -612,7 +612,9 @@ export function ReviewWorkspaceLayout({
         {tour && (
           <GuidedTour opener={tour.opener} onClose={closeTour}
             steps={reviewTourSteps({ ids, hasPaper: Boolean(reader), drawer, paneOpen: open,
-              tabs: allTabs.filter((t): t is TourTab => t !== "readiness"), beside: roomy })} />
+              tabs: allTabs.filter((t): t is TourTab => t !== "readiness"), beside: roomy,
+              sideTab: sideTab === "readiness" ? null : sideTab, canStart: can.has("start_thread"),
+              canComment: can.has("comment_review"), drafting: finishing })} />
         )}
       </div>
     </div>
