@@ -131,7 +131,11 @@ export function PaperDownloadControl({
         onClick={() => setAsking(true)}
         aria-describedby={descriptions || undefined}
         title={download.message}
-        className={CONTROL_SIZE}
+        // 16px a side and a 6px icon gap, as Request again in My Library
+        // (IR-1302). With no tailwind-merge the stylesheet's order decides:
+        // px-4 is emitted after `sm`'s px-3, and gap-x-1.5 after its gap-2
+        // (plain gap-1.5 comes before gap-2 and would lose).
+        className={cn(CONTROL_SIZE, "px-4 gap-x-1.5")}
       >
         <i className="fas fa-download" aria-hidden />
         {ended ? "Request again" : "Request download"}
