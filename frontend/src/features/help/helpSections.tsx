@@ -278,8 +278,9 @@ export const HELP_SECTIONS: HelpSection[] = [
       <>
         <p>
           The menu under your name has two pages. <strong>Profile</strong> is what other people signed in to
-          IRIS see of you, and where you edit it. <strong>Settings</strong> holds your account and security,
-          data privacy and consent, and your role.
+          IRIS see of you. <strong>Settings</strong> is where you change it, in its <strong>Profile</strong> section
+          (your photo, name, bio and research interests), and where your account and security, data privacy and
+          consent, and your role are.
         </p>
         <p>
           Notifications arrive under the bell at the top of the sidebar; <strong>View all

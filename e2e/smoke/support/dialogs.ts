@@ -404,7 +404,7 @@ export const DIALOGS: DialogCase[] = [
     open: press(/^Delete draft/), dialog: anyDialog,
   },
   {
-    id: "crop a profile photo", screen: "profile-edit", sources: ["features/profile/PhotoCropDialog.tsx"],
+    id: "crop a profile photo", screen: "profile-settings", sources: ["features/profile/PhotoCropDialog.tsx"],
     open: async (page) => {
       await page.locator('input[type="file"]').first().setInputFiles({ name: "me.png", mimeType: "image/png", buffer: PNG });
     },
