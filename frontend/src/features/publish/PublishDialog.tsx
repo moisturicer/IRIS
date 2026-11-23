@@ -25,6 +25,12 @@
  * its id, so a reload resumes rather than starting over. Closing clears the
  * parameter, keeps the draft and leaves the reader on that page.
  *
+ * **Every way out asks** (IR-1312): Close, Escape and the backdrop, and also
+ * Back/Forward or any navigation that drops `?publish=` (`useBlocker`), ask
+ * the same question about the work. Reload or closing the tab gets the
+ * browser's own warning while something would be lost, and Keep as draft
+ * saves pending Details before it leaves.
+ *
  * It decides no workflow. The type list is the server's, the author picks no
  * office (the hints are hints; see `metadataPayload`), and the confirmation
  * names whoever the server says holds the record now.
@@ -32,7 +38,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useSearchParams } from "react-router-dom";
+import { useBlocker, useSearchParams } from "react-router-dom";
 
 import { accountsApi } from "@/api/accounts";
 import { documentsApi } from "@/api/documents";
@@ -175,6 +181,27 @@ function PublishUnavailable({ onClose }: { onClose: () => void }) {
 type Closing = "upload" | "leave" | "discard";
 
 /**
+ * Where Keep as draft stands (IR-1312): saving first, or why it stopped.
+ * `incomplete` is a field the save leaves out, which waits for Continue.
+ */
+type Keeping = "idle" | "saving" | "failed" | "conflict" | "incomplete";
+
+const LEAVE_BODY: Record<Keeping, string> = {
+  idle: "Your answers are saved as a draft. You can finish it later from My submissions.",
+  saving: "Saving your latest changes…",
+  failed: "Your latest changes weren't saved.",
+  conflict: "This draft was changed somewhere else, so your latest changes weren't saved.",
+  incomplete: "Some answers aren't saved yet: Continue saves them, or shows what needs fixing.",
+};
+
+/** Whether react-hook-form marks a field, or any part of a list or group field, as changed. */
+function isDirtyEntry(entry: unknown): boolean {
+  if (Array.isArray(entry)) return entry.some(isDirtyEntry);
+  if (entry != null && typeof entry === "object") return Object.values(entry).some(isDirtyEntry);
+  return entry === true;
+}
+
+/**
  * One question about closing, in a popup over the form: an `alertdialog` named
  * by its title and described by its body. Escape, the backdrop and Close all
  * answer "keep going" (`onDismiss`), never a destructive choice.
@@ -285,6 +312,8 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
 
   // Details saves itself while it is shown, unless a save met a newer draft.
   const watched = form.watch();
+  // Read in render so react-hook-form tracks it; `changedButUnsaved` reads it later.
+  void form.formState.dirtyFields;
   const complete = completeBody(watched, decisions, listsFailed);
   const invalid = new Set((schema.safeParse(watched).error?.issues ?? []).map((issue) => String(issue.path[0])));
   const autosaveBody = Object.fromEntries(
@@ -321,6 +350,13 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
   const [matchFailure, setMatchFailure] = useState("");
   // The question closing asks, if any (IR-1227, ADR-009 decision 6).
   const [closing, setClosing] = useState<Closing | null>(null);
+  const [keeping, setKeeping] = useState<Keeping>("idle");
+  // Bumped whenever the author stays, so a Keep as draft save that ends
+  // afterwards does not close the form under them.
+  const keepAttempt = useRef(0);
+  // Set just before Publish closes itself, which is a navigation too, so the
+  // blocker below lets it through rather than asking a second time.
+  const leavingRef = useRef(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -763,19 +799,113 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
    * saved draft, keep it or delete it; or discard a type chosen before any
    * manuscript, when nothing is saved yet. With nothing entered it just closes.
    */
+  function closingQuestion(): Closing | null {
+    if (phase.kind !== "form") return null;
+    if (upload.status === "uploading") return "upload";
+    if (draftIdRef.current != null) return "leave";
+    if (typeId != null) return "discard";
+    return null;
+  }
+  // Read by the blocker, which the router calls outside a render.
+  const closingQuestionRef = useRef(closingQuestion);
+  closingQuestionRef.current = closingQuestion;
+
   function requestClose() {
     if (closing) return;
-    if (phase.kind !== "form") onClose();
-    else if (upload.status === "uploading") setClosing("upload");
-    else if (draftIdRef.current != null) setClosing("leave");
-    else if (typeId != null) setClosing("discard");
-    else onClose();
+    const question = closingQuestion();
+    if (question) setClosing(question);
+    else leave();
+  }
+
+  /**
+   * Back/Forward, or any navigation that drops `?publish=`, asks the same
+   * question Close would (IR-1312). Publish's own navigations keep the
+   * parameter (creating the draft, Publish another) or set `leavingRef`.
+   */
+  const blocker = useBlocker(({ nextLocation }) =>
+    !leavingRef.current
+    && closingQuestionRef.current() != null
+    && !new URLSearchParams(nextLocation.search).has(PUBLISH_PARAM),
+  );
+  const blocked = blocker.state === "blocked";
+  useEffect(() => {
+    if (!blocked) return;
+    const question = closingQuestionRef.current();
+    if (question) setClosing((current) => current ?? question);
+    else blocker.proceed?.();
+  }, [blocked, blocker]);
+
+  /** Leave: by the navigation that was held, or by closing. */
+  function leave() {
+    if (blocker.state === "blocked") {
+      blocker.proceed();
+      return;
+    }
+    leavingRef.current = true;
+    onClose();
+  }
+
+  /** Stay on the form: answer the question, and let go of a held navigation. */
+  function stay() {
+    keepAttempt.current += 1;
+    if (blocker.state === "blocked") blocker.reset();
+    setClosing(null);
+    setKeeping("idle");
   }
 
   function stopAndClose() {
     abortRef.current?.abort();
-    onClose();
+    leave();
   }
+
+  /**
+   * Keep as draft saves pending Details first (IR-1312): the autosave waits
+   * for a pause, so the last edits may not be on the server yet.
+   */
+  async function keepAsDraft() {
+    if (step !== 2) {
+      leave();
+      return;
+    }
+    const attemptNo = ++keepAttempt.current;
+    setKeeping("saving");
+    const ok = await autosave.saveNow();
+    if (attemptNo !== keepAttempt.current) return;
+    if (!ok) setKeeping(autosave.isConflicted() ? "conflict" : "failed");
+    else if (changedButUnsaved().length > 0) setKeeping("incomplete");
+    else leave();
+  }
+
+  /**
+   * The Details fields the author changed that the server does not hold:
+   * an edit still waiting for the pause, or one the save leaves for Continue.
+   * A field never touched is not counted, though a new draft's empty abstract
+   * never reaches the server either.
+   */
+  function changedButUnsaved(): string[] {
+    const dirty = form.formState.dirtyFields as Record<string, unknown>;
+    return autosave.unsavedFields().filter((key) => isDirtyEntry(dirty[FORM_FIELD[key] ?? key]));
+  }
+
+  // Reload or closing the tab: the browser's own warning, while something
+  // would be lost (IR-1312). Its text is the browser's and can't be changed.
+  const detailsAtRisk = draftId != null && step === 2 && (
+    autosave.status === "saving" || autosave.status === "failed" || changedButUnsaved().length > 0
+  );
+  const wouldLose = phase.kind === "form" && (
+    upload.status === "uploading"
+    || (draftId == null && typeId != null)
+    || detailsAtRisk
+  );
+  useEffect(() => {
+    if (!wouldLose) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [wouldLose]);
 
   /** Asked over the form, as My Library asks (IR-1256); Cancel returns to "Leave this submission?". */
   function askToDelete() {
@@ -791,7 +921,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
     setDeleteError(null);
     try {
       await recordsApi.delete(id);
-      onClose();
+      leave();
     } catch (err) {
       setDeleteError(describeFailure(err, "Could not delete this draft. Try again.").message);
       setDeleting(false);
@@ -1091,12 +1221,12 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
       open={closing === "upload"}
       title="Stop the upload and close?"
       body="Your draft is kept, but the file has not finished uploading. You can add it when you come back."
-      onDismiss={() => setClosing(null)}
+      onDismiss={stay}
     >
       <Button type="button" variant="outline" size="md" onClick={stopAndClose}>
         Stop and close
       </Button>
-      <Button type="button" size="md" ref={closeDefaultRef} onClick={() => setClosing(null)}>
+      <Button type="button" size="md" ref={closeDefaultRef} onClick={stay}>
         Keep uploading
       </Button>
     </CloseQuestion>
@@ -1105,30 +1235,52 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
       open={closing === "leave" && !confirmingDelete}
       size="md"
       title="Leave this submission?"
-      body="Your answers are saved as a draft. You can finish it later from My submissions."
-      onDismiss={() => setClosing(null)}
+      body={LEAVE_BODY[keeping]}
+      onDismiss={stay}
     >
-      <Button type="button" variant="ghost" size="md" onClick={() => setClosing(null)}>
-        Keep editing
-      </Button>
-      <Button type="button" variant="outline" size="md" onClick={askToDelete}>
-        Delete draft
-      </Button>
-      <Button type="button" size="md" ref={closeDefaultRef} onClick={onClose}>
-        Keep as draft
-      </Button>
+      {keeping === "failed" ? (
+        <>
+          <Button type="button" variant="outline" size="md" onClick={leave}>
+            Leave without saving
+          </Button>
+          <Button type="button" size="md" ref={closeDefaultRef} onClick={() => void keepAsDraft()}>
+            Try again
+          </Button>
+        </>
+      ) : keeping === "conflict" || keeping === "incomplete" ? (
+        <>
+          <Button type="button" variant="outline" size="md" onClick={leave}>
+            {keeping === "conflict" ? "Leave without saving" : "Leave without them"}
+          </Button>
+          <Button type="button" size="md" ref={closeDefaultRef} onClick={stay}>
+            Keep editing
+          </Button>
+        </>
+      ) : (
+        <>
+          <Button type="button" variant="ghost" size="md" onClick={stay} disabled={keeping === "saving"}>
+            Keep editing
+          </Button>
+          <Button type="button" variant="outline" size="md" onClick={askToDelete} disabled={keeping === "saving"}>
+            Delete draft
+          </Button>
+          <Button type="button" size="md" ref={closeDefaultRef} loading={keeping === "saving"} onClick={() => void keepAsDraft()}>
+            Keep as draft
+          </Button>
+        </>
+      )}
     </CloseQuestion>
 
     <CloseQuestion
       open={closing === "discard"}
       title="Discard what you've entered?"
       body="Nothing is saved until your manuscript is uploaded."
-      onDismiss={() => setClosing(null)}
+      onDismiss={stay}
     >
-      <Button type="button" variant="outline" size="md" onClick={onClose}>
+      <Button type="button" variant="outline" size="md" onClick={leave}>
         Discard
       </Button>
-      <Button type="button" size="md" ref={closeDefaultRef} onClick={() => setClosing(null)}>
+      <Button type="button" size="md" ref={closeDefaultRef} onClick={stay}>
         Keep editing
       </Button>
     </CloseQuestion>
