@@ -9,7 +9,6 @@ import { OVERVIEW_MARKDOWN } from "@/features/ai/components/answerLayout";
 import { DegradedNotice } from "@/features/ai/components/PassageQuote";
 import { cn } from "@/lib/utils";
 import { CONTROL_BASE } from "./controls";
-import { SectionHeading } from "./headings";
 import { OverviewNote } from "./OverviewNote";
 
 /**
@@ -93,16 +92,17 @@ export function PaperAiOverview({ record }: { record: RecordDetail }) {
   };
 
   return (
-    // On the page, like the Abstract above it: a heading and the text, with no
-    // card around it (IR-569).
-    <section>
-      <div className="flex items-baseline justify-between gap-3">
-        <SectionHeading>
-          <span className="inline-flex items-center gap-2">
-            <AskIrisMark className="w-4 h-4 text-brand" />
-            AI Overview
+    // In its own container (IR-1306, reversing IR-569's "no card"): a reader
+    // should know at a glance that this text was written by AI, not by the authors.
+    <section aria-labelledby="ai-overview-heading"
+      className="overflow-hidden rounded-card border border-stone-200 bg-stone-50/70">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-stone-200 bg-surface px-5 py-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
+          <span aria-hidden className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-brand text-white">
+            <AskIrisMark className="size-4" />
           </span>
-        </SectionHeading>
+          <h2 id="ai-overview-heading" className="font-display text-section font-semibold text-stone-900">AI Overview</h2>
+        </div>
         {state === "ready" && overview && (
           <button type="button" onClick={() => void copy()} className={cn("px-2.5 font-medium text-stone-500 hover:bg-stone-100 hover:text-stone-800", CONTROL_BASE)}>
             <i
@@ -117,6 +117,7 @@ export function PaperAiOverview({ record }: { record: RecordDetail }) {
         )}
       </div>
 
+      <div className="px-5 py-5">
       {loading && (
         <div>
           <p className="flex items-center gap-2 text-xs text-stone-500 mb-3">
@@ -219,6 +220,12 @@ export function PaperAiOverview({ record }: { record: RecordDetail }) {
             </p>
           )}
         </>
+      )}
+      </div>
+      {state === "ready" && overview && (
+        <p className="border-t border-stone-200 px-5 py-2.5 text-small text-stone-600">
+          Written by AI from this paper&rsquo;s text. Check important details against the cited pages.
+        </p>
       )}
     </section>
   );

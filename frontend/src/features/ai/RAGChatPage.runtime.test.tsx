@@ -212,13 +212,14 @@ describe("conversations Django answered before the switch (IR-957)", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("This conversation is not available.");
   });
 
-  it("lists them under a new conversation, each linking to its own address", async () => {
+  // IR-1306 removed their list from the conversations pane; each still opens at its own address.
+  it("are no longer listed in the conversations pane", async () => {
     route = (config) => (config.url === "/ai/conversations/" ? { data: [earlier] } : runtime(config));
-    const user = userEvent.setup();
     renderAsk("/ai");
 
-    await user.click(await screen.findByText("Earlier conversations (1)"));
-    expect(screen.getByRole("link", { name: "Gauges" })).toHaveAttribute("href", "/ai/conversations/12");
+    expect(await screen.findByRole("button", { name: "New conversation" })).toBeInTheDocument();
+    expect(screen.queryByText(/Earlier conversations/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Gauges" })).not.toBeInTheDocument();
   });
 });
 

@@ -92,7 +92,6 @@ export function LibraryOverview({
                     <span className="sr-only"> {waiting.length === 1 ? "record" : "records"}</span>
                   </span>
                 </div>
-                <p className="text-small text-brand-dark">A reviewer needs something from you before review can go on.</p>
               </div>
             </div>
             {waiting.length > WAITING_SHOWN && (
