@@ -97,6 +97,15 @@ class RecordType(models.Model):
         upload_to=manuscript_template_path, blank=True, default="",
     )
     manuscript_template_name = models.CharField(max_length=255, blank=True, default="")
+    #: Where the type sits in every list of types (IR-1277). Without it the
+    #: database returned them in storage order, and saving a type on Setup
+    #: moved it to the end. Proposal, Thesis / Research and Project are 1-3;
+    #: any other type comes after them, oldest first.
+    position = models.PositiveSmallIntegerField(default=100)
+
+    class Meta:
+        ordering = ["position", "id"]
+
     def __str__(self): return self.name
 
 
