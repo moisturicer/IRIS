@@ -38,7 +38,7 @@ import { accountsApi } from "@/api/accounts";
 import { documentsApi } from "@/api/documents";
 import { recordsApi, type ManuscriptMatch } from "@/api/records";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { Modal } from "@/components/ui/Modal";
+import { Modal, type ModalSize } from "@/components/ui/Modal";
 import { LOAD_ERROR } from "@/components/ui/fieldClasses";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { canAuthor } from "@/lib/access";
@@ -175,25 +175,26 @@ function PublishUnavailable({ onClose }: { onClose: () => void }) {
 type Closing = "upload" | "leave" | "discard";
 
 /**
- * One question about closing, inline above the form while it waits: an
- * `alertdialog` named by its title and described by its body.
+ * One question about closing, in a popup over the form: an `alertdialog` named
+ * by its title and described by its body. Escape, the backdrop and Close all
+ * answer "keep going" (`onDismiss`), never a destructive choice.
  */
-function CloseQuestion({ title, body, error, children }: {
-  title: string; body: string; error?: string | null; children: ReactNode;
+function CloseQuestion({ open, title, body, onDismiss, size = "sm", children }: {
+  open: boolean; title: string; body: string; onDismiss: () => void; size?: ModalSize; children: ReactNode;
 }) {
-  const id = useId();
+  const bodyId = useId();
   return (
-    <div
+    <Modal
+      open={open}
+      onClose={onDismiss}
+      title={title}
+      size={size}
       role="alertdialog"
-      aria-labelledby={`${id}-title`}
-      aria-describedby={`${id}-body`}
-      className="mb-section rounded-card border border-stone-300 bg-stone-50 p-card-compact"
+      describedBy={bodyId}
+      footer={<div className="flex flex-nowrap justify-end gap-2 whitespace-nowrap">{children}</div>}
     >
-      <p id={`${id}-title`} className="text-body font-medium text-stone-900">{title}</p>
-      <p id={`${id}-body`} className="mt-1 text-small text-stone-600">{body}</p>
-      {error && <p role="alert" className="mt-2 text-small text-brand">{error}</p>}
-      <div className="mt-3 flex flex-wrap gap-2">{children}</div>
-    </div>
+      <p id={bodyId} className="text-body text-stone-600">{body}</p>
+    </Modal>
   );
 }
 
@@ -325,9 +326,10 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
   const [deleteError, setDeleteError] = useState<string | null>(null);
   // Escape or Close put a question on screen; focus goes to its default, once.
   const closeDefaultRef = useRef<HTMLButtonElement>(null);
+  // Again when "Delete this draft?" is cancelled and the leave question returns.
   useEffect(() => {
-    if (closing) closeDefaultRef.current?.focus();
-  }, [closing]);
+    if (closing && !confirmingDelete) closeDefaultRef.current?.focus();
+  }, [closing, confirmingDelete]);
   const [announcement, setAnnouncement] = useState("");
 
   /* ── Load the lists, then the draft if one was named ─────────────────── */
@@ -850,7 +852,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
   };
 
   let footer: ReactNode = null;
-  if (phase.kind === "form" && !closing) {
+  if (phase.kind === "form") {
     footer = (
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-small text-stone-600">
@@ -915,48 +917,6 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
       <span role="status" className="sr-only">
         {announcement}
       </span>
-
-      {closing === "upload" && (
-        <CloseQuestion
-          title="Stop the upload and close?"
-          body="Your draft is kept, but the file has not finished uploading. You can add it when you come back."
-        >
-          <Button type="button" size="page" ref={closeDefaultRef} onClick={() => setClosing(null)}>
-            Keep uploading
-          </Button>
-          <Button type="button" variant="outline" size="page" onClick={stopAndClose}>
-            Stop and close
-          </Button>
-        </CloseQuestion>
-      )}
-
-      {closing === "leave" && (
-        <CloseQuestion
-          title="Leave this submission?"
-          body="Your answers are saved as a draft. You can finish it later from My submissions."
-        >
-          <Button type="button" size="page" ref={closeDefaultRef} onClick={onClose}>
-            Keep as draft
-          </Button>
-          <Button type="button" variant="outline" size="page" onClick={askToDelete}>
-            Delete draft
-          </Button>
-          <Button type="button" variant="ghost" size="page" onClick={() => setClosing(null)}>
-            Keep editing
-          </Button>
-        </CloseQuestion>
-      )}
-
-      {closing === "discard" && (
-        <CloseQuestion title="Discard what you've entered?" body="Nothing is saved until your manuscript is uploaded.">
-          <Button type="button" size="page" ref={closeDefaultRef} onClick={() => setClosing(null)}>
-            Keep editing
-          </Button>
-          <Button type="button" variant="outline" size="page" onClick={onClose}>
-            Discard
-          </Button>
-        </CloseQuestion>
-      )}
 
       {phase.kind === "loading" && (
         <p className="flex items-center gap-2 py-section text-body text-stone-600" role="status">
@@ -1124,6 +1084,55 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
         </>
       )}
     </Modal>
+    {/* The closing questions are popups over the form, not inside it. Only one is
+        up at a time: "Leave this submission?" steps aside while "Delete this
+        draft?" is asked, and returns if that is cancelled. */}
+    <CloseQuestion
+      open={closing === "upload"}
+      title="Stop the upload and close?"
+      body="Your draft is kept, but the file has not finished uploading. You can add it when you come back."
+      onDismiss={() => setClosing(null)}
+    >
+      <Button type="button" variant="outline" size="md" onClick={stopAndClose}>
+        Stop and close
+      </Button>
+      <Button type="button" size="md" ref={closeDefaultRef} onClick={() => setClosing(null)}>
+        Keep uploading
+      </Button>
+    </CloseQuestion>
+
+    <CloseQuestion
+      open={closing === "leave" && !confirmingDelete}
+      size="md"
+      title="Leave this submission?"
+      body="Your answers are saved as a draft. You can finish it later from My submissions."
+      onDismiss={() => setClosing(null)}
+    >
+      <Button type="button" variant="ghost" size="md" onClick={() => setClosing(null)}>
+        Keep editing
+      </Button>
+      <Button type="button" variant="outline" size="md" onClick={askToDelete}>
+        Delete draft
+      </Button>
+      <Button type="button" size="md" ref={closeDefaultRef} onClick={onClose}>
+        Keep as draft
+      </Button>
+    </CloseQuestion>
+
+    <CloseQuestion
+      open={closing === "discard"}
+      title="Discard what you've entered?"
+      body="Nothing is saved until your manuscript is uploaded."
+      onDismiss={() => setClosing(null)}
+    >
+      <Button type="button" variant="outline" size="md" onClick={onClose}>
+        Discard
+      </Button>
+      <Button type="button" size="md" ref={closeDefaultRef} onClick={() => setClosing(null)}>
+        Keep editing
+      </Button>
+    </CloseQuestion>
+
     {/* Over the form, not in it (IR-1256): the one closing question that cannot be undone. */}
     <ConfirmDialog
       open={confirmingDelete}
