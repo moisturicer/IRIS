@@ -2,6 +2,11 @@
  * Guidelines (ADR-063 decision 7, IR-974): what each record type needs, for
  * anyone signed in. The server decides what is listed and hidden; these pin
  * what a reader sees and which download each button asks for.
+ *
+ * The page shows one record type at a time (redesign, 2026-11-23): it used to
+ * stack every type, which readers found overwhelming, so these tests changed
+ * with it. What they protect is unchanged: RDCO's order, the right download,
+ * the address Publish links to, Advisers' Templates and load failures.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { guidelinesApi, type GuidelineRecordType, type SharedTemplate } from "@/api/guidelines";
@@ -31,6 +36,7 @@ const THESIS: GuidelineRecordType = {
   requirements: [
     { id: 21, name: "Community Extension", is_required: false, description: "If the work reached a community.", template_name: "" },
     { id: 22, name: "Release Form", is_required: true, description: "Signed by every author.", template_name: "release.pdf" },
+    { id: 23, name: "Ethics Clearance", is_required: true, description: "", template_name: "" },
   ],
 };
 const ADA: SharedTemplate = {
@@ -47,16 +53,18 @@ function load(types = [PROPOSAL, THESIS], shared = [ADA, ADA_2, ALAN]) {
   vi.spyOn(guidelinesApi, "advisersTemplates").mockResolvedValue({ data: shared } as never);
 }
 
-async function openPage() {
+async function openPage(route = "/guidelines") {
   const user = userEvent.setup();
-  const view = renderScreen(<GuidelinesPage />, { route: "/guidelines" });
-  await screen.findByRole("heading", { level: 2, name: "Proposal" });
+  const view = renderScreen(<GuidelinesPage />, { route });
+  await screen.findByRole("tablist", { name: "Record types" });
   return { user, ...view };
 }
 
-const section = (name: string) => screen.getByRole("region", { name });
+/** The open record type's panel. */
+const panel = (name: string) => screen.getByRole("tabpanel", { name });
+const tab = (name: string) => within(screen.getByRole("tablist", { name: "Record types" })).getByRole("tab", { name });
 const rowNames = (list: HTMLElement) =>
-  within(list).getAllByRole("listitem").map((r) => within(r).getByRole("heading", { level: 3 }).textContent);
+  within(list).getAllByRole("listitem").map((r) => within(r).getByRole("heading", { level: 4 }).textContent);
 
 beforeEach(() => {
   useAuthStore.setState({
@@ -69,72 +77,85 @@ afterEach(() => {
 });
 
 describe("what each record type needs", () => {
-  it("shows every record type in its own section, with jump links to each", async () => {
+  it("shows one record type at a time, chosen at the top and kept in the address", async () => {
     load();
-    const { container } = await openPage();
+    const { user, container } = await openPage();
 
-    const jump = screen.getByRole("navigation", { name: "Record types" });
-    expect(within(jump).getAllByRole("link").map((a) => a.textContent)).toEqual(["Proposal", "Thesis / Research"]);
-    expect(within(jump).getByRole("link", { name: "Thesis / Research" }))
-      .toHaveAttribute("href", "#thesis-research");
-    expect(section("Thesis / Research")).toHaveAttribute("id", "thesis-research");
+    expect(within(screen.getByRole("tablist", { name: "Record types" })).getAllByRole("tab").map((t) => t.textContent))
+      .toEqual(["Proposal", "Thesis / Research"]);
+    expect(tab("Proposal")).toHaveAttribute("aria-selected", "true");
+    expect(panel("Proposal")).toBeInTheDocument();
+    expect(screen.queryByRole("tabpanel", { name: "Thesis / Research" })).toBeNull();
+
+    await user.click(tab("Thesis / Research"));
+    expect(tab("Thesis / Research")).toHaveAttribute("aria-selected", "true");
+    expect(panel("Thesis / Research")).toHaveAttribute("id", "thesis-research");
     await expectNoBlockingA11yViolations(container);
   });
 
-  it("scrolls to the section an address names once the sections have loaded, as Publish's link asks", async () => {
+  it("opens on the type an address names, as Publish's link asks", async () => {
     load();
-    const scrolled: Element[] = [];
-    const original = Element.prototype.scrollIntoView;
-    Element.prototype.scrollIntoView = function (this: Element) { scrolled.push(this); };
-    try {
-      renderScreen(<GuidelinesPage />, { route: "/guidelines#thesis-research" });
-      await screen.findByRole("heading", { level: 2, name: "Thesis / Research" });
-      expect(scrolled).toContain(section("Thesis / Research"));
-    } finally {
-      Element.prototype.scrollIntoView = original;
-    }
+    await openPage("/guidelines#thesis-research");
+    expect(tab("Thesis / Research")).toHaveAttribute("aria-selected", "true");
+    expect(panel("Thesis / Research")).toBeInTheDocument();
   });
 
-  it("starts with the type's description, then the Manuscript, then RDCO's requirements in order", async () => {
+  it("moves between types with the arrow keys", async () => {
     load();
-    await openPage();
+    const { user } = await openPage();
+    tab("Proposal").focus();
+    await user.keyboard("{ArrowRight}");
+    expect(tab("Thesis / Research")).toHaveFocus();
+    expect(panel("Thesis / Research")).toBeInTheDocument();
+  });
 
-    const thesis = section("Thesis / Research");
+  it("starts with the type's description, then the Manuscript alone as what you submit", async () => {
+    load();
+    await openPage("/guidelines#thesis-research");
+
+    const thesis = panel("Thesis / Research");
     expect(within(thesis).getByText(/Needs an approved Proposal first/)).toBeInTheDocument();
     expect(within(thesis).getByRole("link", { name: "https://cit.edu/forms" }))
       .toHaveAttribute("href", "https://cit.edu/forms");
-    const list = within(thesis).getByRole("list", { name: "Thesis / Research requirements" });
-    expect(rowNames(list)).toEqual(["Manuscript", "Community Extension", "Release Form"]);
+    const submit = within(thesis).getByRole("region", { name: "What you submit" });
+    expect(within(submit).getByRole("group", { name: "Manuscript" })).toBeInTheDocument();
+    expect(screen.getByText(/only the manuscript is needed to submit/i)).toBeInTheDocument();
   });
 
-  it("labels each requirement Required or Optional, and says only the manuscript is needed to submit", async () => {
+  it("lists Required requirements to have ready in RDCO's order, and folds the Optional ones away", async () => {
     load();
-    await openPage();
+    const { user } = await openPage("/guidelines#thesis-research");
 
-    const thesis = section("Thesis / Research");
-    const row = (name: string) => within(thesis).getByRole("group", { name });
-    expect(within(row("Manuscript")).getByText("Required")).toBeInTheDocument();
-    expect(within(row("Community Extension")).getByText("Optional")).toBeInTheDocument();
-    expect(within(row("Release Form")).getByText("Required")).toBeInTheDocument();
-    expect(within(row("Release Form")).getByText("Signed by every author.")).toBeInTheDocument();
-    expect(screen.getByText(/only the manuscript is needed to submit/i)).toBeInTheDocument();
+    const thesis = panel("Thesis / Research");
+    expect(rowNames(within(thesis).getByRole("list", { name: "Thesis / Research: have these ready" })))
+      .toEqual(["Release Form", "Ethics Clearance"]);
+    expect(within(thesis).getByText("Signed by every author.")).toBeInTheDocument();
+    expect(within(thesis).queryByRole("group", { name: "Community Extension" })).toBeNull();
+
+    await user.click(within(thesis).getByRole("button", { name: "Show 1 optional document" }));
+    expect(rowNames(within(thesis).getByRole("list", { name: "Thesis / Research: only if they apply" })))
+      .toEqual(["Community Extension"]);
+    await user.click(within(thesis).getByRole("button", { name: "Hide 1 optional document" }));
+    expect(within(thesis).queryByRole("group", { name: "Community Extension" })).toBeNull();
   });
 
   it("offers a download only where there is a Template, and asks for that one", async () => {
     load();
     const manuscript = vi.spyOn(guidelinesApi, "downloadManuscriptTemplate").mockResolvedValue({ data: new Blob() } as never);
     const requirement = vi.spyOn(guidelinesApi, "downloadRequirementTemplate").mockResolvedValue({ data: new Blob() } as never);
-    const { user } = await openPage();
+    const { user } = await openPage("/guidelines#thesis-research");
 
-    const thesis = section("Thesis / Research");
+    const thesis = panel("Thesis / Research");
     expect(within(within(thesis).getByRole("group", { name: "Manuscript" })).queryByRole("button")).toBeNull();
+    await user.click(within(thesis).getByRole("button", { name: "Show 1 optional document" }));
     expect(within(within(thesis).getByRole("group", { name: "Community Extension" })).queryByRole("button")).toBeNull();
 
     await user.click(within(thesis).getByRole("button", { name: "Download the Release Form Template, release.pdf" }));
     expect(requirement).toHaveBeenCalledWith(22);
     expect(save).toHaveBeenLastCalledWith(expect.any(Blob), "release.pdf");
 
-    await user.click(within(section("Proposal"))
+    await user.click(tab("Proposal"));
+    await user.click(within(panel("Proposal"))
       .getByRole("button", { name: "Download the Manuscript Template, proposal-format.docx" }));
     expect(manuscript).toHaveBeenCalledWith(1);
     expect(save).toHaveBeenLastCalledWith(expect.any(Blob), "proposal-format.docx");
@@ -143,36 +164,38 @@ describe("what each record type needs", () => {
   it("says why a download failed, beside it", async () => {
     load();
     vi.spyOn(guidelinesApi, "downloadRequirementTemplate").mockRejectedValue(new Error("boom"));
-    const { user } = await openPage();
+    const { user } = await openPage("/guidelines#thesis-research");
 
-    const row = within(section("Thesis / Research")).getByRole("group", { name: "Release Form" });
+    const row = within(panel("Thesis / Research")).getByRole("group", { name: "Release Form" });
     await user.click(within(row).getByRole("button", { name: /Download the Release Form Template/ }));
     expect(await within(row).findByRole("alert")).toHaveTextContent("didn't download");
   });
 
-  it("changes nothing: there is no control but a download", async () => {
+  it("changes nothing: its only buttons download, or show and hide", async () => {
     load();
-    await openPage();
+    await openPage("/guidelines#thesis-research");
 
     const buttons = screen.getAllByRole("button").map((b) => b.getAttribute("aria-label") ?? b.textContent);
-    expect(buttons.every((name) => name?.startsWith("Download"))).toBe(true);
+    expect(buttons.every((name) => /^(Download|Show|Hide)/.test(name ?? ""))).toBe(true);
   });
 });
 
 describe("Advisers' Templates, in the Proposal section", () => {
   it("lists each Adviser's Templates under their name, only for Proposals", async () => {
     load();
-    await openPage();
+    const { user } = await openPage();
 
-    const proposal = section("Proposal");
-    const shared = within(proposal).getByRole("region", { name: "Advisers' Templates" });
+    const shared = within(panel("Proposal")).getByRole("region", { name: "Advisers' Templates" });
+    await within(shared).findByRole("heading", { level: 4, name: "Ada Lovelace" });
     expect(within(shared).getAllByRole("heading", { level: 4 }).map((h) => h.textContent))
       .toEqual(["Ada Lovelace", "Alan Turing"]);
     expect(within(within(shared).getByRole("list", { name: "Ada Lovelace's Templates" }))
       .getAllByRole("listitem").map((r) => within(r).getByRole("heading", { level: 5 }).textContent))
       .toEqual(["Ada's format", "Ada's budget"]);
     expect(within(shared).getByText("For AI proposals.")).toBeInTheDocument();
-    expect(within(section("Thesis / Research")).queryByRole("region", { name: "Advisers' Templates" })).toBeNull();
+
+    await user.click(tab("Thesis / Research"));
+    expect(within(panel("Thesis / Research")).queryByRole("region", { name: "Advisers' Templates" })).toBeNull();
   });
 
   it("downloads an Adviser's Template", async () => {
@@ -180,7 +203,7 @@ describe("Advisers' Templates, in the Proposal section", () => {
     const file = vi.spyOn(guidelinesApi, "downloadAdviserTemplate").mockResolvedValue({ data: new Blob() } as never);
     const { user } = await openPage();
 
-    await user.click(screen.getByRole("button", { name: "Download Ada's format by Ada Lovelace, ada.docx" }));
+    await user.click(await screen.findByRole("button", { name: "Download Ada's format by Ada Lovelace, ada.docx" }));
     expect(file).toHaveBeenCalledWith(7);
     expect(save).toHaveBeenLastCalledWith(expect.any(Blob), "ada.docx");
   });
@@ -189,8 +212,8 @@ describe("Advisers' Templates, in the Proposal section", () => {
     load();
     const { user } = await openPage();
 
-    const shared = within(section("Proposal")).getByRole("region", { name: "Advisers' Templates" });
-    await user.type(within(shared).getByRole("searchbox", { name: "Search by Adviser" }), "tur");
+    const shared = within(panel("Proposal")).getByRole("region", { name: "Advisers' Templates" });
+    await user.type(await within(shared).findByRole("searchbox", { name: "Search by Adviser" }), "tur");
     expect(within(shared).getAllByRole("heading", { level: 4 }).map((h) => h.textContent)).toEqual(["Alan Turing"]);
 
     await user.clear(within(shared).getByRole("searchbox", { name: "Search by Adviser" }));
@@ -203,8 +226,8 @@ describe("Advisers' Templates, in the Proposal section", () => {
     load([PROPOSAL, THESIS], []);
     await openPage();
 
-    const shared = within(section("Proposal")).getByRole("region", { name: "Advisers' Templates" });
-    expect(within(shared).getByText("No Adviser shares a Template yet.")).toBeInTheDocument();
+    const shared = within(panel("Proposal")).getByRole("region", { name: "Advisers' Templates" });
+    expect(await within(shared).findByText("No Adviser shares a Template yet.")).toBeInTheDocument();
     expect(within(shared).queryByRole("searchbox")).toBeNull();
   });
 
@@ -213,9 +236,9 @@ describe("Advisers' Templates, in the Proposal section", () => {
     vi.spyOn(guidelinesApi, "advisersTemplates").mockRejectedValue(new Error("boom"));
     await openPage();
 
-    const shared = within(section("Proposal")).getByRole("region", { name: "Advisers' Templates" });
+    const shared = within(panel("Proposal")).getByRole("region", { name: "Advisers' Templates" });
     expect(await within(shared).findByRole("alert")).toHaveTextContent("Advisers' Templates didn't load");
-    expect(within(section("Proposal")).getByRole("group", { name: "Thesis Revision Form" })).toBeInTheDocument();
+    expect(within(panel("Proposal")).getByRole("group", { name: "Thesis Revision Form" })).toBeInTheDocument();
   });
 });
 
