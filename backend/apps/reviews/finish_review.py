@@ -158,6 +158,9 @@ def finish_review(record, actor, *, verdict, summary="", to=None, suggested_offi
     # Sent before the verdict, so a Decision closes them with the rest. A sent
     # draft is dated when it was sent: that is when anyone else first read it.
     ReviewComment.objects.filter(pk__in=[d.pk for d in drafts]).update(is_draft=False, created_at=now)
+    if drafts:  # an update() sends no signal: the review's readers are told here (IR-1284)
+        from apps.live.signals import review_changed
+        review_changed(record.pk)
 
     review, announced = None, False
     if verdict != ReviewVerdict.COMMENT_ONLY:

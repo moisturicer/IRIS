@@ -137,6 +137,23 @@ All three were left open in the first draft and decided by Ashlee Sean on 2026-1
 - **No new service, no new port and no migration.** It needs Redis, which is already running.
 - **nginx:** none beyond the existing response header. Caddy already streams Ask IRIS.
 
+## Amendment 2026-11-23: the review discussion (IR-1284)
+
+**Status: Proposed.** Drafted by an AI agent at Lee Jasmin Adolfo's request; it is a proposal until a person accepts it.
+
+**Why.** Decision 3 publishes `record:<id>` only beside a `Notification`. Most review-discussion acts create none -- replies, Conversation comments, resolve, reopen, severity changes, answers, edits -- so an Adviser's reply on one screen never reached the student's open paper. The threads panel also never refetched, not even on focus.
+
+**Change to decision 3.**
+- A saved or deleted `ReviewComment` publishes `record:<id>` on commit to the **own channel** (`live:user:<id>`) of every active account `may_read_review` admits: owners, anyone who held a seat, and members of an office with an active assignment (`apps.reviews.mentions.candidates`). Never a role channel, so an office member with no part in the record hears nothing.
+- Readers are worked out after commit, from committed state.
+- A draft is its writer's alone, so a draft's save or delete is published to its writer only.
+- *Finish review* and a Decision closing threads change comments with `update()`, which sends no signal; both call `apps.live.signals.review_changed` themselves.
+- The paper page's threads panel (`useReviewThreads`) refetches quietly on `record:<id>`, on reconnect and on focus. A failed quiet read keeps the shown list.
+
+**What this widens.** Decision 3 said a record id goes "only to someone already notified about that record". Now it also goes to someone who may read that record's review. They can already open the record and its discussion, so no hint reaches anyone who can't.
+
+**Cost.** One `may_read_review` check per candidate per committed comment write. Bursts are coalesced per tab (decision 8).
+
 ## Related Requirements
 
 NFR labels only: none. Relates to IR-1033 (refetch on focus), IR-1138 (queue counts), IR-1208 (My Reviews count), IR-166 and ADR-072 (sessions), ADR-017 (ASGI), and IR-504 and IR-634 (streaming).
@@ -144,4 +161,5 @@ NFR labels only: none. Relates to IR-1033 (refetch on focus), IR-1138 (queue cou
 ## Related Tasks
 
 - IR-1213: the spec, which builds this after acceptance.
+- IR-1284: the review discussion (Amendment 2026-11-23).
 - IR-1033.
