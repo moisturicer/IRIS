@@ -122,4 +122,18 @@ describe("the row menu", () => {
     await userEvent.click(trigger());
     await expectNoBlockingA11yViolations(document.body);
   });
+
+  it("can wear a full-width labelled trigger for a phone card, still opening the same menu (IR-1291)", async () => {
+    const onRole = vi.fn();
+    renderScreen(
+      <RowMenu wide label="More actions: Stu Dent" items={[{ key: "role", label: "Change role", onSelect: onRole }]} />,
+    );
+
+    const wide = screen.getByRole("button", { name: "More actions: Stu Dent" });
+    expect(wide).toHaveTextContent("More actions");
+    expect(wide).toHaveClass("w-full");
+    await userEvent.click(wide);
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Change role" }));
+    expect(onRole).toHaveBeenCalledOnce();
+  });
 });

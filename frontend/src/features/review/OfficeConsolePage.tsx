@@ -10,6 +10,8 @@ import { Button, Skeleton } from "@/components/ui";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { TONES } from "@/components/ui/statusTones";
 import { RowMenu, type RowMenuItem } from "@/features/accounts/RowMenu";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { PHONE_QUERY } from "@/lib/layout";
 import { failureMessage, readFailureKind } from "@/lib/readFailure";
 import { cn, formatDate } from "@/lib/utils";
 import type { OfficeConsole, OfficeConsoleAction, OfficeConsoleRow, OfficeConsoleStatusKind } from "@/types/reviews";
@@ -41,7 +43,8 @@ const BACK_LINK = cn(
  * sends decides what is offered: each row's `actions`, and the page itself
  * only to a coordinator of the office (anyone else is refused, and told so).
  * Status wording, due dates and overdue are the server's; nothing here works
- * out a date. Below 640px each row stacks into labelled lines.
+ * out a date. Below 768px each row is a stacked card, not a table row
+ * (IR-1291); the facts and acts are the same.
  */
 export default function OfficeConsolePage() {
   const [data, setData] = useState<OfficeConsole | null>(null);
@@ -49,6 +52,9 @@ export default function OfficeConsolePage() {
   const [failure, setFailure] = useState<unknown>(null);
   const [acting, setActing] = useState<Acting | null>(null);
   const [announcement, setAnnouncement] = useState("");
+  // Chosen in script, not hidden in CSS, so only one of the two is in the
+  // accessible tree: a card and a table row would repeat every link and button.
+  const phone = useMediaQuery(PHONE_QUERY);
 
   /** Reload; whether it worked, so an act announces only what is shown. */
   const load = useCallback(async (): Promise<boolean> => {
@@ -153,27 +159,38 @@ export default function OfficeConsolePage() {
               action={<Link to="/review" className={BACK_LINK}>Back to My Reviews</Link>}
             />
           ) : (
-            <div className="rounded-card border border-stone-200 max-sm:border-0">
-              <table className="w-full text-small max-sm:block">
-                <caption className="sr-only">
-                  {label} open reviews: who holds each, when it is due, and what you can do
-                </caption>
-                <thead className="bg-stone-50 text-left text-stone-600 max-sm:sr-only">
-                  <tr>
-                    <th scope="col" className="px-4 py-2 font-semibold">Paper</th>
-                    <th scope="col" className="px-4 py-2 font-semibold">Reviewer</th>
-                    <th scope="col" className="px-4 py-2 font-semibold">Due</th>
-                    <th scope="col" className="px-4 py-2 font-semibold">Status</th>
-                    <th scope="col" className="px-4 py-2 font-semibold"><span className="sr-only">Actions</span></th>
-                  </tr>
-                </thead>
-                <tbody className="max-sm:block max-sm:space-y-3">
-                  {rows.map((r) => (
-                    <ConsoleRow key={r.key} row={r} onAct={(act) => setActing({ act, row: r })} />
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            phone ? (
+              <ul
+                aria-label={`${label} open reviews: who holds each, when it is due, and what you can do`}
+                className="space-y-3"
+              >
+                {rows.map((r) => (
+                  <ConsoleCard key={r.key} row={r} onAct={(act) => setActing({ act, row: r })} />
+                ))}
+              </ul>
+            ) : (
+              <div className="rounded-card border border-stone-200">
+                <table className="w-full text-small">
+                  <caption className="sr-only">
+                    {label} open reviews: who holds each, when it is due, and what you can do
+                  </caption>
+                  <thead className="bg-stone-50 text-left text-stone-600">
+                    <tr>
+                      <th scope="col" className="px-4 py-2 font-semibold">Paper</th>
+                      <th scope="col" className="px-4 py-2 font-semibold">Reviewer</th>
+                      <th scope="col" className="px-4 py-2 font-semibold">Due</th>
+                      <th scope="col" className="px-4 py-2 font-semibold">Status</th>
+                      <th scope="col" className="px-4 py-2 font-semibold"><span className="sr-only">Actions</span></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((r) => (
+                      <ConsoleRow key={r.key} row={r} onAct={(act) => setActing({ act, row: r })} />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
           )}
         </div>
       )}
@@ -235,30 +252,39 @@ const STATUS_TONE: Record<OfficeConsoleStatusKind, { tone: string; icon: string 
   no_date:    { tone: TONES.quiet,     icon: "fa-minus" },
 };
 
-const CELL = "px-4 py-3 align-top max-sm:flex max-sm:gap-3 max-sm:px-0 max-sm:py-1";
-const CELL_LABEL = "hidden shrink-0 basis-20 text-stone-500 max-sm:inline";
+const CELL = "px-4 py-3 align-top";
 
-function ConsoleRow({ row, onAct }: { row: OfficeConsoleRow; onAct: (act: OfficeConsoleAction) => void }) {
-  const { tone, icon } = STATUS_TONE[row.status.kind];
+/** Assign is the row's own button; the rest sit in its "More actions" menu. */
+function menuItems(row: OfficeConsoleRow, onAct: (act: OfficeConsoleAction) => void): RowMenuItem[] {
   const may = (act: OfficeConsoleAction) => row.actions.includes(act);
-
-  // Assign is the row's own button; the rest sit in its "More actions" menu.
-  const items: RowMenuItem[] = [
+  return [
     ...(may("reassign") ? [{ key: "reassign", label: "Reassign…", onSelect: () => onAct("reassign") }] : []),
     // IR-1226: take the reviewer off without naming anyone; it says when that finishes the office.
-    ...(may("withdraw")
-      ? [{
-          key: "withdraw",
-          label: "Withdraw…",
-          onSelect: () => onAct("withdraw"),
-        }]
-      : []),
+    ...(may("withdraw") ? [{ key: "withdraw", label: "Withdraw…", onSelect: () => onAct("withdraw") }] : []),
     ...(may("extend") ? [{ key: "extend", label: "Extend due date…", onSelect: () => onAct("extend") }] : []),
   ];
+}
+
+/** The status chip: the server's words, the tone and icon by kind. */
+function StatusChip({ status, className }: { status: OfficeConsoleRow["status"]; className?: string }) {
+  const { tone, icon } = STATUS_TONE[status.kind];
+  return (
+    <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-label font-semibold", tone, className)}>
+      <i className={cn("fas", icon)} aria-hidden />
+      {status.text}
+    </span>
+  );
+}
+
+const reviewerName = (row: OfficeConsoleRow) =>
+  row.kind === "pool" ? "Nobody yet" : row.reviewer_name ?? "A reviewer";
+
+function ConsoleRow({ row, onAct }: { row: OfficeConsoleRow; onAct: (act: OfficeConsoleAction) => void }) {
+  const items = menuItems(row, onAct);
 
   return (
-    <tr className="border-t border-stone-100 max-sm:block max-sm:rounded-card max-sm:border max-sm:border-stone-200 max-sm:p-4">
-      <td className={cn(CELL, "max-sm:block")}>
+    <tr className="border-t border-stone-100">
+      <td className={CELL}>
         <Link
           to={`/records/${row.record}?section=review`}
           className={cn("font-semibold text-stone-900 hover:text-brand", FOCUS_RING)}
@@ -271,25 +297,17 @@ function ConsoleRow({ row, onAct }: { row: OfficeConsoleRow; onAct: (act: Office
         )}
       </td>
       <td className={CELL}>
-        <span className={CELL_LABEL} aria-hidden>Reviewer</span>
-        <span className={cn(row.kind === "pool" && "text-stone-500")}>
-          {row.kind === "pool" ? "Nobody yet" : row.reviewer_name ?? "A reviewer"}
-        </span>
+        <span className={cn(row.kind === "pool" && "text-stone-500")}>{reviewerName(row)}</span>
       </td>
       <td className={CELL}>
-        <span className={CELL_LABEL} aria-hidden>Due</span>
         <span>{row.due_at ? formatDate(row.due_at) : "—"}</span>
       </td>
       <td className={CELL}>
-        <span className={CELL_LABEL} aria-hidden>Status</span>
-        <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-label font-semibold", tone)}>
-          <i className={cn("fas", icon)} aria-hidden />
-          {row.status.text}
-        </span>
+        <StatusChip status={row.status} />
       </td>
-      <td className={cn(CELL, "text-right max-sm:justify-end")}>
+      <td className={cn(CELL, "text-right")}>
         <div className="inline-flex items-center gap-1">
-          {may("assign") && (
+          {row.actions.includes("assign") && (
             <Button type="button" size="sm" onClick={() => onAct("assign")} aria-label={`Assign reviewer: ${row.title}`}>
               Assign
             </Button>
@@ -298,5 +316,49 @@ function ConsoleRow({ row, onAct }: { row: OfficeConsoleRow; onAct: (act: Office
         </div>
       </td>
     </tr>
+  );
+}
+
+/**
+ * One review as a card on a phone (IR-1291): the same facts and acts as its
+ * table row, stacked so nothing is squeezed or runs off the screen. The title
+ * leads, then the authors and Version, who holds it and when it is due, the
+ * status, the clearances and, last, the action at full width: Assign is the
+ * primary button, and the menu of the rest is an outlined one.
+ */
+function ConsoleCard({ row, onAct }: { row: OfficeConsoleRow; onAct: (act: OfficeConsoleAction) => void }) {
+  const items = menuItems(row, onAct);
+  const canAssign = row.actions.includes("assign");
+  // A note ("Kept from v1") is too long to share a line with another office.
+  const stacked = hasStrip(row.clearance_strip) && row.clearance_strip.some((entry) => Boolean(entry.note));
+
+  return (
+    <li className="grid grid-cols-[minmax(0,1fr)] gap-2.5 rounded-card border border-stone-200 p-3">
+      <h2 className="break-words font-display text-heading font-semibold text-stone-900">
+        <Link to={`/records/${row.record}?section=review`} className={cn("hover:text-brand", FOCUS_RING)}>
+          {row.title}
+        </Link>
+      </h2>
+      {row.authors_line && <p className="break-words text-small text-stone-600">{row.authors_line}</p>}
+      <p className="flex flex-wrap gap-x-3 gap-y-1 text-small text-stone-600">
+        <span className={cn(row.kind === "pool" && "text-stone-500")}>
+          <span className="sr-only">Reviewer: </span>
+          {reviewerName(row)}
+        </span>
+        <span>{row.due_at ? `Due ${formatDate(row.due_at)}` : "Due —"}</span>
+      </p>
+      <StatusChip status={row.status} className="justify-self-start" />
+      {hasStrip(row.clearance_strip) && <ClearanceStrip entries={row.clearance_strip} stacked={stacked} />}
+      {(canAssign || items.length > 0) && (
+        <div className="grid gap-2">
+          {canAssign && (
+            <Button type="button" size="full" onClick={() => onAct("assign")} aria-label={`Assign reviewer: ${row.title}`}>
+              Assign
+            </Button>
+          )}
+          <RowMenu wide label={`More actions: ${row.title}`} items={items} />
+        </div>
+      )}
+    </li>
   );
 }

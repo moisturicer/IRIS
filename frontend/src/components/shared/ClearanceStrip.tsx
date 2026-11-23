@@ -27,6 +27,11 @@ const KIND_META: Record<ClearanceStripKind, { icon: string; tone: string }> = {
 interface ClearanceStripProps {
   /** Null or absent on a response that predates the field: nothing is drawn (F1). */
   entries?: ClearanceStripEntry[] | null;
+  /**
+   * One office per line instead of a wrapping row, for a phone card whose
+   * entries carry a note ("Kept from v1") too long to share a line (IR-1291).
+   */
+  stacked?: boolean;
   className?: string;
 }
 
@@ -39,13 +44,17 @@ interface ClearanceStripProps {
  *
  * Colour and icon are never the only signal: each entry carries its words.
  */
-export function ClearanceStrip({ entries, className }: ClearanceStripProps) {
+export function ClearanceStrip({ entries, stacked = false, className }: ClearanceStripProps) {
   if (!Array.isArray(entries) || entries.length === 0) return null;
 
   return (
     <ul
       aria-label="Clearances"
-      className={cn("flex flex-wrap items-center gap-x-4 gap-y-1 text-label", className)}
+      className={cn(
+        "flex gap-y-1 text-label",
+        stacked ? "flex-col items-start" : "flex-wrap items-center gap-x-4",
+        className,
+      )}
     >
       {entries.map((entry) => {
         const meta = KIND_META[entry.kind];
