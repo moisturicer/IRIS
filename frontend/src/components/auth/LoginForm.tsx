@@ -1,4 +1,4 @@
-import { useState, type Ref } from "react";
+import { useState, type MutableRefObject, type Ref } from "react";
 import { Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -30,6 +30,8 @@ interface LoginFormProps {
   onSubmit: (values: LoginFormValues) => Promise<void>;
   disabled?: boolean;
   submitRef?: Ref<HTMLButtonElement>;
+  /** The password field, so a failed sign-in's dialog can return focus to it (IR-1303). */
+  passwordRef?: MutableRefObject<HTMLInputElement | null>;
   showCredentialsError?: boolean;
   onIdentifierChange?: (identifier: string) => void;
 }
@@ -40,6 +42,7 @@ export function LoginForm({
   showCredentialsError = false,
   onIdentifierChange,
   submitRef,
+  passwordRef,
 }: LoginFormProps) {
   const [showPassword, setShowPassword] = useState(false);
   const {
@@ -55,6 +58,7 @@ export function LoginForm({
   });
 
   const identifier = register("identifier");
+  const password = register("password");
 
   return (
     <form className="flex flex-col gap-5" noValidate onSubmit={handleSubmit(onSubmit)}>
@@ -70,7 +74,8 @@ export function LoginForm({
         placeholder="name@university.edu"
         disabled={disabled}
         error={errors.identifier?.message}
-        // A rejected sign-in is explained by the alert above the form,
+        reserveErrorSpace
+        // A rejected sign-in is explained by the dialog in front of the form,
         // so the field is marked invalid without repeating the sentence.
         aria-invalid={showCredentialsError || undefined}
         onChange={(e) => {
@@ -80,7 +85,11 @@ export function LoginForm({
       />
 
       <Input
-        {...register("password")}
+        {...password}
+        ref={(el) => {
+          password.ref(el);
+          if (passwordRef) passwordRef.current = el;
+        }}
         id="login-password"
         label="Password"
         size="lg"
@@ -89,6 +98,7 @@ export function LoginForm({
         // No placeholder: dots in an empty field read as a saved password (IR-1093).
         disabled={disabled}
         error={errors.password?.message}
+        reserveErrorSpace
         aria-invalid={showCredentialsError || undefined}
         trailing={
           <button
