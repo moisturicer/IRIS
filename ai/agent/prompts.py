@@ -46,6 +46,8 @@ SELECTION_TOOL_VERSION = "research-12"
 #: research-12 plus a paper's recorded details: authors, Adviser, years and more (IR-1278).
 DETAILS_PROMPT_VERSION = "agent-research-13"
 DETAILS_TOOL_VERSION = "research-13"
+#: research-13's tools; its answers explain fully instead of in short paragraphs (IR-1300).
+FULLER_PROMPT_VERSION = "agent-research-14"
 
 INSTRUCTIONS = (
     "You are the IRIS research assistant. Answer the reader's question directly. "
@@ -206,6 +208,14 @@ DETAILS_INSTRUCTIONS = SELECTION_INSTRUCTIONS.replace(_MANUSCRIPT_ANCHOR, (
     "from the paper: give them without passage handles, say a detail is not recorded when it is null, and "
     "never take an author or year from memory. The years count_records, list_records and search filter by "
     "are completion years; name which year you mean. " + _MANUSCRIPT_ANCHOR), 1)
+#: research-13's style line, which research-14 replaces (IR-1300).
+_SHORT_STYLE = "Write short paragraphs. "
+#: research-13's text, asked to explain fully: answers had grown 25-40% shorter since research-4 (IR-1300).
+FULLER_INSTRUCTIONS = DETAILS_INSTRUCTIONS.replace(_SHORT_STYLE, (
+    "Answer fully. Give the direct answer first. Then, from the passages you read, add what the reader "
+    "would want next: how the paper's own method works, what it found and any limits it states, each "
+    "cited. Several short paragraphs are usual for a question about how or why; a question asking for one "
+    "fact or number needs only a sentence or two. Never pad with general knowledge. "), 1)
 #: Labels an earlier Turn's question under research-10 (IR-1168).
 EARLIER_TURN = "[IRIS earlier Turn {n}] "
 #: Opens the list, under an earlier answer, of the papers it cited (IR-1168).
@@ -251,6 +261,7 @@ PROMPTS = {
     (DELIMITED_PROMPT_VERSION, DELIMITED_TOOL_VERSION): DELIMITED_INSTRUCTIONS,
     (SELECTION_PROMPT_VERSION, SELECTION_TOOL_VERSION): SELECTION_INSTRUCTIONS,
     (DETAILS_PROMPT_VERSION, DETAILS_TOOL_VERSION): DETAILS_INSTRUCTIONS,
+    (FULLER_PROMPT_VERSION, DETAILS_TOOL_VERSION): FULLER_INSTRUCTIONS,
 }
 
 #: Any spelling of either marker inside paper text, so the text cannot close or reopen it.

@@ -42,6 +42,8 @@ PREFIXES = {
     ("agent-research-12", "research-12"): "dcca426d6f8810400fb0efaadbf90f3b6ffb9d4793871b47d7e128e789ee85a5",
     # Recorded when research-13 was written (IR-1278).
     ("agent-research-13", "research-13"): "0793152083bbf43448f97ad802a7291ac8adc5f18c4973bcc8efbe7702400227",
+    # Recorded when research-14 was written (IR-1300): research-13's tools, its own text.
+    ("agent-research-14", "research-13"): "76e8902b7ff32c437b141a19ee13949bc395dcd22207e48c38fdd8dd5f3bb99e",
 }
 #: The notes, prefixes and repair texts every research version sends, before the move.
 NOTES = "74d1d448eb110799d49624570b4ca686e8ddca28adf6cb0d53b647db008f27d2"
