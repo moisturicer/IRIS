@@ -7,7 +7,7 @@ import { HERE } from "@/components/ui/highlightRoles";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { RowMenu, type RowMenuItem } from "@/features/accounts/RowMenu";
 import { PanelLeftIcon } from "./AskIrisIcons";
-import { EarlierConversationList } from "./EarlierConversations";
+import { IrisLoader } from "@/components/brand/IrisBrand";
 import { usePinnedConversations, type Pin } from "../hooks/usePinnedConversations";
 import type { TroubleKind } from "../runtime/trouble";
 
@@ -71,6 +71,9 @@ const SEARCH_BOX =
   "flex min-h-10 w-full min-w-0 cursor-text items-center gap-3 rounded-control border border-field bg-stone-100 px-3 text-body text-stone-700 " +
   "focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/20 " + COLOUR_TRANSITION;
 
+/** The hover every row in the pane shares (IR-1306): a low wash of the binding maroon. */
+const MAROON_HOVER = "hover:bg-brand/[0.07] hover:text-brand-dark " + COLOUR_TRANSITION;
+
 const ICON_BUTTON =
   "inline-flex size-10 shrink-0 items-center justify-center rounded-control text-stone-600 " +
   "hover:bg-stone-200/70 hover:text-stone-900 " + COLOUR_TRANSITION + " " + FOCUS_RING;
@@ -132,14 +135,14 @@ export function ConversationSidebar({
         <div className="relative flex h-full min-h-0 flex-col" style={{ width: Math.max(width, STRIP_WIDTH) }}>
           <div className="flex h-14 shrink-0 items-center gap-1 border-b border-stone-200/80 px-2.5">
             <ConversationsToggle open={open} onClick={onToggle} controls={id} />
-            {open && <NewConversationButton onClick={onNewConversation} />}
+            {open && <h2 className="min-w-0 px-1 text-control font-semibold text-stone-800">Conversations</h2>}
           </div>
 
           {/* Hidden, not unmounted, so a search and the scroll position survive a close. */}
           <div aria-hidden={!open} {...(open ? {} : { inert: "" })}
             className={cn("flex min-h-0 flex-1 flex-col", !open && "invisible")}>
             <ConversationHistoryList conversations={conversations} activeId={activeId} search={search}
-              searchRef={searchRef} onDelete={onDelete} onRename={onRename} />
+              searchRef={searchRef} onDelete={onDelete} onRename={onRename} onNewConversation={onNewConversation} />
           </div>
 
           {!open && <div className="absolute left-0 top-14 flex flex-col items-center gap-1 pt-3" style={{ width: STRIP_WIDTH }}>
@@ -195,7 +198,7 @@ function SidebarResizer({ width, onChange }: { width: number; onChange: (width: 
  * page, and in the history drawer on a phone (IR-570).
  */
 export function ConversationHistoryList({
-  conversations, activeId, search, onDelete, onRename, searchRef: givenRef,
+  conversations, activeId, search, onDelete, onRename, onNewConversation, searchRef: givenRef,
 }: {
   conversations: ReaderConversationSummary[];
   activeId:      string | null;
@@ -205,6 +208,8 @@ export function ConversationHistoryList({
   onRename?:     RenameConversation;
   /** Lets the page focus the search box; the list keeps its own when none is given. */
   searchRef?:    RefObject<HTMLInputElement>;
+  /** Shown under the search box, above Pinned (IR-1306). */
+  onNewConversation?: () => void;
 }) {
   const searchId = useId();
   const ownRef = useRef<HTMLInputElement>(null);
@@ -250,6 +255,7 @@ export function ConversationHistoryList({
       <p role="status" aria-live="polite" className="px-3 text-label text-stone-600">
         {search.query && search.state === "ready" ? `${conversations.length}${search.hasMore ? "+" : ""} found` : ""}
       </p>
+      {onNewConversation && <NewConversationButton onClick={onNewConversation} />}
     </div>
 
     <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-thin px-2 pb-2">
@@ -280,15 +286,8 @@ export function ConversationHistoryList({
       {recents.length > 0 && <nav aria-label="Past conversations">
         <ul className="space-y-0.5">{recents.map(c => row(c, c.updated_at))}</ul>
       </nav>}
-      {search.hasMore && (
-        <button type="button" onClick={search.onMore} disabled={search.loadingMore}
-          className="mt-1 min-h-11 w-full rounded-card text-small text-brand underline focus-visible:outline-brand">
-          {search.loadingMore ? "Loading…" : "Load more"}
-        </button>
-      )}
+      {search.hasMore && <LoadOlder loading={search.loadingMore} onClick={search.onMore} />}
     </div>
-    {/* Conversations Django answered before IR-957, read-only. */}
-    <EarlierConversationList />
   </>);
 }
 
@@ -362,7 +361,7 @@ function HistoryRow({ entry, updatedAt, active, pinned, onPin, onRename, onDelet
   // height still when the ⋯ menu appears on hover; wrapped, a long title reflowed.
   return <li ref={rowRef} onMouseEnter={measure} onFocus={measure}
     className={cn("group relative flex items-center rounded-control",
-      active ? HERE : "text-stone-700 hover:bg-stone-200/70")}>
+      active ? HERE : cn("text-stone-700", MAROON_HOVER))}>
     <Tooltip label={title} disabled={!cut} className="block min-w-0 flex-1">
       {/* A link to the conversation's own address (IR-548), so it opens in a new tab and survives a refresh. */}
       <Link to={`/ai/conversations/${entry.id}`} aria-current={active ? "page" : undefined}
@@ -381,13 +380,39 @@ function HistoryRow({ entry, updatedAt, active, pinned, onPin, onRename, onDelet
   </li>;
 }
 
-/** Starts a new conversation; heads the history list wherever it is shown. */
+/**
+ * Starts a new conversation (IR-1306): a quiet row under the search box, above
+ * Pinned, laid out like the conversations it starts. It is the list's own action,
+ * so it is not a filled button; the maroon wash on hover is the one the rows share.
+ */
 export function NewConversationButton({ onClick }: { onClick: () => void }) {
   return (
     <button type="button" onClick={onClick}
-      className="inline-flex min-h-10 min-w-0 flex-1 items-center justify-center gap-2 rounded-card bg-brand px-3 text-control font-semibold text-white transition-colors hover:bg-brand-dark">
-      <i className="fas fa-plus text-label" aria-hidden />
+      className={cn("group mt-1 flex min-h-10 w-full items-center gap-2.5 rounded-control px-3 text-left text-body font-medium text-stone-700",
+        MAROON_HOVER, FOCUS_RING)}>
+      <span aria-hidden className="inline-flex size-5 items-center justify-center rounded-full ring-1 ring-stone-300 text-stone-600
+        transition-colors duration-150 group-hover:bg-brand group-hover:text-white group-hover:ring-brand">
+        <i className="fas fa-plus text-3xs" />
+      </span>
       New conversation
+    </button>
+  );
+}
+
+/**
+ * Older conversations, a page at a time (IR-1306). A quiet full-width row that
+ * says what it brings in, with the IRIS mark while it does.
+ */
+function LoadOlder({ loading, onClick }: { loading: boolean; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} disabled={loading} aria-busy={loading}
+      className={cn("group mt-2 flex min-h-10 w-full items-center justify-center gap-2 rounded-control border border-dashed border-stone-300 px-3",
+        "text-small font-medium text-stone-600 hover:border-brand/40 disabled:cursor-wait disabled:opacity-80",
+        MAROON_HOVER, FOCUS_RING)}>
+      {loading
+        ? <><IrisLoader className="size-4 text-brand" />Loading older conversations…</>
+        : <>Show older conversations
+          <i aria-hidden className="fas fa-arrow-down text-3xs transition-transform duration-150 group-hover:translate-y-0.5 motion-reduce:transition-none" /></>}
     </button>
   );
 }

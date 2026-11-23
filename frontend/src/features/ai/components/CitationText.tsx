@@ -9,6 +9,7 @@ import "katex/dist/katex.min.css";
 import type { ChatCitation } from "@/types/ai";
 import { hasCitationQuote, openCitationLabel, useCitationLink } from "@/lib/citedPage";
 import { remarkLimitMath } from "./mathLimit";
+import { nestLists } from "./listIndent";
 import { breakLongRuns } from "./runLimit";
 import { REFERENCE } from "@/components/ui/highlightRoles";
 
@@ -184,7 +185,7 @@ export function CitationText({ text, citations, streaming = false, pageMarkers =
         }}
         urlTransform={urlTransform}
       >
-        {toMarkdownLinks(linkPapers(breakLongRuns(text), streaming ? [] : papers), streaming)}
+        {toMarkdownLinks(linkPapers(nestLists(breakLongRuns(text)), streaming ? [] : papers), streaming)}
       </ReactMarkdown>
     </div>
   );

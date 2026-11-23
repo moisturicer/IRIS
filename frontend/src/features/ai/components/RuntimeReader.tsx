@@ -416,8 +416,18 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
     }} className={cn(dense ? "px-4 py-5" : "px-4 py-6 sm:px-6",
       centered ? "shrink-0 pb-1 text-center" : "flex-1 min-h-0 overflow-y-auto overflow-x-hidden scrollbar-thin")}>
       <div ref={column} className={cn(dense ? "space-y-5" : `${centered ? CHAT_OPENING_COLUMN : CHAT_COLUMN} space-y-6`)}>
-        {centered && <p className={cn("font-display text-stone-900", dense ? "text-xl text-left" : "text-2xl")}>
-          {scope ? "Ask about this paper." : "What would you like to investigate?"}</p>}
+        {centered && (dense
+          ? <p className="font-display text-xl text-left text-stone-900">{scope ? "Ask about this paper." : "What would you like to investigate?"}</p>
+          : <div className="flex flex-col items-center gap-3">
+            <span aria-hidden className="inline-flex size-12 items-center justify-center rounded-full bg-stone-100 text-brand">
+              <AskIrisMark className="size-6" />
+            </span>
+            <p className="font-display text-display text-balance text-stone-900">
+              {scope ? "Ask about this paper." : "What would you like to investigate?"}</p>
+            <p className="text-body text-stone-600 text-balance">
+              {scope ? "Answers come from this paper and cite the page they draw on."
+                : "Ask about the research held in IRIS. Every answer cites the passages it draws on."}</p>
+          </div>)}
         {centered && <StarterQuestions questions={scope ? PAPER_STARTERS : ASK_STARTERS} onChoose={question => void send(question)} />}
         {opening === "loading" && <Skeleton rows={3} label="Loading this conversation…" onRetry={() => setOpenAttempt(n => n + 1)} />}
         {opening === "unavailable" && <div role="alert" className="py-10 text-center">

@@ -15,6 +15,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { within } from "@testing-library/react";
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { act, renderScreen, screen, userEvent, waitFor } from "@/test/render";
 import type { Citation, RecordOverviewResponse } from "@/types/ai";
@@ -104,15 +105,16 @@ describe("the AI overview on a paper", () => {
     expect(await screen.findByRole("heading", { level: 2, name: "Methodology" })).toBeTruthy();
   });
 
-  it("sits on the page under a heading, with no card around it (IR-569)", async () => {
+  // Reverses IR-569's "no card" (IR-1306): the reader should see at a glance that AI wrote it.
+  it("sits in its own labelled container that says it is AI-generated", async () => {
     renderScreen(<PaperAiOverview record={record} />);
 
     const heading = await screen.findByRole("heading", { level: 2, name: "AI Overview" });
-    const section = heading.closest("section");
-    expect(section).not.toBeNull();
-    for (const card of ["bg-white", "ring-1", "rounded-card", "shadow-card", "border-t-2"]) {
-      expect(section).not.toHaveClass(card);
-    }
+    const section = screen.getByRole("region", { name: "AI Overview" });
+    expect(section).toContainElement(heading);
+    expect(section).toHaveClass("rounded-card", "border");
+    expect(within(section).getByText("AI-generated")).toBeInTheDocument();
+    expect(await within(section).findByText(/Written by AI from this paper/)).toBeInTheDocument();
   });
 
   it("heads itself at the section size, above the 17 px headings inside it (IR-1089)", async () => {
@@ -202,7 +204,7 @@ describe("the AI overview on a paper", () => {
 
     const line = await screen.findByText(/nothing indexed to summarise/i);
     expect(line.tagName).toBe("P");
-    expect(line.parentElement?.tagName).toBe("SECTION");
+    expect(line.closest("section")).toHaveAccessibleName("AI Overview");
     expect(screen.queryByText(/retrieval service could draw on/i)).toBeNull();
     expect(screen.queryByRole("button")).toBeNull();
   });

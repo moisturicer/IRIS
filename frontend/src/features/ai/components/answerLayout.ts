@@ -9,32 +9,28 @@
  * reads at 16px while the interface around it stays on the 13/14px scale --
  * the same split IR-356 made for titles on reading surfaces.
  */
-export const ANSWER_MARKDOWN =
-  "chat-markdown prose prose-base max-w-none prose-pre:my-2 prose-pre:bg-stone-900 prose-pre:text-stone-100";
+export const ANSWER_MARKDOWN = [
+  "chat-markdown prose prose-base max-w-none prose-pre:my-2 prose-pre:bg-stone-900 prose-pre:text-stone-100",
+  // One reading type for every model answer (IR-1306): Ask IRIS and the AI
+  // Overview set the same size, leading, headings and list markers, so the two
+  // read as one voice. 16 px Inter at 1.75; any heading the model writes is a
+  // 17 px ink Garamond line with room above it and no rule under it.
+  "text-md prose-p:leading-[1.75] prose-li:leading-[1.75] prose-li:my-[0.3em] prose-li:marker:text-brand",
+  "prose-headings:text-stone-900 prose-h1:border-b-0 prose-h2:border-b-0 prose-h1:pb-0 prose-h2:pb-0",
+  "prose-h1:text-[1.0625em] prose-h2:text-[1.0625em] prose-h3:text-[1.0625em] prose-h4:text-[1.0625em]",
+  "prose-h1:mt-[1.6em] prose-h2:mt-[1.6em] prose-h3:mt-[1.3em] prose-h1:mb-[0.35em] prose-h2:mb-[0.35em] prose-h3:mb-[0.3em]",
+].join(" ");
 
 /**
- * The AI Overview is an article, not a chat bubble (IR-569): a rhythm made for
- * reading it top to bottom. It fills its column; the Overview page sets that
- * column's width, so the text reaches the panel beside it without running long.
- *
- * - The first paragraph is the lead -- larger and darker, the plain-language
- *   account before the sections.
- * - A section heading is near-black Garamond with room above it and no rule
- *   under it (the answer style's rule and maroon are for a short reply).
- * - Lists take maroon markers and a looser line, so a list of claims reads as
- *   claims rather than a block of grey.
+ * The AI Overview reads in the same type as an Ask IRIS answer (IR-1306,
+ * replacing IR-569's larger lead paragraph and looser leading). It differs only
+ * in that its paragraphs are justified, like the abstract (IR-1221), since it
+ * is read top to bottom as an article.
  */
 export const OVERVIEW_MARKDOWN = [
   ANSWER_MARKDOWN,
-  "prose-headings:text-stone-900 prose-h2:border-b-0 prose-h2:pb-0 prose-h2:mt-[2em] prose-h2:mb-[0.45em]",
-  // One ladder inside the Overview (IR-1089, audit VIS-06): its own heading is
-  // 22 px, so every heading the model writes is 17 px, whatever level it chose.
-  // The chat's 24 / 20 em steps put a section above the heading it sits under.
+  // The same 17 px, pinned under the Overview's own 22 px heading (IR-1089).
   "prose-h1:text-lg prose-h2:text-lg prose-h3:text-lg prose-h4:text-lg",
-  "prose-h3:mt-[1.5em] prose-h3:mb-[0.3em]",
-  "prose-p:leading-[1.8] prose-li:leading-[1.75] prose-li:my-[0.35em] prose-li:marker:text-brand",
-  "[&>p:first-child]:text-lg [&>p:first-child]:leading-[1.7] [&>p:first-child]:text-stone-800",
-  // Its paragraphs are reading text, justified like the abstract (IR-1221).
   "[&_p]:text-justified",
 ].join(" ");
 

@@ -66,7 +66,8 @@ test("a run that reports nothing yet shows only the heading", async () => {
   const progress = await screen.findByRole("region", { name: "Research progress" });
   expect(within(progress).getByRole("heading", { name: "Researching…" })).toBeInTheDocument();
   expect(within(progress).queryByRole("list")).not.toBeInTheDocument();
-  expect(progress).toHaveTextContent(/^Researching…(\d+m \d{2}s|\d+(\.\d)?s)?$/);
+  // The screen reader hears the steady heading; sighted readers see the turning verb (IR-1306).
+  expect(progress).toHaveTextContent(/^Researching…(Reading your question|Planning where to look)…(\d+m \d{2}s|\d+(\.\d)?s)?$/);
 });
 
 test("Stop sends the stop call and puts the question back in the box to edit and resend", async () => {

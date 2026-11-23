@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ReaderActivity, ReaderRun } from "@/api/runtimeReader";
+import { IrisLoader } from "@/components/brand/IrisBrand";
 import { cn } from "@/lib/utils";
 
 const STEP_ICONS: Record<NonNullable<ReaderActivity["step"]>["kind"], string> = {
@@ -8,6 +9,41 @@ const STEP_ICONS: Record<NonNullable<ReaderActivity["step"]>["kind"], string> = 
   catalogue: "fas fa-layer-group",
   recall: "fas fa-clock-rotate-left",
 };
+
+/**
+ * What the heading says IRIS is doing (IR-1306), in the library's own words.
+ * Each set describes only the kind of step the run reported, so turning
+ * through it never claims work the run is not doing.
+ */
+const VERBS = {
+  waiting:   ["Waiting for a reading desk"],
+  starting:  ["Reading your question", "Planning where to look"],
+  search:    ["Searching the stacks", "Scanning the shelves", "Pulling likely papers"],
+  read:      ["Reading the pages", "Following the passage", "Reading closely"],
+  catalogue: ["Consulting the catalogue", "Checking the records"],
+  recall:    ["Rereading earlier answers", "Recalling this conversation"],
+} as const;
+
+/** How long one verb stays before the next in its set. */
+const VERB_MS = 3200;
+
+function verbsFor(activity?: ReaderActivity | null): readonly string[] {
+  if (!activity) return VERBS.starting;
+  if (activity.step) return VERBS[activity.step.kind];
+  return activity.phase === "waiting" ? VERBS.waiting : VERBS.starting;
+}
+
+/** Turns through `verbs`, starting again whenever the set changes. */
+function useVerb(verbs: readonly string[]): string {
+  const [index, setIndex] = useState(0);
+  useEffect(() => {
+    setIndex(0);
+    if (verbs.length < 2) return;
+    const timer = setInterval(() => setIndex(i => (i + 1) % verbs.length), VERB_MS);
+    return () => clearInterval(timer);
+  }, [verbs]);
+  return verbs[index % verbs.length];
+}
 
 /** Seconds since `since`, to a tenth, refreshed while the run works. */
 function useSeconds(since: string | undefined): string | null {
@@ -36,8 +72,12 @@ const PLAN_STATUS: Record<PlanStep["status"], { word: string; mark: string }> = 
 /**
  * One quiet block while a run is queued or running (IR-1236): a heading, then only what the run
  * reports -- its activity (the phase and latest step) and its plan. The page adds no step of its own,
- * so a run that has reported nothing shows the heading alone. Everything but the clock sits in one
- * polite live region, so an update is announced without interrupting the reader.
+ * so a run that has reported nothing shows the heading alone. Everything but the clock and the
+ * turning verb sits in one polite live region, so an update is announced without interrupting.
+ *
+ * IR-1306: the Folio Ribbon mark opens and closes in place of a spinner, and the heading names the
+ * kind of step in library words, one rising into view after another. A screen reader hears one
+ * steady heading instead, since a verb changing every few seconds would be read out each time.
  */
 export function ReasoningBar({ activity, plan, deep = false, runStartedAt, compact = false }: {
   activity?: ReaderActivity | null;
@@ -49,28 +89,40 @@ export function ReasoningBar({ activity, plan, deep = false, runStartedAt, compa
   compact?: boolean;
 }) {
   const elapsed = useSeconds(runStartedAt ?? activity?.since);
+  const verb = useVerb(verbsFor(activity));
   const step = activity?.step;
   const steps = plan?.steps ?? [];
   return (
     <section aria-label="Research progress" className={cn("relative pl-4", compact ? "text-small" : "text-control")}>
-      {/* The thread: a quiet rule with a pulse travelling down it while IRIS works. */}
+      {/* The ribbon: a quiet rule with a marker travelling down it while IRIS works. */}
       <span aria-hidden className="absolute inset-y-0.5 left-0 w-[2px] overflow-hidden rounded-full bg-brand/15">
         <span className="absolute inset-x-0 h-1/2 bg-gradient-to-b from-transparent via-brand to-transparent motion-safe:animate-[iris-thread_1.6s_ease-in-out_infinite]" />
       </span>
       <div aria-live="polite" className="space-y-2">
         <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-          <span aria-hidden className="size-4 shrink-0 rounded-full border-2 border-stone-200 border-t-brand motion-safe:animate-spin" />
-          <h3 className="text-body font-semibold text-stone-900">{deep ? "Thorough research…" : "Researching…"}</h3>
+          <IrisLoader className="size-[18px] shrink-0 text-brand" />
+          <h3 className="text-body font-semibold text-stone-900">
+            <span className="sr-only">{deep ? "Thorough research…" : "Researching…"}</span>
+            <span aria-hidden className="inline-block overflow-hidden align-bottom">
+              <span key={verb} className="inline-block motion-safe:animate-verb-in">{verb}…</span>
+            </span>
+          </h3>
+          {deep && <span className="rounded-full px-2 py-px text-label font-medium text-stone-600 ring-1 ring-stone-300">Thorough</span>}
           {/* Decoration for sighted readers: a clock ticking in a live region would be read out every tenth of a second. */}
-          {elapsed && <span aria-hidden className="font-mono text-small tabular-nums text-stone-500">{elapsed}</span>}
+          {elapsed && <span aria-hidden className="text-small tabular-nums text-stone-500">{elapsed}</span>}
         </div>
         {activity && <p key={activity.label} className="text-stone-700 motion-safe:animate-fade-in">{activity.label}</p>}
-        {step && <div key={`${step.kind}:${step.label}`} className="motion-safe:animate-fade-in-up">
-          <span className="inline-flex items-center gap-1.5 rounded-control bg-surface px-2 py-0.5 text-small font-medium text-brand ring-1 ring-stone-300">
-            <i className={cn(STEP_ICONS[step.kind], "text-small")} aria-hidden />{step.label}
-          </span>
-          {step.detail.length > 0 && <ul className="mt-1 space-y-0.5 text-small text-stone-600">
-            {step.detail.map(title => <li key={title} className="[overflow-wrap:anywhere]">{title}</li>)}
+        {step && <div key={`${step.kind}:${step.label}`} className="space-y-1">
+          <p className="inline-flex items-center gap-2 text-small font-medium text-stone-800 motion-safe:animate-fade-in-up">
+            <i className={cn(STEP_ICONS[step.kind], "w-4 text-center text-label text-brand")} aria-hidden />{step.label}
+          </p>
+          {/* Paper titles, so in the titles' own Garamond, pulled out one after another. */}
+          {step.detail.length > 0 && <ul className="space-y-0.5 pl-6">
+            {step.detail.map((title, index) => <li key={title}
+              style={{ animationDelay: `${Math.min(index, 5) * 70}ms` }}
+              className="font-display text-body leading-snug text-stone-700 [overflow-wrap:anywhere] motion-safe:animate-shelf-in">
+              {title}
+            </li>)}
           </ul>}
         </div>}
         {steps.length > 0 && <ol aria-label="Research plan" className="space-y-1.5">

@@ -1,3 +1,4 @@
+import { ASK_STARTERS } from "./askStarters";
 /**
  * An empty conversation offers starter questions (IR-1090, spec §4.11): at least
  * three, each one sends itself, and none names the institution.
@@ -43,7 +44,8 @@ test("choosing a starter asks that question at once", async () => {
 
   const starters = screen.getByRole("group", { name: "Suggested questions" });
   const first = within(starters).getAllByRole("button")[0];
-  const asked = first.textContent ?? "";
+  // The kind above each starter is decoration (IR-1306); the question is what is asked.
+  const asked = ASK_STARTERS[0];
   await user.click(first);
 
   await waitFor(() => expect(post).toHaveBeenCalledWith("/ai/runtime/runs",

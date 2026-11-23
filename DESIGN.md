@@ -268,7 +268,7 @@ Gold and cream are gone (IR-1097): the thumbnail ring and the other decoration w
 - **Display** (EB Garamond 600, tight tracking, balanced wrap): a record's title on the Overview. The one line the page exists to name. Its size follows its length (IR-1264), read from the `overview` container, never the window: up to 80 characters 48 px (36 px below 40 rem), up to 160 characters 36 px (28 px), longer 30 px (24 px). It is never cut.
 - **Headline** (EB Garamond 600, 20/28 px): section headings on the Overview (Abstract, AI Overview, Related works, Comments) and the Ask IRIS heading. Ink, never maroon.
 - **Title** (EB Garamond 600, 20/28 px): the paper's title in the record bar, wrapping onto as many lines as it needs (the Full Text Rule; it was one truncated line before IR-1218); dialog and card titles.
-- **Reading** (Inter 400, 16 px, line-height 1.8): the AI Overview's prose, filling the Overview column. The first paragraph is the lead at 17 px, darker. Markdown section headings inside it are Ink Garamond with space above and no rule; list markers are maroon. The Abstract reads at 17 px with 1.75 leading.
+- **Reading** (Inter 400, 16 px, line-height 1.8): the AI Overview's prose, filling the Overview column. Every paragraph reads at 16 px with 1.75 leading, the same as an Ask IRIS answer (IR-1306; the 17 px lead is retired). Markdown section headings inside it are Ink Garamond with space above and no rule; list markers are maroon. The Abstract reads at 17 px with 1.75 leading.
 - **Body** (Inter 400, 15/24 px): interface text.
 - **Label** (Inter 600, 13/20 px): every control's text. Metadata is the 13 px `small` role at weight 400; field labels are 12/16 px.
 
@@ -388,7 +388,7 @@ A column on Endpaper behind one Rule Stone line, never a card. A Bar Stone heade
 The rail beside the Overview says what the record is held under and, for those in its review, where it stands. **Status** is drawn here, never under the title: the first line of **Review & routing** for a participant (one line per party with its outcome and the *Preserved* mark, then *See review history*, which opens Review), a *Status* row in **About this record** for anyone outside the review while the record is not published, and nothing on a published paper. **About this record** shows only the rows that say something (no em dash, *Not declared* or *Not flagged*) to anyone outside the review; its owners and reviewers see every row, decided by participation, never by role (IR-411). The owner's waiting work is the revision banner and document requests at the top of the Overview; there is no separate summary card.
 
 ### Overview sections (signature)
-Abstract, AI Overview, Related works and Comments, each under one Desk Stone hairline, each with a Garamond headline. The AI Overview has no card and no provenance label: just the heading with the IRIS mark, a ghost Copy, and the article. Comments are drawn and plainly closed (disabled field and Post, "Not open yet") until the feature exists.
+Abstract, AI Overview, Related works and Comments, each under one Desk Stone hairline, each with a Garamond headline. The AI Overview is the one exception to no cards (IR-1306): a `rounded-card` with a white header (maroon mark disc, Garamond heading, an *AI-generated* pill, a ghost Copy), a `stone-50` body and a footer line saying AI wrote it, so a reader never mistakes it for the authors' text. Comments are drawn and plainly closed (disabled field and Post, "Not open yet") until the feature exists.
 
 ### Entry frame: the Dossier Folder (signature)
 Sign in, register, email verification and the pending and declined screens share one frame (`EntryFrame`, IR-704), read like a file handed across a registry desk.
@@ -425,11 +425,11 @@ Setup and Workflow analytics share one layout (`Handbook`): a Contents rail besi
 - **Do** keep motion to opacity and transform, 150–320 ms, and none under reduced motion.
 
 ### Don't:
-- **Don't** wrap reading content (the AI Overview, the Abstract, the reader, Ask IRIS) in a card.
+- **Don't** wrap reading content (the Abstract, the reader, Ask IRIS) in a card. The AI Overview is the one exception, so its provenance is unmistakable (IR-1306).
 - **Don't** float controls over content. Controls live in a bar or toolbar. The two corner icons are Notes, above Ask IRIS, and both keep clear of the reading text: Overview and Paper reserve bottom padding so the last line scrolls past them.
 - **Don't** use any colour outside maroon, stone, white and black: no green, amber, blue, gradients or glows, and no `brand-400` to `brand-600`.
 - **Don't** use a `lg:` (window) breakpoint to size or arrange anything on the record page.
 - **Don't** give reading text its own narrow measure inside the Overview column, or leave a gap between it and the Ask IRIS panel.
 - **Don't** cut text off with an ellipsis, a line clamp or a fixed height, or cap it narrower than its box. The seven allowed cuts are named in the Full Text Rule.
-- **Don't** add a label explaining how AI text was made, or an outlined button where a ghost one is enough.
+- **Don't** add an outlined button where a ghost one is enough. The AI Overview does say it is AI-generated (IR-1306).
 - **Don't** put a thick accent border on a rounded shape. The one recorded exception is the entry folder's tab joined to the sheet (`EntryTab`, and register's current step), whose 2 px maroon top edge is the approved Dossier direction (the `border-accent-on-rounded` exception in `.impeccable/config.json`).
