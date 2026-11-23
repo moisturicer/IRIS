@@ -54,8 +54,8 @@ export function useRowUploads(onDone: () => Promise<void>) {
   };
 
   /** A row's compact PDF upload, named `label`, keeping its progress and retry under `key`. */
-  const pdfUpload = (key: string, label: string, post: (file: File, onProgress: (p: number) => void) => Promise<unknown>) => (
-    <UploadDropzone compact label={label} accept=".pdf" validate maxBytes={PDF_LIMIT} upload={uploads[key]}
+  const pdfUpload = (key: string, label: string, post: (file: File, onProgress: (p: number) => void) => Promise<unknown>, verb?: string) => (
+    <UploadDropzone compact label={label} verb={verb} accept=".pdf" validate maxBytes={PDF_LIMIT} upload={uploads[key]}
       onFiles={([file]) => void send(key, file, (onProgress) => post(file, onProgress))} />
   );
 

@@ -1292,7 +1292,23 @@ describe("find in this paper (IR-353)", () => {
       await waitFor(() => expect(screen.getByRole("button", { name: "Comment" })).toBeEnabled());
       screen.getByRole("button", { name: "Comment" }).focus();
       await userEvent.keyboard("{Enter}");
-      expect(onComment).toHaveBeenCalledWith(expect.objectContaining({ page: 3, quote: "robot arm" }), 2);
+      expect(onComment).toHaveBeenCalledWith(expect.objectContaining({ page: 3, quote: "robot arm" }), 2, undefined);
+    });
+
+    it("offers a selection's Comment and nothing private, and passes on what was typed", async () => {
+      const onComment = vi.fn();
+      await openCommentable(onComment);
+      await userEvent.type(await openFind(), "robot arm");
+
+      await userEvent.click(await screen.findByRole("button", { name: "Add comment" }));
+      expect(screen.queryByRole("button", { name: /highlight|note|Ask IRIS/i })).not.toBeInTheDocument();
+      const box = screen.queryByPlaceholderText("Comment for Threads…");
+      if (box) await userEvent.type(box, "Say when.{Enter}");
+
+      await waitFor(() => expect(onComment).toHaveBeenCalled());
+      const [passage, version] = onComment.mock.calls[0];
+      expect(passage).toMatchObject({ page: 3, quote: "robot arm" });
+      expect(version).toBe(2);
     });
   });
 

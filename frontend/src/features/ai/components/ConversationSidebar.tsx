@@ -92,7 +92,7 @@ export function ConversationsToggle({ open, onClick, controls, asDialog = false 
   controls?: string;
   asDialog?: boolean;
 }) {
-  const label = open ? "Hide conversations" : "Show conversations";
+  const label = open ? "Hide history" : "Show history";
   return <Tooltip label={label} className="shrink-0">
     <button type="button" onClick={onClick} aria-label={label} aria-expanded={open}
       aria-controls={controls} aria-haspopup={asDialog ? "dialog" : undefined}
@@ -132,7 +132,7 @@ export function ConversationSidebar({
         !open && "cursor-e-resize",
         easing && "transition-[width] duration-200 ease-out motion-reduce:transition-none",
       )}
-      aria-label="Conversations"
+      aria-label="History"
       // Closed, a press on the strip's empty space opens the pane (IR-1306).
       onClick={open ? undefined : (e) => { if (!isControl(e.target)) onToggle(); }}
     >
@@ -141,7 +141,7 @@ export function ConversationSidebar({
         <div className="relative flex h-full min-h-0 flex-col" style={{ width: Math.max(width, STRIP_WIDTH) }}>
           <div className="flex h-14 shrink-0 items-center gap-1 border-b border-stone-200/80 px-2.5">
             <ConversationsToggle open={open} onClick={onToggle} controls={id} />
-            {open && <h2 className={cn("min-w-0 px-1", PANE_TITLE)}>Conversations</h2>}
+            {open && <h2 className={cn("min-w-0 px-1", PANE_TITLE)}>History</h2>}
           </div>
 
           {/* Hidden, not unmounted, so a search and the scroll position survive a close. */}

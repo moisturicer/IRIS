@@ -21,11 +21,21 @@ const tracker = vi.fn();
 const documentRequests = vi.fn();
 const uploadManuscript = vi.fn();
 const uploadForRequestItem = vi.fn();
+const reviewComments = vi.fn();
+const removeUpload = vi.fn();
+const discardManuscript = vi.fn();
+const downloadUpload = vi.fn();
+vi.mock("@/lib/utils", async (original) => ({ ...(await original<object>()), downloadBlob: (...args: unknown[]) => saved(...args) }));
+const saved = vi.fn();
 vi.mock("@/api/records", () => ({
   recordsApi: {
     tracker: (id: number) => tracker(id),
     documentRequests: (id: number) => documentRequests(id),
     uploadManuscript: (id: number, file: File, options: unknown) => uploadManuscript(id, file, options),
+    reviewComments: (id: number) => reviewComments(id),
+    removeDocumentRequestUpload: (itemId: number, uploadId: number) => removeUpload(itemId, uploadId),
+    discardRevisedManuscript: (id: number) => discardManuscript(id),
+    manuscriptBlob: () => Promise.resolve({ data: new Blob(["pdf"]) }),
   },
 }));
 vi.mock("@/api/documents", () => ({
@@ -33,6 +43,7 @@ vi.mock("@/api/documents", () => ({
     uploadForRequestItem: (
       recordId: number, itemId: number, file: File, options?: { onProgress?: (p: number) => void },
     ) => uploadForRequestItem(recordId, itemId, file, options),
+    downloadUpload: (uploadId: number) => downloadUpload(uploadId),
   },
 }));
 const guidelinesList = vi.fn();
@@ -67,7 +78,7 @@ const trackerOf = (parties = PARTIES, extra: Partial<RecordTracker> = {}) =>
 
 const item = (id: number, label: string, extra: Partial<DocumentRequest["items"][number]> = {}) => ({
   id, slot: null, label, state: "missing" as const, state_label: "Missing", upload: null, uploaded_at: null,
-  rejection_reason: null, decided_at: null, ...extra,
+  rejection_reason: null, decided_at: null, can_replace: false, ...extra,
 });
 const request = (extra: Partial<DocumentRequest> = {}): DocumentRequest => ({
   id: 1, party: "ierc", label: "IERC", state: "open", state_label: "Open",
@@ -113,6 +124,11 @@ beforeEach(() => {
   documentRequests.mockReset().mockResolvedValue({ data: [] });
   uploadManuscript.mockReset().mockResolvedValue({ data: {} });
   uploadForRequestItem.mockReset().mockResolvedValue({ data: {} });
+  reviewComments.mockReset().mockResolvedValue({ data: [] });
+  removeUpload.mockReset().mockResolvedValue({ data: {} });
+  discardManuscript.mockReset().mockResolvedValue({ data: {} });
+  downloadUpload.mockReset().mockResolvedValue({ data: new Blob(["pdf"]) });
+  saved.mockReset();
   guidelinesList.mockReset().mockResolvedValue({ data: [{
     id: 2, name: "Thesis / Research", description: "", manuscript: { description: "", template_name: "" },
     requirements: [{ id: 3, name: "Ethics Clearance", is_required: true, description: "", template_name: "ethics-form.docx" }],
@@ -247,8 +263,24 @@ describe("the owner's new version", () => {
 
     await screen.findByRole("region", { name: "Your new version" });
     expect(fileRow("Revised manuscript")).toHaveTextContent("Ready, not yet submitted");
-    drop(screen.getByRole("button", { name: /Upload a different manuscript/ }), pdf("again.pdf"));
+    drop(screen.getByRole("button", { name: "Replace Revised manuscript" }), pdf("again.pdf"));
     await waitFor(() => expect(uploadManuscript).toHaveBeenCalledOnce());
+  });
+
+  it("downloads and, once confirmed, throws away a stored manuscript", async () => {
+    const { onDocumentsChanged } = show(asked({}, { manuscript_unsubmitted: true }), {
+      can: [...REVISER, "discard_revised_manuscript"],
+    });
+
+    await userEvent.click(await screen.findByRole("button", { name: "Download Revised manuscript" }));
+    await waitFor(() => expect(saved).toHaveBeenCalledWith(expect.any(Blob), "Revised manuscript.pdf"));
+
+    await userEvent.click(screen.getByRole("button", { name: "Remove Revised manuscript" }));
+    const dialog = await screen.findByRole("dialog", { name: "Remove Revised manuscript?" });
+    expect(discardManuscript).not.toHaveBeenCalled();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Remove" }));
+    await waitFor(() => expect(discardManuscript).toHaveBeenCalledWith(RECORD_ID));
+    await waitFor(() => expect(onDocumentsChanged).toHaveBeenCalled());
   });
 
   it("offers no manuscript upload without the capability", async () => {
@@ -279,26 +311,95 @@ describe("the owner's new version", () => {
     expect(await screen.findByRole("button", { name: "Submit new version" }))
       .toHaveAccessibleDescription("Nothing has changed since IERC asked for a revision.");
   });
+});
 
-  it("counts each party's comments and sends the owner to answer them in Review", async () => {
-    const entry = (thread: number, extra: object) => ({
-      thread, party: "ierc", party_label: "IERC", severity: "must_fix" as const, comment: "Say when.", version: 1,
-      page: 4, quote: "", answer: null, note: "", ...extra,
-    });
-    const { onOpenReview } = show(asked({ letter: [
-      entry(1, {}), entry(2, {}), entry(3, { severity: "suggestion" }),
-      entry(4, { party: "itso", party_label: "ITSO", answer: "addressed" }),
-    ] as never }));
+describe("the review's comments", () => {
+  const comment = (id: number, extra: object = {}) => ({
+    id, reply_to: null, is_draft: false, version: 1, author: 2, author_name: "Ivy Ethics", party_label: "IERC", kind: "thread",
+    body: `Comment ${id}`, severity: "must_fix", status: "open", status_label: "Open", state: "open",
+    anchor: { version: 1, page: 4, quote: "respondents", regions: [] }, document: null, answer: null, replies: [],
+    resolved_at: null, sent_at: "2026-11-01T00:00:00Z", created_at: "2026-11-01T00:00:00Z", ...extra,
+  });
+  const readable = { readiness: {} } as never;
 
-    const comments = await screen.findByRole("list", { name: "Comments" });
-    const [ierc, itso] = within(comments).getAllByRole("listitem");
-    expect(ierc).toHaveTextContent("2 must-fix comments to answer");
-    expect(ierc).toHaveTextContent("From IERC. 1 suggestion, optional");
-    expect(itso).toHaveTextContent("Every must-fix comment is answered");
-    // Answered in Review's Threads, never here.
-    expect(within(comments).queryByRole("textbox")).not.toBeInTheDocument();
-    await userEvent.click(within(ierc).getByRole("button", { name: "Answer IERC's comments in Review" }));
-    expect(onOpenReview).toHaveBeenCalledWith({ tab: "threads", party: "ierc" });
+  it("shows every open comment, whole, and opens its thread in Review", async () => {
+    reviewComments.mockResolvedValue({ data: [
+      comment(1, { severity: "suggestion", body: "Cite the survey." }),
+      comment(2, { body: `${"Say when the survey ran. ".repeat(20)}The end.` }),
+    ] });
+    const { onOpenReview, container } = show(recordOf({}, readable), { owner: false });
+
+    const list = await screen.findByRole("list", { name: "Comments" });
+    const rows = within(list).getAllByRole("listitem");
+    // Must fix first, and never cut.
+    expect(rows[0]).toHaveTextContent("The end.");
+    expect(rows[0]).toHaveTextContent("Must fix");
+    expect(rows[1]).toHaveTextContent("Cite the survey.");
+    expect(within(list).queryByRole("textbox")).not.toBeInTheDocument();
+    await userEvent.click(within(rows[1]).getByRole("button"));
+    expect(onOpenReview).toHaveBeenCalledWith({ tab: "threads", party: null, thread: 1 });
+    await expectNoBlockingA11yViolations(container);
+  });
+
+  it("asks nothing of a viewer who may not read the review, and draws nothing with none open", async () => {
+    show(recordOf({}, { readiness: null } as never), { owner: false });
+    await screen.findByRole("list", { name: "Offices" });
+    expect(reviewComments).not.toHaveBeenCalled();
+    expect(screen.queryByRole("heading", { name: "Comments" })).not.toBeInTheDocument();
+  });
+});
+
+describe("a document already handed in", () => {
+  const sent = (extra: object = {}) => request({
+    state: "fulfilled", state_label: "Fulfilled",
+    items: [item(11, "Ethics Clearance", { slot: 3, state: "uploaded", state_label: "Uploaded", upload: 40, can_replace: true, ...extra })],
+  });
+  const owner = { can: [] as Capability[] };
+
+  it("can be downloaded, replaced and removed until it is decided", async () => {
+    documentRequests.mockResolvedValue({ data: [sent()] });
+    const { container } = show(recordOf(), owner);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Download Ethics Clearance" }));
+    await waitFor(() => expect(downloadUpload).toHaveBeenCalledWith(40));
+    expect(fileRow("Ethics Clearance")).toHaveTextContent("Uploaded · awaiting review");
+
+    const better = pdf("better.pdf");
+    drop(screen.getByRole("button", { name: "Replace Ethics Clearance" }), better);
+    await waitFor(() => expect(uploadForRequestItem).toHaveBeenCalledWith(
+      RECORD_ID, 11, better, expect.objectContaining({ replaces: 40 })));
+
+    await userEvent.click(await screen.findByRole("button", { name: "Remove Ethics Clearance" }));
+    const dialog = await screen.findByRole("dialog", { name: "Remove Ethics Clearance?" });
+    documentRequests.mockResolvedValue({ data: [request()] });
+    await userEvent.click(within(dialog).getByRole("button", { name: "Remove" }));
+    await waitFor(() => expect(removeUpload).toHaveBeenCalledWith(11, 40));
+    expect(await screen.findByRole("button", { name: /^Upload Ethics Clearance/ })).toBeInTheDocument();
+    await expectNoBlockingA11yViolations(container);
+  });
+
+  it("keeps the file and says why when the server refuses", async () => {
+    documentRequests.mockResolvedValue({ data: [sent()] });
+    removeUpload.mockRejectedValue({ response: { data: { detail: "That document has been accepted, so it can't be changed." } } });
+    show(recordOf(), owner);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Remove Ethics Clearance" }));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Remove" }));
+    expect(await within(dialog).findByText(/has been accepted/)).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(screen.getByRole("button", { name: "Download Ethics Clearance" })).toBeInTheDocument();
+  });
+
+  it("is only read once decided", async () => {
+    documentRequests.mockResolvedValue({ data: [
+      request({ items: [item(11, "Ethics Clearance", { state: "accepted", state_label: "Accepted", upload: 40 }), item(12, "Data sheet")] }),
+    ] });
+    show(recordOf(), owner);
+
+    const row = (await screen.findByRole("button", { name: "Download Ethics Clearance" })).closest("li") as HTMLElement;
+    expect(row).toHaveTextContent("Accepted");
+    expect(within(row).queryByRole("button", { name: /Replace|Remove/ })).not.toBeInTheDocument();
   });
 });
 

@@ -9,6 +9,7 @@ import type { RecordDetail } from "@/types/records";
 import type { ReviewTarget } from "../reviewTarget";
 import { useRecordTracker } from "../useRecordTracker";
 import { branchRows } from "./branches";
+import { OverviewComments } from "./OverviewComments";
 import { OwnerAnswer } from "./OwnerAnswer";
 import { ReviewBranches } from "./ReviewBranches";
 import { useOwnerRequests } from "./useOwnerRequests";
@@ -54,7 +55,6 @@ export function ReviewOverview({
       requests={requests.shown}
       refreshFailed={requests.refreshFailed}
       onStored={stored}
-      onOpenReview={onOpenReview}
       onSubmitNewVersion={onSubmitNewVersion}
     />
   ) : null;
@@ -91,6 +91,7 @@ export function ReviewOverview({
       )}
 
       {(rows.length > 0 || answer) && <ReviewBranches rows={rows} answer={answer} onOpenReview={onOpenReview} />}
+      <OverviewComments record={record} version={trackerVersion} onOpenReview={onOpenReview} />
       {rows.length === 0 && !answer && data && <p className="text-small text-stone-600">No routing recorded yet.</p>}
     </section>
   );

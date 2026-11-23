@@ -92,7 +92,8 @@ export function ReviewSection({
         <DocumentsTab
           record={record}
           owner={userIsOwner}
-          editable={can.has("edit_details")}
+          // Details are always an owner's to edit; a submitted document is only while something is asked of them.
+          editable={userIsOwner && (can.has("continue_draft") || record.workflow_state === "awaiting_resubmission")}
           reviewing={reviewing}
           attach={can.has("attach_file")}
           replaceManuscript={can.has("replace_manuscript")}

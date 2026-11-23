@@ -761,7 +761,7 @@ describe("the new-version control follows revision requests", () => {
     renderPaperView();
 
     const panel = await screen.findByRole("region", { name: "Your new version" });
-    expect(within(panel).getByRole("button", { name: /Upload a different manuscript/ })).toBeInTheDocument();
+    expect(within(panel).getByRole("button", { name: "Replace Revised manuscript" })).toBeInTheDocument();
     expect(panel).toHaveTextContent("Ready, not yet submitted");
   });
 
@@ -921,7 +921,7 @@ describe("document requests (IR-262)", () => {
     created_at: "2026-09-20T02:00:00Z", closed_at: null, can_manage: false,
     items: [{
       id: 11, slot: 3, label: "Ethics Clearance", state: "missing",
-      state_label: "Missing", upload: null, uploaded_at: null, rejection_reason: null, decided_at: null,
+      state_label: "Missing", upload: null, uploaded_at: null, rejection_reason: null, decided_at: null, can_replace: false,
     }],
   };
 
@@ -1015,7 +1015,7 @@ describe("the submitter's own status (IR-625)", () => {
     created_at: "2026-09-20T02:00:00Z", closed_at: null, can_manage: false,
     items: [{
       id: 11, slot: null, label: "Signed form", state: "missing",
-      state_label: "Missing", upload: null, uploaded_at: null, rejection_reason: null, decided_at: null,
+      state_label: "Missing", upload: null, uploaded_at: null, rejection_reason: null, decided_at: null, can_replace: false,
     }],
   };
 
@@ -1775,7 +1775,19 @@ describe("the header's actions follow the capabilities (IR-411)", () => {
     ["in review", { workflow_state: "in_review" as const }],
     ["published", { pipeline_status: "published" as const, workflow_state: "published" as const }],
     ["approved", { pipeline_status: "approved" as const, workflow_state: "approved" as const }],
-  ])("offers no Edit details on a record that is %s", async (_label, overrides) => {
+  ])("offers the owner Edit details on a record that is %s, and opens it", async (_label, overrides) => {
+    shownRecord = { ...inReview, ...overrides, capabilities: ["edit_details"] };
+    signInAs(OWNER_ID, "Student");
+    renderPaperView();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Edit details" }));
+    expect(await screen.findByRole("dialog", { name: "Edit details" })).toBeInTheDocument();
+  });
+
+  it.each([
+    ["in review", { workflow_state: "in_review" as const }],
+    ["published", { pipeline_status: "published" as const, workflow_state: "published" as const }],
+  ])("offers no Edit details the server does not grant, on a record that is %s", async (_label, overrides) => {
     shownRecord = { ...inReview, ...overrides };
     signInAs(OWNER_ID, "Student");
     renderPaper(`/records/${RECORD_ID}?edit=details`);
@@ -2955,7 +2967,7 @@ describe("the Review section (IR-412)", () => {
 
     it("comes second for the author, after Readiness, which has no Documents button", async () => {
       workspaceAt(1600);
-      shownRecord = { ...inReview, capabilities: ["cite", "edit_details"] };
+      shownRecord = { ...inReview, capabilities: ["edit_details", "create_version"], workflow_state: "awaiting_resubmission" };
       signInAs(OWNER_ID, "Student");
       renderPaper(`/records/${RECORD_ID}?section=review`);
 
@@ -2967,8 +2979,18 @@ describe("the Review section (IR-412)", () => {
       await userEvent.click(screen.getByRole("tab", { name: "Documents" }));
       const consent = await within(screen.getByRole("tabpanel", { name: "Documents" }))
         .findByRole("group", { name: "Consent Paper" });
-      // The owner of an editable record may add a version to any slot.
+      // While a revision is asked for, the owner may add a version to any slot.
       expect(within(consent).getByRole("button", { name: /^Upload Consent Paper/ })).toBeInTheDocument();
+    });
+
+    it("leaves the documents alone in review: editing details is not editing documents", async () => {
+      workspaceAt(1600);
+      shownRecord = { ...inReview, capabilities: ["edit_details"] };
+      signInAs(OWNER_ID, "Student");
+      renderPaper(`/records/${RECORD_ID}?section=review&documents=open`);
+
+      const consent = await screen.findByRole("group", { name: "Consent Paper" });
+      expect(within(consent).queryByRole("button", { name: /^(Upload|Replace|Remove)/ })).not.toBeInTheDocument();
     });
 
     it.each([
@@ -2993,7 +3015,7 @@ describe("the Review section (IR-412)", () => {
         id: 1, party: "ierc", label: "IERC", state: "open", state_label: "Open", message: "The signed form, please.",
         requested_by: null, created_at: "2026-09-20T02:00:00Z", closed_at: null, can_manage: false,
         items: [{ id: 11, slot: 3, label: "Consent Paper", state: "missing", state_label: "Missing", upload: null,
-          uploaded_at: null, rejection_reason: null, decided_at: null }],
+          uploaded_at: null, rejection_reason: null, decided_at: null, can_replace: false }],
       }] });
       vi.mocked(documentsApi.slotsForRecord).mockResolvedValue({ data: [
         { id: 3, name: "Consent Paper", record_type: 1, is_required: false, uploads: [upload(11, 1, "2026-10-08T08:00:00Z")] },
@@ -3068,7 +3090,8 @@ describe("the Review section (IR-412)", () => {
       await userEvent.click(within(shown).getByRole("button", { name: "Back to the manuscript" }));
       expect(await screen.findByText(/reading the current paper/)).toBeInTheDocument();
       expect(screen.queryByRole("group", { name: "Shown in the reader" })).not.toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Selection: Save highlight" })).toBeInTheDocument();
+      // Nothing private in Review: a selection is a Comment for Threads (2026-11-24).
+      expect(screen.queryByRole("button", { name: /^Selection:/ })).not.toBeInTheDocument();
     });
 
     it("opens an author's older version and PDF attachment, while a Word file only downloads", async () => {

@@ -153,6 +153,7 @@ export function LibraryRail({ view, onSelect, mayAuthor, waiting, folders, folde
   return (
     <>
       <div className="flex h-14 shrink-0 items-center gap-1 border-b border-stone-200/80 px-4 library-wide:px-2.5">
+        <h1 className={cn("mr-auto min-w-0 library-wide:pl-3.5", PANE_TITLE, collapsed && "library-wide:sr-only")}>{title}</h1>
         <Tooltip label={toggleLabel} className="hidden shrink-0 library-wide:block">
           <button
             type="button"
@@ -164,7 +165,6 @@ export function LibraryRail({ view, onSelect, mayAuthor, waiting, folders, folde
             <PanelLeftIcon className="size-5" />
           </button>
         </Tooltip>
-        <h1 className={cn("min-w-0 library-wide:px-1", PANE_TITLE, collapsed && "library-wide:sr-only")}>{title}</h1>
       </div>
       <div className={cn("min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-3 py-3 scrollbar-thin", collapsed && "library-wide:px-2.5")}>
         {publishHref && (

@@ -181,6 +181,12 @@ export const recordsApi = {
   /** The requesting party accepts or rejects one upload; answers with the request. */
   decideDocumentRequestItem: (itemId: number, body: DocumentRequestItemDecision) =>
     apiClient.patch<DocumentRequest>(`/document-request-items/${itemId}/`, body),
+  /** An owner takes back a requested file nobody has decided; answers with the request. */
+  removeDocumentRequestUpload: (itemId: number, uploadId: number) =>
+    apiClient.delete<DocumentRequest>(`/document-request-items/${itemId}/upload/`, { params: { upload: uploadId } }),
+  /** An owner throws away the revised manuscript they have not submitted (IR-1047). */
+  discardRevisedManuscript: (id: number) =>
+    apiClient.post<RecordDetail>(`/records/${id}/discard-revised-manuscript/`),
   /** The requesting party withdraws an open request (IR-263). No reason is recorded. */
   withdrawDocumentRequest: (requestId: number) =>
     apiClient.patch<DocumentRequest>(`/document-requests/${requestId}/`, { action: "withdraw" }),

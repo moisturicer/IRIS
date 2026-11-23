@@ -201,7 +201,7 @@ function RuntimeAskPage() {
       </div>
     </div>
 
-    {phone && dialogOpen && <ChatDrawer title="Conversations" side="end" closeLabel="Close conversations"
+    {phone && dialogOpen && <ChatDrawer title="History" side="start" closeLabel="Close history"
       onClose={() => setDialogOpen(false)} returnTo={dialogOpener.current}>
       <ConversationHistoryList conversations={conversations} activeId={conversationId ?? null} search={historySearch}
         searchRef={searchRef} onNewConversation={() => { setDialogOpen(false); newConversation(); }}

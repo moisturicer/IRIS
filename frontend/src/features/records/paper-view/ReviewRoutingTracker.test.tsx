@@ -399,7 +399,7 @@ describe("ReviewRoutingTracker", () => {
         created_at: "2026-09-20T02:00:00Z", closed_at: null, can_manage: false,
         items: [{
           id: 51, slot: null, label: "Consent form", state: "missing",
-          state_label: "Missing", upload: null, uploaded_at: null, rejection_reason: null, decided_at: null,
+          state_label: "Missing", upload: null, uploaded_at: null, rejection_reason: null, decided_at: null, can_replace: false,
         }],
       }],
     });

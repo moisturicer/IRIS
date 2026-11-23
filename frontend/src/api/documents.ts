@@ -32,11 +32,15 @@ export const documentsApi = {
   /**
    * Upload a PDF answering one item of a document request (ADR-022 §3.2,
    * IR-262). Same endpoint as `upload`; the server takes the slot from the item.
+   * `replaces`: the upload it corrects, while nobody has decided it (§Amendment 8).
    */
-  uploadForRequestItem: (recordId: number, itemId: number, file: File, options: ProgressOptions = {}) => {
+  uploadForRequestItem: (
+    recordId: number, itemId: number, file: File, options: ProgressOptions & { replaces?: number } = {},
+  ) => {
     const fd = new FormData();
     fd.append("record",       String(recordId));
     fd.append("request_item", String(itemId));
+    if (options.replaces != null) fd.append("replaces", String(options.replaces));
     fd.append("file",         file);
     return apiClient.post<{ upload: RecordUpload; extraction: { id: number; status: string } }>(
       "/documents/submit/", fd, progressConfig(file, options),

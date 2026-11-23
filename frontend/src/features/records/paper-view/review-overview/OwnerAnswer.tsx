@@ -2,19 +2,20 @@ import { useId, useRef, useState, type DragEvent, type ReactNode } from "react";
 
 import { documentsApi } from "@/api/documents";
 import { recordsApi } from "@/api/records";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { UploadDropzone, refuseFiles } from "@/components/shared/UploadDropzone";
 import { Select } from "@/components/ui/Select";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
-import { PILL_PRIMARY } from "@/components/ui/pillStyles";
+import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { ItemStatusChip, itemStatus } from "@/features/document-requests/itemStatus";
 import { GuideUnavailable, RequirementTemplate, useRequirementGuide } from "@/features/guidelines/requirementGuide";
 import type { Capability } from "@/features/records/capabilities";
-import { cn, joinLabels } from "@/lib/utils";
-import type { DocumentRequest, RecordDetail, ResponseLetterEntry } from "@/types/records";
+import { errorDetail } from "@/lib/errorDetail";
+import { cn, downloadBlob, joinLabels } from "@/lib/utils";
+import type { DocumentRequest, RecordDetail } from "@/types/records";
 
 import { WAITING_TARGET } from "../../waitingOnYou";
 import { newVersionSummary } from "../NewVersionDialog";
-import type { ReviewTarget } from "../reviewTarget";
 import { useRowUploads } from "../rowUploads";
 
 const ACCEPT = ".pdf";
@@ -32,6 +33,16 @@ interface FileRow {
   chip: ReactNode;
   template: ReactNode;
   post: (file: File, onProgress: (p: number) => void) => Promise<unknown>;
+  /** The file handed in, and what the owner may still do with it. */
+  file: {
+    download: () => Promise<{ data: Blob }>;
+    /** Sends a corrected file, which its own control announces; null once it may no longer change. */
+    replace: FileRow["post"] | null;
+    /** Takes it back; null once it may no longer change. */
+    remove: (() => Promise<unknown>) | null;
+    /** What removing it does, said before it is done. */
+    removing: string;
+  } | null;
 }
 
 interface OwnerAnswerProps {
@@ -42,24 +53,24 @@ interface OwnerAnswerProps {
   refreshFailed: string | null;
   /** Something was stored: read the requests and the record again. */
   onStored: () => Promise<void>;
-  onOpenReview: (target: ReviewTarget) => void;
   onSubmitNewVersion: () => void;
 }
 
 /**
  * The owner's half of the review's Overview: every file they have been asked
  * for, dropped here, and *Submit new version*. It holds no answers of its own:
- * a comment is answered in Review's Threads, which this counts and links to.
+ * a comment is answered in Review's Threads, which `OverviewComments` links to.
  *
  * A requested document goes to its reviewer as soon as it uploads. The revised
  * manuscript is stored, not sent: reviewers keep reading the submitted one
- * until the owner submits (IR-273). Each row says which.
+ * until the owner submits (IR-273). Each row says which. What is handed in can
+ * be read, replaced and removed until whoever asked has decided it.
  *
  * A file dropped on a row goes there. One dropped on the field goes to the
  * only row left, or waits to be told which it is: a file name never decides,
  * since a wrong guess would send the wrong document to an office.
  */
-export function OwnerAnswer({ record, can, requests, refreshFailed, onStored, onOpenReview, onSubmitNewVersion }: OwnerAnswerProps) {
+export function OwnerAnswer({ record, can, requests, refreshFailed, onStored, onSubmitNewVersion }: OwnerAnswerProps) {
   const headingId = useId();
   const blockedId = useId();
   const guideRead = useRequirementGuide();
@@ -82,6 +93,32 @@ export function OwnerAnswer({ record, can, requests, refreshFailed, onStored, on
   const [waiting, setWaiting] = useState<{ key: number; file: File }[]>([]);
   const [refused, setRefused] = useState<string | null>(null);
   const [over, setOver] = useState<string | null>(null);
+  const [removing, setRemoving] = useState<FileRow | null>(null);
+  const [removeBusy, setRemoveBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const download = async (row: FileRow) => {
+    setProblem(null);
+    try {
+      if (row.file) downloadBlob((await row.file.download()).data, `${row.label}.pdf`);
+    } catch {
+      setProblem(`Could not download ${row.label}. Please try again.`);
+    }
+  };
+  const remove = async () => {
+    if (!removing?.file?.remove) return;
+    setRemoveBusy(true);
+    try {
+      await removing.file.remove();
+      setSaid(`${removing.label} removed`);
+      setRemoving(null);
+      setProblem(null);
+      await stored();
+    } catch (err) {
+      setProblem(errorDetail(err, `Could not remove ${removing.label}. Please try again.`));
+    } finally {
+      setRemoveBusy(false);
+    }
+  };
 
   const revising = record.revision.open.length > 0;
   const hint = can.has("create_version") ? record.revision.new_version : null;
@@ -97,10 +134,17 @@ export function OwnerAnswer({ record, can, requests, refreshFailed, onStored, on
       chip: null,
       template: null,
       post: telling((file, onProgress) => recordsApi.uploadManuscript(record.id, file, { onProgress })),
+      file: record.manuscript_unsubmitted ? {
+        download: () => recordsApi.manuscriptBlob(record.id),
+        replace: (file: File, onProgress: (p: number) => void) => recordsApi.uploadManuscript(record.id, file, { onProgress }),
+        remove: can.has("discard_revised_manuscript") ? () => recordsApi.discardRevisedManuscript(record.id) : null,
+        removing: "Your revised manuscript is deleted, and the paper goes back to the submitted one. No reviewer has seen it.",
+      } : null,
     }] : []),
     ...requests.flatMap((request) => request.items.map((item) => {
       const status = itemStatus(item);
       const open = request.state === "open" && item.state === "missing";
+      const upload = item.upload;
       return {
         key: `item:${item.id}`,
         label: item.label,
@@ -112,6 +156,14 @@ export function OwnerAnswer({ record, can, requests, refreshFailed, onStored, on
         chip: status === "requested" ? null : <ItemStatusChip item={item} />,
         template: <RequirementTemplate requirement={item.slot == null ? null : guideRead.guide?.requirement(item.slot) ?? null} />,
         post: telling((file, onProgress) => documentsApi.uploadForRequestItem(record.id, item.id, file, { onProgress })),
+        file: upload == null ? null : {
+          download: () => documentsApi.downloadUpload(upload),
+          replace: item.can_replace
+            ? (file: File, onProgress: (p: number) => void) => documentsApi.uploadForRequestItem(record.id, item.id, file, { onProgress, replaces: upload })
+            : null,
+          remove: item.can_replace ? () => recordsApi.removeDocumentRequestUpload(item.id, upload) : null,
+          removing: `${request.label} has not decided on it yet. It is asked for again, and you can upload another file.`,
+        },
       };
     })),
   ];
@@ -142,7 +194,6 @@ export function OwnerAnswer({ record, can, requests, refreshFailed, onStored, on
 
   const fulfilled = requests.filter((r) => r.state === "fulfilled");
   const documentAskers = [...new Set(requests.filter((r) => r.state === "open").map((r) => r.label))];
-  const letter = hint?.letter ?? [];
   const title = revising ? "Your new version" : rows.some((r) => r.open) ? "Your documents" : "Requested documents";
 
   if (rows.length === 0 && !hint) return null;
@@ -229,13 +280,21 @@ export function OwnerAnswer({ record, can, requests, refreshFailed, onStored, on
                   {row.template}
                 </div>
                 {row.chip}
-                {((row.open && row !== only) || (row.key === "manuscript" && !row.open)) && pdfUpload(row.key,
-                  row.key === "manuscript" ? (row.open ? "Upload revised manuscript" : "Upload a different manuscript") : `Upload ${row.label}`,
-                  row.post)}
+                {row.open && row !== only && pdfUpload(row.key, `Upload ${row.key === "manuscript" ? "revised manuscript" : row.label}`, row.post)}
+                {row.file && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <RowButton icon="fa-download" verb="Download" name={row.label} onClick={() => void download(row)} />
+                    {row.file.replace && pdfUpload(row.key, `Replace ${row.label}`, row.file.replace, "Replace")}
+                    {row.file.remove && !busy(row) && (
+                      <RowButton icon="fa-trash-can" verb="Remove" name={row.label} onClick={() => { setProblem(null); setRemoving(row); }} />
+                    )}
+                  </div>
+                )}
               </li>
             ))}
           </ul>
         )}
+        {problem && !removing && <p role="alert" className="mt-2 text-small text-brand">{problem}</p>}
         {fulfilled.map((r) => (
           <p key={r.id} className="mt-2 text-small font-semibold text-stone-900">
             <i className="fas fa-circle-check mr-1.5 text-2xs text-cleared" aria-hidden />
@@ -243,7 +302,6 @@ export function OwnerAnswer({ record, can, requests, refreshFailed, onStored, on
           </p>
         ))}
 
-        {letter.length > 0 && <Comments entries={letter} onOpenReview={onOpenReview} />}
       </div>
 
       {(hint || documentAskers.length > 0) && (
@@ -263,40 +321,29 @@ export function OwnerAnswer({ record, can, requests, refreshFailed, onStored, on
           )}
         </div>
       )}
+
+      <ConfirmDialog
+        open={removing !== null}
+        title={`Remove ${removing?.label ?? "this file"}?`}
+        message={removing?.file?.removing ?? ""}
+        confirmLabel="Remove"
+        danger
+        focusCancel
+        confirming={removeBusy}
+        error={problem}
+        onConfirm={() => void remove()}
+        onCancel={() => { setRemoving(null); setProblem(null); }}
+      />
     </section>
   );
 }
 
-/** The comments the next version answers, counted per party and answered in Review's Threads. */
-function Comments({ entries, onOpenReview }: { entries: ResponseLetterEntry[]; onOpenReview: (target: ReviewTarget) => void }) {
-  const parties = [...new Set(entries.map((e) => e.party))];
+/** One act on a handed-in file, named for the file it acts on. */
+function RowButton({ icon, verb, name, onClick }: { icon: string; verb: string; name: string; onClick: () => void }) {
   return (
-    <ul aria-label="Comments" className="mt-2 divide-y divide-stone-200 border-t border-stone-200">
-      {parties.map((party) => {
-        const mine = entries.filter((e) => e.party === party);
-        const label = mine[0].party_label;
-        const must = mine.filter((e) => e.severity === "must_fix" && !e.answer).length;
-        const suggestions = mine.filter((e) => e.severity !== "must_fix" && !e.answer).length;
-        return (
-          <li key={party} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-2 py-3">
-            <i className={cn("fas w-4 shrink-0 text-center", must ? "fa-circle-exclamation text-brand" : "fa-check text-cleared")} aria-hidden />
-            <div className="min-w-0 flex-1 basis-48">
-              <p className="text-body font-semibold text-stone-900">
-                {must ? `${must} must-fix ${must === 1 ? "comment" : "comments"} to answer` : "Every must-fix comment is answered"}
-              </p>
-              <p className="text-small text-stone-600">
-                From {label}{suggestions > 0 && `. ${suggestions} ${suggestions === 1 ? "suggestion" : "suggestions"}, optional`}
-              </p>
-            </div>
-            <button type="button" onClick={() => onOpenReview({ tab: "threads", party })}
-              aria-label={`${must ? "Answer" : "See"} ${label}'s comments in Review`}
-              className={cn("inline-flex min-h-11 reading-split:min-h-9 items-center gap-1.5 rounded-control text-small font-semibold text-brand hover:underline underline-offset-[3px]", FOCUS_RING)}>
-              {must ? "Answer in Review" : "See in Review"}
-              <i className="fas fa-arrow-right text-3xs" aria-hidden />
-            </button>
-          </li>
-        );
-      })}
-    </ul>
+    <button type="button" onClick={onClick} aria-label={`${verb} ${name}`} className={cn(PILL_SECONDARY, "px-3 reading-split:min-h-9", FOCUS_RING)}>
+      <i className={cn("fas text-2xs", icon)} aria-hidden />
+      {verb}
+    </button>
   );
 }

@@ -17,8 +17,8 @@
  *   awaiting review → Accepted, or Replacement needed with the reviewer's
  *   reason (`document-requests/itemStatus`).
  *
- * The page decides who is looking: `owner`, `editable` (the `edit_details`
- * capability, so a draft or a record awaiting revision), `reviewing`, and
+ * The page decides who is looking: `owner`, `editable` (an owner's draft or
+ * record awaiting revision), `reviewing`, and
  * `attach` (the `attach_file` capability: an office filing a supplementary
  * file of its own, decided 2026-10-06). Remove follows each file's
  * server-computed `can_remove` (IR-476). This component decides nothing by
@@ -101,6 +101,10 @@ const needsUpload = (asked: Asked) => {
   return asked.open && (status === "requested" || status === "replacement_needed");
 };
 
+/** Uploaded and not yet decided: the owner may replace or remove it (ADR-022 §Amendment 8). */
+const correctable = (asked: Asked | undefined): asked is Asked & { item: { upload: number } } =>
+  asked != null && asked.item.can_replace && asked.item.upload != null;
+
 /**
  * What has been asked for, newest last, with an open request winning over a
  * closed one for the same slot. Withdrawn requests ask for nothing (IR-263).
@@ -145,12 +149,12 @@ export function DocumentsTab({
   const [failed, setFailed] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   // Every removal asks first (IR-872): a removed file is gone from storage.
-  const [removing, setRemoving] = useState<{ name: string; run: () => Promise<void> } | null>(null);
+  const [removing, setRemoving] = useState<{ name: string; run: () => Promise<void>; message?: string } | null>(null);
   const [removeBusy, setRemoveBusy] = useState(false);
   const [removeError, setRemoveError] = useState<string | null>(null);
-  const askToRemove = (name: string, run: () => Promise<void>) => {
+  const askToRemove = (name: string, run: () => Promise<void>, message?: string) => {
     setRemoveError(null);
-    setRemoving({ name, run });
+    setRemoving({ name, run, message });
   };
   const confirmRemove = async () => {
     if (!removing) return;
@@ -215,7 +219,27 @@ export function DocumentsTab({
   }
   if (slots == null) return <Skeleton rows={6} label="Loading the files…" onRetry={() => void load()} />;
 
-  const { bySlot, other } = askedFor(requests);
+  const { bySlot, other: unslotted } = askedFor(requests);
+  // An "Other" document's files sit in a slot of this record's own: one row, not two.
+  const other = unslotted.filter((asked) => {
+    const own = slots.find((s) => !bySlot.has(s.id) && (
+      s.uploads.some((u) => u.id === asked.item.upload)
+      || (s.name === asked.item.label && s.uploads.length > 0 && guide != null && !guide.requirement(s.id))
+    ));
+    if (own) bySlot.set(own.id, asked);
+    return own == null;
+  });
+  /** A file for `asked`: its own item where the slot is not RDCO's, or where it corrects one sent. */
+  const correction = (asked: Asked & { item: { upload: number } }, name: string, key: string) => (
+    <>
+      {pdfUpload(key, `Replace ${name}`, (file, onProgress) =>
+        documentsApi.uploadForRequestItem(record.id, asked.item.id, file, { onProgress, replaces: asked.item.upload }), "Replace")}
+      <RemoveButton name={name} onClick={() => askToRemove(name, async () => {
+        await recordsApi.removeDocumentRequestUpload(asked.item.id, asked.item.upload);
+        await changed();
+      }, `${asked.asker} has not decided on it yet. It is asked for again, and you can upload another file.`)} />
+    </>
+  );
   const shownSlots = slots.filter((s) => editable || s.uploads.length > 0 || bySlot.has(s.id));
   const download = (fetch: () => Promise<{ data: unknown }>, filename: string) =>
     saveBlob(fetch, filename).catch(() => setNotice(`Could not download ${filename}. Please try again.`));
@@ -276,7 +300,8 @@ export function DocumentsTab({
         {shownSlots.map((slot) => {
           const asked = bySlot.get(slot.id);
           const key = `slot:${slot.id}`;
-          const canUpload = owner && (editable || (asked != null && needsUpload(asked)));
+          const canCorrect = owner && correctable(asked);
+          const canUpload = owner && !canCorrect && (editable || (asked != null && needsUpload(asked)));
           // Newest first, as the server lists them.
           const [latest] = slot.uploads;
           const requirement = guide?.requirement(slot.id) ?? null;
@@ -296,7 +321,10 @@ export function DocumentsTab({
                     <DownloadButton name={`${slot.name} version ${latest.version}`} onClick={() => downloadVersion(slot.name, latest)} />
                   )}
                   {canUpload && pdfUpload(key, `Upload ${slot.name}`,
-                    (file, onProgress) => documentsApi.upload(record.id, slot.id, file, { onProgress }))}
+                    (file, onProgress) => asked != null && asked.item.slot == null && needsUpload(asked)
+                      ? documentsApi.uploadForRequestItem(record.id, asked.item.id, file, { onProgress })
+                      : documentsApi.upload(record.id, slot.id, file, { onProgress }))}
+                  {canCorrect && correction(asked, slot.name, key)}
                 </>
               )}
               versions={{
@@ -330,8 +358,10 @@ export function DocumentsTab({
               latest={itemStatus(asked.item) === "requested" ? null : "Uploaded"}
               status={<ItemStatusChip item={asked.item} />}
               note={<AskedNote asked={asked} />}
-              actions={owner && needsUpload(asked) && pdfUpload(key, `Upload ${asked.item.label}`,
-                (file, onProgress) => documentsApi.uploadForRequestItem(record.id, asked.item.id, file, { onProgress }))}
+              actions={owner && (needsUpload(asked)
+                ? pdfUpload(key, `Upload ${asked.item.label}`,
+                  (file, onProgress) => documentsApi.uploadForRequestItem(record.id, asked.item.id, file, { onProgress }))
+                : correctable(asked) && correction(asked, asked.item.label, key))}
             />
           );
         })}
@@ -402,7 +432,8 @@ export function DocumentsTab({
       <ConfirmDialog
         open={removing !== null}
         title={removing ? `Remove ${removing.name}?` : "Remove this file?"}
-        message="The file is deleted from IRIS and can't be restored. To correct a document, you can upload a new version instead."
+        message={removing?.message
+          ?? "The file is deleted from IRIS and can't be restored. To correct a document, you can upload a new version instead."}
         confirmLabel="Remove"
         danger
         focusCancel

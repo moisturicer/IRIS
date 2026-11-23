@@ -22,7 +22,8 @@ import type { ReviewThreadsState } from "./useReviewThreads";
 /** What the composer comments on: a passage of a Version, or the whole record. */
 export type CommentTarget =
   | { kind: "general" }
-  | { kind: "passage"; version: number; passage: Passage }
+  /** `text` is what was typed in the reader's own box, carried into the composer. */
+  | { kind: "passage"; version: number; passage: Passage; text?: string }
   /** A supporting document's newest upload, as a whole (IR-1204): "Consent form, v1". */
   | { kind: "document"; upload: number; label: string };
 
@@ -687,7 +688,12 @@ function Composer({ recordId, can, target, onCompose, threads, onChanged }: Revi
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
-  useEffect(() => ref.current?.focus(), [target]);
+  useEffect(() => {
+    const typed = target.kind === "passage" ? target.text : undefined;
+    // Added to what is already here: a second passage never drops the first words.
+    if (typed) setBody((was) => (was.trim() ? `${was.trimEnd()}\n\n${typed}` : typed));
+    ref.current?.focus();
+  }, [target]);
 
   const send = async (postNow: boolean) => {
     if (!body.trim() || busy) return;

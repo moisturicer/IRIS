@@ -407,14 +407,15 @@ export function ReviewWorkspaceLayout({
   useEffect(() => {
     if (!linked) return;
     if ((allTabs as string[]).includes(linked.tab)) {
-      if (linked.tab === "threads" && linked.party) tw.showParty(linked.party);
+      if (linked.tab === "threads" && linked.thread) tw.focusThread(linked.thread);
+      else if (linked.tab === "threads" && linked.party) tw.showParty(linked.party);
       else reveal(linked.tab as Tab);
       if (linked.tab === "conversation" && linked.party) setRequestFocus({ party: linked.party, key: Date.now() });
       setPaneForDocuments(true);
     }
     onTargetShown?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per link, not per render
-  }, [linked?.tab, linked?.party]);
+  }, [linked?.tab, linked?.party, linked?.thread]);
   useEffect(() => {
     if (!paneForDocuments || !measured) return;
     setPaneForDocuments(false);

@@ -91,7 +91,7 @@ const documentRequest = (overrides: Partial<DocumentRequest>): DocumentRequest =
   items: [
     {
       id: 11, slot: 3, label: "Ethics Clearance", state: "missing", state_label: "Missing",
-      upload: null, uploaded_at: null, rejection_reason: null, decided_at: null,
+      upload: null, uploaded_at: null, rejection_reason: null, decided_at: null, can_replace: false,
     },
   ],
   ...overrides,
@@ -231,7 +231,7 @@ describe("timelineEntries", () => {
             items: [
               {
                 id: 11, slot: 3, label: "Ethics Clearance", state: "missing", state_label: "Missing",
-                upload: null, uploaded_at: null, rejection_reason: "Unsigned.", decided_at: null,
+                upload: null, uploaded_at: null, rejection_reason: "Unsigned.", decided_at: null, can_replace: false,
               },
             ],
           }),

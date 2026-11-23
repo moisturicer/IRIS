@@ -36,7 +36,7 @@ const RECORD_ID = 9;
 function item(overrides: Partial<DocumentRequestItem> = {}): DocumentRequestItem {
   return {
     id: 11, slot: null, label: "Consent form", state: "uploaded", state_label: "Uploaded",
-    upload: 40, uploaded_at: "2026-09-21T02:00:00Z", rejection_reason: null, decided_at: null,
+    upload: 40, uploaded_at: "2026-09-21T02:00:00Z", rejection_reason: null, decided_at: null, can_replace: false,
     ...overrides,
   };
 }
@@ -126,7 +126,7 @@ describe("ReviewerDocumentRequests", () => {
     await user.click(await screen.findByRole("button", { name: "Accept Consent form" }));
 
     await waitFor(() =>
-      expect(decideDocumentRequestItem).toHaveBeenCalledWith(11, { action: "accept" }),
+      expect(decideDocumentRequestItem).toHaveBeenCalledWith(11, { action: "accept", upload: 40 }),
     );
     await waitFor(() => expect(onChanged).toHaveBeenCalled());
   });
@@ -145,7 +145,7 @@ describe("ReviewerDocumentRequests", () => {
 
     await waitFor(() =>
       expect(decideDocumentRequestItem).toHaveBeenCalledWith(11, {
-        action: "reject", reason: "Unreadable scan.",
+        action: "reject", reason: "Unreadable scan.", upload: 40,
       }),
     );
   });

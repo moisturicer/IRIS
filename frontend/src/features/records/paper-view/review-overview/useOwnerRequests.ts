@@ -7,8 +7,9 @@ import type { DocumentRequest } from "@/types/records";
 
 /**
  * The document requests an owner is shown (IR-262, ADR-022 §3): every open
- * one, and one they fulfil during this visit, so the last upload visibly lands
- * somewhere. A withdrawn request is never shown (IR-263).
+ * one, one whose files they may still replace or remove, and one they fulfil
+ * during this visit, so the last upload visibly lands somewhere. A withdrawn
+ * request is never shown (IR-263).
  *
  * A first read that fails is `failed`: an empty list would read as "nothing
  * required". A refresh that fails keeps the list on screen and is
@@ -46,7 +47,8 @@ export function useOwnerRequests(recordId: number, enabled: boolean) {
   useLiveRefresh([`record:${recordId}`], () => { void load(true); }, enabled);
 
   const shown = (requests ?? []).filter(
-    (r) => r.state === "open" || (r.state === "fulfilled" && seenOpen.current.has(r.id)),
+    (r) => r.state === "open"
+      || (r.state === "fulfilled" && (seenOpen.current.has(r.id) || r.items.some((i) => i.can_replace))),
   );
   return { shown, failed, refreshFailed, reload: load };
 }

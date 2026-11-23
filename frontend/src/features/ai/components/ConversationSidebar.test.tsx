@@ -198,7 +198,7 @@ describe("New conversation, Search, Pinned and Recents", () => {
     expect(edge).toHaveAttribute("aria-valuenow", "304");
     await user.keyboard("{End}");
     expect(edge).toHaveAttribute("aria-valuenow", String(SIDEBAR_MAX));
-    expect(screen.getByRole("complementary", { name: "Conversations" })).toHaveStyle({ width: `${SIDEBAR_MAX}px` });
+    expect(screen.getByRole("complementary", { name: "History" })).toHaveStyle({ width: `${SIDEBAR_MAX}px` });
   });
 });
 
@@ -217,7 +217,7 @@ describe("the closed strip (IR-1306)", () => {
     const user = userEvent.setup();
     render(<Closed onToggle={onToggle} onSearch={onSearch} />);
 
-    await user.click(screen.getByRole("complementary", { name: "Conversations" }));
+    await user.click(screen.getByRole("complementary", { name: "History" }));
     expect(onToggle).toHaveBeenCalledTimes(1);
 
     await user.click(screen.getByRole("button", { name: "Search conversations" }));

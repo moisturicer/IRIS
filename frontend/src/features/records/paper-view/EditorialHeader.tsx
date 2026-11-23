@@ -110,7 +110,7 @@ export function EditorialHeader({
         <h1 className={cn("min-w-0 font-display font-semibold tracking-tight text-stone-900 text-balance", compact && "flex-1 basis-80", titleSizeClasses(record.title))}>
           {record.title}
         </h1>
-        {compact && acts}
+        {compact && (picker || acts) && <div className="flex flex-wrap items-center gap-2">{acts}{picker}</div>}
       </div>
 
       {/* The byline (IR-1264): each author, then the Adviser when the
@@ -145,7 +145,6 @@ export function EditorialHeader({
           </ul>
         )}
         <ResearchOriginBadge origin={record.origin} />
-        {compact && picker}
       </div>
 
       <LineageLinks lineage={record.lineage} />
@@ -153,9 +152,12 @@ export function EditorialHeader({
       {/* The version picker (IR-416) whenever there is a version,
           v1 alone included (IR-1214), and beside the owner's
           unsubmitted revision (IR-273). */}
-      {!compact && picker}
-
-      {!compact && acts}
+      {!compact && (picker || acts) && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          {acts}
+          {picker && <div className="ml-auto">{picker}</div>}
+        </div>
+      )}
     </header>
   );
 }

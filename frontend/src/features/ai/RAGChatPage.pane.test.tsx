@@ -85,48 +85,48 @@ describe("on a page wider than a phone", () => {
   it("shows the list beside the chat, with one toggle that says it hides it", async () => {
     const { container } = renderAsk();
     await flood();
-    const hide = screen.getByRole("button", { name: "Hide conversations" });
+    const hide = screen.getByRole("button", { name: "Hide history" });
     expect(hide).toHaveAttribute("aria-expanded", "true");
-    expect(hide).toHaveAttribute("aria-controls", screen.getByRole("complementary", { name: "Conversations" }).id);
+    expect(hide).toHaveAttribute("aria-controls", screen.getByRole("complementary", { name: "History" }).id);
     // The chat's own header carries no second toggle on these widths.
-    expect(screen.getAllByRole("button", { name: /conversations$/ })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: /history$/ })).toHaveLength(1);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     await expectNoBlockingA11yViolations(container);
   });
 
-  it("hides the list in place and leaves focus on the toggle, now Show conversations", async () => {
+  it("hides the list in place and leaves focus on the toggle, now Show history", async () => {
     const user = userEvent.setup();
     const { container } = renderAsk();
     await flood();
-    await user.click(screen.getByRole("button", { name: "Hide conversations" }));
+    await user.click(screen.getByRole("button", { name: "Hide history" }));
 
     expect(screen.queryByRole("link", { name: /Flood methods/ })).not.toBeInTheDocument();
-    const show = screen.getByRole("button", { name: "Show conversations" });
+    const show = screen.getByRole("button", { name: "Show history" });
     expect(show).toHaveAttribute("aria-expanded", "false");
     expect(show).toHaveFocus();
     await expectNoBlockingA11yViolations(container);
 
     await user.click(show);
     expect(await flood()).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Hide conversations" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Hide history" })).toHaveFocus();
   });
 
   it("works from the keyboard", async () => {
     const user = userEvent.setup();
     renderAsk();
     await flood();
-    screen.getByRole("button", { name: "Hide conversations" }).focus();
+    screen.getByRole("button", { name: "Hide history" }).focus();
     await user.keyboard("{Enter}");
-    expect(screen.getByRole("button", { name: "Show conversations" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Show history" })).toHaveFocus();
     await user.keyboard(" ");
-    expect(screen.getByRole("button", { name: "Hide conversations" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Hide history" })).toHaveFocus();
   });
 
   it("keeps a New conversation icon in the strip, and it starts one", async () => {
     const user = userEvent.setup();
     renderAsk("/ai/conversations/11111111-1111-1111-1111-111111111111");
     await flood();
-    await user.click(screen.getByRole("button", { name: "Hide conversations" }));
+    await user.click(screen.getByRole("button", { name: "Hide history" }));
     await user.click(screen.getByRole("button", { name: "New conversation" }));
     expect(address).toBe("/ai");
   });
@@ -135,12 +135,12 @@ describe("on a page wider than a phone", () => {
     const user = userEvent.setup();
     renderAsk();
     await flood();
-    await user.click(screen.getByRole("button", { name: "Hide conversations" }));
+    await user.click(screen.getByRole("button", { name: "Hide history" }));
     expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Search conversations" }));
     expect(screen.getByRole("searchbox", { name: "Search your past conversations" })).toHaveFocus();
-    expect(screen.getByRole("button", { name: "Hide conversations" })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: "Hide history" })).toHaveAttribute("aria-expanded", "true");
     expect(screen.queryByRole("button", { name: "Search conversations" })).not.toBeInTheDocument();
   });
 
@@ -151,22 +151,22 @@ describe("on a page wider than a phone", () => {
     await user.keyboard("{Control>}k{/Control}");
     expect(screen.getByRole("searchbox", { name: "Search your past conversations" })).toHaveFocus();
 
-    await user.click(screen.getByRole("button", { name: "Hide conversations" }));
+    await user.click(screen.getByRole("button", { name: "Hide history" }));
     expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
     await user.keyboard("{Control>}k{/Control}");
     expect(screen.getByRole("searchbox", { name: "Search your past conversations" })).toHaveFocus();
-    expect(screen.getByRole("button", { name: "Hide conversations" })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: "Hide history" })).toHaveAttribute("aria-expanded", "true");
   });
 
   it("remembers a closed pane after a reload", async () => {
     const user = userEvent.setup();
     const first = renderAsk();
     await flood();
-    await user.click(screen.getByRole("button", { name: "Hide conversations" }));
+    await user.click(screen.getByRole("button", { name: "Hide history" }));
     first.unmount();
 
     renderAsk();
-    expect(await screen.findByRole("button", { name: "Show conversations" })).toHaveAttribute("aria-expanded", "false");
+    expect(await screen.findByRole("button", { name: "Show history" })).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByRole("link", { name: /Flood methods/ })).not.toBeInTheDocument();
   });
 
@@ -177,8 +177,8 @@ describe("on a page wider than a phone", () => {
     renderAsk();
     await flood();
     // Choosing still works for this visit.
-    await user.click(screen.getByRole("button", { name: "Hide conversations" }));
-    expect(screen.getByRole("button", { name: "Show conversations" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Hide history" }));
+    expect(screen.getByRole("button", { name: "Show history" })).toBeInTheDocument();
   });
 });
 
@@ -187,7 +187,7 @@ describe("on a tablet", () => {
     pageAt(768);
     renderAsk();
     await flood();
-    expect(screen.getByRole("button", { name: "Hide conversations" })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: "Hide history" })).toHaveAttribute("aria-expanded", "true");
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });
@@ -195,9 +195,9 @@ describe("on a tablet", () => {
 describe("on a phone", () => {
   beforeEach(() => pageAt(360));
 
-  it("starts with the chat alone, and a Show conversations button in the chat header", async () => {
+  it("starts with the chat alone, and a Show history button in the chat header", async () => {
     const { container } = renderAsk();
-    const show = await screen.findByRole("button", { name: "Show conversations" });
+    const show = await screen.findByRole("button", { name: "Show history" });
     expect(show).toHaveAttribute("aria-expanded", "false");
     expect(show).toHaveAttribute("aria-haspopup", "dialog");
     expect(screen.queryByRole("link", { name: /Flood methods/ })).not.toBeInTheDocument();
@@ -208,29 +208,29 @@ describe("on a phone", () => {
   it("opens the list as a dialog over the chat; Escape closes it and focus returns to the opener", async () => {
     const user = userEvent.setup();
     renderAsk();
-    const show = await screen.findByRole("button", { name: "Show conversations" });
+    const show = await screen.findByRole("button", { name: "Show history" });
     await user.click(show);
 
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByRole("link", { name: /Flood methods/ })).toBeInTheDocument();
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Show conversations" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Show history" })).toHaveFocus();
   });
 
   it("closes with its X, and focus returns to the opener", async () => {
     const user = userEvent.setup();
     renderAsk();
-    await user.click(await screen.findByRole("button", { name: "Show conversations" }));
-    await user.click(await screen.findByRole("button", { name: "Close conversations" }));
+    await user.click(await screen.findByRole("button", { name: "Show history" }));
+    await user.click(await screen.findByRole("button", { name: "Close history" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Show conversations" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Show history" })).toHaveFocus();
   });
 
   it("opens the dialog on Ctrl+K, with focus in the search box", async () => {
     const user = userEvent.setup();
     renderAsk();
-    await screen.findByRole("button", { name: "Show conversations" });
+    await screen.findByRole("button", { name: "Show history" });
     await user.keyboard("{Control>}k{/Control}");
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
     expect(screen.getByRole("searchbox", { name: "Search your past conversations" })).toHaveFocus();
@@ -239,7 +239,7 @@ describe("on a phone", () => {
   it("does not use the saved choice from a wider screen", async () => {
     localStorage.setItem("iris-ask-pane", "open");
     renderAsk();
-    await screen.findByRole("button", { name: "Show conversations" });
+    await screen.findByRole("button", { name: "Show history" });
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });

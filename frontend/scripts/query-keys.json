@@ -20,6 +20,7 @@
     "documents": "`open`",
     "edit": "a named editing mode",
     "tab": "a named tab",
+    "thread": "a review thread id, with `tab=threads` on Review",
     "party": "a review party from the fixed list (adviser, itso, ierc, ktto, rdco), with `tab` on Review",
     "outcome": "a named review outcome",
     "office": "a named office",

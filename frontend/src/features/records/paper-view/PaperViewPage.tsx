@@ -152,7 +152,7 @@ export default function PaperViewPage() {
   const { notesWanted, askAbout, addToNote, chatMinimized, chatModal, stepAsideForHighlight } = panel;
   // The reader draws the reader's own highlights wherever the paper shows, so
   // they are read then, and when Notes lists them (IR-583).
-  const highlights = useReadingHighlights(Number(id), !arriving && (onPaperTab || onReviewTab || notesWanted));
+  const highlights = useReadingHighlights(Number(id), !arriving && (onPaperTab || notesWanted));
 
   // Reading collapses the sidebar to its rail, for this visit only (IR-569).
   useEffect(() => {
@@ -250,10 +250,11 @@ export default function PaperViewPage() {
   const currentVersionLabel = record.manuscript_unsubmitted
     ? "Unsubmitted upload"
     : latestVersion ? `Version ${latestVersion.number}` : "Current version";
-  const selectionActions: SelectionAction[] = [
+  // Review's own selection is a Comment (PaperPdfReader); Notes and highlights are the reader's, outside it.
+  const selectionActions: SelectionAction[] = onReviewTab ? [] : [
     // Wherever Ask IRIS is offered (IR-581). A typed question is sent with the passage at once,
     // from the composer's own Send; with nothing typed, Paper Chat opens on an editable question.
-    ...(onReviewTab || !askOffered ? [] : [{
+    ...(!askOffered ? [] : [{
       id: "ask-selection", label: "Ask about selection", short: "Ask IRIS",
       placeholder: "Ask IRIS about this passage…",
       icon: <AskIrisMark className="size-4" />,
@@ -458,7 +459,7 @@ export default function PaperViewPage() {
       latestVersion={latestVersion}
       onShowCurrentVersion={() => setViewParam("version", null)}
       landingNotice={landingNotice}
-      highlightsNotice={highlights.notice}
+      highlightsNotice={onReviewTab ? null : highlights.notice}
       onPaperTab={onPaperTab}
       workspace={onPaperTab || reviewWorkspace}
       contained={onPaperTab || reviewWorkspace || tier === "wide"}
@@ -477,7 +478,7 @@ export default function PaperViewPage() {
         highlightRegions,
         landingLook: openedInShown ? "highlight" : "citation",
         navKey: openedInShown ? `highlight-${openedInShown.key}` : arrivalKey,
-        highlights: drawnHighlights,
+        highlights: onReviewTab ? [] : drawnHighlights,
         selectionActions,
         highlightsShown,
         onHighlightsShownChange: setHighlightsShown,
@@ -659,7 +660,7 @@ export default function PaperViewPage() {
                 showDocuments={documentsWanted}
                 onDocumentsShown={() => setViewParams({ documents: null, section: "review" })}
                 target={reviewTarget}
-                onTargetShown={() => setViewParams({ tab: null, party: null, section: "review" })}
+                onTargetShown={() => setViewParams({ tab: null, party: null, thread: null, section: "review" })}
                 onShowOverview={() => setViewParam("section", "overview")}
               />
             )}
