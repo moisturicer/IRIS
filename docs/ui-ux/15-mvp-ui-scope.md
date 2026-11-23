@@ -337,7 +337,7 @@ Roles and screen gates come from `lib/access.ts`, with backend permissions enfor
 | My Library | `/records/mine` | Main, research roles |
 | Calls & Conferences | `/opportunities` | Main, research roles; outside MVP validation per ADR-050 |
 | Notifications | `/notifications` | Bell, every role |
-| Profile | `/profile`, `/profile/edit` | Account menu, every role (IR-933) |
+| Profile | `/profile` (edited in `/settings?tab=profile`; `/profile/edit` redirects there, IR-1304) | Account menu, every role (IR-933) |
 | Settings | `/settings` | Account menu, every role |
 | Help | `/help` | Account menu, every role |
 
