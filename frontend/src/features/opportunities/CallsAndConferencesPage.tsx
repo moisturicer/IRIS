@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
 
 import { opportunitiesApi } from "@/api/opportunities";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -118,6 +119,20 @@ export function CallsAndConferencesPage() {
   }, [ensureSaved]);
 
   useEffect(() => load(), [load]);
+
+  // A decision on the reader's own Call says `calls`, and anyone's board
+  // catches up when the tab is shown again (IR-1289). Quiet: the board stays,
+  // and a failed read keeps it.
+  const refresh = useCallback(() => {
+    opportunitiesApi.board()
+      .then((board) => {
+        setItems([...board.items].sort(byBoardOrder));
+        setCanPost(board.can_post);
+        setCanFeature(board.can_feature);
+      })
+      .catch(() => { /* keep the board; focus or the next hint retries */ });
+  }, []);
+  useLiveRefresh(["calls"], refresh);
 
   // ---- Filtering ---------------------------------------------------------
 

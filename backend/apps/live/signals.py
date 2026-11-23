@@ -12,6 +12,9 @@ including ones a future act adds without remembering to publish:
   id; a seat's holder hears `reviews` and the record on their own channel;
 - a role, download, delete or call request is made or decided: RDCO hears
   `queues`;
+- the person who asked hears what became of it (IR-1289): a role request
+  saved, or their role changed, tells them `account`; a Call saved or
+  removed tells its poster `calls`, each on their own channel only;
 - a review comment is posted, edited, answered, resolved, reopened, closed or
   deleted (IR-1284): everyone `may_read_review` admits hears `record:<id>` on
   their own channel, never a role's, so nobody outside the review learns of
@@ -83,6 +86,29 @@ def _rdco_queue_changed(sender, instance, **kwargs):
 for _model in ("accounts.RoleRequest", "records.DownloadRequest", "records.DeleteRequest",
                "opportunities.Opportunity"):
     post_save.connect(_rdco_queue_changed, sender=_model, dispatch_uid=f"live-queue-{_model}")
+
+
+# --- the person who asked (IR-1289) ---------------------------------------------
+
+
+def account_changed(user_id) -> None:
+    """Tell `user_id`'s tabs to read their own account again: role, or request standing."""
+    if user_id:
+        publish([ch.user_channel(user_id)], [ch.ACCOUNT])
+
+
+@receiver(post_save, sender="accounts.RoleRequest")
+def role_request_saved(sender, instance, **kwargs):
+    account_changed(instance.user_id)
+
+
+def _call_changed(sender, instance, **kwargs):
+    if instance.posted_by_id:
+        publish([ch.user_channel(instance.posted_by_id)], [ch.CALLS])
+
+
+post_save.connect(_call_changed, sender="opportunities.Opportunity", dispatch_uid="live-call-saved")
+post_delete.connect(_call_changed, sender="opportunities.Opportunity", dispatch_uid="live-call-deleted")
 
 
 def _review_readers(record_id) -> list[str]:

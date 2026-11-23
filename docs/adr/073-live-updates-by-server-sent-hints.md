@@ -137,6 +137,18 @@ All three were left open in the first draft and decided by Ashlee Sean on 2026-1
 - **No new service, no new port and no migration.** It needs Redis, which is already running.
 - **nginx:** none beyond the existing response header. Caddy already streams Ask IRIS.
 
+## Amendment 2026-11-23 (b): the person who asked (IR-1289)
+
+**Status: Proposed.** Drafted by an AI agent at Lee Jasmin Adolfo's request; it is a proposal until a person accepts it.
+
+**Why.** Decision 3 tells RDCO's queues when a role or call request changes, but not the person who made it. An approved user's open app kept its old role, and the pending-approval screen stayed up. Because the server picks a stream's role channel when the stream opens, a new role was not heard until a reload. A Call's poster didn't see RDCO's decision either.
+
+**Two new topics, each on one person's own channel only:**
+- **`account`.** A saved `RoleRequest` (asked, approved or declined) and any role change through `User.assign_role` tell that user. Their tabs read `/auth/me` again, on the hint and when the tab is shown. When the role has changed, the tab reopens its stream (`restartLive`), so the new role's channel is heard. A generation counter stops the replaced loop from reconnecting.
+- **`calls`.** A saved or deleted `Opportunity` tells its poster. **My Calls** and **Calls and conferences** refetch quietly on it and when the tab is shown.
+
+**Not covered.** A newly confirmed Call has no reader list to tell, so other people's boards catch up when their tab is shown again.
+
 ## Amendment 2026-11-23: the review discussion (IR-1284)
 
 **Status: Proposed.** Drafted by an AI agent at Lee Jasmin Adolfo's request; it is a proposal until a person accepts it.
