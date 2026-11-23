@@ -3,7 +3,7 @@ import { Link, Navigate, useLocation, useNavigate, useSearchParams } from "react
 import { useNoticeStore } from "@/store/notice.store";
 import { authApi } from "@/api/auth";
 import { useAuth } from "@/hooks/useAuth";
-import { AuthAlert } from "@/components/auth/AuthAlert";
+import { EntryErrorDialog, type EntryError } from "@/components/auth/EntryErrorDialog";
 import { EntryFrame, EntryTab } from "@/components/auth/EntryFrame";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { cn } from "@/lib/utils";
@@ -54,6 +54,8 @@ export default function LoginPage() {
   // The submitting button may lose focus when the form disables it, before the
   // lock reply arrives. Keep its actual element as the dialog's return target.
   const signInRef = useRef<HTMLButtonElement>(null);
+  // Where a failure's dialog returns focus: the field most often retyped.
+  const passwordRef = useRef<HTMLInputElement>(null);
   const navigate       = useNavigate();
   const location       = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -64,6 +66,9 @@ export default function LoginPage() {
    */
   const signingIn = useRef(false);
   const [loginAlert, setLoginAlert]     = useState<LoginAlert | null>(null);
+  // The failure stays after its dialog closes, so the fields stay marked wrong
+  // until the next attempt; only the dialog goes (IR-1303).
+  const [alertOpen, setAlertOpen]       = useState(false);
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [lockoutOpen, setLockoutOpen]   = useState(false);
   const [lock, setLock]                 = useState<AccountLock | null>(null);
@@ -204,6 +209,11 @@ export default function LoginPage() {
     }
   };
 
+  const showAlert = (failure: LoginAlert) => {
+    setLoginAlert(failure);
+    setAlertOpen(true);
+  };
+
   const handleLogin = async (data: LoginFormValues) => {
     setLoginAlert(null);
 
@@ -240,7 +250,7 @@ export default function LoginPage() {
       // reached rejected nothing (IR-536), and a rate limit counts the address
       // a whole campus may share (IR-661).
       if (failure.kind === "unverified" || failure.kind === "unreachable" || failure.kind === "throttled") {
-        setLoginAlert(failure);
+        showAlert(failure);
         return;
       }
 
@@ -252,7 +262,7 @@ export default function LoginPage() {
         return;
       }
 
-      setLoginAlert(failure);
+      showAlert(failure);
     }
   };
 
@@ -262,6 +272,55 @@ export default function LoginPage() {
   // than just tinting a border, as it did before IR-204.
   const showFieldError = loginAlert?.kind === "credentials" && !lockoutOpen;
   const attemptsLeft = LOGIN_FAILURE_LIMIT - failedAttempts;
+
+  /** What each failure says, in the dialog in front of the form (IR-1303). */
+  const alertContent = (alert: LoginAlert): EntryError => {
+    switch (alert.kind) {
+      case "credentials":
+        return {
+          title: "Invalid email or password",
+          body: (
+            <>
+              Please check your credentials and try again.
+              {attemptsLeft > 0 && attemptsLeft < LOGIN_FAILURE_LIMIT && (
+                <>
+                  {" "}
+                  {attemptsLeft === 1
+                    ? "One more failed attempt will lock your account."
+                    : `${attemptsLeft} more failed attempts will lock your account.`}{" "}
+                  <strong>Attempt {failedAttempts} of {LOGIN_FAILURE_LIMIT}</strong>
+                </>
+              )}
+            </>
+          ),
+        };
+      // Says nothing about the fields on purpose: the server never judged
+      // them, and a credentials message here is what IR-200 reported.
+      case "unreachable":
+        return {
+          title: "IRIS can't be reached right now",
+          body: "This is a connection or server problem, not a problem with what you typed. Try again shortly.",
+        };
+      case "unverified":
+        return {
+          title: "Email not verified",
+          body: (
+            <>
+              Check your inbox for the verification link. If it expired or never arrived,{" "}
+              {/* The typed address rides in router state, never the URL (IR-643). */}
+              <Link to="/verify-email/resend" state={{ email: identifier }} className="font-semibold text-brand underline">
+                resend verification email
+              </Link>
+              .
+            </>
+          ),
+        };
+      case "throttled":
+        return { title: "Unable to sign in", body: alert.message };
+      case "other":
+        return { title: "Unable to sign in", body: alert.detail };
+    }
+  };
 
   // Someone whose session is still valid has nothing to do here (IR-1215).
   // `AuthBootstrap` renders no page until the session is restored, so this
@@ -282,6 +341,11 @@ export default function LoginPage() {
       before={
         <>
           <SessionNoticeDialog notice={signedOutNotice} onClose={dismissSignedOutNotice} />
+          <EntryErrorDialog
+            error={alertOpen && loginAlert ? alertContent(loginAlert) : null}
+            onClose={() => setAlertOpen(false)}
+            returnTo={passwordRef.current}
+          />
           <AccountLockedModal
             open={lockoutOpen}
             onClose={closeLockout}
@@ -297,55 +361,9 @@ export default function LoginPage() {
         Sign in to access your research workspace.
       </p>
 
-      {loginAlert?.kind === "credentials" && (
-        <AuthAlert variant="error" title="Invalid email or password">
-          Please check your credentials and try again.
-          {attemptsLeft > 0 && attemptsLeft < LOGIN_FAILURE_LIMIT && (
-            <>
-              {" "}
-              {attemptsLeft === 1
-                ? "One more failed attempt will lock your account."
-                : `${attemptsLeft} more failed attempts will lock your account.`}{" "}
-              <strong>Attempt {failedAttempts} of {LOGIN_FAILURE_LIMIT}</strong>
-            </>
-          )}
-        </AuthAlert>
-      )}
-
-      {/* Says nothing about the fields on purpose: the server never judged
-          them, and a credentials message here is what IR-200 reported. */}
-      {loginAlert?.kind === "unreachable" && (
-        <AuthAlert variant="error" title="IRIS can't be reached right now">
-          This is a connection or server problem, not a problem with what you typed.
-          Try again shortly.
-        </AuthAlert>
-      )}
-
-      {loginAlert?.kind === "unverified" && (
-        <AuthAlert variant="warning" title="Email not verified">
-          Check your inbox for the verification link. If it expired or never arrived,{" "}
-          {/* The typed address rides in router state, never the URL (IR-643). */}
-          <Link to="/verify-email/resend" state={{ email: identifier }} className="font-semibold underline">
-            resend verification email
-          </Link>
-          .
-        </AuthAlert>
-      )}
-
-      {loginAlert?.kind === "throttled" && (
-        <AuthAlert variant="error" title="Unable to sign in">
-          {loginAlert.message}
-        </AuthAlert>
-      )}
-
-      {loginAlert?.kind === "other" && (
-        <AuthAlert variant="error" title="Unable to sign in">
-          {loginAlert.detail}
-        </AuthAlert>
-      )}
-
       <LoginForm
         submitRef={signInRef}
+        passwordRef={passwordRef}
         onSubmit={handleLogin}
         disabled={lockoutOpen}
         showCredentialsError={showFieldError}

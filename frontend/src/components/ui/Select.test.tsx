@@ -73,4 +73,25 @@ describe("Select", () => {
     expect(screen.getByRole("combobox", { name: "College" })).not.toBeRequired();
     expect(screen.queryByText(/optional|required/i)).not.toBeInTheDocument();
   });
+
+  it("keeps one slot under the field for its hint or error, so neither moves the form (IR-1303)", () => {
+    const { rerender } = renderScreen(<Select label="College" reserveErrorSpace hint="Choose where you study">
+        <option value="">Select college</option>
+      </Select>);
+    const slot = screen.getByText("Choose where you study").parentElement;
+
+    rerender(<Select label="College" reserveErrorSpace hint="Choose where you study" error="Choose a college.">
+        <option value="">Select college</option>
+      </Select>);
+    expect(screen.getByText("Choose a college.").parentElement).toBe(slot);
+    expect(screen.getByRole("combobox", { name: "College" })).toHaveAccessibleDescription("Choose a college.");
+
+    // With nothing to say, the slot stays, empty, and describes nothing.
+    rerender(<Select label="College" reserveErrorSpace>
+        <option value="">Select college</option>
+      </Select>);
+    expect(slot).toBeInTheDocument();
+    expect(slot).toBeEmptyDOMElement();
+    expect(screen.getByRole("combobox", { name: "College" })).not.toHaveAttribute("aria-describedby");
+  });
 });
