@@ -334,11 +334,11 @@ function ConsoleCard({ row, onAct }: { row: OfficeConsoleRow; onAct: (act: Offic
 
   return (
     <li className="grid grid-cols-[minmax(0,1fr)] gap-2.5 rounded-card border border-stone-200 p-3">
-      <h3 className="break-words font-display text-heading font-semibold text-stone-900">
+      <h2 className="break-words font-display text-heading font-semibold text-stone-900">
         <Link to={`/records/${row.record}?section=review`} className={cn("hover:text-brand", FOCUS_RING)}>
           {row.title}
         </Link>
-      </h3>
+      </h2>
       {row.authors_line && <p className="break-words text-small text-stone-600">{row.authors_line}</p>}
       <p className="flex flex-wrap gap-x-3 gap-y-1 text-small text-stone-600">
         <span className={cn(row.kind === "pool" && "text-stone-500")}>

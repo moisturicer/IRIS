@@ -367,7 +367,7 @@ describe("OfficeConsolePage on a phone", () => {
     await screen.findByRole("list", { name: /ITSO open reviews/ });
 
     const held = cardOf("Smart Campus Energy Monitor");
-    expect(within(held).getByRole("heading", { level: 3 })).toHaveTextContent("Smart Campus Energy Monitor");
+    expect(within(held).getByRole("heading", { level: 2 })).toHaveTextContent("Smart Campus Energy Monitor");
     expect(within(held).getByRole("link", { name: "Smart Campus Energy Monitor" }))
       .toHaveAttribute("href", "/records/7?section=review");
     expect(held).toHaveTextContent("Ada Lovelace · v2");
