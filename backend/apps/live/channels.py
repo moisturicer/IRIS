@@ -39,6 +39,10 @@ NOTIFICATIONS = "notifications"
 REVIEWS = "reviews"
 LIBRARY = "library"
 QUEUES = "queues"
+#: The signed-in account itself: its role, or its role request (IR-1289).
+ACCOUNT = "account"
+#: Calls and conferences, told to a Call's poster (IR-1289).
+CALLS = "calls"
 
 
 def record_topic(record_id) -> str:
