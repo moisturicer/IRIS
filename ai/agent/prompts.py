@@ -43,6 +43,9 @@ DELIMITED_TOOL_VERSION = "research-11"
 #: research-11 plus a passage the reader selected in the paper (IR-581).
 SELECTION_PROMPT_VERSION = "agent-research-12"
 SELECTION_TOOL_VERSION = "research-12"
+#: research-12 plus a paper's recorded details: authors, Adviser, years and more (IR-1278).
+DETAILS_PROMPT_VERSION = "agent-research-13"
+DETAILS_TOOL_VERSION = "research-13"
 
 INSTRUCTIONS = (
     "You are the IRIS research assistant. Answer the reader's question directly. "
@@ -193,6 +196,16 @@ SELECTION_INSTRUCTIONS = DELIMITED_INSTRUCTIONS.replace(_SOURCES_ANCHOR, (
     "paper with read_manuscript or search it; if you still cannot find it, say so, and say the reader may "
     "have selected it on another version. If the message says the selection could not be used, do not "
     "guess what it said.\n\n" + _SOURCES_ANCHOR), 1)
+#: Where research-13 says how to read a paper's recorded details (IR-1278).
+_MANUSCRIPT_ANCHOR = "To answer from a whole paper,"
+#: research-12's text plus paper_details (IR-1278).
+DETAILS_INSTRUCTIONS = SELECTION_INSTRUCTIONS.replace(_MANUSCRIPT_ANCHOR, (
+    "For what was recorded about a paper when it was submitted, such as its authors, Adviser, completion, "
+    "accomplishment or publication year, record type, Area, PSCED area, keywords or abstract, call "
+    "paper_details with its paper handle. These details are what the submitter entered, not text read "
+    "from the paper: give them without passage handles, say a detail is not recorded when it is null, and "
+    "never take an author or year from memory. The years count_records, list_records and search filter by "
+    "are completion years; name which year you mean. " + _MANUSCRIPT_ANCHOR), 1)
 #: Labels an earlier Turn's question under research-10 (IR-1168).
 EARLIER_TURN = "[IRIS earlier Turn {n}] "
 #: Opens the list, under an earlier answer, of the papers it cited (IR-1168).
@@ -237,6 +250,7 @@ PROMPTS = {
     (CITED_PROMPT_VERSION, CITED_TOOL_VERSION): CITED_INSTRUCTIONS,
     (DELIMITED_PROMPT_VERSION, DELIMITED_TOOL_VERSION): DELIMITED_INSTRUCTIONS,
     (SELECTION_PROMPT_VERSION, SELECTION_TOOL_VERSION): SELECTION_INSTRUCTIONS,
+    (DETAILS_PROMPT_VERSION, DETAILS_TOOL_VERSION): DETAILS_INSTRUCTIONS,
 }
 
 #: Any spelling of either marker inside paper text, so the text cannot close or reopen it.
@@ -345,4 +359,9 @@ TOOL_DESCRIPTIONS = {
         "Read one earlier Turn of this conversation again exactly as it was answered, by its number, with "
         "fresh handles for the passages it cited. Use it when the reader asks for an exact detail from an "
         "earlier Turn, such as one a compacted summary mentions."),
+    "paper_details": (
+        "What was recorded for up to 5 papers when they were submitted, by paper handle: title, authors, "
+        "Adviser, completion, accomplishment and publication years, record type, Area (classification), "
+        "PSCED area, keywords, abstract, origin and the IP, commercialization, extension and ethics flags. "
+        "A null value is not recorded. Names any handle it could not read."),
 }

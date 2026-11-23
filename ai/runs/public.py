@@ -118,6 +118,7 @@ TOOL_STEPS = {
     "resolve": ("search", "Looked up papers"), "list_records": ("catalogue", "Looked through the catalogue"),
     "count": ("catalogue", "Counted papers"), "recall": ("recall", "Recalled the conversation"),
     "recover_turn": ("recall", "Reread an earlier answer"),
+    "paper_details": ("catalogue", "Read paper details"),
 }
 READING = ("read_manuscript", "read_page", "open_passage", "outline")
 
