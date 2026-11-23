@@ -251,32 +251,61 @@ describe("photo", () => {
     return { file, dialog };
   }
 
-  it("crops the chosen photo to a circle and uploads the framed square", async () => {
+  const save = () => screen.getByRole("button", { name: "Save" });
+
+  it("crops the chosen photo to a circle and uploads the framed square with Save", async () => {
     const user = userEvent.setup();
     vi.spyOn(profileApi, "uploadPhoto").mockResolvedValue({ data: { photo_url: "/users/7/photo/?v=2" } } as never);
-    vi.spyOn(profileApi, "photo").mockResolvedValue({ data: new Blob(["png"]) } as never);
-    const { container } = renderScreen(<EditProfilePage />, { route: "/profile/edit" });
+    vi.spyOn(profileApi, "updateFields");
+    vi.spyOn(authApi, "updateMe");
+    const { container } = renderScreen(withProfile(), { route: "/profile/edit" });
 
+    expect(save()).toBeDisabled();
     const { file, dialog } = await choosePhoto(user);
     expect(within(dialog).getByRole("slider", { name: "Zoom" })).toBeVisible();
     await expectNoBlockingA11yViolations(container);
     await user.click(within(dialog).getByRole("button", { name: "Use photo" }));
 
-    expect(profileApi.uploadPhoto).toHaveBeenCalledWith(file, { x: 250, y: 0, size: 500 });
+    // Framed and shown, but not sent until Save.
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(screen.getByRole("img", { name: "Your profile photo" })).toBeVisible();
+    expect(profileApi.uploadPhoto).not.toHaveBeenCalled();
+    expect(save()).toBeEnabled();
+
+    await user.click(save());
+
+    expect(profileApi.uploadPhoto).toHaveBeenCalledWith(file, { x: 250, y: 0, size: 500 });
+    expect(await screen.findByRole("heading", { name: "Your profile" })).toBeVisible();
     expect(useAuthStore.getState().user?.photo_url).toBe("/users/7/photo/?v=2");
+    // Only the photo changed, so nothing else is sent.
+    expect(profileApi.updateFields).not.toHaveBeenCalled();
+    expect(authApi.updateMe).not.toHaveBeenCalled();
+  });
+
+  it("Cancel leaves the old photo: a cropped photo is not uploaded", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(profileApi, "uploadPhoto");
+    renderScreen(withProfile(), { route: "/profile/edit" });
+
+    const { dialog } = await choosePhoto(user);
+    await user.click(within(dialog).getByRole("button", { name: "Use photo" }));
+    await user.click(screen.getByRole("link", { name: "Cancel" }));
+
+    expect(await screen.findByRole("heading", { name: "Your profile" })).toBeVisible();
+    expect(profileApi.uploadPhoto).not.toHaveBeenCalled();
+    expect(useAuthStore.getState().user?.photo_url).toBeNull();
   });
 
   it("moves the framing with the arrow keys", async () => {
     const user = userEvent.setup();
     vi.spyOn(profileApi, "uploadPhoto").mockResolvedValue({ data: { photo_url: "/users/7/photo/?v=2" } } as never);
-    vi.spyOn(profileApi, "photo").mockResolvedValue({ data: new Blob(["png"]) } as never);
-    renderScreen(<EditProfilePage />, { route: "/profile/edit" });
+    renderScreen(withProfile(), { route: "/profile/edit" });
 
     const { file, dialog } = await choosePhoto(user);
     within(dialog).getByRole("group", { name: /Drag or use the arrow keys/ }).focus();
     await user.keyboard("{ArrowRight}");
     await user.click(within(dialog).getByRole("button", { name: "Use photo" }));
+    await user.click(save());
 
     // Each arrow press moves the framing 10 screen px. The dialog's square is
     // 256 px, so on this 500 px-tall photo one screen px is 500 / 256 image px:
@@ -284,7 +313,7 @@ describe("photo", () => {
     expect(profileApi.uploadPhoto).toHaveBeenCalledWith(file, { x: 270, y: 0, size: 500 });
   });
 
-  it("shows the server's message when it refuses the photo", async () => {
+  it("shows the server's message when it refuses the photo, and stays on the page", async () => {
     const user = userEvent.setup();
     vi.spyOn(profileApi, "uploadPhoto").mockRejectedValue({
       response: { status: 400, data: { photo: ["The photo must be 2 MB or smaller."] } },
@@ -293,22 +322,42 @@ describe("photo", () => {
 
     const { dialog } = await choosePhoto(user);
     await user.click(within(dialog).getByRole("button", { name: "Use photo" }));
+    await user.click(save());
 
-    expect(await within(dialog).findByRole("alert")).toHaveTextContent("The photo must be 2 MB or smaller.");
+    expect(await screen.findByRole("alert")).toHaveTextContent("The photo must be 2 MB or smaller.");
+    expect(save()).toBeEnabled();
   });
 
-  it("removes the photo", async () => {
+  it("removes the photo with Save", async () => {
     const user = userEvent.setup();
     signIn({ photo_url: "/users/7/photo/?v=1" });
     vi.spyOn(profileApi, "photo").mockResolvedValue({ data: new Blob(["png"]) } as never);
     vi.spyOn(profileApi, "removePhoto").mockResolvedValue({} as never);
-    renderScreen(<EditProfilePage />, { route: "/profile/edit" });
+    renderScreen(withProfile(), { route: "/profile/edit" });
 
     expect(await screen.findByRole("img", { name: "Your profile photo" })).toBeVisible();
     await user.click(screen.getByRole("button", { name: "Remove photo" }));
 
+    expect(screen.queryByRole("img", { name: "Your profile photo" })).not.toBeInTheDocument();
+    expect(profileApi.removePhoto).not.toHaveBeenCalled();
+    await user.click(save());
+
     expect(profileApi.removePhoto).toHaveBeenCalled();
     await waitFor(() => expect(useAuthStore.getState().user?.photo_url).toBeNull());
-    expect(screen.queryByRole("button", { name: "Remove photo" })).not.toBeInTheDocument();
+  });
+
+  it("Cancel keeps the photo a person chose to remove", async () => {
+    const user = userEvent.setup();
+    signIn({ photo_url: "/users/7/photo/?v=1" });
+    vi.spyOn(profileApi, "photo").mockResolvedValue({ data: new Blob(["png"]) } as never);
+    vi.spyOn(profileApi, "removePhoto");
+    renderScreen(withProfile(), { route: "/profile/edit" });
+
+    await user.click(await screen.findByRole("button", { name: "Remove photo" }));
+    await user.click(screen.getByRole("link", { name: "Cancel" }));
+
+    expect(await screen.findByRole("heading", { name: "Your profile" })).toBeVisible();
+    expect(profileApi.removePhoto).not.toHaveBeenCalled();
+    expect(useAuthStore.getState().user?.photo_url).toBe("/users/7/photo/?v=1");
   });
 });
