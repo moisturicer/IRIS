@@ -247,9 +247,9 @@ export const HELP_SECTIONS: HelpSection[] = [
         <p>The RDCO part of the sidebar holds the research office&rsquo;s coordination tools:</p>
         <ul>
           <li><strong>Users</strong>: give Student or Adviser roles and lock or unlock accounts. Office roles and coordinator assignments belong to the System Admin.</li>
-          <li><strong>Role requests</strong>: approve or decline the Student or Adviser role someone requested at registration.</li>
-          <li><strong>Download requests</strong> and <strong>Delete requests</strong>: decide requests to download or delete a paper.</li>
-          <li><strong>Import records</strong>: file research on someone&rsquo;s behalf.</li>
+          <li><strong>Role Requests</strong>: approve or decline the Student or Adviser role someone requested at registration.</li>
+          <li><strong>Download Requests</strong> and <strong>Delete Requests</strong>: decide requests to download or delete a paper.</li>
+          <li><strong>Import Records</strong>: file research on someone&rsquo;s behalf.</li>
         </ul>
         <p>The System Admin alone reads the Audit Log. RDCO cannot change a System Admin account.</p>
       </>

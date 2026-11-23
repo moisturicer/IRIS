@@ -196,11 +196,11 @@ describe("the sidebar's list", () => {
 
     await screen.findByRole("heading", { name: "My Library" });
     const admin = screen.getByRole("list", { name: "RDCO" });
-    expect(within(admin).getAllByRole("link").map((l) => l.textContent?.trim())[0]).toBe("Import records");
-    expect(await within(admin).findByRole("link", { name: "Role requests, 3 pending" })).toHaveAttribute("href", "/rdco/role-requests");
+    expect(within(admin).getAllByRole("link").map((l) => l.textContent?.trim())[0]).toBe("Import Records");
+    expect(await within(admin).findByRole("link", { name: "Role Requests, 3 pending" })).toHaveAttribute("href", "/rdco/role-requests");
     expect(within(admin).getByRole("link", { name: "Users" })).toHaveAttribute("href", "/rdco/users");
-    expect(within(admin).getByRole("link", { name: "Download requests, 2 pending" })).toHaveAttribute("href", "/rdco/download-requests");
-    expect(within(admin).getByRole("link", { name: "Delete requests, 1 pending" })).toHaveAttribute("href", "/rdco/delete-requests");
+    expect(within(admin).getByRole("link", { name: "Download Requests, 2 pending" })).toHaveAttribute("href", "/rdco/download-requests");
+    expect(within(admin).getByRole("link", { name: "Delete Requests, 1 pending" })).toHaveAttribute("href", "/rdco/delete-requests");
     expect(screen.queryByRole("link", { name: "Audit Log" })).not.toBeInTheDocument();
   });
 
@@ -211,7 +211,7 @@ describe("the sidebar's list", () => {
     renderAt("/records/mine");
 
     const admin = await screen.findByRole("list", { name: "RDCO" });
-    expect(await within(admin).findByRole("link", { name: "Reported comments, 4 pending" }))
+    expect(await within(admin).findByRole("link", { name: "Reported Comments, 4 pending" }))
       .toHaveAttribute("href", "/moderation/comments");
   });
 
@@ -221,7 +221,7 @@ describe("the sidebar's list", () => {
     renderAt("/records/mine");
 
     const admin = await screen.findByRole("list", { name: "Administration" });
-    expect(await within(admin).findByRole("link", { name: "Reported comments, 2 pending" }))
+    expect(await within(admin).findByRole("link", { name: "Reported Comments, 2 pending" }))
       .toHaveAttribute("href", "/moderation/comments");
   });
 
@@ -232,8 +232,8 @@ describe("the sidebar's list", () => {
 
     const admin = await screen.findByRole("list", { name: "RDCO" });
     await vi.waitFor(() => expect(apiClient.get).toHaveBeenCalledWith("/dashboard/queue-counts/"));
-    expect(within(admin).getByRole("link", { name: "Download requests" })).toBeInTheDocument();
-    expect(within(admin).getByRole("link", { name: "Delete requests" })).toBeInTheDocument();
+    expect(within(admin).getByRole("link", { name: "Download Requests" })).toBeInTheDocument();
+    expect(within(admin).getByRole("link", { name: "Delete Requests" })).toBeInTheDocument();
   });
 
   it("shows no count, not a stale one, when the read fails", async () => {
@@ -243,7 +243,7 @@ describe("the sidebar's list", () => {
 
     const admin = await screen.findByRole("list", { name: "RDCO" });
     await vi.waitFor(() => expect(apiClient.get).toHaveBeenCalledWith("/dashboard/queue-counts/"));
-    expect(within(admin).getByRole("link", { name: "Download requests" })).toBeInTheDocument();
+    expect(within(admin).getByRole("link", { name: "Download Requests" })).toBeInTheDocument();
   });
 
   it("reads the counts again when a decision is made, without a reload", async () => {
@@ -251,11 +251,11 @@ describe("the sidebar's list", () => {
     signIn(ROLES.RDCO, true);
     renderAt("/records/mine");
     const admin = await screen.findByRole("list", { name: "RDCO" });
-    expect(await within(admin).findByRole("link", { name: "Download requests, 2 pending" })).toBeInTheDocument();
+    expect(await within(admin).findByRole("link", { name: "Download Requests, 2 pending" })).toBeInTheDocument();
 
     queues({ role_change_requests: 0, download_requests: 1, delete_requests: 1 });
     act(() => { queueCountsChanged(); });
-    expect(await within(admin).findByRole("link", { name: "Download requests, 1 pending" })).toBeInTheDocument();
+    expect(await within(admin).findByRole("link", { name: "Download Requests, 1 pending" })).toBeInTheDocument();
   });
 
   // The System Admin asks since IR-693: it shares the Reported comments queue.
@@ -277,7 +277,7 @@ describe("the sidebar's list", () => {
     // IR-693 adds Reported comments, after Account Deletions; IR-972 moves the Notice onto RDCO's Setup.
     // IR-974: no Guidelines link for the System Admin (ADR-063 amendment 2026-11-19).
     expect(within(nav).getAllByRole("link").map((link) => link.textContent?.trim()))
-      .toEqual(["Discover", "Users", "Audit Log", "Account Deletions", "Reported comments", "Retention"]);
+      .toEqual(["Discover", "Users", "Audit Log", "Account Deletions", "Reported Comments", "Retention"]);
     const admin = within(nav).getByRole("list", { name: "Administration" });
     expect(within(admin).getByRole("link", { name: "Users" })).toHaveAttribute("href", "/admin/users");
     expect(within(admin).getByRole("link", { name: "Audit Log" })).toHaveAttribute("href", "/admin/audit");
@@ -549,13 +549,13 @@ describe("pages nested under My Reviews (IR-1085, D5)", () => {
     renderAt("/records/mine");
 
     await screen.findByRole("heading", { name: "My Library" });
-    expect(linksUnder()).toEqual(["My Reviews", "Office console"]);
+    expect(linksUnder()).toEqual(["My Reviews", "Office Console"]);
     const item = within(myReviewsItem());
-    expect(item.getByRole("link", { name: "Office console" })).toHaveAttribute("href", "/review/office");
+    expect(item.getByRole("link", { name: "Office Console" })).toHaveAttribute("href", "/review/office");
     // Nested, not a second heading level: one list inside My Reviews' own row.
     expect(item.getByRole("list")).toBeInTheDocument();
     // Workflow analytics is RDCO's alone since IR-1216.
-    expect(screen.queryByRole("link", { name: "Workflow analytics" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Workflow Analytics" })).not.toBeInTheDocument();
   });
 
   it("gives an office member who is not a coordinator nothing nested, and no analytics (IR-1216)", async () => {
@@ -564,8 +564,8 @@ describe("pages nested under My Reviews (IR-1085, D5)", () => {
 
     await screen.findByRole("heading", { name: "My Library" });
     expect(linksUnder()).toEqual(["My Reviews"]);
-    expect(screen.queryByRole("link", { name: "Office console" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Workflow analytics" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Office Console" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Workflow Analytics" })).not.toBeInTheDocument();
   });
 
   it("lists Workflow analytics in RDCO's group, not under My Reviews, and marks it there (IR-1216)", async () => {
@@ -573,9 +573,9 @@ describe("pages nested under My Reviews (IR-1085, D5)", () => {
     renderAt("/rdco/analytics");
 
     await screen.findByRole("heading", { name: "Workflow analytics" });
-    expect(linksUnder()).not.toContain("Workflow analytics");
+    expect(linksUnder()).not.toContain("Workflow Analytics");
     const nav = within(screen.getByRole("navigation", { name: "Main" }));
-    const analytics = nav.getByRole("link", { name: "Workflow analytics" });
+    const analytics = nav.getByRole("link", { name: "Workflow Analytics" });
     expect(analytics).toHaveAttribute("href", "/rdco/analytics");
     expect(analytics).toHaveAttribute("aria-current", "page");
     expect(nav.getByRole("link", { name: "My Reviews" })).not.toHaveAttribute("aria-current");
@@ -590,8 +590,8 @@ describe("pages nested under My Reviews (IR-1085, D5)", () => {
     renderAt("/records/mine");
 
     await screen.findByRole("heading", { name: "My Library" });
-    expect(screen.queryByRole("link", { name: "Office console" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Workflow analytics" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Office Console" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Workflow Analytics" })).not.toBeInTheDocument();
   });
 
   it("shows neither when the user has no review work, because they hang from My Reviews", async () => {
@@ -600,7 +600,7 @@ describe("pages nested under My Reviews (IR-1085, D5)", () => {
 
     await screen.findByRole("heading", { name: "My Library" });
     expect(screen.queryByRole("link", { name: "My Reviews" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Workflow analytics" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Workflow Analytics" })).not.toBeInTheDocument();
   });
 
   it("marks the nested page you are on, and not My Reviews", async () => {
@@ -609,7 +609,7 @@ describe("pages nested under My Reviews (IR-1085, D5)", () => {
 
     await screen.findByRole("heading", { name: "Office console" });
     const nav = within(screen.getByRole("navigation", { name: "Main" }));
-    expect(nav.getByRole("link", { name: "Office console" })).toHaveAttribute("aria-current", "page");
+    expect(nav.getByRole("link", { name: "Office Console" })).toHaveAttribute("aria-current", "page");
     expect(nav.getByRole("link", { name: "My Reviews" })).not.toHaveAttribute("aria-current");
   });
 
@@ -618,7 +618,7 @@ describe("pages nested under My Reviews (IR-1085, D5)", () => {
     signIn(ROLES.ITSO, true, true);
     renderAt("/review");
 
-    await user.click(await screen.findByRole("link", { name: "Office console" }));
+    await user.click(await screen.findByRole("link", { name: "Office Console" }));
 
     expect(await screen.findByRole("heading", { name: "Office console" })).toBeInTheDocument();
   });
@@ -629,7 +629,7 @@ describe("pages nested under My Reviews (IR-1085, D5)", () => {
     const { container } = renderAt("/records/mine");
 
     await screen.findByRole("heading", { name: "My Library" });
-    for (const name of ["Office console"]) {
+    for (const name of ["Office Console"]) {
       const link = screen.getByRole("link", { name });
       expect(within(link).getByText(name)).toHaveClass("md:sr-only");
     }
