@@ -115,6 +115,7 @@ def problems(cursor) -> list[str]:
         [VERIFIER],
     )
     found += [f"function iris_authz.{name} is not owned by {VERIFIER}" for (name,) in cursor.fetchall()]
+    found += _verifier_column_problems(cursor)
     found += _policy_problems(cursor)
     cursor.execute("SELECT 1 FROM pg_roles WHERE rolname = 'iris_ai_runtime'")
     if cursor.fetchone() is not None:
@@ -137,6 +138,28 @@ def problems(cursor) -> list[str]:
         )
         if cursor.fetchone()[0]:
             found.append("role iris_ai_runtime can rewrite reservations")
+    return found
+
+
+def _verifier_column_problems(cursor) -> list[str]:
+    """A column the verifier's functions read but may not: they fail at the first read (IR-1285)."""
+    cursor.execute("SELECT 1 FROM pg_roles WHERE rolname = %s", [VERIFIER])
+    if cursor.fetchone() is None:
+        return []
+    found = []
+    for table, columns in VERIFIER_COLUMNS.items():
+        for column in (c.strip() for c in columns.split(",")):
+            # A table or column this database does not have yet is not a missing grant.
+            cursor.execute(
+                """SELECT has_column_privilege(%s, c.oid, a.attnum, 'SELECT')
+                     FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+                     JOIN pg_attribute a ON a.attrelid = c.oid AND NOT a.attisdropped
+                    WHERE n.nspname = 'public' AND c.relname = %s AND a.attname = %s""",
+                [VERIFIER, table, column],
+            )
+            row = cursor.fetchone()
+            if row is not None and not row[0]:
+                found.append(f"role {VERIFIER} cannot read {table}.{column}")
     return found
 
 
