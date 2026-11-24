@@ -48,6 +48,9 @@ DETAILS_PROMPT_VERSION = "agent-research-13"
 DETAILS_TOOL_VERSION = "research-13"
 #: research-13's tools; its answers explain fully instead of in short paragraphs (IR-1300).
 FULLER_PROMPT_VERSION = "agent-research-14"
+#: agent-research-14's text with three dates to filter and sort by, and what "recent" means (IR-1316).
+DATED_PROMPT_VERSION = "agent-research-15"
+DATED_TOOL_VERSION = "research-14"
 
 INSTRUCTIONS = (
     "You are the IRIS research assistant. Answer the reader's question directly. "
@@ -216,6 +219,30 @@ FULLER_INSTRUCTIONS = DETAILS_INSTRUCTIONS.replace(_SHORT_STYLE, (
     "would want next: how the paper's own method works, what it found and any limits it states, each "
     "cited. Several short paragraphs are usual for a question about how or why; a question asking for one "
     "fact or number needs only a sentence or two. Never pad with general knowledge. "), 1)
+#: What research-13 said about years, which agent-research-15 replaces (IR-1316).
+_YEARS_RULE = ("The years count_records, list_records and search filter by are completion years; name which "
+               "year you mean. ")
+_YEARS_LISTED = "completion, accomplishment or publication year, record type"
+_PAPERS_ANCHOR = "Papers. When the reader names a paper"
+#: agent-research-14's text plus the three dates and what "recent" means (IR-1316).
+DATED_INSTRUCTIONS = FULLER_INSTRUCTIONS.replace(_YEARS_RULE, "", 1).replace(
+    _YEARS_LISTED, "completion year, publication year, date added, record type", 1).replace(_PAPERS_ANCHOR, (
+        "Dates. A paper has three recorded dates: the year it was completed, the year it was published, and "
+        "the day it was added to IRIS, which is when it was uploaded. year_from and year_to filter by "
+        "completion year, published_from and published_to by publication year, and added_from and added_to "
+        "by the day added. An [IRIS today] message gives today's date and what recent means: use its ranges "
+        "for recent or new papers, and work out phrases such as last year or the past six months from its "
+        "date. Recent means completion years, unless the reader says published (publication years) or "
+        "uploaded, added or new in IRIS (the day added). For the newest or latest papers, or for recent "
+        "papers with no topic, call list_records with sort. For recent papers about a topic, search with the "
+        "range as filters; for the latest on a topic, search without a range and compare the dates the "
+        "results give. If the range finds nothing, say so, then give the newest that match with their dates. "
+        "Always say which of the three dates you used and the first and last year or day of the range, never "
+        "a number of years or days. A paper with no recorded year is left out of a year range: when undated "
+        "is above zero, say how many were left out. Give these dates without passage handles, never from "
+        "memory, and never take a year in a paper's text for its recorded date.\n\n" + _PAPERS_ANCHOR), 1)
+#: Gives a run under research-14 today's date and the recent ranges (IR-1316).
+TODAY_PREFIX = "[IRIS today] "
 #: Labels an earlier Turn's question under research-10 (IR-1168).
 EARLIER_TURN = "[IRIS earlier Turn {n}] "
 #: Opens the list, under an earlier answer, of the papers it cited (IR-1168).
@@ -262,6 +289,7 @@ PROMPTS = {
     (SELECTION_PROMPT_VERSION, SELECTION_TOOL_VERSION): SELECTION_INSTRUCTIONS,
     (DETAILS_PROMPT_VERSION, DETAILS_TOOL_VERSION): DETAILS_INSTRUCTIONS,
     (FULLER_PROMPT_VERSION, DETAILS_TOOL_VERSION): FULLER_INSTRUCTIONS,
+    (DATED_PROMPT_VERSION, DATED_TOOL_VERSION): DATED_INSTRUCTIONS,
 }
 
 #: Any spelling of either marker inside paper text, so the text cannot close or reopen it.
@@ -375,4 +403,25 @@ TOOL_DESCRIPTIONS = {
         "Adviser, completion, accomplishment and publication years, record type, Area (classification), "
         "PSCED area, keywords, abstract, origin and the IP, commercialization, extension and ethics flags. "
         "A null value is not recorded. Names any handle it could not read."),
+    #: research-14's versions, with the three dates (IR-1316).
+    "dated_search": (
+        "Search the readable papers' passages by keyword and by meaning, optionally narrowed by Area "
+        "(classification), PSCED area, record type, completion years, publication years or the day added. "
+        "Returns a sample of matching passages, never all of them, with each paper's dates, and says when "
+        "meaning search was unavailable."),
+    "dated_count": (
+        "Exactly how many papers this reader can see match metadata: Area (classification), PSCED area, "
+        "record type, completion years, publication years, the day added or IP flag, optionally grouped. "
+        "undated counts papers a year range left out for having no such year. Cannot count by topic."),
+    "dated_list": (
+        "Every paper this reader can see that matches metadata: Area (classification), PSCED area, record "
+        "type, completion years, publication years, the day added or IP flag, with its dates and the exact "
+        "total. sort orders by title, or newest first by completed, published or added. Names at most 50 at "
+        "a time and says when more remain; pass offset to continue from where the last page stopped. "
+        "Cannot list by topic."),
+    "dated_details": (
+        "What was recorded for up to 5 papers when they were submitted, by paper handle: title, authors, "
+        "Adviser, completion year, publication year, date added, record type, Area (classification), PSCED "
+        "area, keywords, abstract, origin and the IP, commercialization, extension and ethics flags. A null "
+        "value is not recorded. Names any handle it could not read."),
 }

@@ -85,7 +85,18 @@ class MyResearchSerializer(serializers.ModelSerializer):
     on detail.
     """
     can_continue         = serializers.SerializerMethodField()
+    delete_act           = serializers.SerializerMethodField()
     record_type_name     = serializers.CharField(source="record_type.name", read_only=True)
+
+    def get_delete_act(self, obj):
+        """What the owner's `DELETE /records/<id>/` would do, as Record detail
+        names it (IR-508): `delete_record`, `withdraw_submission` or
+        `request_deletion`, or None while a decision is pending (IR-1282).
+        Every listed record is the viewer's own (`owned_by`), so the status
+        alone decides it, and the row's button names its consequence."""
+        from core.permissions import DELETE_CAPABILITY
+
+        return DELETE_CAPABILITY.get(obj.pipeline_status)
 
     def get_can_continue(self, obj):
         from core.enums import PipelineStatus, RecordTypeName
@@ -152,6 +163,7 @@ class MyResearchSerializer(serializers.ModelSerializer):
             "id", "title", "record_type_name", "authors", "adviser_name",
             "pipeline_status", "workflow_state", "workflow_state_label",
             "holders", "cleared_offices", "clearance_strip", "submitter_status", "created_at", "updated_at", "can_continue",
+            "delete_act",
         ]
         read_only_fields = fields
 

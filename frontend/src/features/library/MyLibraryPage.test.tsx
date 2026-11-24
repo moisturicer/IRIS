@@ -530,6 +530,70 @@ describe("My Library: what each paper waits on (IR-1084, IR-1306)", () => {
   });
 });
 
+describe("My Library: withdrawing a paper in review (IR-1282)", () => {
+  const inReview = (overrides: Partial<MyResearchItem> = {}) => ownRecord({
+    id: 13, title: "Still with the offices", pipeline_status: "in_review", workflow_state: "in_review",
+    workflow_state_label: "In review", holders: [{ party: "ierc", label: "IERC" }],
+    submitter_status: { line: "In specialist review: IERC", waiting_on_you: [] },
+    delete_act: "withdraw_submission",
+    ...overrides,
+  });
+
+  // IR-1311 moves IR-1282's trash can into the row's ⋯ menu, at the project
+  // owner's request; the question, its words and what it does are unchanged.
+  it("offers Withdraw and delete in a paper in review's ⋯ menu, asks once in withdrawal's words, then drops the row", async () => {
+    mine([inReview()]);
+    vi.mocked(recordsApi.delete).mockResolvedValue({} as Awaited<ReturnType<typeof recordsApi.delete>>);
+    const user = userEvent.setup();
+    renderScreen(<MyLibraryPage />, SUBMISSIONS);
+
+    await screen.findByRole("link", { name: "Still with the offices" });
+    await user.click(screen.getByRole("button", { name: "Actions for Still with the offices" }));
+    const remove = screen.getByRole("menuitem", { name: "Withdraw and delete" });
+    expect(remove).toHaveClass("text-brand-dark");
+
+    await user.click(remove);
+    const dialog = screen.getByRole("dialog", { name: "Withdraw and delete this paper?" });
+    expect(dialog).toHaveTextContent("“Still with the offices” leaves review and is removed with its files.");
+    expect(dialog).toHaveTextContent("Your Adviser and any office reviewing it stop, and are told.");
+    expect(within(dialog).getByRole("button", { name: "Cancel" })).toHaveFocus();
+    expect(recordsApi.delete).not.toHaveBeenCalled();
+
+    await user.click(within(dialog).getByRole("button", { name: "Withdraw and delete" }));
+    await waitFor(() => expect(screen.queryByRole("link", { name: "Still with the offices" })).not.toBeInTheDocument());
+    expect(recordsApi.delete).toHaveBeenCalledWith(13);
+  });
+
+  it("keeps the paper and says why when the withdrawal fails", async () => {
+    mine([inReview()]);
+    vi.mocked(recordsApi.delete).mockRejectedValue({ response: { status: 403, data: { detail: "Only an owner can delete this record." } } });
+    renderScreen(<MyLibraryPage />, SUBMISSIONS);
+
+    await screen.findByRole("link", { name: "Still with the offices" });
+    await choose("Actions for Still with the offices", "Withdraw and delete");
+    await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Withdraw and delete" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Only an owner can delete this record.");
+    expect(screen.getByRole("dialog", { name: "Withdraw and delete this paper?" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Still with the offices" })).toBeInTheDocument();
+  });
+
+  it("offers no delete on accepted work, a rejected paper, or one awaiting RDCO's delete decision", async () => {
+    mine([
+      inReview({ id: 31, title: "Published work", pipeline_status: "published", workflow_state: "published", holders: [], delete_act: "request_deletion" }),
+      inReview({ id: 32, title: "Rejected work", pipeline_status: "rejected", workflow_state: "rejected", holders: [], delete_act: "delete_record" }),
+      inReview({ id: 33, title: "Awaiting RDCO", pipeline_status: "pending_delete", workflow_state: "pending_delete", holders: [], delete_act: null }),
+    ]);
+    renderScreen(<MyLibraryPage />, SUBMISSIONS);
+
+    for (const title of ["Published work", "Rejected work", "Awaiting RDCO"]) {
+      const row = (await screen.findByRole("link", { name: title })).closest("li") as HTMLElement;
+      // Nothing to offer, so no menu at all.
+      expect(within(row).queryByRole("button", { name: `Actions for ${title}` })).not.toBeInTheDocument();
+    }
+  });
+});
+
 describe("My Library: interrupted reads (IR-906)", () => {
   const timeout = () => new RequestTimeoutError(30_000, "get", "/x/");
 

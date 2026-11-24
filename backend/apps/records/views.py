@@ -57,6 +57,7 @@ from .serializers import (
     DownloadRequestSerializer,
     DeleteRequestSerializer,
 )
+from .completion import with_completion_year
 from .filters import RecordFilter, RecordOrderingFilter
 from .services import ImportChoices, check_import_pdf, check_import_row, soft_delete_record, parse_excel_import
 from apps.notifications.services import (
@@ -1714,15 +1715,15 @@ class RecordViewSet(viewsets.ModelViewSet):
         """GET /records/facets/ -- the filter choices Discover offers (IR-560).
 
         Drawn from the whole catalogue `list` serves, so a year held only by
-        Records beyond the first page is still offered. `year_accomplished`
+        Records beyond the first page is still offered. The completion year
         is what `year_from`/`year_to` filter on, so every year returns a
         Record. Distinct values only: no count of anything is exposed.
         """
         years = (
-            self.get_queryset()
-            .exclude(year_accomplished__isnull=True)
-            .order_by("-year_accomplished")
-            .values_list("year_accomplished", flat=True)
+            with_completion_year(self.get_queryset())
+            .exclude(completion_year__isnull=True)
+            .order_by("-completion_year")
+            .values_list("completion_year", flat=True)
             .distinct()
         )
         return Response({"years": list(years)})

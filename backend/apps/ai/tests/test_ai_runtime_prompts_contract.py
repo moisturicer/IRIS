@@ -44,6 +44,8 @@ PREFIXES = {
     ("agent-research-13", "research-13"): "0793152083bbf43448f97ad802a7291ac8adc5f18c4973bcc8efbe7702400227",
     # Recorded when research-14 was written (IR-1300): research-13's tools, its own text.
     ("agent-research-14", "research-13"): "76e8902b7ff32c437b141a19ee13949bc395dcd22207e48c38fdd8dd5f3bb99e",
+    # Recorded when agent-research-15 was written (IR-1316).
+    ("agent-research-15", "research-14"): "24abdd97386a5fc6aaa3600d77874b89bb9245471d07c9fcffb6ad868e4f9db1",
 }
 #: The notes, prefixes and repair texts every research version sends, before the move.
 NOTES = "74d1d448eb110799d49624570b4ca686e8ddca28adf6cb0d53b647db008f27d2"
@@ -112,5 +114,6 @@ def test_the_texts_are_defined_in_the_prompts_module():
     assert compaction.STATE_PREFIX is prompts.STATE_PREFIX
     assert compaction.reader(prompts.STATE_PREFIX) == "(reader) " + prompts.STATE_PREFIX
     every = Investigation(None, clarify=True, metadata=True, manuscripts=True, recovery=True, hybrid=True,
-                          listing=True, details=True).specs() + toolset.RESEARCH[:1]
+                          listing=True, details=True).specs() + toolset.RESEARCH[:1] + (
+        toolset.DATED_SEARCH, toolset.DATED_COUNT, toolset.DATED_LIST, toolset.DATED_DETAILS)
     assert {spec.description for spec in every} == set(prompts.TOOL_DESCRIPTIONS.values())

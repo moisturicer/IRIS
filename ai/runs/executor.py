@@ -7,6 +7,7 @@ paid capacity or answer quality. `tools` is `ai.research.tools.ResearchTools`.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import date
 from typing import TYPE_CHECKING, Awaitable, Callable, Optional, Protocol
 
 if TYPE_CHECKING:
@@ -97,6 +98,8 @@ class RunContext:
     selection: Optional["Assessed"] = None
     #: The reader asked about a passage whose paper this reader may not read now, or that has no indexed text.
     selection_withdrawn: bool = False
+    #: The day the question is answered; None reads the clock (IR-1316).
+    today: Optional[date] = None
 
 
 class Unavailable(Exception):

@@ -10,7 +10,7 @@ import { usePublishHref } from "@/features/publish/publishLink";
 import { cn, formatDate } from "@/lib/utils";
 import type { MyResearchItem } from "@/types/records";
 
-import { DeleteDraftDialog } from "./DeleteDraft";
+import { DELETE_WORDS, DeleteRecordDialog, deleteKindOf } from "./DeleteRecord";
 
 /**
  * Where the row itself leads: a draft opens Publish over this page, since a
@@ -24,7 +24,7 @@ function rowHref(item: MyResearchItem, publishHref: (target: number) => string) 
 
 interface SubmissionRowProps {
   item: MyResearchItem;
-  /** Offered on a draft: the row is gone once the server deleted it. */
+  /** Offered on a draft or a paper in review: the row is gone once the server deleted it. */
   onDeleted?: (id: number) => void;
 }
 
@@ -33,15 +33,17 @@ interface SubmissionRowProps {
  * the row's link, stretched over the row (`rowHref`). The status words are the
  * server's (`submitter_status.line`). One action at most: Continue on an accepted Proposal. Open requests are
  * answered on the paper's Overview, so the row carries no button for them;
- * Delete draft is in its menu (IR-1311).
+ * Delete draft, or Withdraw and delete on a paper in review (IR-1282), is in its menu (IR-1311).
  */
 export function SubmissionRow({ item, onDeleted }: SubmissionRowProps) {
   const publishHref = usePublishHref();
   const [deleting, setDeleting] = useState(false);
   // Open requests are answered on the paper's Overview, which the row opens;
-  // the row offers only what is not there: Continue on a Proposal, Delete on a draft.
-  const menu: RowMenuItem[] = item.pipeline_status === "draft" && onDeleted
-    ? [{ key: "delete", label: "Delete draft", danger: true, onSelect: () => setDeleting(true) }]
+  // the row offers only what is not there: Continue on a Proposal, and in its
+  // menu Delete draft or, for a paper in review, Withdraw and delete (IR-1282).
+  const deleteKind = onDeleted ? deleteKindOf(item) : null;
+  const menu: RowMenuItem[] = deleteKind
+    ? [{ key: "delete", label: DELETE_WORDS[deleteKind].action, danger: true, onSelect: () => setDeleting(true) }]
     : [];
   const action: ReactNode = item.can_continue ? <ContinueProposal recordId={item.id} /> : null;
 
@@ -90,8 +92,9 @@ export function SubmissionRow({ item, onDeleted }: SubmissionRowProps) {
         )}
       </div>
 
-      {onDeleted && item.pipeline_status === "draft" && (
-        <DeleteDraftDialog
+      {onDeleted && deleteKind && (
+        <DeleteRecordDialog
+          kind={deleteKind}
           recordId={item.id}
           title={item.title}
           open={deleting}

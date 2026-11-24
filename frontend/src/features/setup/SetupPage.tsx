@@ -32,6 +32,7 @@ import { LoadFailedAlert } from "@/components/shared/LoadFailedAlert";
 import { PlainTextWithLinks } from "@/components/shared/PlainTextWithLinks";
 import { RequirementLabel } from "./RequirementLabel";
 import { Button } from "@/components/ui/Button";
+import { Modal } from "@/components/ui/Modal";
 import { fieldClasses, LABEL, WARNING_NOTICE } from "@/components/ui/fieldClasses";
 import { SELECTED_SEGMENT } from "@/components/ui/highlightRoles";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
@@ -150,7 +151,7 @@ function RequirementsSection() {
     }
   };
 
-  const act = async (work: () => Promise<unknown>, done: string, fallback: string): Promise<boolean> => {
+  const act: Act = async (work, done, fallback, onFailed) => {
     setOutcome(null);
     try {
       await work();
@@ -158,7 +159,9 @@ function RequirementsSection() {
       setOutcome({ kind: "done", text: done });
       return true;
     } catch (err) {
-      setOutcome({ kind: "failed", text: errorDetail(err, fallback) });
+      const text = errorDetail(err, fallback);
+      if (onFailed) onFailed(text);
+      else setOutcome({ kind: "failed", text });
       return false;
     }
   };
@@ -264,7 +267,14 @@ function RequirementsSection() {
   );
 }
 
-type Act = (work: () => Promise<unknown>, done: string, fallback: string) => Promise<boolean>;
+/**
+ * Run a change, re-read the list and say what happened. A failure is the
+ * page's warning unless `onFailed` takes it: a popup does, because the page's
+ * line sits behind its backdrop (IR-1315).
+ */
+type Act = (
+  work: () => Promise<unknown>, done: string, fallback: string, onFailed?: (text: string) => void,
+) => Promise<boolean>;
 
 /* -------------------------------------------------------------------------- */
 /* The record type's description                                              */
@@ -350,7 +360,10 @@ function Requirements({ recordType, act }: { recordType: SetupRecordType; act: A
 
   return (
     <section aria-labelledby={titleId} className="pt-8">
-      <h2 id={titleId} className="font-display text-section font-semibold text-stone-900">Requirements &amp; Templates</h2>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 id={titleId} className="font-display text-section font-semibold text-stone-900">Requirements &amp; Templates</h2>
+        <AddRequirement recordType={recordType} act={act} />
+      </div>
       <p className="mt-1 text-small text-stone-600">
         Required and Optional are labels. They tell people what RDCO expects and never stop anyone submitting.
         A Template is a PDF, Word, spreadsheet or image up to 50 MB, and people download it.
@@ -374,8 +387,6 @@ function Requirements({ recordType, act }: { recordType: SetupRecordType; act: A
           </li>
         ))}
       </ol>
-
-      <AddRequirement recordType={recordType} act={act} />
 
       <ConfirmDialog
         open={removing !== null}
@@ -655,44 +666,59 @@ function TemplateControls({
 /* Forms                                                                      */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Adding a requirement starts from the section's heading and is a popup
+ * (IR-1315). Closing it by X, Escape, the backdrop or Cancel throws away what
+ * was typed, with no question: the form is mounted only while open, so the
+ * next open starts empty. The new requirement still goes last.
+ */
 function AddRequirement({ recordType, act }: { recordType: SetupRecordType; act: Act }) {
   const [open, setOpen] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
 
-  if (!open) {
-    return (
-      <div className="mt-5">
-        <Button type="button" variant="outline" onClick={() => setOpen(true)}>
-          <i className="fas fa-plus" aria-hidden />
-          Add a requirement
-        </Button>
-      </div>
-    );
-  }
+  const close = () => {
+    setOpen(false);
+    setProblem(null);
+  };
 
   return (
-    <div className="mt-5 rounded-card border border-stone-200 bg-stone-50 p-5">
-      <RequirementForm
-        title={`Add a requirement to ${recordType.name}`}
-        initial={{ name: "", is_required: false, description: "" }}
-        submitLabel="Add requirement"
-        onCancel={() => setOpen(false)}
-        siblings={recordType.requirements}
-        onSubmit={async (fields) => {
-          const ok = await act(
-            () => setupApi.addRequirement(recordType.id, fields),
-            `${fields.name} is added to ${recordType.name}.`,
-            "The requirement wasn't added. Try again.",
-          );
-          if (ok) setOpen(false);
-          return ok;
-        }}
-      />
-    </div>
+    <>
+      <Button type="button" variant="outline" onClick={() => setOpen(true)}>
+        <i className="fas fa-plus" aria-hidden />
+        Add a requirement
+      </Button>
+      {open && (
+        <RequirementForm
+          title={`Add a requirement to ${recordType.name}`}
+          initial={{ name: "", is_required: false, description: "" }}
+          submitLabel="Add requirement"
+          onCancel={close}
+          siblings={recordType.requirements}
+          dialog={{ problem }}
+          onSubmit={async (fields) => {
+            setProblem(null);
+            const ok = await act(
+              () => setupApi.addRequirement(recordType.id, fields),
+              `${fields.name} is added to ${recordType.name}.`,
+              "The requirement wasn't added. Try again.",
+              setProblem,
+            );
+            if (ok) close();
+            return ok;
+          }}
+        />
+      )}
+    </>
   );
 }
 
+/**
+ * A requirement's Name, label and Description. Inline for Edit; with `dialog`
+ * it is the Add popup, titled by the Modal, its actions in the footer and the
+ * server's refusal (`dialog.problem`) shown inside it.
+ */
 function RequirementForm({
-  title, initial, submitLabel, onSubmit, onCancel, siblings,
+  title, initial, submitLabel, onSubmit, onCancel, siblings, dialog,
 }: {
   title: string;
   initial: RequirementFields;
@@ -700,8 +726,11 @@ function RequirementForm({
   onSubmit: (fields: RequirementFields) => Promise<boolean>;
   onCancel: () => void;
   siblings: SetupRequirement[];
+  dialog?: { problem: string | null };
 }) {
   const id = useId();
+  const nameRef = useRef<HTMLInputElement>(null);
+  const inDialog = Boolean(dialog);
   const [name, setName] = useState(initial.name);
   const [required, setRequired] = useState(initial.is_required);
   const [description, setDescription] = useState(initial.description);
@@ -722,12 +751,18 @@ function RequirementForm({
     setSaving(false);
   };
 
-  return (
-    <form onSubmit={(e) => void submit(e)} aria-labelledby={`${id}-title`} className="space-y-3">
-      <h3 id={`${id}-title`} className="text-small font-semibold text-stone-900">{title}</h3>
+  // The Modal (a child, so its effect runs first) puts focus on its Close
+  // button; a popup with one job starts at Name instead.
+  useEffect(() => {
+    if (inDialog) nameRef.current?.focus();
+  }, [inDialog]);
+
+  const fields = (
+    <>
       <div>
         <label htmlFor={`${id}-name`} className={LABEL}>Name</label>
         <input
+          ref={nameRef}
           id={`${id}-name`}
           value={name}
           maxLength={200}
@@ -765,6 +800,36 @@ function RequirementForm({
           className={fieldClasses(false)}
         />
       </div>
+    </>
+  );
+
+  if (dialog) {
+    return (
+      <Modal
+        open
+        title={title}
+        size="md"
+        // A save already sent can't be taken back, so the popup waits for it.
+        onClose={saving ? () => undefined : onCancel}
+        footer={
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+            <Button type="button" variant="outline" onClick={onCancel} disabled={saving}>Cancel</Button>
+            <Button type="submit" form={`${id}-form`} loading={saving}>{submitLabel}</Button>
+          </div>
+        }
+      >
+        {dialog.problem && <p role="alert" className={cn(WARNING_NOTICE, "mb-4")}>{dialog.problem}</p>}
+        <form id={`${id}-form`} onSubmit={(e) => void submit(e)} className="space-y-3">
+          {fields}
+        </form>
+      </Modal>
+    );
+  }
+
+  return (
+    <form onSubmit={(e) => void submit(e)} aria-labelledby={`${id}-title`} className="space-y-3">
+      <h3 id={`${id}-title`} className="text-small font-semibold text-stone-900">{title}</h3>
+      {fields}
       <div className="flex flex-wrap gap-3">
         <Button type="submit" loading={saving}>{submitLabel}</Button>
         <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
