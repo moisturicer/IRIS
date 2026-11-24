@@ -574,6 +574,88 @@ describe("the manuscript, while a revision is asked for (IR-273)", () => {
 
 });
 
+// IR-1318: the Documents tab is where the owner uploads what is asked for and submits.
+describe("answering a request in the Documents tab (IR-1318)", () => {
+  const ethicsUpload = (id: number) => ({
+    id, record: RECORD_ID, slot: ETHICS, slot_name: "Ethics Clearance", file: "/media/uploads/9/ethics.pdf",
+    version: 1, status: null, status_name: null, uploaded_by: 50, uploaded_by_name: "Sam Student",
+    created_at: "2026-10-09T02:00:00Z", reviews: [], delete_refused: null,
+  });
+  const inRevision = (unsent: NonNullable<RecordDetail["revision"]["new_version"]>["unsent"], blocked: string | null = null) => ({
+    ...record,
+    revision: {
+      ...record.revision,
+      open: [{
+        id: 3, party: "ierc", label: "IERC", reason: "Fix the consent section.",
+        requested_by: "Ivy Ethics", version: 2, created_at: "2026-10-08T02:00:00Z",
+      }],
+      new_version: { number: 3, rereview: ["IERC"], kept: ["KTTO"], blocked, unsent },
+    },
+  } as RecordDetail);
+
+  it("puts Submit new version at the top, naming what is not sent yet", async () => {
+    requests = [];
+    slots = [{ ...slot(ETHICS, "Ethics Clearance"), uploads: [ethicsUpload(320)] }];
+    const onSubmit = vi.fn();
+    const { container } = renderScreen(
+      <DocumentsTab
+        record={{ ...inRevision({ manuscript: true, details: false, uploads: [{ id: 320, label: "Ethics Clearance" }] }), manuscript_unsubmitted: true } as RecordDetail}
+        owner editable reviewing={false} attach={false} replaceManuscript onSubmitNewVersion={onSubmit}
+      />,
+    );
+
+    const bar = await screen.findByRole("region", { name: "Revision requested by IERC" });
+    expect(bar).toHaveTextContent("2 changes not sent yet: revised manuscript and Ethics Clearance.");
+    expect(bar).toHaveTextContent("IERC will review v3. KTTO's clearance is kept.");
+    const documents = screen.getByRole("list", { name: "Documents" });
+    const [manuscript, ethics] = within(documents).getAllByRole("listitem");
+    expect(manuscript).toHaveTextContent("Revised, not yet submitted");
+    expect(ethics).toHaveTextContent("Uploaded, not yet submitted");
+
+    fireEvent.click(within(bar).getByRole("button", { name: "Submit new version" }));
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    await expectNoBlockingA11yViolations(container);
+  });
+
+  it("says why it cannot be sent yet, describing the button, before anything changed", async () => {
+    requests = [];
+    renderScreen(
+      <DocumentsTab
+        record={inRevision({ manuscript: false, details: false, uploads: [] }, "Nothing has changed since IERC asked for a revision.")}
+        owner editable reviewing={false} attach={false} onSubmitNewVersion={vi.fn()}
+      />,
+    );
+
+    const bar = await screen.findByRole("region", { name: "Revision requested by IERC" });
+    expect(bar).not.toHaveTextContent("not sent yet");
+    expect(within(bar).getByRole("button", { name: "Submit new version" }))
+      .toHaveAccessibleDescription("Nothing has changed since IERC asked for a revision.");
+  });
+
+  it("offers no submit to an owner the page gave none, nor to a reviewer", async () => {
+    requests = [];
+    renderScreen(
+      <DocumentsTab record={inRevision({ manuscript: true, details: false, uploads: [] })} owner editable reviewing={false} attach={false} />,
+    );
+    await screen.findByRole("list", { name: "Documents" });
+    expect(screen.queryByRole("button", { name: "Submit new version" })).not.toBeInTheDocument();
+  });
+
+  it("tells the owner a requested document is sent as soon as it is uploaded, with nothing to submit", async () => {
+    renderFiles();
+
+    expect(await screen.findByText("IERC asked for 2 documents. Each is sent as soon as you upload it.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Submit new version" })).not.toBeInTheDocument();
+  });
+
+  it("tells a reviewer nothing about uploading", async () => {
+    renderFiles({ owner: false, reviewing: true });
+
+    await screen.findByRole("list", { name: "Documents" });
+    expect(screen.queryByText(/sent as soon as you upload it/)).not.toBeInTheDocument();
+  });
+});
+
 // IR-1203: a slot's file is saved under its own type, not always as .pdf.
 describe("downloading a document version", () => {
   it("saves it under the stored file's own extension", async () => {

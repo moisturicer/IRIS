@@ -809,6 +809,18 @@ export interface NewVersionHint {
   blocked:  string | null;
   /** The response to reviewers it would carry, as it stands (IR-876). */
   letter?:  ResponseLetterEntry[];
+  /**
+   * What it would carry that no version does yet (IR-1318): a revised
+   * manuscript, edited details, and each document uploaded since the latest
+   * version. The Documents tab marks these *not yet submitted*.
+   */
+  unsent?:  NewVersionUnsent;
+}
+
+export interface NewVersionUnsent {
+  manuscript: boolean;
+  details:    boolean;
+  uploads:    { id: number; label: string }[];
 }
 
 export interface OpenRevisionRequest {
