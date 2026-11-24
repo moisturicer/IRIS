@@ -48,6 +48,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | FR-M2-02/03 | Download and delete request queues | [details](traceability/FR-M2-02-03.md) | **PARTIAL** |
 | FR-M2-04 | Bulk import from a template | [details](traceability/FR-M2-04.md) | **IMPLEMENTED** |
 | FR-M3-01 | PDF text extraction | [details](traceability/FR-M3-01.md) | **IMPLEMENTED** |
+| **IR-1327** | The sign-in error and Account locked pop-ups close with an X in their corner, not a Close button — no FR- id | [details](traceability/IR-1327.md) | **IMPLEMENTED** |
 | **IR-1184** | A keyboard user can skip the sidebar to the page's content: a "Skip to content" link is the first tab stop and moves focus into `main` — WCAG 2.4.1; no FR- id | [details](traceability/IR-1184.md) | **IMPLEMENTED** |
 | **IR-1214** | A paper's version menu shows whenever it has a version, listing v1 alone when that is all there is, so every paper's header looks alike — bug; no FR- id | [details](traceability/IR-1214.md) | **IMPLEMENTED** |
 | **IR-1212** | The review page's Conversation tab opens with who submitted and when ("Ana Cruz submitted on Sep 1, 2026"), without repeating the abstract the Overview shows — no FR- id | [details](traceability/IR-1212.md) | **IMPLEMENTED** |
