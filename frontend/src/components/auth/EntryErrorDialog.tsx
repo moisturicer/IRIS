@@ -60,7 +60,7 @@ export function EntryErrorDialog({ error, onClose, returnTo }: EntryErrorDialogP
         <h2 id={titleId} className="text-title font-bold text-stone-900">
           {error.title}
         </h2>
-        <div id={descriptionId} className="mt-3 text-body text-stone-600 leading-relaxed">
+        <div id={descriptionId} className="mt-3 text-body text-stone-600 leading-relaxed text-justified">
           {error.body}
         </div>
       </div>

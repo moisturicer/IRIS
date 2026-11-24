@@ -78,7 +78,7 @@ export function AccountLockedModal({ open, onClose, lock, returnTo }: AccountLoc
         <h2 id={titleId} className="text-title font-bold text-stone-900">
           Account Locked
         </h2>
-        <p id={descriptionId} className="mt-3 text-body text-stone-600 leading-relaxed">
+        <p id={descriptionId} className="mt-3 text-body text-stone-600 leading-relaxed text-justified">
           {lock.by === "admin" ? (
             <>
               An administrator has locked this account, and it stays locked until they unlock it, so
