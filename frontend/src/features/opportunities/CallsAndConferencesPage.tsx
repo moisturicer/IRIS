@@ -311,6 +311,11 @@ export function CallsAndConferencesPage() {
               leading={<SearchGlyph className="h-3 w-3" />}
             />
           </div>
+          {/* One width whatever the Areas are (IR-1313): it grew with the
+              longest Area on the board. 18rem from `sm`, the row below it. That
+              holds every Area IRIS has (the longest needs about 190px); an Area
+              is typed by staff, up to 200 characters, so a longer one is clipped
+              closed and read in full in the open list or on hover. */}
           <div className="w-full sm:w-auto">
             <Select
               id={`${ids}-area`}
@@ -320,6 +325,8 @@ export function CallsAndConferencesPage() {
               value={activeArea}
               onChange={(e) => setActiveArea(e.target.value)}
               disabled={loadFailed}
+              title={activeArea || "All Areas"}
+              className="sm:w-72"
             >
               <option value="">All Areas</option>
               {areas.map((name) => <option key={name} value={name}>{name}</option>)}

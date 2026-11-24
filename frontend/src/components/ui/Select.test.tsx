@@ -94,4 +94,14 @@ describe("Select", () => {
     expect(slot).toBeEmptyDOMElement();
     expect(screen.getByRole("combobox", { name: "College" })).not.toHaveAttribute("aria-describedby");
   });
+
+  // IR-1313: inline, the control takes the rest of the row, so a caller sizing
+  // the row sizes the box, whatever its options are.
+  it("fills the rest of its row when inline, and only then", () => {
+    const { rerender } = renderScreen(<Colleges inline size="sm" />);
+    expect(screen.getByRole("combobox", { name: "College" }).parentElement).toHaveClass("flex-1", "min-w-0");
+
+    rerender(<Colleges />);
+    expect(screen.getByRole("combobox", { name: "College" }).parentElement).not.toHaveClass("flex-1");
+  });
 });

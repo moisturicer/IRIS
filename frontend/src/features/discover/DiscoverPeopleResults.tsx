@@ -15,6 +15,22 @@ interface DiscoverPeopleResultsProps {
 }
 
 const ROLE_OPTIONS = ["Student", "Adviser", "Faculty", "ITSO", "IERC", "KTTO", "RDCO"];
+
+/**
+ * Each filter's width from `sm` up (IR-1313). A native select with no width is
+ * as wide as its longest current option, so College grew when its list arrived
+ * and Department resized on every College choice, moving Role along. Each is
+ * sized to show the longest name it can hold in full (accounts migration 0003;
+ * the Full Text Rule), measured in Chromium: "College of Management, Business &
+ * Accountancy" needs 400px, "English & Applied Linguistics" 249px, "All roles"
+ * 103px (Role keeps its old 9rem). Below `sm` each fills the row, as before.
+ */
+const PEOPLE_FILTER_WIDTHS = {
+  college:    "sm:w-[26rem]",
+  department: "sm:w-64",
+  role:       "sm:w-36",
+} as const;
+const FILTER_BOX = "h-11 w-full rounded-control border border-field bg-white px-3 text-body";
 const PEOPLE_PAGE_SIZE = 20;
 
 function hasNamedOptions(value: unknown): value is { results: { id: number; name: string }[] } {
@@ -23,6 +39,11 @@ function hasNamedOptions(value: unknown): value is { results: { id: number; name
     && value.results.every((option: unknown) => typeof option === "object" && option !== null
       && "id" in option && typeof option.id === "number"
       && "name" in option && typeof option.name === "string");
+}
+
+/** The chosen option's name, for the box's hover title (a phone's row can be narrower than a long name). */
+function nameOf(options: { id: number; name: string }[], value: string, all: string) {
+  return options.find((option) => String(option.id) === value)?.name ?? all;
 }
 
 function isPeopleSearchResult(value: unknown): value is PeopleSearchResult {
@@ -162,23 +183,23 @@ export function DiscoverPeopleResults({ query }: DiscoverPeopleResultsProps) {
   return (
     <section aria-labelledby="discover-people-heading" className="mt-5">
       <div className="mb-4 flex flex-wrap gap-3">
-        <label className="grid gap-1 text-small font-medium text-stone-700">
+        <label className={cn("grid w-full gap-1 text-small font-medium text-stone-700", PEOPLE_FILTER_WIDTHS.college)}>
           College
-          <select value={college} onChange={(event) => { setCollege(event.target.value); setDepartment(""); }} className="h-11 min-w-44 rounded-control border border-field bg-white px-3 text-body">
+          <select value={college} onChange={(event) => { setCollege(event.target.value); setDepartment(""); }} title={nameOf(colleges, college, "All colleges")} className={FILTER_BOX}>
             <option value="">All colleges</option>
             {colleges.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
           </select>
         </label>
-        <label className="grid gap-1 text-small font-medium text-stone-700">
+        <label className={cn("grid w-full gap-1 text-small font-medium text-stone-700", PEOPLE_FILTER_WIDTHS.department)}>
           Department
-          <select value={department} onChange={(event) => setDepartment(event.target.value)} disabled={!college} className="h-11 min-w-44 rounded-control border border-field bg-white px-3 text-body disabled:bg-stone-100">
+          <select value={department} onChange={(event) => setDepartment(event.target.value)} disabled={!college} title={nameOf(departments, department, "All departments")} className={cn(FILTER_BOX, "disabled:bg-stone-100")}>
             <option value="">All departments</option>
             {departments.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
           </select>
         </label>
-        <label className="grid gap-1 text-small font-medium text-stone-700">
+        <label className={cn("grid w-full gap-1 text-small font-medium text-stone-700", PEOPLE_FILTER_WIDTHS.role)}>
           Role
-          <select value={role} onChange={(event) => setRole(event.target.value)} className="h-11 min-w-36 rounded-control border border-field bg-white px-3 text-body">
+          <select value={role} onChange={(event) => setRole(event.target.value)} className={FILTER_BOX}>
             <option value="">All roles</option>
             {ROLE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
           </select>
