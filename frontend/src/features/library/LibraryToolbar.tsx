@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 /**
  * My Library's search field (IR-1324): one long field, the same on My
  * Submissions, Saved Papers and Saved Calls, set on the page rather than in a
- * box.
+ * box. A filled field with no outline until it has focus, at the owner's direction.
  */
 export function LibrarySearch({ label, value, onChange, placeholder = "Search by title or author", className }: {
   /** Read to a screen reader; the placeholder says what is searched. */
@@ -24,15 +24,14 @@ export function LibrarySearch({ label, value, onChange, placeholder = "Search by
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-control border border-field bg-white py-2 pl-10 pr-3 text-body placeholder:text-stone-600 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+        className="w-full rounded-control border border-transparent bg-stone-100 py-2 pl-10 pr-3 text-body placeholder:text-stone-600 hover:bg-stone-200/70 focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/20"
       />
     </label>
   );
 }
 
 /**
- * Filters as underlined words on a ruled line (IR-1324), like the page's own
- * tabs one size down. A group of toggle buttons, so a screen reader hears
+ * Filters as underlined words on a ruled line (IR-1324). A group of toggle buttons, so a screen reader hears
  * which one is pressed. Every option always shows; on a phone the row
  * scrolls sideways rather than wrapping.
  */

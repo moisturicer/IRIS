@@ -223,7 +223,7 @@ export default function MyLibraryPage() {
         )}
       />
 
-      <div role="tablist" aria-label="My Library" className="mb-section-lg flex gap-1 overflow-x-auto overflow-y-hidden border-b border-stone-200">
+      <div role="tablist" aria-label="My Library" className="mb-section-lg -mx-1 flex gap-1 overflow-x-auto overflow-y-hidden p-1 scrollbar-none">
         {tabs.map((t) => {
           const current = t.value === tab;
           return (
@@ -239,11 +239,11 @@ export default function MyLibraryPage() {
               onClick={() => selectTab(t.value)}
               onKeyDown={onTabKey}
               className={cn(
-                "relative min-h-11 shrink-0 whitespace-nowrap rounded-t-control px-3 text-small font-semibold",
-                "after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:rounded-full after:content-['']",
+                // The current tab is a filled pill (IR-1324, the owner's choice B).
+                "min-h-10 shrink-0 whitespace-nowrap rounded-full px-4 text-small font-semibold",
                 COLOUR_TRANSITION,
                 FOCUS_RING,
-                current ? "text-brand after:bg-brand" : "text-stone-600 hover:text-stone-900 after:bg-transparent",
+                current ? "bg-brand text-white" : "text-stone-600 hover:bg-stone-100 hover:text-stone-900",
               )}
             >
               {t.label}

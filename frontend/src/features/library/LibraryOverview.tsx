@@ -190,7 +190,6 @@ function WaitingOnYou({ waiting, loading, failed }: {
       id="overview-waiting"
       title="Waiting on you"
       height="h-96"
-      accent={any}
       badge={any && (
         <span className="rounded-full border border-brand px-2 text-label font-semibold tabular-nums text-brand">
           {waiting.length}

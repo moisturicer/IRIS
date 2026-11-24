@@ -9,7 +9,7 @@ import { PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { Select } from "@/components/ui/Select";
 import { PaperCiteModal } from "@/features/discover/PaperCiteModal";
 import { useHistoryStore } from "@/store/history.store";
-import { MAX_FOLDER_NAME, readingStatusLabel, sortedItems, type LibraryFolder, type LibraryItem } from "@/store/library.store";
+import { readingStatusLabel, sortedItems, type LibraryFolder, type LibraryItem } from "@/store/library.store";
 import { cn } from "@/lib/utils";
 import type { RecordListItem } from "@/types/records";
 
@@ -77,7 +77,6 @@ export function SavedView({
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [citing, setCiting] = useState<RecordListItem | null>(null);
-  const [renaming, setRenaming] = useState(false);
 
   const folder = view.kind === "folder" ? folders.find((f) => f.id === view.id) : undefined;
   /* All saved and a Reading status show the folders above the papers (IR-1324). */
@@ -105,7 +104,6 @@ export function SavedView({
   useEffect(() => {
     setSelected(new Set());
     setQuery("");
-    setRenaming(false);
   }, [view.kind, folder?.id, statusFilter]);
 
   const shownRecords = useMemo(
@@ -205,6 +203,8 @@ export function SavedView({
           historyCount={historyStore.items.length}
           onOpen={(next) => { if (next.kind !== "research") onOpenView(next); }}
           onCreate={onCreateFolder}
+          onRename={onRename}
+          onDelete={onDelete}
         />
       )}
 
@@ -215,33 +215,8 @@ export function SavedView({
         </button>
       )}
       <div className={cn("flex flex-wrap items-center justify-between gap-3", topLevel && filters ? "mb-2" : "mb-4")}>
-        {renaming && folder ? (
-          <input
-            autoFocus
-            defaultValue={folder.name}
-            maxLength={MAX_FOLDER_NAME}
-            aria-label={`Rename ${folder.name}`}
-            onBlur={(e) => {
-              const name = e.target.value.trim();
-              if (name && name !== folder.name) onRename(folder.id, name);
-              setRenaming(false);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") e.currentTarget.blur();
-              if (e.key === "Escape") setRenaming(false);
-            }}
-            className="rounded-control border border-field px-3 py-1.5 font-display text-title font-semibold focus:border-brand focus:outline-none"
-          />
-        ) : (
-          <h2 className="font-display text-title font-semibold text-stone-900">{topLevel ? "Papers" : title}</h2>
-        )}
+        <h2 className="font-display text-title font-semibold text-stone-900">{topLevel ? "Papers" : title}</h2>
         <div className="flex items-center gap-1">
-          {folder && !renaming && (
-            <>
-              <button type="button" onClick={() => setRenaming(true)} className={textButton}>Rename</button>
-              <button type="button" onClick={() => onDelete(folder.id)} className={textButton}>Delete folder</button>
-            </>
-          )}
           {historyView && historyStore.items.length > 0 && (
             <button type="button" onClick={() => void historyStore.clear()} className={textButton}>Clear history</button>
           )}

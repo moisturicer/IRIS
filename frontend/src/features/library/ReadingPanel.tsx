@@ -1,10 +1,14 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
+import { Modal } from "@/components/ui/Modal";
 import { PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { cn } from "@/lib/utils";
 import type { ReadingStatus } from "@/api/library";
 import { MAX_FOLDER_NAME, atFolderLimit, type LibraryFolder } from "@/store/library.store";
+import { RowMenu } from "@/features/accounts/RowMenu";
 
 /**
  * Which part of My Library the main column shows. `research` is the owner's
@@ -41,6 +45,8 @@ interface FolderShelfProps {
   historyCount: number;
   onOpen:       (view: LibraryView) => void;
   onCreate:     (name: string) => void;
+  onRename:     (id: number, name: string) => void;
+  onDelete:     (id: number) => void;
 }
 
 /** A closed folder, drawn in greys like a desktop folder (IR-1324). */
@@ -62,27 +68,72 @@ const TILE = cn(
 );
 
 /**
+ * Naming a folder, new or renamed, in a dialog (IR-1324). Closing it by
+ * Cancel, the close button, Escape or a click outside just closes it: nothing
+ * is saved and nothing asks first.
+ */
+function FolderNameDialog({ open, title, initial = "", submitLabel, onClose, onSubmit }: {
+  open:        boolean;
+  title:       string;
+  initial?:    string;
+  submitLabel: string;
+  onClose:     () => void;
+  onSubmit:    (name: string) => void;
+}) {
+  const formId = useId();
+  const [name, setName] = useState(initial);
+  useEffect(() => {
+    if (open) setName(initial);
+  }, [open, initial]);
+  const trimmed = name.trim();
+  const ready = trimmed.length > 0 && trimmed !== initial;
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={title}
+      size="sm"
+      footer={
+        <>
+          <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button type="submit" form={formId} disabled={!ready}>{submitLabel}</Button>
+        </>
+      }
+    >
+      <form
+        id={formId}
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!ready) return;
+          onSubmit(trimmed);
+          onClose();
+        }}
+      >
+        <Input
+          label="Folder name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          maxLength={MAX_FOLDER_NAME}
+          autoFocus
+          required
+        />
+      </form>
+    </Modal>
+  );
+}
+
+/**
  * Saved Papers' folders as tiles (IR-1324), replacing the Folder picker
  * (IR-1313): each of the reader's own folders (IR-572) with its name and how
- * many papers it holds, then History (IR-756). **+ Folder** turns into a name
- * field in place and is greyed once the account has no room for another.
- * Renaming and deleting a folder happen in the folder's own view.
+ * many papers it holds, then History (IR-756). **+ Folder** names a new
+ * folder in a dialog and is greyed once the account has no room for another.
+ * Each folder's "⋯" menu renames it (in a dialog) or deletes it; deleting a
+ * folder never unsaves its papers.
  */
-export function FolderShelf({ folders, limit, historyCount, onOpen, onCreate }: FolderShelfProps) {
+export function FolderShelf({ folders, limit, historyCount, onOpen, onCreate, onRename, onDelete }: FolderShelfProps) {
   const [creating, setCreating] = useState(false);
-  const [name, setName] = useState("");
-  const input = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (creating) input.current?.focus();
-  }, [creating]);
-
-  const submit = () => {
-    const trimmed = name.trim();
-    if (trimmed) onCreate(trimmed);
-    setName("");
-    setCreating(false);
-  };
+  const [renaming, setRenaming] = useState<LibraryFolder | null>(null);
   const full = atFolderLimit(folders, limit);
 
   return (
@@ -92,41 +143,21 @@ export function FolderShelf({ folders, limit, historyCount, onOpen, onCreate }: 
           <h2 id="saved-folders" className="font-display text-title font-semibold text-stone-900">Folders</h2>
           <p className="text-small text-stone-600">Saves and folders follow your account.</p>
         </div>
-        {creating ? (
-          <input
-            ref={input}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onBlur={submit}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") submit();
-              if (e.key === "Escape") {
-                setName("");
-                setCreating(false);
-              }
-            }}
-            aria-label="New folder name"
-            placeholder="Folder name, then Enter"
-            maxLength={MAX_FOLDER_NAME}
-            className="min-h-9 w-full rounded-control border border-field bg-white px-3 text-small placeholder:text-stone-600 focus:border-brand focus:outline-none sm:w-72"
-          />
-        ) : (
-          <button
-            type="button"
-            onClick={() => setCreating(true)}
-            disabled={full}
-            className={cn(PILL_SECONDARY, "min-h-9 px-4 disabled:cursor-not-allowed disabled:opacity-60", FOCUS_RING)}
-          >
-            <i className="fas fa-plus text-label" aria-hidden />
-            Folder
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => setCreating(true)}
+          disabled={full}
+          className={cn(PILL_SECONDARY, "min-h-9 px-4 disabled:cursor-not-allowed disabled:opacity-60", FOCUS_RING)}
+        >
+          <i className="fas fa-plus text-label" aria-hidden />
+          Folder
+        </button>
       </div>
       {full && <p className="-mt-1 mb-3 text-small text-stone-600">You have {limit} folders, the most an account can hold.</p>}
 
       <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
         {folders.length === 0 && (
-          <li className="col-span-2 flex items-center gap-3 rounded-card border border-dashed border-stone-300 p-3 sm:col-span-2">
+          <li className="col-span-2 flex items-center gap-3 rounded-card border border-dashed border-stone-300 p-3">
             <FolderGlyph />
             <p className="text-small text-stone-600">
               No folders yet. <span className="font-semibold text-stone-800">+ Folder</span> makes one; file papers into it from their Save menu.
@@ -134,12 +165,27 @@ export function FolderShelf({ folders, limit, historyCount, onOpen, onCreate }: 
           </li>
         )}
         {folders.map((folder) => (
-          <li key={folder.id}>
-            <button type="button" onClick={() => onOpen({ kind: "folder", id: folder.id })} aria-label={`${folder.name}, ${papers(folder.recordIds.length)}`} className={TILE}>
+          <li key={folder.id} className="relative">
+            <button
+              type="button"
+              onClick={() => onOpen({ kind: "folder", id: folder.id })}
+              aria-label={`${folder.name}, ${papers(folder.recordIds.length)}`}
+              className={cn(TILE, "pr-11")}
+            >
               <FolderGlyph />
               <span className="break-words text-small font-semibold text-stone-900">{folder.name}</span>
               <span className="mt-auto text-label text-stone-600">{papers(folder.recordIds.length)}</span>
             </button>
+            <div className="absolute right-1.5 top-1.5">
+              <RowMenu
+                small
+                label={`Actions for ${folder.name}`}
+                items={[
+                  { key: "rename", label: "Rename", onSelect: () => setRenaming(folder) },
+                  { key: "delete", label: "Delete folder", danger: true, onSelect: () => onDelete(folder.id) },
+                ]}
+              />
+            </div>
           </li>
         ))}
         <li>
@@ -152,6 +198,22 @@ export function FolderShelf({ folders, limit, historyCount, onOpen, onCreate }: 
           </button>
         </li>
       </ul>
+
+      <FolderNameDialog
+        open={creating}
+        title="New folder"
+        submitLabel="Create folder"
+        onClose={() => setCreating(false)}
+        onSubmit={onCreate}
+      />
+      <FolderNameDialog
+        open={renaming !== null}
+        title="Rename folder"
+        initial={renaming?.name ?? ""}
+        submitLabel="Rename"
+        onClose={() => setRenaming(null)}
+        onSubmit={(name) => { if (renaming) onRename(renaming.id, name); }}
+      />
     </section>
   );
 }

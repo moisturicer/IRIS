@@ -173,9 +173,17 @@ async function openTile(name: string) {
   if (!screen.queryByRole("region", { name: "Folders" })) await userEvent.click(screen.getByRole("button", { name: "All saved papers" }));
   await userEvent.click(folderTile(name));
 }
+/** + Folder names the folder in a dialog (IR-1324). */
 async function newFolder(name: string) {
   await userEvent.click(within(folderShelf()).getByRole("button", { name: "Folder" }));
-  await userEvent.type(screen.getByRole("textbox", { name: "New folder name" }), `${name}{Enter}`);
+  const dialog = await screen.findByRole("dialog", { name: "New folder" });
+  await userEvent.type(within(dialog).getByRole("textbox", { name: "Folder name" }), name);
+  await userEvent.click(within(dialog).getByRole("button", { name: "Create folder" }));
+}
+/** A folder tile's "⋯" menu (IR-1324). */
+async function folderAction(folder: string, action: string) {
+  await userEvent.click(within(folderShelf()).getByRole("button", { name: `Actions for ${folder}` }));
+  await userEvent.click(await screen.findByRole("menuitem", { name: action }));
 }
 
 beforeEach(() => {
@@ -1028,28 +1036,54 @@ describe("My Library: folders follow the account (IR-572)", () => {
     expect(screen.getByRole("link", { name: water.title })).toBeInTheDocument();
   });
 
+  // IR-1324: rename and delete live on the tile's "⋯" menu, and renaming is a dialog.
   it("renames a folder on the server, and a failed delete brings the folder back visibly", async () => {
     saves([savedEntry(water)]);
     folders([folderEntry(3, "Methods", [water.id])]);
     vi.mocked(libraryApi.renameFolder).mockResolvedValue({ data: folderEntry(3, "Method papers", [water.id]) } as Awaited<ReturnType<typeof libraryApi.renameFolder>>);
     vi.mocked(libraryApi.deleteFolder).mockImplementationOnce(failed);
-    renderScreen(<MyLibraryPage />, SAVED);
+    const { container } = renderScreen(<MyLibraryPage />, SAVED);
     await screen.findByRole("link", { name: water.title });
-    await pick("Methods");
 
-    await userEvent.click(await screen.findByRole("button", { name: "Rename" }));
-    const field = screen.getByRole("textbox", { name: "Rename Methods" });
+    await folderAction("Methods", "Rename");
+    const dialog = await screen.findByRole("dialog", { name: "Rename folder" });
+    const field = within(dialog).getByRole("textbox", { name: "Folder name" });
+    expect(field).toHaveValue("Methods");
     await userEvent.clear(field);
-    await userEvent.type(field, "Method papers{Enter}");
-    expect(await screen.findByRole("heading", { name: "Method papers" })).toBeInTheDocument();
+    await userEvent.type(field, "Method papers");
+    await expectNoBlockingA11yViolations(container);
+    await userEvent.click(within(dialog).getByRole("button", { name: "Rename" }));
+    expect(await within(folderShelf()).findByRole("button", { name: "Method papers, 1 paper" })).toBeInTheDocument();
     expect(libraryApi.renameFolder).toHaveBeenCalledWith(3, "Method papers");
 
-    await userEvent.click(screen.getByRole("button", { name: "Delete folder" }));
+    await folderAction("Method papers", "Delete folder");
     expect(await screen.findByRole("alert")).toHaveTextContent(/could not delete this folder/i);
     expect(await within(folderShelf()).findByRole("button", { name: "Method papers, 1 paper" })).toBeInTheDocument();
     // The paper was never at risk: deleting a folder never deletes a save.
     expect(screen.getByRole("link", { name: water.title })).toBeInTheDocument();
     expect(libraryApi.unsave).not.toHaveBeenCalled();
+  });
+
+  // IR-1324: leaving a folder dialog just closes it, with no warning, and saves nothing.
+  it("closes a folder dialog without asking, and saves nothing", async () => {
+    folders([folderEntry(3, "Methods")]);
+    renderScreen(<MyLibraryPage />, SAVED);
+    await screen.findByRole("heading", { name: "No saved papers yet" });
+
+    await userEvent.click(within(folderShelf()).getByRole("button", { name: "Folder" }));
+    await userEvent.type(within(await screen.findByRole("dialog", { name: "New folder" })).getByRole("textbox", { name: "Folder name" }), "Half typed");
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    await folderAction("Methods", "Rename");
+    const rename = await screen.findByRole("dialog", { name: "Rename folder" });
+    await userEvent.type(within(rename).getByRole("textbox", { name: "Folder name" }), " changed");
+    await userEvent.click(within(rename).getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(libraryApi.createFolder).not.toHaveBeenCalled();
+    expect(libraryApi.renameFolder).not.toHaveBeenCalled();
+    expect(folderTile("Methods")).toBeInTheDocument();
   });
 
   it("never shows one account's folders to the next account on the same browser", async () => {
