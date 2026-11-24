@@ -420,16 +420,32 @@ describe("saved calls (IR-766)", () => {
 });
 
 describe("states", () => {
-  it("shows no counts until there is a board to count", async () => {
+  // IR-1314: the controls used to show (without counts) while loading, then
+  // vanish when the board turned out empty. They now arrive with the rows, so
+  // a count is never a number IRIS does not know yet.
+  it("shows no search or filters while loading, and brings them with the calls", async () => {
     let resolve!: (b: OpportunityBoard) => void;
     board.mockReturnValueOnce(new Promise((r) => { resolve = r; }));
     renderScreen(<CallsAndConferencesPage />);
 
-    const all = screen.getByRole("button", { name: "All" });
-    expect(all).toHaveTextContent(/^All$/);
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Filter by type" })).not.toBeInTheDocument();
 
     resolve({ items: [soon()], can_post: false, can_feature: false });
-    await waitFor(() => expect(all).toHaveTextContent(/^All\s*1$/));
+    expect(await screen.findByRole("searchbox", { name: "Search calls by title, location or Area" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^All/ })).toHaveTextContent(/^All\s*1$/);
+  });
+
+  it("never shows search or filters on an empty board, not even while it loads", async () => {
+    let resolve!: (b: OpportunityBoard) => void;
+    board.mockReturnValueOnce(new Promise((r) => { resolve = r; }));
+    renderScreen(<CallsAndConferencesPage />);
+
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+    resolve({ items: [], can_post: false, can_feature: false });
+    expect(await screen.findByRole("heading", { name: "No calls posted yet" })).toBeInTheDocument();
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Filter by type" })).not.toBeInTheDocument();
   });
 
   it("says the board failed to load, and loads again on request", async () => {
@@ -438,9 +454,10 @@ describe("states", () => {
 
     const alert = await screen.findByRole("alert");
     expect(within(alert).getByRole("heading", { name: "Could not load calls and conferences" })).toBeInTheDocument();
-    // Nothing to filter, so nothing offers to.
-    expect(screen.getByRole("button", { name: "All" })).toBeDisabled();
-    expect(screen.getByRole("searchbox", { name: "Search calls by title, location or Area" })).toBeDisabled();
+    // Nothing to filter, so nothing offers to: the controls are absent rather
+    // than disabled since IR-1314.
+    expect(screen.queryByRole("button", { name: "All" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
 
     serve([soon()]);
     await userEvent.setup().click(within(alert).getByRole("button", { name: "Try again" }));
