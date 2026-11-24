@@ -465,6 +465,8 @@ python -m ai.runs.migrate          # (repo root) migrate the AI-owned `iris_ai` 
                                    # command only, never in ai/.env (running services refuse it); refuses a runtime
                                    # login, re-grants iris_ai_runtime. Run after `manage.py migrate` and
                                    # `provision_research_roles`. Verified 2026-11-01 on a dev-DB copy
+                                   # Production runs it on every `up` as the one-shot `ai-migrate`
+                                   # service, after `migrate`, before the AI services (IR-1320)
 python -m ai.runs.purge            # remove deleted accounts' AI-owned Conversations (IR-722);
                                    # needs RUNS_DATABASE_URL. Verified 2026-11-01: purged 0
 ```

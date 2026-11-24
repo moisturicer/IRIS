@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useSearchParams } from "react-router-dom";
 import { libraryApi, type FolderEntry, type ReadingHistoryEntry, type ReadingStatus, type SavedRecordEntry } from "@/api/library";
 import { recordsApi } from "@/api/records";
@@ -638,6 +639,55 @@ describe("My Library: reading", () => {
     expect(await screen.findByRole("heading", { name: "No saved papers yet" })).toBeInTheDocument();
     // Audit LAY-06 (IR-1098): an empty page names the next useful step.
     expect(screen.getByRole("link", { name: "Browse Discover" })).toHaveAttribute("href", "/");
+  });
+});
+
+// IR-1314: an empty library used to draw research and saved cards for a moment,
+// then swap them for its empty state. A load answered inside 400 ms now goes
+// straight to the empty state.
+/**
+ * Records whether a loader ever put a placeholder shape on the page, however
+ * briefly: anything inside a `role="status"` region's `aria-hidden` wrapper.
+ * The shapes are decoration with no role or name, so this reads the mutation
+ * records, which keep a node's subtree even after React has removed it.
+ */
+function watchForPlaceholders() {
+  let seen = false;
+  const SHAPES = "[role='status'] > [aria-hidden='true'] > *";
+  const check = (records: MutationRecord[]) => {
+    for (const record of records) {
+      const target = record.target as Element;
+      for (const node of Array.from(record.addedNodes)) {
+        if (!(node instanceof Element)) continue;
+        const wrapperFilled = target.getAttribute("role") === "status"
+          && node.getAttribute("aria-hidden") === "true" && node.childElementCount > 0;
+        const regionWithShapes = node.getAttribute("role") === "status"
+          && node.querySelector(":scope > [aria-hidden='true'] > *") !== null;
+        if (wrapperFilled || regionWithShapes || node.querySelector(SHAPES)) seen = true;
+      }
+    }
+  };
+  const observer = new MutationObserver(check);
+  observer.observe(document.body, { childList: true, subtree: true });
+  return { seen: () => { check(observer.takeRecords()); return seen; }, stop: () => observer.disconnect() };
+}
+
+describe("My Library: an empty library that answers at once", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it.each([
+    ["Overview", undefined, "You haven’t published anything yet"],
+    ["Saved", { route: "/records/mine?section=saved" }, "No saved papers yet"],
+  ] as const)("never draws a placeholder on %s", async (_tab, route, empty) => {
+    vi.useFakeTimers();
+    const placeholders = watchForPlaceholders();
+    renderScreen(<MyLibraryPage />, route);
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+
+    expect(screen.getByRole("heading", { name: empty })).toBeInTheDocument();
+    await act(async () => { await vi.advanceTimersByTimeAsync(5_000); });
+    expect(placeholders.seen()).toBe(false);
+    placeholders.stop();
   });
 });
 

@@ -22,6 +22,9 @@ MIN_FREE_GB="${IRIS_DEPLOY_MIN_FREE_GB:-5}"
 # Ready on this many checks in a row, so a container that crash-loops isn't
 # taken as up because it was caught between two crashes.
 STEADY_CHECKS=3
+# The services that run once and exit 0 (IR-1320): Django's migrations, then
+# the AI runtime's own schema, iris_ai. Every other service must keep running.
+ONE_SHOTS="migrate ai-migrate"
 STEP="setup"
 DEADLINE=0
 # The commit running before this deploy, set once the pull has moved the
@@ -60,9 +63,19 @@ show_logs() {
     done
 }
 
-migrate_failed() {
-    show_logs migrate
-    fail "migrate $1: the database update failed (its log is above)"
+is_one_shot() {
+    [[ " $ONE_SHOTS " == *" $1 "* ]]
+}
+
+# Stops the run when a one-shot service failed, with its log.
+one_shot_failed() {
+    local service="$1" what
+    case "$service" in
+        ai-migrate) what="the AI schema update (iris_ai)" ;;
+        *) what="the database update" ;;
+    esac
+    show_logs "$service"
+    fail "$service $2: $what failed (its log is above)"
 }
 
 # One line per container: service|state|health|exit code. A service with
@@ -72,14 +85,14 @@ containers() {
         fail "docker compose ps failed (the error is above). Is Docker running?"
 }
 
-# Why a service isn't ready yet, or nothing when it is. migrate is the one
-# service that must have run and exited 0; every other one must be running,
-# and healthy when it has a healthcheck.
+# Why a service isn't ready yet, or nothing when it is. A one-shot service
+# (migrate, ai-migrate) must have run and exited 0; every other one must be
+# running, and healthy when it has a healthcheck.
 not_ready_reason() {
     local service="$1" lines="$2" state health code
     [ -n "$lines" ] || { echo "no container"; return; }
     while IFS='|' read -r _ state health code; do
-        if [ "$service" = migrate ]; then
+        if is_one_shot "$service"; then
             [ "$state" = exited ] && [ "$code" = 0 ] && continue
             if [ "$state" = exited ]; then echo "exited $code"; else echo "$state"; fi
             return
@@ -96,8 +109,8 @@ not_ready_reason() {
 }
 
 # Waits until every service has been ready for STEADY_CHECKS checks in a row,
-# or fails at DEADLINE with the logs of the ones that weren't. A migrate that
-# exited non-zero fails at once: waiting won't fix it.
+# or fails at DEADLINE with the logs of the ones that weren't. A one-shot
+# that exited non-zero fails at once: waiting won't fix it.
 wait_until_ready() {
     local services all service lines reason waiting steady=0
     services="$("${COMPOSE[@]}" config --services)" ||
@@ -111,8 +124,8 @@ wait_until_ready() {
             lines="$(awk -F'|' -v s="$service" '$1 == s' <<< "$all")"
             reason="$(not_ready_reason "$service" "$lines")"
             [ -z "$reason" ] && continue
-            if [ "$service" = migrate ] && [[ "$reason" == exited* ]]; then
-                migrate_failed "$reason"
+            if is_one_shot "$service" && [[ "$reason" == exited* ]]; then
+                one_shot_failed "$service" "$reason"
             fi
             waiting+=("$service ($reason)")
         done
@@ -207,11 +220,14 @@ Keep them with git stash, or undo them with git checkout -- <file>."
     if $rebuild; then
         say "step 3/5 rebuild: building and restarting; this takes a few minutes"
         if ! "${COMPOSE[@]}" up -d --build; then
-            # up fails when migrate does, since the other services wait for it.
-            local listing reason
+            # up fails when a one-shot does, since other services wait for
+            # it. They run in order, so the first not finished is the one.
+            local listing reason service
             listing="$(containers)" || exit 1
-            reason="$(not_ready_reason migrate "$(awk -F'|' '$1 == "migrate"' <<< "$listing")")"
-            [ -n "$reason" ] && migrate_failed "didn't finish ($reason)"
+            for service in $ONE_SHOTS; do
+                reason="$(not_ready_reason "$service" "$(awk -F'|' -v s="$service" '$1 == s' <<< "$listing")")"
+                [ -n "$reason" ] && one_shot_failed "$service" "didn't finish ($reason)"
+            done
             fail "docker compose up failed (the error is above)"
         fi
     else
