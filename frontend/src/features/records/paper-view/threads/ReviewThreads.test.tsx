@@ -5,6 +5,7 @@
  * every query goes through the accessible tree.
  */
 import userEvent from "@testing-library/user-event";
+import { StrictMode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Capability } from "@/features/records/capabilities";
@@ -350,6 +351,17 @@ describe("the composer", () => {
     });
     expect(onCompose).toHaveBeenCalledWith(null);
     expect(reload).toHaveBeenCalled();
+  });
+
+  it("carries a selection's typed words in once, and a second selection's after them", () => {
+    const { props, unmount } = setup([]);
+    unmount();
+    // StrictMode runs effects twice, as development does.
+    const view = renderScreen(<StrictMode><ReviewThreads {...props} composing={{ ...passage, text: "Of what?" }} /></StrictMode>);
+    const box = screen.getByRole("textbox", { name: "Comment" });
+    expect(box).toHaveValue("Of what?");
+    view.rerender(<StrictMode><ReviewThreads {...props} composing={{ ...passage, text: "Cite it." }} /></StrictMode>);
+    expect(box).toHaveValue("Of what?\n\nCite it.");
   });
 
   it("asks no severity where the server holds nothing as a draft", async () => {

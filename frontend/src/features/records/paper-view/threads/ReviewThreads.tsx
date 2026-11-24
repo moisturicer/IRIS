@@ -688,10 +688,15 @@ function Composer({ recordId, can, target, onCompose, threads, onChanged }: Revi
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
+  // The target whose words are already in the box, so a re-run never adds them twice.
+  const carried = useRef<CommentTarget | null>(null);
   useEffect(() => {
     const typed = target.kind === "passage" ? target.text : undefined;
     // Added to what is already here: a second passage never drops the first words.
-    if (typed) setBody((was) => (was.trim() ? `${was.trimEnd()}\n\n${typed}` : typed));
+    if (typed && carried.current !== target) {
+      carried.current = target;
+      setBody((was) => (was.trim() ? `${was.trimEnd()}\n\n${typed}` : typed));
+    }
     ref.current?.focus();
   }, [target]);
 

@@ -1300,15 +1300,16 @@ describe("find in this paper (IR-353)", () => {
       await openCommentable(onComment);
       await userEvent.type(await openFind(), "robot arm");
 
-      await userEvent.click(await screen.findByRole("button", { name: "Add comment" }));
+      await screen.findByRole("button", { name: "Add comment" });
       expect(screen.queryByRole("button", { name: /highlight|note|Ask IRIS/i })).not.toBeInTheDocument();
-      const box = screen.queryByPlaceholderText("Comment for Threads…");
-      if (box) await userEvent.type(box, "Say when.{Enter}");
+      await userEvent.type(screen.getByPlaceholderText("Comment for Threads…"), "Say when.{Enter}");
 
       await waitFor(() => expect(onComment).toHaveBeenCalled());
       const [passage, version] = onComment.mock.calls[0];
       expect(passage).toMatchObject({ page: 3, quote: "robot arm" });
       expect(version).toBe(2);
+      expect(onComment).toHaveBeenCalledTimes(1);
+      expect(onComment.mock.calls[0][2]).toBe("Say when.");
     });
   });
 
