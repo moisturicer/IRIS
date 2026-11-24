@@ -35,13 +35,14 @@ export const AUDIT_EVENT_GROUPS = {
     ASSIGNMENT_ESCALATED: "Assignment Overdue Escalated",
     PUBLISHED: "Published", RESUBMISSION_REQUESTED: "Revision Requested",
     REVISION_REQUEST_WITHDRAWN: "Revision Request Withdrawn", RESUBMITTED: "New Version Submitted",
-    REVISION_DRAFT_DISCARDED: "Revised Manuscript Discarded",
+    REVISION_DRAFT_DISCARDED: "Revised Manuscript Discarded", DETAILS_EDITED: "Details Edited",
     CLEARANCE_PRESERVED: "Clearance Preserved", RECORD_WITHDRAWN: "Record Withdrawn",
   },
   "Document requests": {
     DOCUMENT_REQUESTED: "Documents Requested", DOCUMENT_REQUEST_FULFILLED: "Document Request Fulfilled",
     DOCUMENT_REQUEST_ACCEPTED: "Requested Document Accepted", DOCUMENT_REQUEST_REJECTED: "Requested Document Rejected",
     DOCUMENT_REQUEST_WITHDRAWN: "Document Request Withdrawn",
+    DOCUMENT_REQUEST_REPLACED: "Requested Document Replaced", DOCUMENT_REQUEST_REMOVED: "Requested Document Removed",
   },
   Embargo: {
     EMBARGO_ANSWERED: "Embargo Question Answered", EMBARGO_SET: "Embargo Set",

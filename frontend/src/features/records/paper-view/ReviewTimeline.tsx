@@ -90,12 +90,16 @@ interface Discussion {
  */
 export function ReviewTimeline({
   recordId, canComment = false, statusTarget, renderStatus, beforeComment, onCommented, submission, statusBox = false, onLoaded,
-  onOpenThreads,
+  onOpenThreads, requestFocus = null, onRequestFocused,
 }: {
   recordId: number;
   canComment?: boolean;
   /** Show Threads, at one thread when given: a line here links there (IR-1194). Left out, no link. */
   onOpenThreads?: (thread?: number) => void;
+  /** Land on this party's open request once the timeline is read; a new key lands again. */
+  requestFocus?: { party: string; key: number } | null;
+  /** The request has been landed on, so a later remount does not land again. */
+  onRequestFocused?: () => void;
   /** A comment was posted: the Threads tab reads its threads again (IR-875). */
   onCommented?: () => void;
   /** Move the status to the workspace sidebar, sharing this tracker read. */
@@ -145,6 +149,22 @@ export function ReviewTimeline({
     };
   }, [recordId, attempt]);
 
+  // A link's request takes focus once, when the timeline that holds it is drawn.
+  const landedOn = useRef<number | null>(null);
+  const sectionRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!data || !requestFocus || landedOn.current === requestFocus.key) return;
+    landedOn.current = requestFocus.key;
+    requestAnimationFrame(() => {
+      const entries = sectionRef.current?.querySelectorAll<HTMLElement>("[data-open-request]") ?? [];
+      const entry = Array.from(entries).find((el) => el.dataset.openRequest === requestFocus.party);
+      entry?.scrollIntoView?.({ block: "center" });
+      entry?.focus({ preventScroll: true });
+      onRequestFocused?.();
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `onRequestFocused` is told, never a reason to land
+  }, [data, requestFocus]);
+
   const reread = () => setAttempt((n) => n + 1);
   const rereadQuietly = useCallback(() => {
     quiet.current = true;
@@ -178,7 +198,7 @@ export function ReviewTimeline({
       {data && !failed && (statusTarget === undefined
         ? <ReviewStatus data={data} />
         : statusTarget && createPortal(renderStatus ? renderStatus(data) : <ReviewStatus data={data} />, statusTarget))}
-      <section aria-labelledby={headingId} className="space-y-4">
+      <section ref={sectionRef} aria-labelledby={headingId} className="space-y-4">
         <h3 id={headingId} className="sr-only">Timeline</h3>
 
         {failed ? (
@@ -312,7 +332,10 @@ function TimelineItem({ entry, discussion, onOpenThreads }: {
 
   // Every other entry: one line on the rail, with a round badge.
   return (
-    <li className="review-tl-ev">
+    <li
+      className={cn("review-tl-ev", entry.openRequest && cn("rounded-control", FOCUS_RING, "focus:bg-brand/[0.07]"))}
+      {...(entry.openRequest ? { "data-open-request": entry.openRequest, tabIndex: -1 } : {})}
+    >
       <span aria-hidden className="review-badge"><i className={cn("fas", KIND_ICON[entry.kind])} /></span>
       <div className="min-w-0">
         <div className="flex items-baseline gap-x-2 gap-y-1 flex-wrap">

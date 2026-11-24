@@ -129,6 +129,7 @@ rows whose `metadata.via` is `publish_unlisted`.
 | `RESUBMISSION_REQUESTED` | A party asks the owners to revise the work | `party`, `request`, `reason`, `version` (the version it was made against) |
 | `REVISION_REQUEST_WITHDRAWN` | The request is withdrawn unanswered | `party`, `request`, `closed_by` (`requesting_party`, or `record_withdrawn` when the owner withdrew the record) |
 | `REVISION_DRAFT_DISCARDED` | An owner throws away the revised manuscript they uploaded and had not yet submitted (IR-1047) | `version` (the submitted version the record reads again), `discarded_revision` (the dropped file's manuscript revision) |
+| `DETAILS_EDITED` | An owner changes a paper's details once it has left draft (ADR-032 §10, 2026-11-24) | `fields` (names only, never text), `status`, `version` |
 | `RESUBMITTED` | The owner submits a new version answering every open request | `version`, `policy` (`clearance_aware` or `restart_all`, the active ADR-004 arm), `requests` (the request ids it answered), `rereview_parties` (the parties that review the new version: those that asked, and under `restart_all` the offices it reopens, IR-632), `reset_parties` (the offices whose clearance the policy reset), `preserved_parties` (the offices whose `cleared` clearance it kept) |
 | `CLEARANCE_PRESERVED` | One row per office in `preserved_parties`, right after its `RESUBMITTED` | `party`, `version`, `policy` |
 
@@ -268,6 +269,8 @@ Every document-request event carries `party` (the **requesting** party), `reques
 | `DOCUMENT_REQUEST_FULFILLED` | The last missing item receives an upload, through `request_item` or a slot upload | all | |
 | `DOCUMENT_REQUEST_ACCEPTED` | The requesting party accepts an uploaded item | that item | |
 | `DOCUMENT_REQUEST_REJECTED` | The requesting party rejects an item; it returns to missing | that item | `reason` |
+| `DOCUMENT_REQUEST_REPLACED` | An owner replaces an undecided upload (ADR-022 §Amendment 8) | that item | `upload`, the new file |
+| `DOCUMENT_REQUEST_REMOVED` | An owner removes an undecided upload; it is asked for again | that item | `upload`, the file removed |
 | `DOCUMENT_REQUEST_WITHDRAWN` | The request closes unanswered | all | `closed_by` (`requesting_party`, `decision` or `record_withdrawn`), `closed_by_decision` (true when a Decision closed it) |
 
 ## Computing the metrics

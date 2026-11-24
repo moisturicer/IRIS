@@ -122,6 +122,53 @@ Setup and Workflow analytics are one handbook layout (`frontend/src/components/l
 | **Notice** | The live version is a Bar Stone strip ("Live now", version, published); the publish form and version history follow on hairlines | A two-column grid of cards |
 | **Workflow analytics** | The Office/From/To fields sit in one `stone-100` bar with the "Updating…" status at its end. Tables: `stone-50` header row on a `stone-300` rule, `stone-200` row rules, office names semibold, **a zero steps back to Faint Ink** and Open and Overdue counts above zero are semibold Ink. Time in stage draws a thin bar beside each duration, against the longest 90th percentile in the table (`aria-hidden`, from `sm`); the figure always says it. The method notes are a two-column list behind a hairline | Plain tables, and a `stone-50` box for the method and the "figures start" line |
 
+### IR-1311 amendment: My Library's rail and the ⋯ menu rule (2026-11-24)
+
+Asked for by Jive Tyler I. Revalde, who chose direction **B · Library rail** from three HTML prototypes (`iris-uiux-audit/prototype/my-library.html`). My Library had three ways to move between lists at once: five tabs, then a Folder picker and a row of Reading status chips inside Saved papers, and the Overview tab copied the other tabs. It is now the reference-manager pattern (Zotero, Mendeley, Semantic Scholar): one list, and one rail that names every list once.
+
+| Element | Now | Replaces |
+|---|---|---|
+| **Library rail** | The page is a container named `library` (`library-wide`, 52rem of its own width). A 14rem rail stands beside the list from there and stays in view (`sticky`): **Your research** (All research, Needs your action, In review, Drafts, Finished; authors only), **Reading** (All saved, Want to read, Reading, Completed, History), **Folders** (each folder, then *New folder*, which becomes a name field in place; at the account's limit a line says so instead), **Requests** (Saved calls, Download requests). Group names are Garamond `text-heading`; items are 36 px (44 px on touch). The current list takes **Here** (`HERE`, maroon icon). Only *Needs your action* carries a count, a maroon outline on white, because each is a thing to do. Below 52rem the rail is one native **Show** picker with the same groups | Five tabs (Overview, My submissions, Saved papers, Saved calls, Download requests), the Folder picker, the Reading status chips |
+| **The list in the address** | `?section=` names the list (`research`, `waiting`, `review`, `drafts`, `finished`, `saved`, a Reading status, `history`, `folder&folder=<id>`, `calls`, `downloads`). Every value the tabs used still opens the same list; `overview` opens the default (All research for an author, All saved for anyone else) | The tab alone in the address; folders and statuses not in it |
+| **View header** | The list's name in Garamond `text-section`, one line under it saying what it holds, and the list's own **⋯** at its end: *Select papers* (any list of saves), *Rename folder* and *Delete folder*, *Pause history* or *Resume history* and *Clear history* | Rename and Delete folder as text buttons, the Keep reading history checkbox, the select checkboxes always shown |
+| **Saved papers** | One ruled list: the title (Garamond, the row's link), authors · year · type, then the Reading status chip and provenance badges. The row's **⋯** holds its Reading status (three `menuitemradio` items with a check; choosing the checked one clears it, as the Save menu does), then *Cite* (published papers only, IR-1305) and *Remove from library* or *Remove from folder*. *Select papers* shows a checkbox on each row and a bar with Choose all, Cancel and the remove action | A table and a card grid with a toggle between them, Cite and Remove as two icon buttons on every row |
+| **Research rows** | One filled action at most: the first open request, or Continue on an accepted Proposal. A second open request, and *Delete draft* (a destructive item, Binding Maroon Dark with a warning glyph), are in the row's **⋯**. A row with nothing to add has no ⋯. The file icon and the trailing chevron are gone | IR-1279's red trash can under the date, every open request as its own pill |
+
+**The ⋯ menu rule (IR-1311).** A row's acts beyond opening it live in one ⋯ menu (`RowMenu`, `features/accounts/RowMenu.tsx`), never as a strip of icon buttons. The one exception is the act the viewer owes next, which stays a filled pill. This reverses IR-1279's trash can on My Library rows, at the project owner's request.
+
+#### IR-1311, refined (2026-11-24)
+
+Asked for by Jive Tyler I. Revalde after using the first build. Where this differs from the table above, this is current.
+
+| Element | Now |
+|---|---|
+| **Pane** | The rail is a pane docked to the sidebar, as Ask IRIS's conversations are: 17.5rem, `stone-50`, full height, its name at the top. It folds to a 3.75rem strip of icons with tooltips (`iris-library-pane` in the browser). *Publish* is its first row. My Library is full-bleed in `AppShell` |
+| **Pane titles** | My Library, History (Ask IRIS's past conversations) and Ask IRIS share `PANE_TITLE` (Garamond 20/28) |
+| **Hover** | A 7% maroon wash (`brand/[0.07]`) on the sidebar, both panes and menus. The sidebar and the panes share `stone-50` |
+| **Counts** | *Needs your action* is white on maroon |
+| **Rows** | One line of type, Adviser and date, then the title; status at the end; the row's ⋯ is vertical and centred. No filled action: an open request is answered on the paper's Overview. Continue on an accepted Proposal stays |
+| **Reading status** | A label at the row's end: an outline (Want to read), an ink fill (Reading), a green outline (Completed). Set from the menu's *Reading status* flyout |
+| **Menus** | `RowMenu` items may carry an icon and a `submenu`: beside the item, or under it where a phone has no room |
+| **History** | Ask IRIS's past conversations, called History, on the left of the chat, reversing IR-1306 |
+| **Fold** | The pane's fold button is at the right of its name |
+| **Publish, Details** | A taller dialog that does not scroll at desktop sizes; the preview is the paper and its tools alone; field hints are an `InfoHint` "?" |
+
+### Review Overview amendment: the Overview summarises the review (2026-11-24)
+
+Asked for by Jive Tyler I. Revalde, who chose **D · Branches** from the prototypes in [`prototypes/review-overview.html`](prototypes/review-overview.html). The Overview is the review's summary and the Review tab its detail, so a request is read whole, and a comment answered, in Review.
+
+| Element | Rule |
+|---|---|
+| **Branches** | While a paper is in review, its participants see the Adviser, the offices **side by side** (they review at the same time) and RDCO, joined by lines. Green cleared or kept, amber reviewing, a maroon outline for who asks. The lines are decoration: each box says its state in the server's words |
+| **Requests** | On the box of who asked, in their words, opening in place when long (the Full Text Rule's review-comment cut). *Read in Review* opens Conversation on that request, or Documents |
+| **The owner's files** | One panel under whoever asked: a drop field, a row per file, and *Submit new version*. A file dropped on a row goes there; several dropped on the field ask which is which. The file name never decides. Requested documents go at once, the manuscript with the new version, and each row says so |
+| **Handed-in files** | Download, Replace and Remove on the file's own row, until whoever asked has decided it (ADR-022 §Amendment 8). Documents offers the same |
+| **Comments** | Every open comment, whole, must fix first. A row opens that thread in Review, where it is answered |
+| **Selecting text in Review** | One act, *Add comment*, which starts a thread with what was typed. Highlights, notes and Ask IRIS on a selection stay on the Paper tab |
+| **Header** | The version picker is at the right: after *Edit details* on the Overview, before the sections on Paper and Review. An owner has *Edit details* in every state (ADR-032 §10, proposed 2026-11-24) |
+| **Left out while in review** | The AI Overview (until a decision), Related works, Notes, and the detail rows that say nothing |
+| **Review** | Its tabs have addresses (`?section=review&tab=…&party=…`, spent once shown), and an owner's Review points back to the Overview to submit. Readiness says *waiting on you* when the owner has been asked for a revision or a document |
+
 ### IR-1072 amendment: the UI/UX audit's design decisions (D1, D4, D5, D6)
 
 Decided on 2026-11-14 by **Lee Jasmin Adolfo** (project lead and frontend owner), from the audit in [`frontend_ui_audit_spec.md`](../frontend_ui_audit_spec.md) §7.1 and the prototype it points to. **Decided, not built:** the tickets named below build each one, and `DESIGN.md` carries the same text under "Decided changes". D2 and D3 are server decisions and live in [ADR-069](../adr/069-notifications-know-when-their-task-closed.md) and [ADR-032](../adr/032-adviser-first-review-and-office-reviewer-pools.md) §9.

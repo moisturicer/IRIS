@@ -77,8 +77,8 @@ export function useThreadsWorkspace({ record, can, onChanged, showThreads, showP
       ].filter((m): m is ReaderMark => m !== null),
       // Starting a thread takes an open seat; a finished reviewer only replies (IR-1226).
       onComment: can.has("start_thread")
-        ? (passage, version) => {
-          setComposing({ kind: "passage", version, passage });
+        ? (passage, version, text) => {
+          setComposing({ kind: "passage", version, passage, ...(text ? { text } : {}) });
           showThreads();
         }
         : null,
@@ -149,6 +149,12 @@ export function useThreadsWorkspace({ record, can, onChanged, showThreads, showP
     finish: (verdict?: ReviewVerdict) => setFinishing(verdict ?? true),
     /** Open one thread in the Threads tab (the Changes tab's thread links). */
     openThread,
+    /** One thread by id, from a link: it lands once the threads are read. */
+    focusThread: (id: number) => {
+      setParty(null);
+      showThreads();
+      setFocus({ id, key: Date.now() });
+    },
     /** Conversation's *View in Threads* (IR-1194): one thread by id, else the tab. */
     openThreads: (id?: number) => {
       const thread = id === undefined ? undefined : threads.sent.find((t) => t.root.id === id);

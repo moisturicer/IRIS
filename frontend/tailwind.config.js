@@ -21,6 +21,9 @@ export const readingVariants = {
   // sits beside the column once the page's own box has room for both, so the
   // sidebar opening changes the layout as surely as a narrower window does.
   "handbook-wide": "@container handbook (min-width: 52rem)",
+  // My Library's rail stands beside its list once the page's own box has room
+  // for both (IR-1311); below that it is one picker.
+  "library-wide": "@container library (min-width: 52rem)",
 };
 
 const readingTiers = plugin(({ addVariant }) => {

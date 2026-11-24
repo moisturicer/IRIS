@@ -760,9 +760,8 @@ class RecordWriteSerializer(serializers.ModelSerializer):
         """
         What an owner may change (IR-507, ADR-032 §10 Amendment).
 
-        Only an owner reaches an update (`IsRecordOwner`), and only while the
-        record is a `draft` or awaits their revision (`RecordViewSet.update`).
-        Once submitted, the fields in `versions.SUBMISSION_FIXED_FIELDS` stay
+        Only an owner reaches an update (`IsRecordOwner`), in any state. Once
+        submitted, the fields in `versions.SUBMISSION_FIXED_FIELDS` stay
         as they were submitted. Sending one unchanged is not a change, so a
         form that re-sends every field still saves; changing any is one
         refusal naming each field, so a single correction clears them all.
@@ -852,7 +851,8 @@ class RecordWriteSerializer(serializers.ModelSerializer):
                 lock_digest(digest)
                 enforce_exact(self.context["request"].user, instance.pk, digest)
                 validated_data.update(changes)
-        if self._details_changed(instance, validated_data, authors_data):
+        changed = self._details_changed(instance, validated_data, authors_data)
+        if changed:
             # What a new version answers a revision request with, when no file
             # changed (IR-273). Only a real change: saving the same details
             # again answers nothing. Only an owner edits at all (IR-507), so
@@ -872,20 +872,25 @@ class RecordWriteSerializer(serializers.ModelSerializer):
                     RecordOwner(record=record, user=user, is_primary=user.pk == primary_id)
                     for user in owners
                 ])
+            if changed and record.pipeline_status != PipelineStatus.DRAFT:
+                from apps.audit import workflow as audit
+
+                audit.details_edited(record, self.context["request"].user, fields=changed)
         return record
 
     @staticmethod
-    def _details_changed(instance, validated_data, authors_data) -> bool:
-        """Does this update change a detail? The manuscript is not one (IR-273)."""
-        for field, value in validated_data.items():
-            if field in _MANUSCRIPT_FIELDS or field == "metadata_sources":
-                continue
-            if getattr(instance, field) != value:
-                return True
-        if authors_data is None:
-            return False
-        sent = [name.strip() for name in authors_data if name.strip()]
-        return sent != list(instance.authors.order_by("pk").values_list("name", flat=True))
+    def _details_changed(instance, validated_data, authors_data) -> list[str]:
+        """The details this update changes. The manuscript is not one (IR-273)."""
+        changed = [
+            field for field, value in validated_data.items()
+            if field not in _MANUSCRIPT_FIELDS and field != "metadata_sources"
+            and getattr(instance, field) != value
+        ]
+        if authors_data is not None:
+            sent = [name.strip() for name in authors_data if name.strip()]
+            if sent != list(instance.authors.order_by("pk").values_list("name", flat=True)):
+                changed.append("authors")
+        return changed
 
 
 class VisibleRecordField(serializers.PrimaryKeyRelatedField):

@@ -63,6 +63,8 @@ See the *Amendment* notes under §4 and §10.
 
 **Amended 2026-11-18 (Hermoine Zozobrado, IR-1204 design session): §7's review threads.** A reviewer may open a thread on a supporting document, one uploaded version in one of the record's slots, as a whole and never a passage. It is a thread in every other respect, read by whoever reads the review. Its answers block the next Version and go in the response to reviewers, and its *Must fix* blocks its own party's approval. A newer upload labels it "from an earlier upload", and an upload with a thread is kept. See the *Amendment, 2026-11-18* note under §7.
 
+**Amended 2026-11-24 (Proposed; PR #994): §10.** An owner edits their paper's details in every state. See the *Amendment, proposed 2026-11-24* note under §10, which supersedes part of the 2026-10-11 (IR-507) note.
+
 **Clarified 2026-11-14 (project lead, IR-1072; Accepted): §9's word "Accepted".** It names an act, not only a record state. A record is *Accepted* only when it is a Proposal; an Adviser's or RDCO's *accept* of a Thesis/Research or Project reads "Accepted" on that reviewer's own Done row, and the record itself reads by where it rests. No behaviour changes. See the *Clarification, 2026-11-14* note under §9.
 
 **Amended 2026-11-18 (Hermoine Zozobrado, IR-1220; security review by Ashlee Sean): §10 and Security Impact.** An office's supplementary file (`attach_file`) is PDF, Word (`.docx`), PNG or JPG, by its name and its first bytes, where it was any type. See the *Amendment, 2026-11-18* note under §10.
@@ -807,6 +809,14 @@ readiness: null | {
 - **Correcting a published record's details is deferred, not built.** Before publication, a reviewer asks for a revision. After it, nothing in IRIS corrects details: `Record` is not in Django admin, and adding it would bypass every rule here.
     - *Rejected:* a narrow staff correction right (for example RDCO, published records, a fixed field list). It is a new capability with its own allowlist and audit event, and a decision about how the institution runs, not part of narrowing an accidental authority.
 - **Out of scope:** `destroy` has the same `IsOwnerOrStaff` gate. Who may delete is its own decision, on [IR-508](https://citiris.atlassian.net/browse/IR-508). *Settled by the IR-508 amendment below.*
+
+**Amendment, proposed 2026-11-24 (PR #994; awaiting the project lead's acceptance): an owner edits details in every state.** Asked for by Jive Tyler I. Revalde: "The user should always be able to edit the details". It supersedes the IR-507 note's *when*: the second bullet, the 400 in it, and "Correcting a published record's details is deferred".
+
+- **`edit_details` is offered to every owner in every state**, and the update accepts it: in review with no revision asked for, published, unlisted and rejected included.
+- **Nothing else of IR-507 moves.** Only an owner edits. `SUBMISSION_FIXED_FIELDS` stay as submitted, owners change only on a draft, and the manuscript changes only by a new version.
+- **Uploading into a document slot is not editing details.** Documents keeps its draft or revision-asked rule.
+- **Past draft each edit is audited** as `DETAILS_EDITED`, with the field names and never their text, and *Edit details* says who sees the change.
+- **What this costs.** A title or an abstract can change under a reviewer, or on a published paper, with nobody's approval. The audit row says that it changed, not what it said before: a Version names files, not details, so earlier wording is not kept. Reviewers are not notified. An edited published paper's search text updates at once, and its record vector only when it is next embedded.
 
 **Amendment, 2026-10-11 (project lead, IR-508): who deletes a record, and what a delete does.** Settled in a design grilling. `DELETE /records/<id>/` was `IsOwnerOrStaff`, so any office could soft-delete a student's draft outright, or file a delete request on accepted work with the office member recorded as the requester. No screen offered it; the API did.
 

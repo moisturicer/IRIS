@@ -325,6 +325,8 @@ export type Capability =
   | "add_reviewer"
   | "create_version"
   | "replace_manuscript"
+  /** Throw away a revised manuscript not yet submitted (IR-1047). */
+  | "discard_revised_manuscript"
   | "edit_details"
   | "continue_draft"
   | "delete_record"
@@ -1613,6 +1615,8 @@ export interface DocumentRequestItem {
   rejection_reason: string | null;
   /** When the requesting party last accepted or rejected an upload. */
   decided_at:  string | null;
+  /** The viewer owns the paper and may still replace or remove this file: nobody has decided it (ADR-022 §Amendment 8). */
+  can_replace: boolean;
 }
 
 export interface DocumentRequest {
@@ -1637,8 +1641,9 @@ export interface DocumentRequest {
 
 /** `PATCH /document-request-items/<id>/` (IR-263). A rejection needs a reason. */
 export type DocumentRequestItemDecision =
-  | { action: "accept" }
-  | { action: "reject"; reason: string };
+  // `upload`: the file that was read, so a verdict never lands on one replaced since.
+  | { action: "accept"; upload?: number | null }
+  | { action: "reject"; reason: string; upload?: number | null };
 
 /** One entry of a new request: a picklist slot, or free text for "Other". */
 export type DocumentRequestItemInput = { slot: number } | { label: string };

@@ -54,6 +54,8 @@ interface UploadDropzoneProps {
   upload?:   UploadState | null;
   /** One small Upload button instead of a drop area (IR-1203). */
   compact?:  boolean;
+  /** The compact button's drawn word, which `label` starts with. */
+  verb?:     string;
 }
 
 function acceptedPatterns(accept: string | undefined): string[] {
@@ -94,6 +96,11 @@ function refusal(files: File[], patterns: string[], maxBytes: number | undefined
   return null;
 }
 
+/** Why `files` may not go up, in the words the zone itself uses, or null. For a row that takes drops of its own. */
+export function refuseFiles(files: File[], accept: string, maxBytes: number): string | null {
+  return refusal(files, acceptedPatterns(accept), maxBytes);
+}
+
 function defaultHint(patterns: string[], maxBytes: number | undefined): string | undefined {
   const parts = [
     patterns.length > 0 ? describeAccepted(patterns) : null,
@@ -113,6 +120,7 @@ export function UploadDropzone({
   hint,
   upload,
   compact = false,
+  verb = "Upload",
 }: UploadDropzoneProps) {
   const [dragging, setDragging] = useState(false);
   const [refused, setRefused] = useState<string | null>(null);
@@ -227,8 +235,8 @@ export function UploadDropzone({
           {compact ? (
             <>
               <i className="fas fa-upload text-2xs" aria-hidden="true" />
-              {/* "Upload" is drawn, so the name starts with it (WCAG 2.5.3, IR-908). */}
-              {label ? <><span aria-hidden="true">Upload</span><span className="sr-only">{label}</span></> : "Upload"}
+              {/* The verb is drawn, so the name starts with it (WCAG 2.5.3, IR-908). */}
+              {label ? <><span aria-hidden="true">{verb}</span><span className="sr-only">{label}</span></> : verb}
             </>
           ) : (
             <>

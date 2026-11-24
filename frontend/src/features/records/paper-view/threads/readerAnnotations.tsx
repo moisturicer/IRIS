@@ -36,8 +36,8 @@ export interface ReaderAnnotations {
   /** The Version the reader shows when it is given none: the latest. */
   currentVersion: number | null;
   marks:          ReaderMark[];
-  /** Comment on a passage of the Version shown; null where the viewer may not comment. */
-  onComment:      ((passage: Passage, version: number) => void) | null;
+  /** Comment on a passage of the Version shown, with what was typed beside it; null where the viewer may not comment. */
+  onComment:      ((passage: Passage, version: number, text?: string) => void) | null;
   /**
    * Open a thread on the supporting document shown, as a whole (IR-1204): its
    * upload and its name, "Consent form, v1". Null where the viewer may not.

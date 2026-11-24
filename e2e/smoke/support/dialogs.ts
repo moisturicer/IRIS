@@ -412,7 +412,8 @@ export const DIALOGS: DialogCase[] = [
       submitter_status: { line: "Draft: not yet submitted", waiting_on_you: [] },
       created_at: "2026-11-01T08:00:00+08:00", updated_at: "2026-11-02T08:00:00+08:00",
     }]),
-    open: press(/^Delete draft/), dialog: anyDialog,
+    // IR-1311: Delete draft is in the row's ⋯ menu.
+    open: fromRowMenu("Delete draft"), dialog: anyDialog,
   },
   {
     id: "crop a profile photo", screen: "profile-settings", sources: ["features/profile/PhotoCropDialog.tsx"],
@@ -467,7 +468,9 @@ export const DIALOGS: DialogCase[] = [
       api.on("GET", `/records/${PAPER.id}/tracker/`, { ...TRACKER, workflow_state: "revision_requested", workflow_state_label: "Revision requested" });
       api.on("GET", `/records/${PAPER.id}/document-requests/`, []);
       api.on("GET", `/records/${PAPER.id}/`, {
-      ...PAPER_DETAIL, workflow_state: "revision_requested", workflow_state_label: "Revision requested",
+      // In review, with the owner in it: the Overview draws the review, and the files it asks for.
+      ...PAPER_DETAIL, pipeline_status: "in_review", is_participant: true,
+      workflow_state: "revision_requested", workflow_state_label: "Revision requested",
       owners: [{ id: 1, user: 1, email: "student@cit.edu", full_name: "Sam Student", is_primary: true }],
       capabilities: ["cite", "create_version"],
       revision: {
@@ -478,6 +481,27 @@ export const DIALOGS: DialogCase[] = [
       });
     },
     open: press("Submit new version"), dialog: anyDialog,
+  },
+  {
+    // The owner takes back a requested document nobody has decided (ADR-022 Amendment 8).
+    id: "remove a requested document", screen: "paper-view", sources: ["features/records/paper-view/review-overview/OwnerAnswer.tsx"],
+    override: (api) => {
+      api.on("GET", `/records/${PAPER.id}/tracker/`, TRACKER);
+      api.on("GET", `/records/${PAPER.id}/document-requests/`, [{
+        id: 1, party: "itso", label: "ITSO", state: "fulfilled", state_label: "Fulfilled", message: "Please attach the search.",
+        requested_by: "Ines Tan", created_at: "2026-11-04T08:00:00+08:00", closed_at: "2026-11-05T08:00:00+08:00", can_manage: false,
+        items: [{
+          id: 11, slot: null, label: "Prior-art search", state: "uploaded", state_label: "Uploaded", upload: 40,
+          uploaded_at: "2026-11-05T08:00:00+08:00", rejection_reason: null, decided_at: null, can_replace: true,
+        }],
+      }]);
+      api.on("GET", `/records/${PAPER.id}/`, {
+        ...PAPER_DETAIL, pipeline_status: "in_review", is_participant: true,
+        workflow_state: "in_review", workflow_state_label: "In review", capabilities: ["edit_details"],
+        owners: [{ id: 1, user: 1, email: "student@cit.edu", full_name: "Sam Student", is_primary: true }],
+      });
+    },
+    open: press("Remove Prior-art search"), dialog: anyDialog,
   },
   {
     id: "ask iris chat history on a narrow screen", screen: "ask-iris-conversation", sources: ["features/ai/components/ChatDrawer.tsx", "features/ai/RAGChatPage.tsx"],

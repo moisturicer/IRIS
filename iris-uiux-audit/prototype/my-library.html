@@ -1,0 +1,576 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>My Library · prototypes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --maroon: #6b0f12; --maroon-light: #8b1316; --maroon-press: #5a0c0f;
+  --endpaper: #fafaf9; --page: #fff; --bar: #f5f5f4; --desk: #e7e5e4; --rule: #d6d3d1; --field: #8f8884;
+  --ink: #1c1917; --body: #44403c; --quiet: #57534e; --faint: #78716c;
+  --cleared: #1e6b3f; --cleared-line: #3f8a5a; --review: #8a5300; --review-line: #b07a1e;
+  --serif: "EB Garamond", Georgia, Cambria, serif;
+  --sans: "Inter", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  --r-thumb: 6px; --r-control: 12px; --r-sheet: 16px; --r-card: 20px;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --proto: 52px;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; font: 400 15px/24px var(--sans); color: var(--body); background: var(--endpaper); font-feature-settings: "cv11", "ss01"; }
+::selection { background: #f7e08f; color: var(--ink); }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--maroon); outline-offset: 2px; border-radius: 6px; }
+svg.i { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.tnum { font-variant-numeric: tabular-nums; }
+
+/* ── Prototype switcher (not part of the design) ───────────── */
+.proto { position: sticky; top: 0; z-index: 50; min-height: var(--proto); display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 8px 16px; background: var(--ink); color: #e7e5e4; font-size: 13px; }
+.proto strong { color: #fff; font-weight: 600; }
+.proto .opts { display: flex; gap: 4px; padding: 3px; border-radius: 10px; background: #292524; }
+.proto .opts button, .proto .who button { border: 0; background: none; color: #d6d3d1; padding: 6px 12px; border-radius: 7px; font-weight: 500; white-space: nowrap; }
+.proto .opts button[aria-pressed="true"], .proto .who button[aria-pressed="true"] { background: #fff; color: var(--ink); }
+.proto .who { display: flex; gap: 4px; padding: 3px; border-radius: 10px; background: #292524; margin-left: auto; }
+.proto .note { flex-basis: 100%; color: #a8a29e; font-size: 12.5px; line-height: 18px; }
+.proto .note b { color: #f5f5f4; font-weight: 600; }
+
+/* ── App shell ─────────────────────────────────────────────── */
+.shell { display: grid; grid-template-columns: 248px minmax(0, 1fr); min-height: calc(100vh - var(--proto)); }
+.side { background: var(--page); border-right: 1px solid var(--desk); padding: 18px 12px; position: sticky; top: var(--proto); height: calc(100vh - var(--proto)); display: flex; flex-direction: column; }
+.brand { display: flex; align-items: center; gap: 10px; padding: 0 8px 22px; color: var(--maroon); font: 600 22px/1 var(--serif); letter-spacing: 0.14em; }
+.brand svg { width: 26px; height: 26px; fill: var(--maroon); }
+.nav a { display: flex; align-items: center; gap: 10px; min-height: 38px; padding: 0 10px; border-radius: var(--r-control); color: var(--body); text-decoration: none; font-weight: 500; font-size: 14px; }
+.nav a:hover { background: var(--bar); color: var(--ink); }
+.nav a[aria-current="page"] { background: var(--desk); color: var(--ink); font-weight: 600; }
+.nav a[aria-current="page"] svg { color: var(--maroon); }
+.nav .badge { margin-left: auto; }
+.me { margin-top: auto; display: flex; align-items: center; gap: 10px; padding: 10px 8px 0; border-top: 1px solid var(--desk); font-size: 13px; line-height: 18px; }
+.me .av { width: 32px; height: 32px; border-radius: 50%; background: var(--maroon); color: #fff; display: grid; place-items: center; font: 600 12px var(--sans); }
+.me b { color: var(--ink); font-weight: 600; display: block; }
+.topbar { display: none; }
+
+.main { min-width: 0; padding: 32px 40px 80px; }
+.wrap { max-width: 1180px; margin: 0 auto; }
+
+.badge { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; font: 600 11.5px/1 var(--sans); background: var(--page); color: var(--maroon); box-shadow: inset 0 0 0 1px var(--maroon); }
+
+/* ── Page header ───────────────────────────────────────────── */
+.ph { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px 24px; margin-bottom: 28px; }
+.ph h1 { margin: 0; font: 600 34px/1.1 var(--serif); color: var(--ink); letter-spacing: -0.015em; }
+.ph p { margin: 6px 0 0; color: var(--quiet); }
+
+/* ── Buttons, fields ───────────────────────────────────────── */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 0 18px; border-radius: 999px; border: 1px solid var(--rule); background: var(--page); color: var(--body); font: 600 14px/20px var(--sans); white-space: nowrap; text-decoration: none; transition: background-color .15s, border-color .15s, color .15s; }
+.btn:hover { border-color: var(--maroon); color: var(--maroon); }
+.btn.primary { background: var(--maroon); border-color: var(--maroon); color: #fff; }
+.btn.primary:hover { background: var(--maroon-light); border-color: var(--maroon-light); color: #fff; }
+.btn.primary:active { background: var(--maroon-press); }
+.btn.sm { min-height: 36px; padding: 0 14px; font-size: 13px; }
+.btn.ghost { border-color: transparent; background: none; color: var(--quiet); }
+.btn.ghost:hover { background: var(--bar); color: var(--ink); }
+.link { display: inline-flex; align-items: center; gap: 6px; color: var(--maroon); font-weight: 600; font-size: 13.5px; text-decoration: none; background: none; border: 0; padding: 4px 0; }
+.link:hover { text-decoration: underline; text-underline-offset: 3px; }
+.search { position: relative; flex: 1 1 260px; max-width: 420px; }
+.search svg { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--faint); }
+.search input { width: 100%; height: 40px; padding: 0 14px 0 38px; border: 1px solid var(--field); border-radius: var(--r-control); background: var(--page); font-size: 14px; }
+.search input::placeholder { color: var(--quiet); }
+.search input:focus { outline: none; border-color: var(--maroon); box-shadow: 0 0 0 3px rgb(107 15 18 / 0.12); }
+.select { appearance: none; height: 40px; padding: 0 34px 0 14px; border: 1px solid var(--field); border-radius: var(--r-control); background: var(--page) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2357534e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 12px center; font-size: 14px; font-weight: 500; color: var(--body); }
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 20px; }
+.toolbar .spacer { flex: 1; }
+
+/* Segmented (Selected = white raised segment, never maroon) */
+.seg { display: inline-flex; padding: 3px; border-radius: var(--r-control); background: var(--desk); box-shadow: inset 0 1px 2px rgb(41 37 36 / .12); }
+.seg button { display: inline-flex; align-items: center; gap: 8px; min-height: 38px; padding: 0 18px; border: 0; border-radius: 9px; background: none; color: var(--quiet); font: 600 14px var(--sans); transition: background-color .2s var(--ease), color .2s; }
+.seg button:hover { color: var(--ink); }
+.seg button[aria-selected="true"] { background: var(--page); color: var(--ink); box-shadow: 0 1px 3px rgb(41 37 36 / .14); }
+
+/* ── Ruled list (the one row system) ───────────────────────── */
+.sheet { background: var(--page); border: 1px solid var(--desk); border-radius: var(--r-card); overflow: hidden; }
+.row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 24px; padding: 16px 20px; border-top: 1px solid var(--desk); align-items: start; transition: background-color .15s; }
+.row:first-child { border-top: 0; }
+a.row, .row.click { color: inherit; text-decoration: none; cursor: pointer; }
+.row.click:hover { background: #fcfcfb; }
+.row .t { margin: 0; font: 600 18.5px/26px var(--serif); color: var(--ink); text-wrap: pretty; }
+.row.click:hover .t { color: var(--maroon); }
+.row .m { margin: 2px 0 0; font-size: 13px; line-height: 20px; color: var(--quiet); display: flex; flex-wrap: wrap; gap: 0 10px; }
+.row .m span + span::before { content: "·"; margin-right: 10px; color: var(--faint); }
+.row .end { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; text-align: right; }
+.row .when { font-size: 12.5px; color: var(--faint); white-space: nowrap; }
+.row .do { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-top: 8px; }
+.row .do .strip { flex-basis: 100%; }
+.c-grid .reading .row { grid-template-columns: minmax(0, 1fr); }
+.c-grid .reading .row .end { flex-direction: row; align-items: center; justify-content: flex-start; }
+.row.compact { padding: 12px 20px; }
+.row.compact .t { font-size: 17px; line-height: 24px; }
+
+.chip { display: inline-flex; align-items: center; gap: 6px; min-height: 26px; padding: 0 10px; border-radius: 999px; font: 600 12.5px/1 var(--sans); background: var(--page); white-space: nowrap; box-shadow: inset 0 0 0 1px var(--rule); color: var(--body); }
+.chip svg.i { width: 13px; height: 13px; stroke-width: 2.4; }
+.chip.attention { color: var(--maroon); box-shadow: inset 0 0 0 1px var(--maroon); }
+.chip.review { color: var(--review); box-shadow: inset 0 0 0 1px var(--review-line); }
+.chip.cleared { color: var(--cleared); box-shadow: inset 0 0 0 1px var(--cleared-line); }
+.chip.settled { color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.chip.quiet { color: var(--quiet); }
+
+.strip { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; line-height: 18px; }
+.strip span { display: inline-flex; align-items: center; gap: 5px; font-weight: 500; }
+.strip svg.i { width: 13px; height: 13px; stroke-width: 2.6; }
+.strip b { font-weight: 600; color: var(--ink); }
+.strip .kept, .strip .cleared { color: var(--cleared); }
+.strip .reviewing { color: var(--review); }
+.strip .revision { color: var(--maroon); }
+
+.rs { appearance: none; height: 32px; padding: 0 30px 0 12px; border: 1px solid var(--rule); border-radius: 999px; background: var(--page) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2357534e' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center; font: 600 12.5px var(--sans); color: var(--body); }
+.rs:hover { border-color: var(--field); }
+.rs.set { color: var(--ink); border-color: var(--ink); }
+.iconbtn { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; border: 0; background: none; color: var(--faint); }
+.iconbtn:hover { background: var(--bar); color: var(--ink); }
+
+/* Section headings: Garamond over one hairline */
+.sec { margin-top: 36px; }
+.sec:first-child { margin-top: 0; }
+.sec > header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.sec h2 { margin: 0; font: 600 22px/28px var(--serif); color: var(--ink); display: flex; align-items: center; gap: 10px; }
+.sec h2 .hint { font: 400 13px var(--sans); color: var(--quiet); }
+.sec .lede { margin: -6px 0 12px; font-size: 13.5px; color: var(--quiet); }
+.sec.todo h2 svg { color: var(--maroon); width: 20px; height: 20px; }
+
+details.fold > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 8px 0; font: 600 22px/28px var(--serif); color: var(--ink); }
+details.fold > summary::-webkit-details-marker { display: none; }
+details.fold > summary svg { color: var(--faint); transition: transform .25s var(--ease); }
+details.fold[open] > summary svg { transform: rotate(90deg); }
+details.fold > summary .hint { font: 400 13px var(--sans); color: var(--quiet); }
+
+.empty { padding: 28px 20px; text-align: center; color: var(--quiet); font-size: 14px; }
+.empty b { display: block; font: 600 18px/26px var(--serif); color: var(--ink); margin-bottom: 2px; }
+.aside h3 { margin: 0 0 4px; font: 600 18px/26px var(--serif); color: var(--ink); }
+.aside .block { padding: 18px 20px; border-top: 1px solid var(--desk); }
+.aside .block:first-child { border-top: 0; }
+.aside ul { list-style: none; margin: 8px 0 0; padding: 0; }
+.aside li { padding: 6px 0; }
+.aside li a { color: var(--ink); font-weight: 600; font-size: 14px; line-height: 20px; text-decoration: none; }
+.aside li a:hover { color: var(--maroon); text-decoration: underline; text-underline-offset: 3px; }
+.aside li small { display: block; color: var(--faint); font-size: 12.5px; }
+.aside p { margin: 4px 0 0; font-size: 13.5px; color: var(--quiet); }
+.folderchip { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 999px; box-shadow: inset 0 0 0 1px var(--rule); font: 600 12.5px var(--sans); color: var(--body); background: var(--page); border: 0; }
+.folderchip:hover { box-shadow: inset 0 0 0 1px var(--maroon); color: var(--maroon); }
+
+/* ── Menu (Shelf picker) ───────────────────────────────────── */
+.menuwrap { position: relative; }
+.menu { position: absolute; z-index: 20; top: calc(100% + 6px); left: 0; min-width: 260px; padding: 6px; background: var(--page); border: 1px solid var(--desk); border-radius: var(--r-sheet); box-shadow: 0 12px 32px rgb(41 37 36 / .16), 0 2px 6px rgb(41 37 36 / .06); opacity: 0; transform: translateY(-4px); pointer-events: none; transition: opacity .16s, transform .2s var(--ease); }
+.sec > header .menu { left: auto; right: 0; }
+.menu.open { opacity: 1; transform: none; pointer-events: auto; }
+.menu .g { padding: 10px 10px 4px; font: 600 12px var(--sans); color: var(--quiet); }
+.menu button.it { display: flex; width: 100%; align-items: center; gap: 10px; min-height: 36px; padding: 0 10px; border: 0; background: none; border-radius: 10px; text-align: left; font-size: 14px; color: var(--body); }
+.menu button.it:hover { background: var(--bar); color: var(--ink); }
+.menu button.it[aria-checked="true"] { color: var(--ink); font-weight: 600; }
+.menu button.it .ck { margin-left: auto; color: var(--ink); visibility: hidden; }
+.menu button.it[aria-checked="true"] .ck { visibility: visible; }
+.menu hr { border: 0; border-top: 1px solid var(--desk); margin: 6px 4px; }
+.menu .foot { padding: 8px 10px 6px; font-size: 12px; color: var(--quiet); }
+
+/* ── Option A: two rooms ───────────────────────────────────── */
+.a-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 28px; }
+.a-reading { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 28px; align-items: start; }
+
+/* ── Option B: library rail ────────────────────────────────── */
+.b-grid { display: grid; grid-template-columns: 236px minmax(0, 1fr); gap: 32px; align-items: start; }
+.rail { position: sticky; top: calc(var(--proto) + 24px); }
+.rail .grp { margin-top: 22px; }
+.rail .grp:first-child { margin-top: 0; }
+.rail h2 { margin: 0 0 6px; padding: 0 10px; font: 600 15px/22px var(--serif); color: var(--ink); }
+.rail button.v { display: flex; width: 100%; align-items: center; gap: 10px; min-height: 36px; padding: 0 10px; border: 0; border-radius: 10px; background: none; color: var(--body); font: 500 14px var(--sans); text-align: left; transition: background-color .15s; }
+.rail button.v svg { color: var(--faint); }
+.rail button.v:hover { background: var(--bar); color: var(--ink); }
+.rail button.v[aria-current="true"] { background: var(--desk); color: var(--ink); font-weight: 600; }
+.rail button.v[aria-current="true"] svg { color: var(--maroon); }
+.rail button.v .badge { margin-left: auto; }
+.rail .add { color: var(--quiet); }
+.b-mobile { display: none; }
+.b-title { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px; margin-bottom: 16px; }
+.b-title h2 { margin: 0; font: 600 26px/32px var(--serif); color: var(--ink); }
+.b-title p { margin: 2px 0 0; color: var(--quiet); font-size: 14px; flex-basis: 100%; }
+
+/* ── Option C: one desk ────────────────────────────────────── */
+.c-grid { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); gap: 40px; align-items: start; }
+.tbl { width: 100%; border-collapse: collapse; }
+.tbl th { text-align: left; font: 600 12.5px var(--sans); color: var(--quiet); padding: 10px 20px; border-bottom: 1px solid var(--desk); background: var(--bar); }
+.tbl td { padding: 12px 20px; border-top: 1px solid var(--desk); vertical-align: top; }
+.tbl tr:first-child td { border-top: 0; }
+.tbl td.ti a { font: 600 16.5px/23px var(--serif); color: var(--ink); text-decoration: none; }
+.tbl td.ti a:hover { color: var(--maroon); text-decoration: underline; text-underline-offset: 3px; }
+.tbl td.ti small { display: block; font-size: 12.5px; color: var(--quiet); }
+.tbl td.st { white-space: nowrap; }
+.tbl td.up { white-space: nowrap; color: var(--faint); font-size: 12.5px; text-align: right; }
+.tbl tbody.more tr { display: none; }
+.tbl.all tbody.more tr { display: table-row; }
+
+.view { animation: in .32s var(--ease) both; }
+@keyframes in { from { opacity: 0; transform: translateY(6px); } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* ── Responsive ────────────────────────────────────────────── */
+@media (max-width: 1100px) {
+  .a-reading, .c-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 960px) {
+  .b-grid { grid-template-columns: minmax(0, 1fr); }
+  .rail { display: none; }
+  .b-mobile { display: block; margin-bottom: 18px; }
+  .b-mobile .select { width: 100%; }
+}
+@media (max-width: 860px) {
+  .shell { grid-template-columns: minmax(0, 1fr); }
+  .side { display: none; }
+  .topbar { display: flex; align-items: center; justify-content: space-between; height: 56px; padding: 0 16px; background: var(--page); border-bottom: 1px solid var(--desk); position: sticky; top: var(--proto); z-index: 10; }
+  .topbar .brand { padding: 0; font-size: 19px; }
+  .main { padding: 24px 16px 64px; }
+  .ph h1 { font-size: 30px; }
+}
+@media (max-width: 560px) {
+  .row { grid-template-columns: minmax(0, 1fr); padding: 16px; }
+  .row .end { flex-direction: row; align-items: center; justify-content: space-between; text-align: left; }
+  .row .do .btn.primary { width: 100%; }
+  .seg { display: flex; width: 100%; }
+  .seg button { flex: 1; justify-content: center; padding: 0 10px; }
+  .ph .btn.primary { width: 100%; }
+  .ph > div { flex-basis: 100%; }
+  .search { max-width: none; flex-basis: 100%; }
+  .toolbar .select, .toolbar .menuwrap { flex: 1; }
+  .toolbar .menuwrap .btn { width: 100%; justify-content: space-between; }
+  .tbl thead { display: none; }
+  .tbl td.up { display: none; }
+  .tbl td { padding: 12px 16px; }
+  .proto .who { margin-left: 0; }
+  .proto { position: static; }
+  .proto .opts { flex-wrap: wrap; }
+  .proto .opts button { padding: 6px 9px; }
+  .tbl, .tbl tbody, .tbl tr { display: block; }
+  .tbl tbody.more { display: none; }
+  .tbl.all tbody.more, .tbl.all tbody.more tr { display: block; }
+  .tbl tr { padding: 12px 16px; border-top: 1px solid var(--desk); }
+  .tbl tbody:first-of-type tr:first-child { border-top: 0; }
+  .tbl td { display: block; padding: 0; border: 0; }
+  .tbl td.st { margin-top: 8px; }
+  .proto .note { display: none; }
+  .topbar { top: 0; }
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+  <symbol id="plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+  <symbol id="check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="reset" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></symbol>
+  <symbol id="alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></symbol>
+  <symbol id="clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+  <symbol id="file" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M16 13H8"/><path d="M16 17H8"/></symbol>
+  <symbol id="pen" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></symbol>
+  <symbol id="done" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="folder" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></symbol>
+  <symbol id="bookmark" viewBox="0 0 24 24"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></symbol>
+  <symbol id="upload" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></symbol>
+  <symbol id="arrow" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></symbol>
+  <symbol id="down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="compass" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36 6.36-2.12z"/></symbol>
+  <symbol id="chat" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+  <symbol id="book" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></symbol>
+  <symbol id="bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></symbol>
+  <symbol id="mega" viewBox="0 0 24 24"><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></symbol>
+  <symbol id="guide" viewBox="0 0 24 24"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></symbol>
+  <symbol id="lock" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+  <symbol id="history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></symbol>
+  <symbol id="more" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></symbol>
+  <symbol id="menu" viewBox="0 0 24 24"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></symbol>
+  <symbol id="mark" viewBox="0 0 32 32"><path d="M3 6c4-1.5 7.5-1 10 1v20c-2.5-2-6-2.5-10-1Z"/><path d="M29 6c-4-1.5-7.5-1-10 1v20c2.5-2 6-2.5 10-1Z"/></symbol>
+</svg>
+
+<div class="proto" role="region" aria-label="Prototype controls">
+  <strong>My Library prototypes</strong>
+  <div class="opts" role="group" aria-label="Direction">
+    <button type="button" data-opt="a" aria-pressed="true">A · Two rooms</button>
+    <button type="button" data-opt="b" aria-pressed="false">B · Library rail</button>
+    <button type="button" data-opt="c" aria-pressed="false">C · One desk</button>
+  </div>
+  <div class="who" role="group" aria-label="Viewer">
+    <button type="button" data-who="author" aria-pressed="true">Student (author)</button>
+    <button type="button" data-who="reader" aria-pressed="false">Reader only</button>
+  </div>
+  <p class="note" id="protoNote"></p>
+</div>
+
+<div class="shell">
+  <aside class="side" aria-label="Main">
+    <div class="brand"><svg viewBox="0 0 32 32" aria-hidden="true"><use href="#mark"/></svg>IRIS</div>
+    <nav class="nav">
+      <a href="#"><svg class="i"><use href="#compass"/></svg>Discover</a>
+      <a href="#"><svg class="i"><use href="#chat"/></svg>Ask IRIS</a>
+      <a href="#" aria-current="page"><svg class="i"><use href="#book"/></svg>My Library<span class="badge" id="navBadge">2</span></a>
+      <a href="#"><svg class="i"><use href="#bell"/></svg>Notifications</a>
+      <a href="#"><svg class="i"><use href="#mega"/></svg>Calls &amp; Conferences</a>
+      <a href="#"><svg class="i"><use href="#guide"/></svg>Guidelines</a>
+    </nav>
+    <div class="me"><span class="av">SS</span><span><b>Sam Student</b>Student</span></div>
+  </aside>
+
+  <div>
+    <div class="topbar">
+      <div class="brand"><svg viewBox="0 0 32 32" aria-hidden="true"><use href="#mark"/></svg>IRIS</div>
+      <button class="iconbtn" type="button" aria-label="Open menu"><svg class="i"><use href="#menu"/></svg></button>
+    </div>
+    <main class="main">
+      <div class="wrap" id="app"></div>
+    </main>
+  </div>
+</div>
+
+<script>
+/* ── Data: the seed_demo student, as the dev stack shows it (2026-11-24) ── */
+const RESEARCH = [
+  { t: "[DEMO] Declined by IERC, ITSO and KTTO preserved", type: "Project", adviser: "Ana Adviser", g: "action", st: "Revision requested · IERC", tone: "attention", act: "Submit a new version", actIcon: "upload", when: "Nov 3, 2026",
+    clear: [["ITSO", "cleared", "cleared"], ["IERC", "revision", "asked for revision"], ["KTTO", "cleared", "cleared"]] },
+  { t: "[DEMO] Adviser requested a supporting document", type: "Thesis / Research", adviser: "Ana Adviser", g: "action", st: "Documents requested · Adviser", tone: "attention", act: "Upload the documents", actIcon: "upload", when: "Nov 3, 2026" },
+  { t: "[DEMO] Resubmitted, ITSO and KTTO preserved", type: "Project", adviser: "Ana Adviser", g: "review", st: "Office review · IERC", tone: "review", when: "Nov 3, 2026",
+    clear: [["ITSO", "kept", "cleared · kept from v1"], ["IERC", "reviewing", "reviewing v2"], ["KTTO", "kept", "cleared · kept from v1"]] },
+  { t: "[DEMO] New model: Thesis at its Adviser, ready to accept and route", type: "Thesis / Research", adviser: "Ana Adviser", g: "review", st: "Adviser review", tone: "review", when: "Nov 3, 2026" },
+  { t: "[DEMO] New model: Proposal at its Adviser, ready to accept or reject", type: "Proposal", adviser: "Ana Adviser", g: "review", st: "Adviser review", tone: "review", when: "Nov 3, 2026" },
+  { t: "[DEMO] New model: Thesis ITSO cleared, in RDCO's pool to decide", type: "Thesis / Research", adviser: "Ana Adviser", g: "review", st: "RDCO decision", tone: "review", when: "Nov 3, 2026",
+    clear: [["ITSO", "cleared", "cleared"]] },
+  { t: "IRIS Requirements Questions", type: "Thesis / Research", g: "draft", st: "Draft", tone: "quiet", when: "Nov 3, 2026" },
+  { t: "[DEMO] Draft, never submitted", type: "Thesis / Research", g: "draft", st: "Draft", tone: "quiet", when: "Nov 3, 2026" },
+  { t: "ClusterCAD: a computational platform for type I modular polyketide synthase design", type: "Thesis / Research", g: "draft", st: "Draft", tone: "quiet", when: "Nov 3, 2026" },
+  { t: "[DEMO] Proposal approved by adviser", type: "Thesis / Research", adviser: "Ana Adviser", g: "draft", st: "Draft", tone: "quiet", when: "Nov 3, 2026", note: "Continues an accepted Proposal" },
+  { t: "[DEMO] Proposal approved by adviser", type: "Proposal", adviser: "Ana Adviser", g: "done", st: "Accepted", tone: "settled", when: "Nov 3, 2026" },
+  { t: "[DEMO] Project kept unlisted after KTTO", type: "Project", adviser: "Ana Adviser", g: "done", st: "Unlisted", tone: "settled", when: "Nov 3, 2026" },
+];
+const SAVED = [
+  { t: "HBFlex: A Flexible Memory System for Bridging Fine-Grained LLM States and Coarse-Grained HBF Parallel Execution", type: "Thesis / Research", rs: "", folders: ["Thesis references"], added: "Nov 24, 2026" },
+  { t: "MeshKV: A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators", type: "Thesis / Research", rs: "want", folders: [], added: "Nov 24, 2026" },
+  { t: "Nested Parallel von Neumann Architecture and Nested BSP", type: "Thesis / Research", rs: "reading", folders: ["Thesis references"], added: "Nov 23, 2026" },
+];
+const OPENED = [
+  ["Nested Parallel von Neumann Architecture and Nested BSP", "Nov 24, 2026"],
+  ["Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark", "Nov 24, 2026"],
+  ["MeshKV: A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators", "Nov 24, 2026"],
+];
+const FOLDERS = ["Thesis references"];
+const RS = [["want", "Want to read"], ["reading", "Reading"], ["done", "Completed"]];
+const GROUPS = { action: "Needs your action", review: "In review", draft: "Drafts", done: "Finished" };
+const TONE_ICON = { attention: "alert", review: "clock", cleared: "check", settled: "done", quiet: "pen" };
+const STRIP_ICON = { cleared: "check", kept: "check", reviewing: "clock", revision: "reset" };
+
+const NOTES = {
+  a: "<b>A · Two rooms.</b> Five tabs become two: <b>My research</b> (what you wrote) and <b>Reading</b> (what you saved). The Overview tab is gone, so nothing is shown twice. Folders and reading status merge into one <b>Shelf</b> menu. Requests and saved calls move to a side column. Lowest change from today.",
+  b: "<b>B · Library rail.</b> The reference-manager pattern (Zotero, Mendeley, Semantic Scholar): one list on the right, and one rail on the left that replaces tabs, chips and the folder dropdown. Every view is one click away and named once. Below 960 px the rail becomes one picker. Best when the library grows.",
+  c: "<b>C · One desk.</b> No tabs. One page answers three questions in order: what is waiting on me, where is my research, what am I reading. Lists show their first rows and open in place (progressive disclosure), the way GitHub's and Linear's home pages work. Best for a quick look; weakest past a few dozen papers.",
+};
+
+const ic = (id, cls = "i") => `<svg class="${cls}" aria-hidden="true"><use href="#${id}"/></svg>`;
+const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+let state = { opt: "a", who: "author", a: "research", b: "action", shelf: "all", cAll: false };
+
+function chip(r) { return `<span class="chip ${r.tone}">${ic(TONE_ICON[r.tone])}${esc(r.st)}</span>`; }
+function strip(r) {
+  if (!r.clear) return "";
+  return `<div class="strip" aria-label="Office clearances">${r.clear.map(([o, k, w]) => `<span class="${k}">${ic(STRIP_ICON[k])}<b>${o}</b> ${w}</span>`).join("")}</div>`;
+}
+function researchRow(r, { compact = false } = {}) {
+  const meta = [r.type, r.adviser && `Adviser ${r.adviser}`, r.note].filter(Boolean).map((m) => `<span>${esc(m)}</span>`).join("");
+  const action = r.act ? `<button class="btn primary sm" type="button">${ic(r.actIcon)}${r.act}</button>` : "";
+  const extra = (r.clear || action) ? `<div class="do">${strip(r)}${action}</div>` : "";
+  return `<article class="row click${compact ? " compact" : ""}" tabindex="0">
+    <div><h3 class="t">${esc(r.t)}</h3><p class="m">${meta}</p></div>
+    <div class="end">${chip(r)}<span class="when tnum">Updated ${r.when}</span></div>${extra}</article>`;
+}
+function rsSelect(p) {
+  return `<label class="sr" for="rs-${slug(p.t)}">Reading status</label><select id="rs-${slug(p.t)}" class="rs${p.rs ? " set" : ""}">
+    <option value=""${p.rs ? "" : " selected"}>No status</option>${RS.map(([v, l]) => `<option value="${v}"${p.rs === v ? " selected" : ""}>${l}</option>`).join("")}</select>`;
+}
+const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40);
+function savedRow(p) {
+  const meta = [p.type, "Authors not recorded", ...p.folders.map((f) => `In ${f}`)].map((m) => `<span>${esc(m)}</span>`).join("");
+  return `<article class="row click" tabindex="0">
+    <div><h3 class="t">${esc(p.t)}</h3><p class="m">${meta}</p></div>
+    <div class="end" style="flex-direction:row;align-items:center">${rsSelect(p)}<button class="iconbtn" type="button" aria-label="More for ${esc(p.t)}">${ic("more")}</button></div></article>`;
+}
+function savedFor(shelf) {
+  if (shelf === "all") return SAVED;
+  if (shelf.startsWith("f:")) return SAVED.filter((p) => p.folders.includes(shelf.slice(2)));
+  return SAVED.filter((p) => p.rs === shelf);
+}
+function shelfLabel(shelf) {
+  if (shelf === "all") return "All saved";
+  if (shelf.startsWith("f:")) return shelf.slice(2);
+  return RS.find(([v]) => v === shelf)[1];
+}
+function emptyFor(shelf) {
+  if (shelf === "reading") return `<div class="empty"><b>Nothing marked Reading</b>Set a saved paper to Reading and it waits here.</div>`;
+  if (shelf === "done") return `<div class="empty"><b>Nothing completed yet</b>Mark a paper Completed when you finish it.</div>`;
+  if (shelf === "want") return `<div class="empty"><b>Nothing to read later</b>Choose Want to read on a saved paper.</div>`;
+  return `<div class="empty"><b>This folder is empty</b>File a saved paper here from its menu.</div>`;
+}
+function savedList(shelf) {
+  const items = savedFor(shelf);
+  return `<div class="sheet">${items.length ? items.map(savedRow).join("") : emptyFor(shelf)}</div>`;
+}
+function shelfMenu(id) {
+  const it = (v, l, icon) => `<button class="it" type="button" role="menuitemradio" aria-checked="${state.shelf === v}" data-shelf="${v}">${ic(icon)}${esc(l)}${ic("check", "i ck")}</button>`;
+  return `<div class="menuwrap">
+    <button class="btn" type="button" aria-haspopup="menu" aria-expanded="false" data-menu="${id}">${ic("bookmark")}<span>Shelf: ${esc(shelfLabel(state.shelf))}</span>${ic("down")}</button>
+    <div class="menu" role="menu" id="${id}">
+      ${it("all", "All saved", "bookmark")}
+      <div class="g">Reading status</div>${RS.map(([v, l]) => it(v, l, v === "done" ? "done" : v === "reading" ? "book" : "clock")).join("")}
+      <hr><div class="g">Your folders</div>${FOLDERS.map((f) => it("f:" + f, f, "folder")).join("")}
+      <button class="it" type="button" role="menuitem">${ic("plus")}New folder</button>
+      <p class="foot">Saves, status and folders follow your account. Up to 10 folders.</p>
+    </div></div>`;
+}
+function asideReading() {
+  return `<aside class="aside sheet" aria-label="More from your library">
+    <div class="block"><h3>Recently opened</h3><ul>${OPENED.map(([t, d]) => `<li><a href="#">${esc(t)}</a><small>Opened ${d}</small></li>`).join("")}</ul>
+      <button class="link" type="button" style="margin-top:6px">Pause or clear history</button></div>
+    <div class="block"><h3>Download requests</h3><p>None yet. When you ask RDCO for a copy of a paper, the request and its answer appear here.</p></div>
+    <div class="block"><h3>Saved calls</h3><p>No saved calls. Use the bookmark on a call in Calls &amp; Conferences.</p>
+      <a class="link" href="#" style="margin-top:6px">Calls &amp; Conferences ${ic("arrow")}</a></div>
+  </aside>`;
+}
+const isAuthor = () => state.who === "author";
+const byGroup = (g) => RESEARCH.filter((r) => r.g === g);
+function header(desc) {
+  return `<div class="ph"><div><h1>My Library</h1><p>${desc}</p></div>
+    ${isAuthor() ? `<a class="btn primary" href="#">${ic("plus")}Publish</a>` : ""}</div>`;
+}
+
+/* ── A · Two rooms ───────────────────────────────────────── */
+function viewA() {
+  const room = isAuthor() ? state.a : "reading";
+  const todo = byGroup("action");
+  const seg = isAuthor() ? `<div class="seg" role="tablist" aria-label="My Library">
+      <button type="button" role="tab" aria-selected="${room === "research"}" data-a="research">My research${todo.length ? `<span class="badge" aria-label="${todo.length} need you">${todo.length}</span>` : ""}</button>
+      <button type="button" role="tab" aria-selected="${room === "reading"}" data-a="reading">Reading</button></div>` : "";
+  let body;
+  if (room === "research") {
+    body = `<div class="toolbar"><div class="search">${ic("search")}<input type="search" placeholder="Search your research" aria-label="Search your research"></div></div>
+      ${todo.length ? `<section class="sec todo"><header><h2>${ic("alert")}Waiting on you</h2></header><div class="sheet">${todo.map((r) => researchRow(r)).join("")}</div></section>` : ""}
+      <section class="sec"><header><h2>In review</h2></header><p class="lede">With your Adviser or an office. Nothing for you to do yet.</p><div class="sheet">${byGroup("review").map((r) => researchRow(r)).join("")}</div></section>
+      <section class="sec"><header><h2>Drafts</h2></header><div class="sheet">${byGroup("draft").map((r) => researchRow(r, { compact: true })).join("")}</div></section>
+      <details class="fold sec"><summary>${ic("right")}Finished <span class="hint">Accepted, published or unlisted</span></summary><div class="sheet">${byGroup("done").map((r) => researchRow(r, { compact: true })).join("")}</div></details>`;
+  } else {
+    body = `<div class="a-reading"><div>
+      <div class="toolbar"><div class="search">${ic("search")}<input type="search" placeholder="Search saved papers" aria-label="Search saved papers"></div>
+        ${shelfMenu("shelfA")}
+        <select class="select" aria-label="Sort"><option>Recently saved</option><option>Title</option></select></div>
+      ${savedList(state.shelf)}</div>${asideReading()}</div>`;
+  }
+  return `${header(isAuthor() ? "Your research, from draft to shelf, and the papers you saved." : "Papers you saved and opened, and your requests.")}
+    ${seg ? `<div class="a-head">${seg}</div>` : ""}<div class="view" data-k="a-${room}-${state.shelf}">${body}</div>`;
+}
+
+/* ── B · Library rail ────────────────────────────────────── */
+const B_VIEWS = () => [
+  ...(isAuthor() ? [{ g: "Your research", items: [["action", "Needs your action", "alert"], ["review", "In review", "clock"], ["draft", "Drafts", "pen"], ["done", "Finished", "done"]] }] : []),
+  { g: "Reading", items: [["all", "All saved", "bookmark"], ["want", "Want to read", "clock"], ["reading", "Reading", "book"], ["rdone", "Completed", "done"], ["opened", "Recently opened", "history"]] },
+  { g: "Folders", items: FOLDERS.map((f) => ["f:" + f, f, "folder"]) },
+  { g: "Requests", items: [["downloads", "Download requests", "lock"], ["calls", "Saved calls", "mega"]] },
+];
+const B_COPY = {
+  action: ["Needs your action", "An office or your Adviser is waiting on you."],
+  review: ["In review", "With your Adviser or an office. Nothing for you to do yet."],
+  draft: ["Drafts", "Only you can see these until you submit."],
+  done: ["Finished", "Accepted, published or unlisted."],
+  all: ["All saved", "Saves, reading status and folders follow your account."],
+  want: ["Want to read", ""], reading: ["Reading", ""], rdone: ["Completed", ""],
+  opened: ["Recently opened", "Only you can see your reading history."],
+  downloads: ["Download requests", "Copies you asked RDCO for, and their answers."],
+  calls: ["Saved calls", "Calls for papers you bookmarked in Calls & Conferences."],
+};
+function viewB() {
+  let v = state.b;
+  if (!isAuthor() && GROUPS[v]) v = state.b = "all";
+  const todo = byGroup("action").length;
+  const rail = B_VIEWS().map(({ g, items }) => `<div class="grp"><h2>${g}</h2>${items.map(([k, l, icon]) =>
+    `<button class="v" type="button" data-b="${k}" aria-current="${v === k}">${ic(icon)}${esc(l)}${k === "action" && todo ? `<span class="badge">${todo}</span>` : ""}</button>`).join("")}
+    ${g === "Folders" ? `<button class="v add" type="button">${ic("plus")}New folder</button>` : ""}</div>`).join("");
+  const opts = B_VIEWS().map(({ g, items }) => `<optgroup label="${g}">${items.map(([k, l]) => `<option value="${k}"${v === k ? " selected" : ""}>${esc(l)}</option>`).join("")}</optgroup>`).join("");
+  const [title, sub] = v.startsWith("f:") ? [v.slice(2), "A folder of saved papers. Taking a paper out keeps it saved."] : B_COPY[v];
+  let list;
+  if (GROUPS[v]) list = `<div class="sheet">${byGroup(v).map((r) => researchRow(r, { compact: v === "draft" || v === "done" })).join("")}</div>`;
+  else if (v === "opened") list = `<div class="sheet">${OPENED.map(([t, d]) => `<article class="row click compact" tabindex="0"><div><h3 class="t">${esc(t)}</h3><p class="m"><span>Opened ${d}</span></p></div><div class="end"><button class="btn sm" type="button">${ic("bookmark")}Save</button></div></article>`).join("")}</div>
+      <p style="margin-top:12px"><button class="link" type="button">Pause or clear history</button></p>`;
+  else if (v === "downloads") list = `<div class="sheet"><div class="empty"><b>No download requests yet</b>When you ask RDCO for a copy of a paper, it appears here.<p style="margin:14px 0 0"><a class="btn sm" href="#">Browse Discover</a></p></div></div>`;
+  else if (v === "calls") list = `<div class="sheet"><div class="empty"><b>No saved calls</b>Use the bookmark on a call to keep it here.<p style="margin:14px 0 0"><a class="btn sm" href="#">Go to Calls &amp; Conferences</a></p></div></div>`;
+  else list = savedList(v === "rdone" ? "done" : v);
+  const showSearch = !["downloads", "calls"].includes(v);
+  return `${header(isAuthor() ? "Your research, from draft to shelf, and the papers you saved." : "Papers you saved and opened, and your requests.")}
+    <div class="b-grid"><nav class="rail" aria-label="Library views">${rail}</nav>
+      <div><div class="b-mobile"><label class="sr" for="bpick">Show</label><select id="bpick" class="select">${opts}</select></div>
+        <div class="view" data-k="b-${v}"><div class="b-title"><h2>${esc(title)}</h2>${sub ? `<p>${esc(sub)}</p>` : ""}</div>
+        ${showSearch ? `<div class="toolbar"><div class="search">${ic("search")}<input type="search" placeholder="Search ${esc(title.toLowerCase())}" aria-label="Search"></div><span class="spacer"></span><select class="select" aria-label="Sort"><option>${GROUPS[v] ? "Last changed" : "Recently saved"}</option><option>Title</option></select></div>` : ""}
+        ${list}</div></div></div>`;
+}
+
+/* ── C · One desk ────────────────────────────────────────── */
+function viewC() {
+  const todo = byGroup("action");
+  const rest = RESEARCH.filter((r) => r.g !== "action");
+  const first = rest.slice(0, 5), more = rest.slice(5);
+  const tr = (r) => `<tr><td class="ti"><a href="#">${esc(r.t)}</a><small>${esc(r.type)}</small></td><td class="st">${chip(r)}</td><td class="up tnum">${r.when}</td></tr>`;
+  const reading = `<section class="sec"><header><h2>Reading</h2>${shelfMenu("shelfC")}</header>${savedList(state.shelf)}</section>
+    <section class="sec"><header><h2>Recently opened</h2><button class="link" type="button">Clear</button></header>
+      <div class="sheet">${OPENED.map(([t, d]) => `<article class="row click compact" tabindex="0"><div><h3 class="t">${esc(t)}</h3><p class="m"><span>Opened ${d}</span></p></div></article>`).join("")}</div></section>
+    <section class="sec"><header><h2>Requests</h2></header><div class="sheet aside">
+      <div class="block"><h3>Download requests</h3><p>None yet. Copies you ask RDCO for appear here.</p></div>
+      <div class="block"><h3>Saved calls</h3><p>None saved. <a class="link" href="#">Calls &amp; Conferences ${ic("arrow")}</a></p></div></div></section>`;
+  if (!isAuthor()) return `${header("Papers you saved and opened, and your requests.")}<div class="view" data-k="c-r">${reading}</div>`;
+  return `${header("Your research, from draft to shelf, and the papers you saved.")}<div class="view" data-k="c">
+    ${todo.length ? `<section class="sec todo"><header><h2>${ic("alert")}Waiting on you</h2></header><div class="sheet">${todo.map((r) => researchRow(r)).join("")}</div></section>` : ""}
+    <div class="c-grid" style="margin-top:36px">
+      <section class="sec"><header><h2>Your research</h2><div class="search" style="max-width:240px;flex:0 1 240px">${ic("search")}<input type="search" placeholder="Search" aria-label="Search your research"></div></header>
+        <div class="sheet"><table class="tbl${state.cAll ? " all" : ""}"><thead><tr><th>Title</th><th>Status</th><th style="text-align:right">Updated</th></tr></thead>
+          <tbody>${first.map(tr).join("")}</tbody><tbody class="more">${more.map(tr).join("")}</tbody></table></div>
+        <p style="margin:10px 0 0"><button class="link" type="button" data-call aria-expanded="${state.cAll}">${state.cAll ? "Show fewer" : `Show all ${rest.length}`} ${ic(state.cAll ? "down" : "right")}</button></p>
+      </section>
+      <div class="reading">${reading}</div>
+    </div></div>`;
+}
+
+/* ── Render + events ─────────────────────────────────────── */
+const app = document.getElementById("app");
+function render() {
+  document.querySelectorAll("[data-opt]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.opt === state.opt));
+  document.querySelectorAll("[data-who]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.who === state.who));
+  document.getElementById("protoNote").innerHTML = NOTES[state.opt];
+  document.getElementById("navBadge").hidden = !isAuthor();
+  app.innerHTML = state.opt === "a" ? viewA() : state.opt === "b" ? viewB() : viewC();
+}
+document.addEventListener("click", (e) => {
+  const t = e.target.closest("button, a");
+  document.querySelectorAll(".menu.open").forEach((m) => { if (!t || t.dataset.menu !== m.id) { m.classList.remove("open"); m.previousElementSibling.setAttribute("aria-expanded", "false"); } });
+  if (!t) return;
+  if (t.tagName === "A") e.preventDefault();
+  const d = t.dataset;
+  if (d.opt) { state.opt = d.opt; render(); window.scrollTo({ top: 0 }); }
+  else if (d.who) { state.who = d.who; render(); }
+  else if (d.a) { state.a = d.a; render(); }
+  else if (d.b) { state.b = d.b; render(); }
+  else if ("call" in d) { state.cAll = !state.cAll; render(); }
+  else if (d.shelf) { state.shelf = d.shelf; render(); }
+  else if (d.menu) { const m = document.getElementById(d.menu); const open = !m.classList.contains("open"); m.classList.toggle("open", open); t.setAttribute("aria-expanded", open); }
+});
+document.addEventListener("change", (e) => { if (e.target.id === "bpick") { state.b = e.target.value; render(); } });
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") document.querySelectorAll(".menu.open").forEach((m) => { m.classList.remove("open"); m.previousElementSibling.focus(); });
+});
+render();
+</script>
+</body>
+</html>

@@ -1,9 +1,6 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
-import { recordsApi } from "@/api/records";
-import { isRequestTimeout } from "@/api/requestPolicy";
 import { FOCUS_RING } from "@/components/ui/interaction";
-import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { cn } from "@/lib/utils";
 import type {
   RecordTracker,
@@ -12,6 +9,7 @@ import type {
   TrackerPartyState,
 } from "@/types/records";
 import { RailHeading } from "./headings";
+import { useRecordTracker } from "./useRecordTracker";
 
 interface ReviewRoutingTrackerProps {
   recordId: number;
@@ -67,40 +65,7 @@ const HEADING_ID = "review-routing-tracker-heading";
  * surviving another office's resubmission request -- is visible.
  */
 export function ReviewRoutingTracker({ recordId, status, onOpenHistory }: ReviewRoutingTrackerProps) {
-  const [data, setData] = useState<RecordTracker | null>(null);
-  /** Why the read failed (IR-906): a timeout is worded as one, and both offer a retry. */
-  const [failed, setFailed] = useState<"failed" | "interrupted" | null>(null);
-  const [attempt, setAttempt] = useState(0);
-  /** A live re-read (ADR-073, IR-1287): keeps the rail on screen, and keeps it if the read fails. */
-  const quiet = useRef(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    const isQuiet = quiet.current;
-    quiet.current = false;
-    if (!isQuiet) {
-      setData(null);
-      setFailed(null);
-    }
-    recordsApi
-      .tracker(recordId)
-      .then(({ data: payload }) => {
-        if (cancelled) return;
-        setData(payload);
-        setFailed(null);
-      })
-      .catch((error: unknown) => {
-        if (!cancelled && !isQuiet) setFailed(isRequestTimeout(error) ? "interrupted" : "failed");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [recordId, attempt]);
-  const reloadQuietly = useCallback(() => {
-    quiet.current = true;
-    setAttempt((n) => n + 1);
-  }, []);
-  useLiveRefresh([`record:${recordId}`], reloadQuietly);
+  const { data, failed, retry } = useRecordTracker(recordId);
 
   return (
     <section
@@ -125,7 +90,7 @@ export function ReviewRoutingTracker({ recordId, status, onOpenHistory }: Review
           </p>
           <button
             type="button"
-            onClick={() => setAttempt((n) => n + 1)}
+            onClick={retry}
             className={cn("font-semibold text-brand hover:underline min-h-11", FOCUS_RING)}
           >
             {failed === "interrupted" ? "Retry" : "Try again"}
@@ -153,7 +118,7 @@ export function ReviewRoutingTracker({ recordId, status, onOpenHistory }: Review
  * (frontend_redesign_spec §0, invariant 1). The routing history below still
  * names it, in the server's words, as the record's past.
  */
-const RETIRED_PARTY = "intake";
+export const RETIRED_PARTY = "intake";
 
 function TrackerBody({ data, onOpenHistory }: { data: RecordTracker; onOpenHistory?: () => void }) {
   const parties = data.parties.filter((p) => p.party !== RETIRED_PARTY);

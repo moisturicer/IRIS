@@ -6,9 +6,8 @@
  * body `metadataPayload`'s, all shared with Publish (IR-408), so the two
  * places a record's details are edited cannot drift apart.
  *
- * The page offers this only under the `edit_details` capability: the owner's
- * draft, or the owner's record awaiting a revision, where the change goes back
- * to the reviewers with the resubmission (invariant 4). The server re-checks.
+ * The page offers this under the `edit_details` capability, which an owner has
+ * in every state. The server re-checks.
  * Once submitted, the Adviser and the hints are fixed (IR-507): the form shows
  * them read-only and the PATCH leaves them out.
  */
@@ -119,6 +118,7 @@ export function EditDetailsDialog({ record, selfId, onClose, onSaved }: EditDeta
 
   const onSubmit = form.handleSubmit(save, (errors) => focusFirstInvalid(errors, () => setMoreOpen(true)));
   const revising = record.workflow_state === "awaiting_resubmission";
+  const published = record.pipeline_status === "published";
 
   return (
     <Modal
@@ -153,6 +153,13 @@ export function EditDetailsDialog({ record, selfId, onClose, onSaved }: EditDeta
           <p className="text-small text-stone-700">
             A revision was requested. Changes here are saved straight away, and the reviewers see them when you
             resubmit.
+          </p>
+        )}
+        {submitted && !revising && (
+          <p className="text-small text-stone-700">
+            {published
+              ? "This paper is published. Everyone who reads it sees the change as soon as you save."
+              : "Everyone who can read this paper, its reviewers included, sees the change as soon as you save."}
           </p>
         )}
         {failure && failure.message && Object.keys(failure.fields).length === 0 && (

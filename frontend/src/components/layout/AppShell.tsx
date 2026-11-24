@@ -74,7 +74,9 @@ export function AppShell() {
   const isAskIris = pathname === ASK_PATH || pathname.startsWith(`${ASK_PATH}/`);
   // A record lays out its own bar and workspace (IR-569).
   const isRecord = /^\/records\/\d+\/?$/.test(pathname);
-  const isFullBleed = pathname === "/" || isAskIris || isRecord;
+  // My Library docks its own pane to the sidebar, as Ask IRIS does.
+  const isLibrary = pathname === "/records/mine";
+  const isFullBleed = pathname === "/" || isAskIris || isRecord || isLibrary;
   // Ask IRIS fills the window exactly (`h-screen`) and its toolbar carries the
   // bell on a phone, so a bar above it would push the composer off screen.
   const showPhoneBar = !isAskIris;

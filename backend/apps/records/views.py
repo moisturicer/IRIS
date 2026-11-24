@@ -150,8 +150,9 @@ class RecordViewSet(viewsets.ModelViewSet):
             return [IsAuthenticated(), IsAuthor()]
         # Editing details and submitting are an owner's alone (IR-507, ADR-032
         # §10 Amendment): no office edits or submits a record that is not
-        # theirs, so submission's consent is always an owner's. When an owner
-        # may edit is `update()`'s question (`versions.details_editable`).
+        # theirs, so submission's consent is always an owner's. An owner edits
+        # in every state (ADR-032 §10, amendment 2026-11-24); which fields is
+        # the serializer's question.
         # Deleting is an owner's too (IR-508): no office deletes a student's
         # draft or files a delete request in their name. What a delete does in
         # each state is `perform_destroy`'s, and `destroy()` refuses a second one.
@@ -203,24 +204,13 @@ class RecordViewSet(viewsets.ModelViewSet):
     @transaction.atomic
     def update(self, request, *args, **kwargs):
         """
-        An owner edits only a `draft`, or a record awaiting their revision
-        (IR-507, ADR-032 §10 Amendment). Refused here, before the body is
-        validated, so "not now" is what the owner hears first. A 400, not a
-        403: the owner is the right person at the wrong moment, as with
-        `submit/` on a non-draft. What may change is the serializer's question.
+        An owner edits their paper's details in every state (ADR-032 §10,
+        amendment 2026-11-24). What may change is the serializer's question:
+        past draft the fixed fields and the manuscript do not.
         `partial_update` comes through here too.
         """
-        from .versions import details_editable
-
         record = self.get_object()
         Record.objects.select_for_update().get(pk=record.pk)
-        record = self.get_object()
-        if not details_editable(record):
-            return Response(
-                {"detail": "This record's details can be edited only while it is a draft "
-                           f"or a revision is asked for, and it is '{record.pipeline_status}'."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
         return super().update(request, *args, **kwargs)
 
     def perform_update(self, serializer):

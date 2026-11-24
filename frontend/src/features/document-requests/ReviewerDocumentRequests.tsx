@@ -181,7 +181,7 @@ function ManagedItem({
     setError(null);
     setBusy(true);
     try {
-      await recordsApi.decideDocumentRequestItem(item.id, body);
+      await recordsApi.decideDocumentRequestItem(item.id, { ...body, upload: item.upload });
       setRejecting(false);
       setReason("");
       await onChanged();

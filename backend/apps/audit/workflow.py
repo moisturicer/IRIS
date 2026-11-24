@@ -328,6 +328,26 @@ def document_rejected(request, item, actor, *, reason):
     _document_request(AuditEvent.DOCUMENT_REQUEST_REJECTED, request, actor, [item], reason=reason)
 
 
+def document_replaced(request, item, actor, *, upload):
+    _document_request(
+        AuditEvent.DOCUMENT_REQUEST_REPLACED, request, actor, [item], upload=upload.pk,
+    )
+
+
+def document_removed(request, item, actor, *, upload):
+    _document_request(
+        AuditEvent.DOCUMENT_REQUEST_REMOVED, request, actor, [item], upload=upload.pk,
+    )
+
+
+def details_edited(record, actor, *, fields):
+    """An owner changed a submitted paper's details: which fields, never their text."""
+    _write(
+        AuditEvent.DETAILS_EDITED, actor, record,
+        fields=sorted(fields), status=str(record.pipeline_status), version=_version(record),
+    )
+
+
 def document_request_withdrawn(request, actor, *, closed_by=BY_REQUESTING_PARTY):
     _document_request(
         AuditEvent.DOCUMENT_REQUEST_WITHDRAWN, request, actor, _every_item(request),

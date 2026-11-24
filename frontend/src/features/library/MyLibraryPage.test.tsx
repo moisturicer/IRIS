@@ -159,8 +159,21 @@ const downloadRequest = (overrides: Partial<ReaderDownloadRequest>): ReaderDownl
 const myDownloads = (rows: ReaderDownloadRequest[]) =>
   vi.mocked(recordsApi.myDownloadRequests).mockResolvedValue({ data: rows } as MyDownloadsResponse);
 
-const section = (name: string) =>
-  screen.getByRole("heading", { name, level: 2 }).closest("section, details") as HTMLElement;
+/** The rail (IR-1311): every list, named once. */
+const rail = () => screen.getByRole("navigation", { name: "My Library" });
+const railItem = (name: string) => within(rail()).getByRole("button", { name: new RegExp(`^${name}`) });
+const open = (name: string) => userEvent.click(railItem(name));
+const railNames = () => within(rail()).getAllByRole("button").map((b) => b.textContent);
+
+/** A group of All research, folded like a chapter. */
+const group = (name: string) =>
+  screen.getByRole("heading", { name, level: 3 }).closest("details") as HTMLDetailsElement;
+
+/** Open a row's or a view's ⋯ menu and choose an item. */
+async function choose(menu: string, item: string) {
+  await userEvent.click(screen.getByRole("button", { name: menu }));
+  await userEvent.click(screen.getByRole("menuitem", { name: item }));
+}
 
 beforeEach(() => {
   localStorage.clear();
@@ -183,27 +196,30 @@ describe("My Library: an author's research", () => {
     expect(await screen.findByRole("button", { name: "Continue as Thesis" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Continue as Project" })).toBeInTheDocument();
   });
-  it("opens My submissions from ?section=research, with the server's status, and a draft's row reopens Publish", async () => {
+
+  it("opens All research from ?section=research, with the server's status, and a draft's row reopens Publish", async () => {
     mine([ownRecord({})]);
     const { container } = renderScreen(<MyLibraryPage />, SUBMISSIONS);
 
-    // The whole row is the link: a draft's opens Publish over this tab
+    // The whole row is the link: a draft's opens Publish over this list
     // (IR-1258), so it has no separate "Continue draft" button (IR-1279).
     expect(await screen.findByRole("link", { name: "Community Water Monitoring" }))
       .toHaveAttribute("href", "/records/mine?section=research&publish=12");
-    expect(within(section("Drafts")).getByText("Draft: not yet submitted")).toBeInTheDocument();
+    expect(within(group("Drafts")).getByText("Draft: not yet submitted")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /^Continue draft/ })).not.toBeInTheDocument();
+    expect(railItem("All research")).toHaveAttribute("aria-current", "page");
     expect(recordsApi.mine).toHaveBeenCalledOnce();
     await expectNoBlockingA11yViolations(container);
   });
 
-  it("deletes a draft after one confirmation and drops its row", async () => {
+  it("deletes a draft from its ⋯ menu after one confirmation and drops its row", async () => {
     mine([ownRecord({}), ownRecord({ id: 13, title: "Still with the offices", pipeline_status: "in_review", workflow_state: "in_review", workflow_state_label: "In review", submitter_status: { line: "In review", waiting_on_you: [] } })]);
     vi.mocked(recordsApi.delete).mockResolvedValue({} as Awaited<ReturnType<typeof recordsApi.delete>>);
     const user = userEvent.setup();
     renderScreen(<MyLibraryPage />, SUBMISSIONS);
 
-    await user.click(await screen.findByRole("button", { name: "Delete draft “Community Water Monitoring”" }));
+    await user.click(await screen.findByRole("button", { name: "Actions for Community Water Monitoring" }));
+    await user.click(screen.getByRole("menuitem", { name: "Delete draft" }));
     const dialog = screen.getByRole("dialog", { name: "Delete this draft?" });
     expect(within(dialog).getByRole("button", { name: "Cancel" })).toHaveFocus();
     expect(recordsApi.delete).not.toHaveBeenCalled();
@@ -212,26 +228,26 @@ describe("My Library: an author's research", () => {
     await waitFor(() => expect(screen.queryByRole("link", { name: "Community Water Monitoring" })).not.toBeInTheDocument());
     expect(recordsApi.delete).toHaveBeenCalledWith(12);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    // Only a draft offers it.
+    // Only a draft offers it: a row in review has nothing for its menu, so it has none.
     expect(screen.getByRole("link", { name: "Still with the offices" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /^Delete draft/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Actions for Still with the offices" })).not.toBeInTheDocument();
   });
 
   it("keeps the draft and says why when the delete fails", async () => {
     mine([ownRecord({})]);
     vi.mocked(recordsApi.delete).mockRejectedValue({ response: { status: 400, data: { detail: "A delete decision is already pending for this record." } } });
-    const user = userEvent.setup();
     renderScreen(<MyLibraryPage />, SUBMISSIONS);
 
-    await user.click(await screen.findByRole("button", { name: "Delete draft “Community Water Monitoring”" }));
-    await user.click(screen.getByRole("button", { name: "Delete draft" }));
+    await screen.findByRole("link", { name: "Community Water Monitoring" });
+    await choose("Actions for Community Water Monitoring", "Delete draft");
+    await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Delete draft" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("A delete decision is already pending for this record.");
     expect(screen.getByRole("dialog", { name: "Delete this draft?" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Community Water Monitoring" })).toBeInTheDocument();
   });
 
-  it("puts what waits on the author first, each request linking straight to the act that answers it", async () => {
+  it("puts what waits on the author first, with no button for a request: it is answered on the paper's Overview", async () => {
     const revision = { kind: "revision", party: "ierc", label: "Revision requested by IERC", action_label: "Submit a new version" } as const;
     const document = { kind: "document", party: "adviser", label: "Documents requested by Adviser", action_label: "Upload the documents" } as const;
     mine([
@@ -242,20 +258,22 @@ describe("My Library: an author's research", () => {
     const { container } = renderScreen(<MyLibraryPage />, SUBMISSIONS);
 
     await screen.findByRole("link", { name: "Asked to revise" });
-    const headings = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+    const headings = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
     expect(headings.indexOf("Needs your action")).toBeLessThan(headings.indexOf("In review"));
 
-    const waiting = section("Needs your action");
+    const waiting = group("Needs your action");
     expect(within(waiting).getByText("Revision requested by IERC: action needed")).toBeInTheDocument();
-    expect(within(waiting).getByRole("link", { name: "Submit a new version (Revision requested by IERC)" }))
-      .toHaveAttribute("href", "/records/14?section=overview#revision-requested");
-    const uploads = within(waiting).getAllByRole("link", { name: "Upload the documents (Documents requested by Adviser)" });
-    expect(uploads.map((link) => link.getAttribute("href"))).toEqual([
-      "/records/14?section=overview#documents-requested",
-      "/records/15?section=overview#documents-requested",
-    ]);
+    // The requests are answered on the paper's Overview, which the title opens: no button, no menu.
+    expect(within(waiting).queryByRole("link", { name: /^Submit a new version/ })).not.toBeInTheDocument();
+    expect(within(waiting).queryByRole("link", { name: /^Upload the documents/ })).not.toBeInTheDocument();
+    expect(within(waiting).queryByRole("button", { name: "Actions for Asked to revise" })).not.toBeInTheDocument();
+    expect(within(waiting).getByRole("link", { name: "Asked to revise" })).toHaveAttribute("href", "/records/14");
+
     expect(within(waiting).queryByRole("link", { name: "Still with the offices" })).not.toBeInTheDocument();
-    expect(within(section("In review")).getByText("In specialist review: IERC")).toBeInTheDocument();
+    expect(within(group("In review")).getByText("In specialist review: IERC")).toBeInTheDocument();
+    // The rail counts what waits on the author, and nothing else.
+    expect(railItem("Needs your action")).toHaveTextContent("2");
+    expect(railItem("In review")).not.toHaveTextContent(/\d/);
     await expectNoBlockingA11yViolations(container);
   });
 
@@ -272,7 +290,7 @@ describe("My Library: an author's research", () => {
     renderScreen(<MyLibraryPage />, SUBMISSIONS);
 
     await screen.findByRole("link", { name: "Parallel review" });
-    const review = section("In review");
+    const review = group("In review");
     // The strip is the server's words (IR-1083): kept says which version it was kept from.
     const strip = within(review).getByRole("list", { name: "Clearances" });
     expect(strip).toHaveTextContent("ITSO: Cleared · Kept from v1");
@@ -281,30 +299,35 @@ describe("My Library: an author's research", () => {
     expect(screen.queryByRole("heading", { name: /With your Adviser|With the offices|With RDCO/ })).not.toBeInTheDocument();
   });
 
-  it("renders no numeric counters", async () => {
+  it("renders no numeric counters in its headings", async () => {
     mine([ownRecord({ id: 31, title: "Draft one" }), ownRecord({ id: 32, title: "Draft two" })]);
     renderScreen(<MyLibraryPage />, SUBMISSIONS);
 
     await screen.findByRole("link", { name: "Draft one" });
-    for (const heading of screen.getAllByRole("heading", { level: 2 })) {
+    for (const heading of screen.getAllByRole("heading")) {
       expect(heading.textContent).not.toMatch(/\d/);
     }
   });
 
-  it("folds every group, keeps Finished folded until asked for, and opens a group picked as a filter", async () => {
+  it("folds every group, keeps Finished folded, and shows one group's rows alone when the rail picks it", async () => {
     mine([
       ownRecord({ id: 22, title: "Rejected paper", pipeline_status: "rejected", workflow_state: "rejected", workflow_state_label: "Archived" }),
       ownRecord({ id: 23, title: "Draft paper" }),
     ]);
     renderScreen(<MyLibraryPage />, SUBMISSIONS);
 
-    await screen.findByRole("heading", { name: "Drafts", level: 2 });
-    expect((section("Drafts") as HTMLDetailsElement).open).toBe(true);
-    expect((section("Finished") as HTMLDetailsElement).open).toBe(false);
+    await screen.findByRole("heading", { name: "Drafts", level: 3 });
+    expect(group("Drafts").open).toBe(true);
+    expect(group("Finished").open).toBe(false);
 
-    await userEvent.click(within(screen.getByRole("group", { name: "Show" })).getByRole("button", { name: "Finished" }));
-    expect((section("Finished") as HTMLDetailsElement).open).toBe(true);
-    expect(screen.queryByRole("heading", { name: "Drafts", level: 2 })).not.toBeInTheDocument();
+    await open("Finished");
+    expect(railItem("Finished")).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("heading", { name: "Finished", level: 2 })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Rejected paper" })).toBeVisible();
+    expect(screen.queryByRole("link", { name: "Draft paper" })).not.toBeInTheDocument();
+
+    await open("Needs your action");
+    expect(screen.getByRole("heading", { name: "Nothing is waiting on you" })).toBeInTheDocument();
   });
 
   it("searches titles and authors, and says when nothing matches", async () => {
@@ -320,7 +343,9 @@ describe("My Library: an author's research", () => {
     expect(screen.getByRole("heading", { name: "Nothing matches “soilzzz”" })).toBeInTheDocument();
   });
 
-  it("opens an author on Overview: what waits on them, counted, and a tab to every submission", async () => {
+  // IR-1311 replaces the Overview tab: an author lands on All research, which
+  // already puts what waits on them first, and the rail names every list once.
+  it("opens an author on All research, with one rail in place of tabs, and keeps the list in the address", async () => {
     const document = { kind: "document", party: "adviser", label: "Documents requested by Adviser", action_label: "Upload the documents" } as const;
     mine([
       ownRecord({ id: 15, title: "Asked for a form", pipeline_status: "in_review", workflow_state: "awaiting_document", workflow_state_label: "Awaiting document", holders: [{ party: "adviser", label: "Adviser" }], submitter_status: { line: "Documents requested by Adviser: action needed", waiting_on_you: [document] } }),
@@ -328,20 +353,36 @@ describe("My Library: an author's research", () => {
     ]);
     const { container } = renderScreen(<MyLibraryPage />, { route: "/records/mine" });
 
-    expect(await screen.findByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
-    const waiting = screen.getByRole("region", { name: "Waiting on you" });
-    expect(within(waiting).getByText("1")).toBeInTheDocument();
-    expect(within(waiting).getByRole("link", { name: /^Upload the documents/ }))
-      .toHaveAttribute("href", "/records/15?section=overview#documents-requested");
+    expect(await screen.findByRole("link", { name: "Asked for a form" })).toHaveAttribute("href", "/records/15");
+    expect(screen.queryByRole("link", { name: /^Upload the documents/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    expect(railItem("All research")).toHaveAttribute("aria-current", "page");
+    expect(railItem("Needs your action")).toHaveTextContent("1");
+    expect(railNames()).toEqual([
+      "All research", "Needs your action1 waiting", "In review", "Drafts", "Finished",
+      "All saved", "Want to read", "Reading", "Completed", "History",
+      "New folder", "Saved calls", "Download requests",
+    ]);
     // The draft's title opens Publish over My Library (IR-1258).
-    expect(within(screen.getByRole("region", { name: "Recent submissions" })).getByRole("link", { name: "Community Water Monitoring" }))
-      .toHaveAttribute("href", "/records/mine?publish=12");
-    expect(screen.getByRole("region", { name: "Reading shelf" })).toHaveTextContent("Saved papers follow your account.");
+    expect(screen.getByRole("link", { name: "Community Water Monitoring" })).toHaveAttribute("href", "/records/mine?publish=12");
     await expectNoBlockingA11yViolations(container);
 
-    await userEvent.click(screen.getByRole("tab", { name: "My submissions" }));
-    expect(screen.getByRole("tab", { name: "My submissions" })).toHaveAttribute("aria-selected", "true");
-    expect(within(section("Drafts")).getByRole("link", { name: "Community Water Monitoring" })).toBeInTheDocument();
+    await open("Drafts");
+    expect(railItem("Drafts")).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "Community Water Monitoring" })).toHaveAttribute("href", "/records/mine?section=drafts&publish=12");
+  });
+
+  it("offers the same lists in one picker for a narrow page", async () => {
+    mine([ownRecord({})]);
+    renderScreen(<MyLibraryPage />, SUBMISSIONS);
+    await screen.findByRole("link", { name: "Community Water Monitoring" });
+
+    const picker = screen.getByRole("combobox", { name: "Show" });
+    expect(picker).toHaveValue("research:all");
+    await userEvent.selectOptions(picker, "Drafts");
+    expect(railItem("Drafts")).toHaveAttribute("aria-current", "page");
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Show" }), "Download requests");
+    expect(await screen.findByRole("heading", { name: "No download requests yet" })).toBeInTheDocument();
   });
 
   it("offers Publish when the author has nothing yet", async () => {
@@ -354,7 +395,7 @@ describe("My Library: an author's research", () => {
     await expectNoBlockingA11yViolations(container);
   });
 
-  it("opens Publish over the tab it is on, never over Discover (IR-1258)", async () => {
+  it("opens Publish over the list it is on, never over Discover (IR-1258)", async () => {
     renderScreen(<MyLibraryPage />, SUBMISSIONS);
 
     expect(await screen.findByRole("heading", { name: "You haven’t published anything yet" })).toBeInTheDocument();
@@ -378,7 +419,7 @@ describe("My Library: an author's research", () => {
 
     await waitFor(() => expect(recordsApi.mine).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(screen.queryByRole("link", { name: "Community Water Monitoring" })).not.toBeInTheDocument());
-    expect(screen.getByRole("tab", { name: "My submissions" })).toHaveAttribute("aria-selected", "true");
+    expect(railItem("All research")).toHaveAttribute("aria-current", "page");
   });
 
   it("offers a retry when the research list fails to load", async () => {
@@ -401,40 +442,16 @@ describe("My Library: what each paper waits on (IR-1084, IR-1306)", () => {
     ...overrides,
   });
 
-  it("shows each Overview row's status without a sentence about it, and offers one action", async () => {
-    mine([ownRecord({}), inReview()]);
-    renderScreen(<MyLibraryPage />);
+  it("gives a row in review no button: its link opens the review", async () => {
+    mine([inReview()]);
+    renderScreen(<MyLibraryPage />, SUBMISSIONS);
 
-    const recent = await screen.findByRole("region", { name: "Recent submissions" });
-    const review = within(recent).getByRole("link", { name: "Still with the offices" }).closest("li") as HTMLElement;
-    expect(within(review).queryByText(/Nothing to do yet/)).not.toBeInTheDocument();
-    // The row itself opens the review; there is no "Open review" button to add.
-    expect(within(recent).getByRole("link", { name: "Still with the offices" })).toHaveAttribute("href", "/records/13");
-    expect(within(review).queryByRole("link", { name: /^Open review/ })).not.toBeInTheDocument();
-    expect(within(review).queryByRole("button")).not.toBeInTheDocument();
-
-    const draft = within(recent).getByRole("link", { name: "Community Water Monitoring" }).closest("li") as HTMLElement;
-    expect(within(draft).queryByText(/waits on you/)).not.toBeInTheDocument();
-    // The row reopens Publish; the trash can is its one button.
-    expect(within(recent).getByRole("link", { name: "Community Water Monitoring" })).toHaveAttribute("href", "/?publish=12");
-    expect(within(draft).queryByRole("link", { name: /^Continue draft/ })).not.toBeInTheDocument();
-    expect(within(draft).getByRole("button", { name: "Delete draft “Community Water Monitoring”" })).toBeInTheDocument();
-  });
-
-  it("deletes a draft from the Overview after the same question, and drops its row (IR-1256)", async () => {
-    mine([ownRecord({})]);
-    vi.mocked(recordsApi.delete).mockResolvedValue({} as Awaited<ReturnType<typeof recordsApi.delete>>);
-    const user = userEvent.setup();
-    renderScreen(<MyLibraryPage />);
-
-    const recent = await screen.findByRole("region", { name: "Recent submissions" });
-    await user.click(within(recent).getByRole("button", { name: "Delete draft “Community Water Monitoring”" }));
-    const dialog = screen.getByRole("dialog", { name: "Delete this draft?" });
-    expect(recordsApi.delete).not.toHaveBeenCalled();
-    await user.click(within(dialog).getByRole("button", { name: "Delete draft" }));
-
-    await waitFor(() => expect(screen.queryByRole("link", { name: "Community Water Monitoring" })).not.toBeInTheDocument());
-    expect(recordsApi.delete).toHaveBeenCalledWith(12);
+    const link = await screen.findByRole("link", { name: "Still with the offices" });
+    const row = link.closest("li") as HTMLElement;
+    expect(link).toHaveAttribute("href", "/records/13");
+    expect(within(row).queryByText(/Nothing to do yet/)).not.toBeInTheDocument();
+    expect(within(row).queryByRole("link", { name: /^Open review/ })).not.toBeInTheDocument();
+    expect(within(row).queryByRole("button")).not.toBeInTheDocument();
   });
 
   it("labels each row by the server's status alone, with no sentence about who holds it", async () => {
@@ -452,7 +469,30 @@ describe("My Library: what each paper waits on (IR-1084, IR-1306)", () => {
     expect(screen.queryByText(/Nothing to do yet|Nothing is waiting/)).not.toBeInTheDocument();
   });
 
-  it("offers what the author owes as its one action, in the server's words, where a request is open", async () => {
+  it("folds its pane to icons that keep their names, and remembers it in this browser", async () => {
+    localStorage.removeItem("iris-library-pane");
+    mine([inReview({ id: 14, title: "Folding" })]);
+    const { container, unmount } = renderScreen(<MyLibraryPage />, SUBMISSIONS);
+    await screen.findByRole("link", { name: "Folding" });
+
+    const toggle = screen.getByRole("button", { name: "Hide My Library lists" });
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await userEvent.click(toggle);
+    expect(screen.getByRole("button", { name: "Show My Library lists" })).toHaveAttribute("aria-expanded", "false");
+    expect(railItem("In review")).toBeInTheDocument();
+    await expectNoBlockingA11yViolations(container);
+    unmount();
+
+    renderScreen(<MyLibraryPage />, SUBMISSIONS);
+    await screen.findByRole("link", { name: "Folding" });
+    // New folder needs the width, so it opens the pane and asks for the name there.
+    await userEvent.click(screen.getByRole("button", { name: "New folder" }));
+    expect(screen.getByRole("textbox", { name: "New folder name" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Hide My Library lists" })).toBeInTheDocument();
+    localStorage.removeItem("iris-library-pane");
+  });
+
+  it("says what the author owes in the server's words, with no button for it", async () => {
     const revision = { kind: "revision", party: "ierc", label: "Revision requested by IERC", action_label: "Submit a new version" } as const;
     mine([inReview({ id: 14, title: "Asked to revise", workflow_state: "awaiting_resubmission",
       submitter_status: { line: "Revision requested by IERC: action needed", waiting_on_you: [revision] } })]);
@@ -461,30 +501,28 @@ describe("My Library: what each paper waits on (IR-1084, IR-1306)", () => {
     await screen.findByRole("link", { name: "Asked to revise" });
     expect(screen.getByText("Revision requested by IERC: action needed")).toBeInTheDocument();
     expect(screen.queryByText(/^Waiting on you:/)).not.toBeInTheDocument();
-    // Its own act stays the one action; "Open review" is not added beside it.
-    expect(screen.getByRole("link", { name: "Submit a new version (Revision requested by IERC)" })).toBeInTheDocument();
+    // The act is on the paper's Overview, so the row has no button for it, no "Open review" and no menu.
+    expect(screen.queryByRole("link", { name: /^Submit a new version/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /^Open review/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Actions for Asked to revise" })).not.toBeInTheDocument();
   });
 
-  it("puts a red trash can alone under the draft's Updated date, and it asks once (IR-1279)", async () => {
+  // IR-1311 replaces IR-1279's trash can, at the project owner's request: a
+  // row's acts live in its ⋯ menu, and the row itself still continues the draft.
+  it("keeps a draft's Delete in its ⋯ menu, marked as destructive, and it asks once (IR-1311)", async () => {
     mine([ownRecord({})]);
     const user = userEvent.setup();
     renderScreen(<MyLibraryPage />, SUBMISSIONS);
 
     const row = (await screen.findByRole("link", { name: "Community Water Monitoring" })).closest("li") as HTMLElement;
-    const updated = within(row).getByText(/^Updated /);
-    const remove = within(row).getByRole("button", { name: "Delete draft “Community Water Monitoring”" });
-    // After the date, in the same column, and the row's only button.
-    expect(updated.compareDocumentPosition(remove) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(updated.parentElement?.contains(remove)).toBe(true);
-    expect(within(row).getAllByRole("button")).toEqual([remove]);
+    const menu = within(row).getByRole("button", { name: "Actions for Community Water Monitoring" });
+    expect(within(row).getAllByRole("button")).toEqual([menu]);
+    expect(menu).toHaveAttribute("aria-haspopup", "menu");
     expect(within(row).queryByRole("link", { name: /^Continue draft/ })).not.toBeInTheDocument();
-    // A red trash can, not a menu.
-    expect(remove).toHaveClass("text-brand");
-    expect(remove).not.toHaveAttribute("aria-haspopup");
-    expect(within(row).queryByRole("button", { name: /^Actions for/ })).not.toBeInTheDocument();
 
-    // One press, then the one question.
+    await user.click(menu);
+    const remove = screen.getByRole("menuitem", { name: "Delete draft" });
+    expect(remove).toHaveClass("text-brand-dark");
     await user.click(remove);
     const dialog = screen.getByRole("dialog", { name: "Delete this draft?" });
     expect(dialog).toHaveTextContent("“Community Water Monitoring” and its files will be removed.");
@@ -501,16 +539,18 @@ describe("My Library: withdrawing a paper in review (IR-1282)", () => {
     ...overrides,
   });
 
-  it("puts the same red trash can on a paper in review, asks once in withdrawal's words, then drops the row", async () => {
+  // IR-1311 moves IR-1282's trash can into the row's ⋯ menu, at the project
+  // owner's request; the question, its words and what it does are unchanged.
+  it("offers Withdraw and delete in a paper in review's ⋯ menu, asks once in withdrawal's words, then drops the row", async () => {
     mine([inReview()]);
     vi.mocked(recordsApi.delete).mockResolvedValue({} as Awaited<ReturnType<typeof recordsApi.delete>>);
     const user = userEvent.setup();
     renderScreen(<MyLibraryPage />, SUBMISSIONS);
 
-    const row = (await screen.findByRole("link", { name: "Still with the offices" })).closest("li") as HTMLElement;
-    const remove = within(row).getByRole("button", { name: "Withdraw and delete “Still with the offices”" });
-    expect(within(row).getByText(/^Updated /).parentElement?.contains(remove)).toBe(true);
-    expect(remove).toHaveClass("text-brand");
+    await screen.findByRole("link", { name: "Still with the offices" });
+    await user.click(screen.getByRole("button", { name: "Actions for Still with the offices" }));
+    const remove = screen.getByRole("menuitem", { name: "Withdraw and delete" });
+    expect(remove).toHaveClass("text-brand-dark");
 
     await user.click(remove);
     const dialog = screen.getByRole("dialog", { name: "Withdraw and delete this paper?" });
@@ -527,18 +567,18 @@ describe("My Library: withdrawing a paper in review (IR-1282)", () => {
   it("keeps the paper and says why when the withdrawal fails", async () => {
     mine([inReview()]);
     vi.mocked(recordsApi.delete).mockRejectedValue({ response: { status: 403, data: { detail: "Only an owner can delete this record." } } });
-    const user = userEvent.setup();
     renderScreen(<MyLibraryPage />, SUBMISSIONS);
 
-    await user.click(await screen.findByRole("button", { name: "Withdraw and delete “Still with the offices”" }));
-    await user.click(screen.getByRole("button", { name: "Withdraw and delete" }));
+    await screen.findByRole("link", { name: "Still with the offices" });
+    await choose("Actions for Still with the offices", "Withdraw and delete");
+    await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Withdraw and delete" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Only an owner can delete this record.");
     expect(screen.getByRole("dialog", { name: "Withdraw and delete this paper?" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Still with the offices" })).toBeInTheDocument();
   });
 
-  it("offers no trash can on accepted work, a rejected paper, or one awaiting RDCO's delete decision", async () => {
+  it("offers no delete on accepted work, a rejected paper, or one awaiting RDCO's delete decision", async () => {
     mine([
       inReview({ id: 31, title: "Published work", pipeline_status: "published", workflow_state: "published", holders: [], delete_act: "request_deletion" }),
       inReview({ id: 32, title: "Rejected work", pipeline_status: "rejected", workflow_state: "rejected", holders: [], delete_act: "delete_record" }),
@@ -548,7 +588,8 @@ describe("My Library: withdrawing a paper in review (IR-1282)", () => {
 
     for (const title of ["Published work", "Rejected work", "Awaiting RDCO"]) {
       const row = (await screen.findByRole("link", { name: title })).closest("li") as HTMLElement;
-      expect(within(row).queryByRole("button", { name: /^(Withdraw and delete|Delete draft)/ })).not.toBeInTheDocument();
+      // Nothing to offer, so no menu at all.
+      expect(within(row).queryByRole("button", { name: `Actions for ${title}` })).not.toBeInTheDocument();
     }
   });
 });
@@ -586,45 +627,55 @@ describe("My Library: interrupted reads (IR-906)", () => {
 });
 
 describe("My Library: reading", () => {
-  // IR-572 changes this test on purpose: folders follow the account, so the
-  // toolbar no longer says they stay in this browser, and "New folder" asks
-  // the server for the folder rather than writing it to localStorage.
-  it("keeps search, sort, Folder and Reading status in one toolbar, and says saves and folders follow the account", async () => {
+  // IR-1311 changes this test on purpose: the Folder picker and the Reading
+  // status chips are gone, and the rail names each of those lists once.
+  it("names every reading list in the rail, says saves follow the account, and makes a folder there", async () => {
     mine([ownRecord({})]);
     vi.mocked(libraryApi.createFolder).mockResolvedValue({ data: folderEntry(3, "Methods") } as Awaited<ReturnType<typeof libraryApi.createFolder>>);
     renderScreen(<MyLibraryPage />);
+    await screen.findByRole("link", { name: "Community Water Monitoring" });
 
-    await userEvent.click(await screen.findByRole("tab", { name: "Saved papers" }));
-    expect(screen.getByText("Saves and folders follow your account.")).toBeInTheDocument();
-    expect(screen.queryByRole("region", { name: "Folders" })).not.toBeInTheDocument();
+    await open("All saved");
+    expect(screen.getByRole("heading", { name: "All saved", level: 2 })).toBeInTheDocument();
+    expect(screen.getByText("Saves, reading status and folders follow your account.")).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Folder" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Reading status" })).not.toBeInTheDocument();
+    // No grid of cards to toggle to: one ruled list.
+    expect(screen.queryByRole("button", { name: /Grid view|List view/ })).not.toBeInTheDocument();
 
-    // History is back in the picker (IR-756): it now follows the account, and
-    // its pause switch lives in the History view, which every reader must reach.
-    expect(within(screen.getByRole("combobox", { name: "Folder" })).getByRole("option", { name: "History" })).toBeInTheDocument();
-    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Folder" }), "+ New folder…");
+    await open("New folder");
     await userEvent.type(screen.getByRole("textbox", { name: "New folder name" }), "Methods{Enter}");
-    expect(await screen.findByRole("heading", { name: "Methods" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Methods", level: 2 })).toBeInTheDocument();
     expect(libraryApi.createFolder).toHaveBeenCalledWith("Methods");
+    expect(railItem("Methods")).toHaveAttribute("aria-current", "page");
     expect(screen.queryByRole("button", { name: /liked/i })).not.toBeInTheDocument();
 
-    await userEvent.click(within(screen.getByRole("group", { name: "Reading status" })).getByRole("button", { name: "Want to read" }));
+    await open("Want to read");
     expect(await screen.findByRole("heading", { name: "Nothing in Want to read yet" })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("tab", { name: "My submissions" }));
+    await open("All research");
     expect(screen.getByRole("link", { name: "Community Water Monitoring" })).toBeInTheDocument();
   });
 
-  // IR-743 replaces "no tablist" for a non-author: every reader has a
-  // Download requests tab beside Saved papers, and nothing an author has.
-  it("defaults a non-author to All saved, with Download requests beside it, and never fetches owned research", async () => {
+  // IR-743, IR-1311: every reader has the reading, folder and request lists,
+  // and nothing an author has.
+  it("defaults a non-author to All saved, with no research lists, and never fetches owned research", async () => {
     signIn(10, "RDCO");
     const { container } = renderScreen(<MyLibraryPage />);
 
     expect(await screen.findByRole("heading", { name: "No saved papers yet" })).toBeInTheDocument();
-    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Saved papers", "Saved calls", "Download requests"]);
-    expect(screen.getByRole("tab", { name: "Saved papers" })).toHaveAttribute("aria-selected", "true");
+    expect(railNames()).toEqual(["All saved", "Want to read", "Reading", "Completed", "History", "New folder", "Saved calls", "Download requests"]);
+    expect(railItem("All saved")).toHaveAttribute("aria-current", "page");
     expect(screen.queryByRole("link", { name: "Publish" })).not.toBeInTheDocument();
     await waitFor(() => expect(recordsApi.mine).not.toHaveBeenCalled());
     await expectNoBlockingA11yViolations(container);
+  });
+
+  it("sends a non-author's old research link to All saved", async () => {
+    signIn(10, "RDCO");
+    renderScreen(<MyLibraryPage />, SUBMISSIONS);
+
+    expect(await screen.findByRole("heading", { name: "No saved papers yet" })).toBeInTheDocument();
+    expect(recordsApi.mine).not.toHaveBeenCalled();
   });
 
   it("opens Saved directly from ?section=saved", async () => {
@@ -648,9 +699,68 @@ describe("My Library: saves follow the account (IR-566)", () => {
     expect(links.map((l) => l.textContent)).toEqual([rice.title, water.title]);
     expect(recordsApi.list).not.toHaveBeenCalled();
 
-    await userEvent.click(within(screen.getByRole("group", { name: "Reading status" })).getByRole("button", { name: "Reading" }));
+    await open("Reading");
     expect(await screen.findByRole("link", { name: rice.title })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: water.title })).not.toBeInTheDocument();
+  });
+
+  it("sets a saved paper's Reading status from its ⋯ menu, and choosing the checked one clears it", async () => {
+    saves([savedEntry(water, "want_to_read")]);
+    vi.mocked(libraryApi.save).mockImplementation(async (id, body) => ({
+      data: { ...savedEntry(water, (body as { reading_status?: ReadingStatus | null }).reading_status ?? null), record_id: id },
+    }) as Awaited<ReturnType<typeof libraryApi.save>>);
+    renderScreen(<MyLibraryPage />, { route: "/records/mine?section=saved" });
+    await screen.findByRole("link", { name: water.title });
+
+    await userEvent.click(screen.getByRole("button", { name: `Actions for ${water.title}` }));
+    // Reading status opens as a flyout beside its item.
+    await userEvent.click(screen.getByRole("menuitem", { name: "Reading status" }));
+    expect(screen.getByRole("menuitemradio", { name: "Want to read" })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("menuitemradio", { name: "Reading" })).toHaveAttribute("aria-checked", "false");
+    await userEvent.click(screen.getByRole("menuitemradio", { name: "Reading" }));
+    expect(libraryApi.save).toHaveBeenLastCalledWith(water.id, { reading_status: "reading" });
+
+    await userEvent.click(screen.getByRole("button", { name: `Actions for ${water.title}` }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Reading status" }));
+    await userEvent.click(screen.getByRole("menuitemradio", { name: "Reading" }));
+    expect(libraryApi.save).toHaveBeenLastCalledWith(water.id, { reading_status: null });
+    // Clearing a status never unsaves.
+    expect(libraryApi.unsave).not.toHaveBeenCalled();
+  });
+
+  it("offers Cite in a paper's menu only when it is published (IR-1305)", async () => {
+    const proposal = { ...paper(43, "Soil moisture sensing for upland farms"), record_type_name: "Proposal", pipeline_status: "approved" } as RecordListItem;
+    saves([savedEntry(water), savedEntry(proposal)]);
+    renderScreen(<MyLibraryPage />, { route: "/records/mine?section=saved" });
+    await screen.findByRole("link", { name: water.title });
+
+    await userEvent.click(screen.getByRole("button", { name: `Actions for ${water.title}` }));
+    expect(screen.getByRole("menuitem", { name: "Cite" })).toBeInTheDocument();
+    await userEvent.keyboard("{Escape}");
+
+    await userEvent.click(screen.getByRole("button", { name: `Actions for ${proposal.title}` }));
+    expect(screen.queryByRole("menuitem", { name: "Cite" })).not.toBeInTheDocument();
+    // Removing a saved Proposal from the Library still works.
+    expect(screen.getByRole("menuitem", { name: "Remove from library" })).toBeInTheDocument();
+  });
+
+  it("removes papers together after Select papers in the view's menu", async () => {
+    saves([savedEntry(water), savedEntry(rice)]);
+    renderScreen(<MyLibraryPage />, { route: "/records/mine?section=saved" });
+    await screen.findByRole("link", { name: water.title });
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+
+    await choose("All saved options", "Select papers");
+    const bar = screen.getByRole("region", { name: "Selected papers" });
+    expect(within(bar).getByRole("button", { name: "Remove from library" })).toBeDisabled();
+    await userEvent.click(screen.getByRole("checkbox", { name: `Select ${water.title}` }));
+    await userEvent.click(screen.getByRole("checkbox", { name: `Select ${rice.title}` }));
+    expect(bar).toHaveTextContent("2 papers chosen");
+    await userEvent.click(within(bar).getByRole("button", { name: "Remove from library" }));
+
+    expect(libraryApi.unsave).toHaveBeenCalledWith(water.id);
+    expect(libraryApi.unsave).toHaveBeenCalledWith(rice.id);
+    expect(screen.queryByRole("region", { name: "Selected papers" })).not.toBeInTheDocument();
   });
 
   it("shows a save the reader can no longer read as unavailable, discloses nothing, and lets them remove it", async () => {
@@ -670,8 +780,9 @@ describe("My Library: saves follow the account (IR-566)", () => {
     saves([savedEntry(water)]);
     vi.mocked(libraryApi.unsave).mockRejectedValueOnce(new Error("offline"));
     renderScreen(<MyLibraryPage />, { route: "/records/mine?section=saved" });
+    await screen.findByRole("link", { name: water.title });
 
-    await userEvent.click(await screen.findByRole("button", { name: `Remove from library: ${water.title}` }));
+    await choose(`Actions for ${water.title}`, "Remove from library");
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/could not remove this paper/i);
     expect(screen.getByRole("link", { name: water.title })).toBeInTheDocument();
@@ -698,7 +809,7 @@ describe("My Library: saves follow the account (IR-566)", () => {
 
     expect(await screen.findByRole("link", { name: rice.title })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: water.title })).not.toBeInTheDocument();
-    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Folder" }), "History");
+    await open("History");
     expect(await screen.findByRole("heading", { name: "No reading history yet" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: water.title })).not.toBeInTheDocument();
   });
@@ -717,10 +828,10 @@ describe("My Library: saves follow the account (IR-566)", () => {
     renderScreen(<MyLibraryPage />, { route: "/records/mine?section=saved" });
 
     expect(await screen.findByRole("heading", { name: "No saved papers yet" })).toBeInTheDocument();
-    await userEvent.click(within(screen.getByRole("group", { name: "Reading status" })).getByRole("button", { name: "Want to read" }));
+    await open("Want to read");
 
     expect(await screen.findByRole("heading", { name: "Nothing in Want to read yet" })).toBeInTheDocument();
-    expect(within(screen.getByRole("combobox", { name: "Folder" })).queryByRole("option", { name: "Old browser folder" })).not.toBeInTheDocument();
+    expect(within(rail()).queryByRole("button", { name: "Old browser folder" })).not.toBeInTheDocument();
     expect(libraryApi.save).not.toHaveBeenCalled();
     expect(libraryApi.createFolder).not.toHaveBeenCalled();
 
@@ -736,7 +847,8 @@ describe("My Library: reading history follows the account (IR-756)", () => {
 
   async function openHistory() {
     renderScreen(<MyLibraryPage />, { route: "/records/mine?section=saved" });
-    await userEvent.selectOptions(await screen.findByRole("combobox", { name: "Folder" }), "History");
+    await screen.findByRole("heading", { name: "All saved", level: 2 });
+    await open("History");
     return screen.findByRole("heading", { name: "History", level: 2 });
   }
 
@@ -749,6 +861,14 @@ describe("My Library: reading history follows the account (IR-756)", () => {
     expect(recordsApi.list).not.toHaveBeenCalled();
     expect(screen.getByText(/stored on your account.*only you can see it/i)).toBeInTheDocument();
     expect(localStorage.getItem("iris_reading_history")).toBeNull();
+  });
+
+  it("opens History directly from ?section=history", async () => {
+    history([visitEntry(water)]);
+    renderScreen(<MyLibraryPage />, { route: "/records/mine?section=history" });
+
+    expect(await screen.findByRole("link", { name: water.title })).toBeInTheDocument();
+    expect(railItem("History")).toHaveAttribute("aria-current", "page");
   });
 
   it("shows a paper the reader can no longer read as unavailable and discloses nothing", async () => {
@@ -764,8 +884,9 @@ describe("My Library: reading history follows the account (IR-756)", () => {
     history([visitEntry(water)]);
     vi.mocked(libraryApi.clearHistory).mockResolvedValue({} as Awaited<ReturnType<typeof libraryApi.clearHistory>>);
     await openHistory();
+    await screen.findByRole("link", { name: water.title });
 
-    await userEvent.click(await screen.findByRole("button", { name: "Clear history" }));
+    await choose("History options", "Clear history");
 
     expect(libraryApi.clearHistory).toHaveBeenCalledTimes(1);
     expect(await screen.findByRole("heading", { name: "No reading history yet" })).toBeInTheDocument();
@@ -775,34 +896,37 @@ describe("My Library: reading history follows the account (IR-756)", () => {
     history([visitEntry(water)]);
     vi.mocked(libraryApi.clearHistory).mockRejectedValue(new Error("offline"));
     await openHistory();
+    await screen.findByRole("link", { name: water.title });
 
-    await userEvent.click(await screen.findByRole("button", { name: "Clear history" }));
+    await choose("History options", "Clear history");
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/could not clear your history/i);
     expect(screen.getByRole("link", { name: water.title })).toBeInTheDocument();
   });
 
-  it("pauses history on the account, keeping what is listed", async () => {
+  it("pauses history on the account, keeping what is listed, and can resume it", async () => {
     history([visitEntry(water)]);
     vi.mocked(libraryApi.updatePreferences).mockImplementation(async (body) => ({ data: body }) as Awaited<ReturnType<typeof libraryApi.updatePreferences>>);
     await openHistory();
+    await screen.findByRole("link", { name: water.title });
 
-    const keep = await screen.findByRole("checkbox", { name: "Keep reading history" });
-    expect(keep).toBeChecked();
-    await userEvent.click(keep);
+    await choose("History options", "Pause history");
 
     expect(libraryApi.updatePreferences).toHaveBeenCalledWith({ keep_history: false });
-    expect(keep).not.toBeChecked();
-    expect(screen.getByText(/history is paused/i)).toBeInTheDocument();
+    expect(await screen.findByText(/history is paused/i)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: water.title })).toBeInTheDocument();
+
+    await choose("History options", "Resume history");
+    expect(libraryApi.updatePreferences).toHaveBeenLastCalledWith({ keep_history: true });
   });
 
   it("opens with history paused when the account says so", async () => {
     history([], false);
     await openHistory();
 
-    expect(await screen.findByRole("checkbox", { name: "Keep reading history" })).not.toBeChecked();
-    expect(screen.getByRole("heading", { name: "History is paused" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "History is paused" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "History options" }));
+    expect(screen.getByRole("menuitem", { name: "Resume history" })).toBeInTheDocument();
   });
 
   it("says the history is safe when loading it fails, and Try again reads it again", async () => {
@@ -814,15 +938,6 @@ describe("My Library: reading history follows the account (IR-756)", () => {
 
     await waitFor(() => expect(libraryApi.history).toHaveBeenCalledTimes(2));
     expect(await screen.findByRole("heading", { name: "No reading history yet" })).toBeInTheDocument();
-  });
-
-  it("shows the most recent papers on an author's Overview, from the account", async () => {
-    history([visitEntry(rice), { record_id: 77, available: false }, visitEntry(water, "2026-11-01T08:00:00Z")]);
-    renderScreen(<MyLibraryPage />);
-
-    const recent = await screen.findByRole("heading", { name: "Recently opened" });
-    const block = recent.parentElement as HTMLElement;
-    expect(within(block).getAllByRole("link").map((l) => l.textContent)).toEqual([rice.title, water.title]);
   });
 
   it("has no blocking accessibility violations in the History view", async () => {
@@ -838,7 +953,6 @@ describe("My Library: folders follow the account (IR-572)", () => {
   const water = paper(41, "Rainwater Harvesting Survey");
   const rice = paper(42, "Rice Husk Insulation Panels");
   const SAVED = { route: "/records/mine?section=saved" };
-  const pick = (name: string) => userEvent.selectOptions(screen.getByRole("combobox", { name: "Folder" }), name);
   const failed = () => Promise.reject(new Error("offline"));
 
   it("reads the account's folders from the server and shows a folder's saves in filing order", async () => {
@@ -847,16 +961,25 @@ describe("My Library: folders follow the account (IR-572)", () => {
     const { container } = renderScreen(<MyLibraryPage />, SAVED);
 
     await screen.findByRole("link", { name: water.title });
-    await pick("Methods");
+    await open("Methods");
 
-    expect(await screen.findByRole("heading", { name: "Methods" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Methods", level: 2 })).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: /Rainwater|Rice Husk/ }).map((l) => l.textContent)).toEqual([rice.title, water.title]);
     expect(screen.getByText(/1 saved paper is no longer available to you/)).toBeInTheDocument();
     expect(recordsApi.list).not.toHaveBeenCalled();
     await expectNoBlockingA11yViolations(container);
 
-    await pick("Results");
+    await open("Results");
     expect(await screen.findByRole("heading", { name: "Nothing in Results yet" })).toBeInTheDocument();
+  });
+
+  it("opens a folder directly from its address", async () => {
+    saves([savedEntry(water)]);
+    folders([folderEntry(3, "Methods", [water.id])]);
+    renderScreen(<MyLibraryPage />, { route: "/records/mine?section=folder&folder=3" });
+
+    expect(await screen.findByRole("heading", { name: "Methods", level: 2 })).toBeInTheDocument();
+    expect(railItem("Methods")).toHaveAttribute("aria-current", "page");
   });
 
   it("creates a folder on the server and opens it; a refusal says why and adds nothing", async () => {
@@ -867,24 +990,26 @@ describe("My Library: folders follow the account (IR-572)", () => {
     renderScreen(<MyLibraryPage />, SAVED);
     await screen.findByRole("heading", { name: "No saved papers yet" });
 
-    await pick("+ New folder…");
+    await open("New folder");
     await userEvent.type(screen.getByRole("textbox", { name: "New folder name" }), "Field work{Enter}");
-    expect(await screen.findByRole("heading", { name: "Field work" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Field work", level: 2 })).toBeInTheDocument();
 
-    await pick("+ New folder…");
+    await open("New folder");
     await userEvent.type(screen.getByRole("textbox", { name: "New folder name" }), "One more{Enter}");
     expect(await screen.findByRole("alert")).toHaveTextContent("You have 10 folders. Delete one to make another.");
-    expect(within(screen.getByRole("combobox", { name: "Folder" })).queryByRole("option", { name: "One more" })).not.toBeInTheDocument();
+    expect(within(rail()).queryByRole("button", { name: "One more" })).not.toBeInTheDocument();
   });
 
-  it("does not offer a new folder once the account holds the most it may", async () => {
+  it("does not offer a new folder once the account holds the most it may, and says so", async () => {
     folders([folderEntry(3, "Methods"), folderEntry(4, "Results")], 2);
     renderScreen(<MyLibraryPage />, SAVED);
     await screen.findByRole("heading", { name: "No saved papers yet" });
 
-    const folderPicker = screen.getByRole("combobox", { name: "Folder" });
-    expect(within(folderPicker).queryByRole("option", { name: "+ New folder…" })).not.toBeInTheDocument();
-    expect(within(folderPicker).getByRole("option", { name: "No room for a new folder (2 is the most)" })).toBeDisabled();
+    expect(within(rail()).queryByRole("button", { name: "New folder" })).not.toBeInTheDocument();
+    expect(within(rail()).getByText("No room for a new folder (2 is the most)")).toBeInTheDocument();
+    const picker = screen.getByRole("combobox", { name: "Show" });
+    expect(within(picker).queryByRole("option", { name: "+ New folder…" })).not.toBeInTheDocument();
+    expect(within(picker).getByRole("option", { name: "No room for a new folder (2 is the most)" })).toBeDisabled();
   });
 
   it("takes a paper out of a folder without unsaving it", async () => {
@@ -893,14 +1018,15 @@ describe("My Library: folders follow the account (IR-572)", () => {
     vi.mocked(libraryApi.removeFromFolder).mockResolvedValue({ status: 204 } as Awaited<ReturnType<typeof libraryApi.removeFromFolder>>);
     renderScreen(<MyLibraryPage />, SAVED);
     await screen.findByRole("link", { name: water.title });
-    await pick("Methods");
+    await open("Methods");
+    await screen.findByRole("heading", { name: "Methods", level: 2 });
 
-    await userEvent.click(await screen.findByRole("button", { name: `Remove from folder: ${water.title}` }));
+    await choose(`Actions for ${water.title}`, "Remove from folder");
 
     expect(libraryApi.removeFromFolder).toHaveBeenCalledWith(3, water.id);
     expect(libraryApi.unsave).not.toHaveBeenCalled();
     expect(await screen.findByRole("heading", { name: "Nothing in Methods yet" })).toBeInTheDocument();
-    await pick("All saved papers");
+    await open("All saved");
     expect(await screen.findByRole("link", { name: water.title })).toBeInTheDocument();
   });
 
@@ -910,33 +1036,35 @@ describe("My Library: folders follow the account (IR-572)", () => {
     vi.mocked(libraryApi.removeFromFolder).mockImplementation(failed);
     renderScreen(<MyLibraryPage />, SAVED);
     await screen.findByRole("link", { name: water.title });
-    await pick("Methods");
+    await open("Methods");
+    await screen.findByRole("heading", { name: "Methods", level: 2 });
 
-    await userEvent.click(await screen.findByRole("button", { name: `Remove from folder: ${water.title}` }));
+    await choose(`Actions for ${water.title}`, "Remove from folder");
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/could not take this paper out of the folder/i);
     expect(screen.getByRole("link", { name: water.title })).toBeInTheDocument();
   });
 
-  it("renames a folder on the server, and a failed delete brings the folder back visibly", async () => {
+  it("renames a folder from its menu, and a failed delete brings the folder back visibly", async () => {
     saves([savedEntry(water)]);
     folders([folderEntry(3, "Methods", [water.id])]);
     vi.mocked(libraryApi.renameFolder).mockResolvedValue({ data: folderEntry(3, "Method papers", [water.id]) } as Awaited<ReturnType<typeof libraryApi.renameFolder>>);
     vi.mocked(libraryApi.deleteFolder).mockImplementationOnce(failed);
     renderScreen(<MyLibraryPage />, SAVED);
     await screen.findByRole("link", { name: water.title });
-    await pick("Methods");
+    await open("Methods");
+    await screen.findByRole("heading", { name: "Methods", level: 2 });
 
-    await userEvent.click(await screen.findByRole("button", { name: "Rename" }));
+    await choose("Methods options", "Rename folder");
     const field = screen.getByRole("textbox", { name: "Rename Methods" });
     await userEvent.clear(field);
     await userEvent.type(field, "Method papers{Enter}");
-    expect(await screen.findByRole("heading", { name: "Method papers" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Method papers", level: 2 })).toBeInTheDocument();
     expect(libraryApi.renameFolder).toHaveBeenCalledWith(3, "Method papers");
 
-    await userEvent.click(screen.getByRole("button", { name: "Delete folder" }));
+    await choose("Method papers options", "Delete folder");
     expect(await screen.findByRole("alert")).toHaveTextContent(/could not delete this folder/i);
-    expect(within(screen.getByRole("combobox", { name: "Folder" })).getByRole("option", { name: "Method papers" })).toBeInTheDocument();
+    expect(railItem("Method papers")).toBeInTheDocument();
     // The paper was never at risk: deleting a folder never deletes a save.
     expect(screen.getByRole("link", { name: water.title })).toBeInTheDocument();
     expect(libraryApi.unsave).not.toHaveBeenCalled();
@@ -947,7 +1075,7 @@ describe("My Library: folders follow the account (IR-572)", () => {
     folders([folderEntry(3, "First reader's folder", [water.id])]);
     const first = renderScreen(<MyLibraryPage />, SAVED);
     await screen.findByRole("link", { name: water.title });
-    expect(within(screen.getByRole("combobox", { name: "Folder" })).getByRole("option", { name: "First reader's folder" })).toBeInTheDocument();
+    expect(railItem("First reader's folder")).toBeInTheDocument();
     first.unmount();
 
     useAuthStore.getState().logout();
@@ -959,9 +1087,8 @@ describe("My Library: folders follow the account (IR-572)", () => {
     renderScreen(<MyLibraryPage />, SAVED);
 
     await screen.findByRole("link", { name: rice.title });
-    const picker = screen.getByRole("combobox", { name: "Folder" });
-    expect(within(picker).getByRole("option", { name: "Second reader's folder" })).toBeInTheDocument();
-    expect(within(picker).queryByRole("option", { name: "First reader's folder" })).not.toBeInTheDocument();
+    expect(railItem("Second reader's folder")).toBeInTheDocument();
+    expect(within(rail()).queryByRole("button", { name: "First reader's folder" })).not.toBeInTheDocument();
     expect(localStorage.getItem("iris_record_collections")).toBeNull();
   });
 });
@@ -980,8 +1107,9 @@ describe("My Library: download requests (IR-743)", () => {
     const { container } = renderScreen(<MyLibraryPage />, DOWNLOADS);
 
     expect(await screen.findByRole("link", { name: "Pending paper" })).toHaveAttribute("href", "/records/45");
-    expect(screen.getByRole("tab", { name: "Download requests" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getAllByRole("listitem").map((li) => within(li).getByRole("link").textContent))
+    expect(railItem("Download requests")).toHaveAttribute("aria-current", "page");
+    const list = screen.getByRole("link", { name: "Pending paper" }).closest("ul") as HTMLElement;
+    expect(within(list).getAllByRole("listitem").map((li) => within(li).getByRole("link").textContent))
       .toEqual(["Pending paper", "Granted paper", "Declined paper", "Revoked paper", "Expired paper"]);
 
     const pending = row("Pending paper");
@@ -1011,12 +1139,12 @@ describe("My Library: download requests (IR-743)", () => {
     await expectNoBlockingA11yViolations(container);
   });
 
-  it("is offered to an author as a fourth tab, and fetched only when opened", async () => {
+  it("is offered to an author in the rail, and fetched only when opened", async () => {
     renderScreen(<MyLibraryPage />);
 
-    expect(await screen.findByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
+    expect(await screen.findByRole("heading", { name: "You haven’t published anything yet" })).toBeInTheDocument();
     expect(recordsApi.myDownloadRequests).not.toHaveBeenCalled();
-    await userEvent.click(screen.getByRole("tab", { name: "Download requests" }));
+    await open("Download requests");
     expect(await screen.findByRole("heading", { name: "No download requests yet" })).toBeInTheDocument();
     expect(recordsApi.myDownloadRequests).toHaveBeenCalledOnce();
   });
@@ -1073,27 +1201,27 @@ describe("My Library: download requests (IR-743)", () => {
 });
 
 describe("My Library follows the server's can_author (IR-1096)", () => {
-  it("gives a Student the server refuses only Saved papers, Saved calls and Download requests, and no Publish", async () => {
+  it("gives a Student the server refuses only the reading, folder and request lists, and no Publish", async () => {
     signIn(12, "Student", false);
     renderScreen(<MyLibraryPage />);
 
     expect(await screen.findByRole("heading", { name: "No saved papers yet" })).toBeInTheDocument();
-    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Saved papers", "Saved calls", "Download requests"]);
+    expect(within(rail()).queryByRole("button", { name: "All research" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Publish" })).not.toBeInTheDocument();
     await waitFor(() => expect(recordsApi.mine).not.toHaveBeenCalled());
   });
 
-  it("gives anyone the server says can author the research tabs and Publish, whatever their role", async () => {
+  it("gives anyone the server says can author the research lists and Publish, whatever their role", async () => {
     signIn(13, "RDCO", true);
     renderScreen(<MyLibraryPage />);
 
-    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Overview", "My submissions", "Saved papers", "Saved calls", "Download requests"]);
+    expect(railItem("All research")).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: "Publish" })).toBeInTheDocument();
   });
 });
 
 describe("Saved calls (IR-766)", () => {
-  it("has its own tab, apart from saved papers, at ?section=calls", async () => {
+  it("has its own list, apart from saved papers, at ?section=calls", async () => {
     savedCalls.mockResolvedValue({ data: { results: [{
       call_id: 5, available: true, saved_at: "2026-11-15T08:00:00Z",
       call: {
@@ -1110,7 +1238,7 @@ describe("Saved calls (IR-766)", () => {
     renderScreen(<MyLibraryPage />, { route: "/records/mine?section=calls" });
 
     expect(await screen.findByRole("article", { name: "Energy Letters special issue" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Saved calls" })).toHaveAttribute("aria-selected", "true");
+    expect(railItem("Saved calls")).toHaveAttribute("aria-current", "page");
     expect(screen.queryByRole("heading", { name: "No saved papers yet" })).toBeNull();
   });
 });

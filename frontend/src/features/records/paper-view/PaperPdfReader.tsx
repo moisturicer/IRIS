@@ -659,7 +659,7 @@ function PaperPdfReaderSource({
   const commentOnRef = useRef(commentOn);
   commentOnRef.current = commentOn;
   const onComment = useMemo(
-    () => (commentOn ? (passage: Passage) => commentOnRef.current?.(passage, shownVersion as number) : null),
+    () => (commentOn ? (passage: Passage, text?: string) => commentOnRef.current?.(passage, shownVersion as number, text) : null),
     // Stable while commenting stays possible on this Version.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [commentOn !== null, shownVersion],
@@ -667,7 +667,19 @@ function PaperPdfReaderSource({
   const findMatch = find.open && find.targetPage !== null;
 
   // The selection menu belongs to the current paper only (IR-583, ADR-065 §2).
-  const menuActions = version === null ? selectionActions : NO_ACTIONS;
+  // In Review it is the review's: a selection becomes a Comment for Threads, on
+  // any Version a thread can be about, and nothing private (2026-11-24).
+  const menuActions = useMemo<SelectionAction[]>(() => {
+    if (annotations) {
+      return onComment
+        ? [{
+            id: "comment", label: "Add comment", placeholder: "Comment for Threads…", icon: "fa-comment",
+            run: (passage, _revision, text) => onComment(passage, text || undefined),
+          }]
+        : NO_ACTIONS;
+    }
+    return version === null ? selectionActions : NO_ACTIONS;
+  }, [annotations !== null, onComment, version, selectionActions]); // eslint-disable-line react-hooks/exhaustive-deps
   const menuOffered = menuActions.length > 0;
   const [menuAt, setMenuAt] = useState<MenuPosition | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);

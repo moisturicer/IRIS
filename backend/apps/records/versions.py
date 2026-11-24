@@ -74,17 +74,6 @@ def _awaiting_resubmission(record) -> bool:
     )
 
 
-def details_editable(record) -> bool:
-    """
-    May `record`'s owners edit its details now? A `draft`, or while a revision
-    is asked for: exactly where Record detail offers `edit_details` (IR-507).
-    Who may edit, and this, are the view's questions (`IsRecordOwner`,
-    `RecordViewSet.update`); which fields, the serializer's
-    (`SUBMISSION_FIXED_FIELDS`).
-    """
-    return record.pipeline_status == PipelineStatus.DRAFT or _awaiting_resubmission(record)
-
-
 def may_replace_manuscript(record, user=None) -> bool:
     """May `user` replace `record`'s manuscript right now? (module note)"""
     if record.pipeline_status in MANUSCRIPT_REPLACEABLE_STATUSES:

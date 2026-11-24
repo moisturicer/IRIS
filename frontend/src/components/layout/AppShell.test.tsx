@@ -40,6 +40,7 @@ function renderAt(path: string) {
         element: <AppShell />,
         children: [
           { path: "/records/mine", element: <h1>My Library</h1>, handle: { title: "My Library" } },
+          { path: "/settings", element: <h1>Settings</h1>, handle: { title: "Settings" } },
           { path: "/admin/audit", element: <h1>Audit Log</h1>, handle: { title: "Audit Log", width: "full" } },
           // Stands in for Ask IRIS, whose toolbar mounts a third bell.
           {
@@ -153,10 +154,17 @@ describe("the app shell", () => {
   });
 
   it("gives a page the standard width unless its route asks for full", async () => {
+    renderAt("/settings");
+
+    const page = await screen.findByRole("heading", { name: "Settings" });
+    expect(page.parentElement!.className).toContain(PAGE_WIDTH.standard);
+  });
+
+  it("lets My Library dock its own pane, with no page container around it", async () => {
     renderAt("/records/mine");
 
     const page = await screen.findByRole("heading", { name: "My Library" });
-    expect(page.parentElement!.className).toContain(PAGE_WIDTH.standard);
+    expect(page.parentElement!.className).not.toContain(PAGE_WIDTH.standard);
   });
 
   it("gives a full-width route the whole width", async () => {

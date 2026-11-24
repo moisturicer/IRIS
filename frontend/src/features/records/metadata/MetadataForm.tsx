@@ -18,6 +18,7 @@ import { Controller, useFormContext, type FieldErrors } from "react-hook-form";
 
 import { FieldError } from "@/components/ui/FieldError";
 import { FieldLabel } from "@/components/ui/FieldLabel";
+import { InfoHint } from "@/components/ui/InfoHint";
 import { Select } from "@/components/ui/Select";
 import { CHECKBOX, LABEL, LOAD_ERROR, fieldClasses } from "@/components/ui/fieldClasses";
 import { FOCUS_RING } from "@/components/ui/interaction";
@@ -182,21 +183,23 @@ export function MetadataForm({
         {fieldNotes?.title}
       </Field>
 
-      <Field label="Keywords" htmlFor={ids.keywords} error={errors.keywords?.message} errorId={errorId("keywords")}>
+      <div className="grid gap-section-sm sm:grid-cols-2">
+      <Field label="Keywords" htmlFor={ids.keywords} error={errors.keywords?.message} errorId={errorId("keywords")}
+        hint={{ id: "keywords-hint", text: "Separate keywords with commas." }}>
         <input id={ids.keywords} {...register("keywords")}
           aria-invalid={Boolean(errors.keywords)} aria-describedby={describedBy("keywords", "keywords-hint")}
           className={fieldClasses(Boolean(errors.keywords))} />
-        <p id="keywords-hint" className="text-small text-stone-600">Separate keywords with commas.</p>
         {fieldNotes?.keywords}
       </Field>
       {!submitted && (
-        <Field label="Owner emails" htmlFor={ids.owner_emails} error={errors.owner_emails?.message} errorId={errorId("owner_emails")}>
+        <Field label="Owner emails" htmlFor={ids.owner_emails} error={errors.owner_emails?.message} errorId={errorId("owner_emails")}
+          hint={{ id: "owner-emails-hint", text: "Existing account emails, separated by commas. Include yourself and exclude the Adviser." }}>
           <input id={ids.owner_emails} {...register("owner_emails")}
             aria-invalid={Boolean(errors.owner_emails)} aria-describedby={describedBy("owner_emails", "owner-emails-hint")}
             className={fieldClasses(Boolean(errors.owner_emails))} />
-          <p id="owner-emails-hint" className="text-small text-stone-600">Existing account emails, separated by commas. Include yourself and exclude the Adviser.</p>
         </Field>
       )}
+      </div>
 
       <div>
         <div className="flex items-baseline justify-between gap-3">
@@ -209,7 +212,7 @@ export function MetadataForm({
           id={ids.abstract}
           {...register("abstract")}
           aria-required
-          rows={4}
+          rows={3}
           maxLength={MAX_ABSTRACT}
           aria-invalid={Boolean(errors.abstract) || undefined}
           aria-describedby={describedBy("abstract")}
@@ -232,7 +235,10 @@ export function MetadataForm({
           </div>
         ) : (
         <div>
-          <FieldLabel htmlFor={ids.adviser} label="Adviser" className="mb-1" />
+          <div className="mb-1 flex items-center gap-1.5">
+            <FieldLabel htmlFor={ids.adviser} label="Adviser" />
+            <InfoHint id={`${ids.adviser}-hint`} about="Adviser">The faculty member who supervised this work. They review it first.</InfoHint>
+          </div>
           <Controller
             control={control}
             name="adviser"
@@ -253,9 +259,6 @@ export function MetadataForm({
           {errors.adviser ? (
             <FieldError id={errorId("adviser")}>{errors.adviser.message}</FieldError>
           ) : null}
-          <p id={`${ids.adviser}-hint`} className="mt-1 text-small text-stone-600">
-            The faculty member who supervised this work. They review it first.
-          </p>
         </div>
         )}
 
@@ -283,18 +286,21 @@ export function MetadataForm({
           <option value="imported_reference">Imported reference</option>
           <option value="synthetic">Synthetic (demonstration or test)</option>
         </Select>
-        <Field label="Publication year" htmlFor={ids.publication_year} error={errors.publication_year?.message} errorId={errorId("publication_year")}>
+        <Field label="Publication year" htmlFor={ids.publication_year} error={errors.publication_year?.message} errorId={errorId("publication_year")}
+          hint={{ id: "publication-year-hint", text: "Leave blank if not recorded. This is separate from the completion year." }}>
           <input id={ids.publication_year} type="number" inputMode="numeric" min={1} max={9999}
             {...register("publication_year", { setValueAs: (value) => value == null || value === "" ? null : Number(value) })}
-            aria-invalid={Boolean(errors.publication_year) || undefined} aria-describedby={describedBy("publication_year")}
+            aria-invalid={Boolean(errors.publication_year) || undefined} aria-describedby={describedBy("publication_year", "publication-year-hint")}
             className={fieldClasses(Boolean(errors.publication_year))} />
-          <p className="mt-1 text-small text-stone-600">Leave blank if not recorded. This is separate from the completion year.</p>
           {fieldNotes?.publication_year}
         </Field>
       </div>
 
       <div>
-        <FieldLabel htmlFor={ids.authors} label="Authors" className="mb-1" />
+        <div className="mb-1 flex items-center gap-1.5">
+          <FieldLabel htmlFor={ids.authors} label="Authors" />
+          <InfoHint id={`${ids.authors}-hint`} about="Authors">Yourself and every co-author, in the order they should be credited.</InfoHint>
+        </div>
         <div className="flex gap-2">
           <input
             id={ids.authors}
@@ -310,15 +316,12 @@ export function MetadataForm({
             aria-invalid={Boolean(errors.authors) || undefined}
             aria-describedby={describedBy("authors", `${ids.authors}-hint`)}
             placeholder="Full name, then Enter"
-            className={fieldClasses(Boolean(errors.authors))}
+            className={cn(fieldClasses(Boolean(errors.authors)), "min-w-0 flex-1")}
           />
           <button type="button" onClick={addAuthor} className={cn(PILL_SECONDARY, FOCUS_RING, "min-h-0 shrink-0 px-4")}>
             Add
           </button>
         </div>
-        <p id={`${ids.authors}-hint`} className="mt-1 text-small text-stone-600">
-          Yourself and every co-author, in the order they should be credited.
-        </p>
         {authors.length > 0 && (
           <ul aria-label="Authors added" className="mt-2 flex flex-wrap gap-2">
             {authors.map((name) => (
@@ -425,17 +428,23 @@ function Field({
   htmlFor,
   error,
   errorId,
+  hint,
   children,
 }: {
   label: string;
   htmlFor: string;
   error?: string;
   errorId: string;
+  /** Shown from a "?" beside the label, not as a line under the field. */
+  hint?: { id: string; text: string };
   children: ReactNode;
 }) {
   return (
     <div>
-      <FieldLabel htmlFor={htmlFor} label={label} className="mb-1" />
+      <div className="mb-1 flex items-center gap-1.5">
+        <FieldLabel htmlFor={htmlFor} label={label} />
+        {hint && <InfoHint id={hint.id} about={label}>{hint.text}</InfoHint>}
+      </div>
       {children}
       {error && <FieldError id={errorId}>{error}</FieldError>}
     </div>

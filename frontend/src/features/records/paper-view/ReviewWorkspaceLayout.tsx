@@ -26,6 +26,7 @@ import { isDiscussion } from "./threads/threadModel";
 import { useThreadsWorkspace } from "./threads/useThreadsWorkspace";
 import { ReviewPaneContext, type ReviewPane } from "./reviewPane";
 import { DRAWER_BELOW_PX, fitWidths, maxWidth, minWidth, SIDE_TAB_MIN_PX, type Widths } from "./reviewGeometry";
+import type { ReviewTarget } from "./reviewTarget";
 import { GuidedTour } from "./tour/GuidedTour";
 import { markTourSeen, tourSeen } from "./tour/tourStorage";
 import { reviewTourSteps, tourTargets, type TourTab } from "./tour/tourSteps";
@@ -101,6 +102,14 @@ export interface ReviewWorkspaceProps {
   showDocuments?: boolean;
   onDocumentsShown?: () => void;
   /**
+   * The tab a link asked for, and whose request in it: that party's open
+   * threads in Threads, its open request in Conversation. Spent once shown.
+   */
+  target?: ReviewTarget | null;
+  onTargetShown?: () => void;
+  /** The Overview, where an owner sends their files and new version. */
+  onShowOverview?: () => void;
+  /**
    * The viewer owns the paper (IR-1206): the same workspace as reviewers,
    * with the author's tabs -- Readiness first, then Documents, Conversation,
    * Threads and Details -- and no tour and no Changes.
@@ -151,6 +160,7 @@ function SentBy({ version }: { version: RecordVersion }) {
 
 export function ReviewWorkspaceLayout({
   record, can, reader, timelineVersion, onChanged, documents, showDocuments = false, onDocumentsShown, onOpenReview,
+  target: linked = null, onTargetShown, onShowOverview,
   onShowVersion, authorView = false, authorDetails, onShowManuscript, onShowDocument,
 }: ReviewWorkspaceProps) {
   const [observe, width] = useElementWidth<HTMLDivElement>();
@@ -170,6 +180,8 @@ export function ReviewWorkspaceLayout({
   const [routed, setRouted] = useState("");
   // The Conversation tab's count (IR-1131): comments and replies sent, from the timeline's own read.
   const [commentCount, setCommentCount] = useState(0);
+  // Whose open request Conversation lands on, from a link; a bumped key lands again.
+  const [requestFocus, setRequestFocus] = useState<{ party: string; key: number } | null>(null);
   const pane = useRef<HTMLElement>(null);
   const launcher = useRef<HTMLButtonElement>(null);
   const ids = useId();
@@ -393,6 +405,18 @@ export function ReviewWorkspaceLayout({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per request, not per render
   }, [showDocuments]);
   useEffect(() => {
+    if (!linked) return;
+    if ((allTabs as string[]).includes(linked.tab)) {
+      if (linked.tab === "threads" && linked.thread) tw.focusThread(linked.thread);
+      else if (linked.tab === "threads" && linked.party) tw.showParty(linked.party);
+      else reveal(linked.tab as Tab);
+      if (linked.tab === "conversation" && linked.party) setRequestFocus({ party: linked.party, key: Date.now() });
+      setPaneForDocuments(true);
+    }
+    onTargetShown?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per link, not per render
+  }, [linked?.tab, linked?.party, linked?.thread]);
+  useEffect(() => {
     if (!paneForDocuments || !measured) return;
     setPaneForDocuments(false);
     if (drawer) setOpen(true);
@@ -458,6 +482,7 @@ export function ReviewWorkspaceLayout({
     conversation: (
       <ReviewTimeline key={`${record.id}-${timelineVersion}`} recordId={record.id} canComment={can.has("comment_review")} statusTarget={statusTarget}
         onCommented={tw.threads.reload} onOpenThreads={tw.openThreads} renderStatus={renderDetails} submission={submission} statusBox
+        requestFocus={requestFocus} onRequestFocused={() => setRequestFocus(null)}
         onLoaded={(data) => setCommentCount((data.review_comments ?? []).filter((c) => !c.is_draft && isDiscussion(c)).length)} />
     ),
     documents: documentsOpened ? documents : null,
@@ -485,6 +510,7 @@ export function ReviewWorkspaceLayout({
   // A document opened from the Documents tab is read beside the pane or, narrow,
   // instead of it (IR-1203). The opener moves focus to it, so the launcher is not focused here.
   const paneForTabs: ReviewPane = { showReader: () => { if (drawer) setOpen(false); } };
+  const newVersion = can.has("create_version") ? record.revision?.new_version ?? null : null;
   const draftCount = finishing ? tw.threads.drafts.length : 0;
   const part = yourPartSummary({ readiness: record.readiness, seat: ownSeat, draftCount });
   const hasFacts = readinessFacts(record.readiness).length > 0;
@@ -563,9 +589,20 @@ export function ReviewWorkspaceLayout({
           {/* The author's part is the Readiness tab, so their foot holds only
               the review actions the server grants them, if any (IR-1206). */}
           {authorView ? (
-            REVIEW_ACTIONS.some((a) => can.has(a.capability)) && (
+            (newVersion || REVIEW_ACTIONS.some((a) => can.has(a.capability))) && (
               <footer className="review-pane-foot" aria-label="Your actions">
-                <ReviewActionBar record={record} can={can} onChanged={onChanged} />
+                {/* A new version is sent from the Overview, so Review points back to it. */}
+                {newVersion && onShowOverview && (
+                  <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                    <p className="min-w-0 flex-1 basis-60 text-small text-stone-700">
+                      {newVersion.blocked ?? `v${newVersion.number} is ready to submit.`}
+                    </p>
+                    <button type="button" onClick={onShowOverview} className={cn(PILL_SECONDARY, "min-h-11 reading-split:min-h-9", FOCUS_RING)}>
+                      Go to Overview
+                    </button>
+                  </div>
+                )}
+                {REVIEW_ACTIONS.some((a) => can.has(a.capability)) && <ReviewActionBar record={record} can={can} onChanged={onChanged} />}
               </footer>
             )
           ) : (

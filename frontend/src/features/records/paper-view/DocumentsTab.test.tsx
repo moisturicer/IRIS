@@ -22,7 +22,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { emitLiveHint } from "@/lib/live";
 import { expectNoBlockingA11yViolations } from "@/test/axe";
-import { act, fireEvent, renderScreen, screen, waitFor, within } from "@/test/render";
+import { act, fireEvent, renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
 import type { RecordFile, RecordUpload, SlotWithUploads } from "@/types/documents";
 import type { DocumentRequest, DocumentRequestItem, RecordDetail } from "@/types/records";
 
@@ -46,6 +46,7 @@ const uploadRecordFile = vi.fn();
 const uploadManuscript = vi.fn();
 const deleteFile = vi.fn();
 const deleteUpload = vi.fn();
+const removeUpload = vi.fn();
 
 /** The server's answer to an owner's upload: every open missing item it answers. */
 function answer(match: (item: DocumentRequestItem) => boolean) {
@@ -66,6 +67,7 @@ vi.mock("@/api/records", () => ({
     documentRequests: () => Promise.resolve({ data: structuredClone(requests) }),
     documentRequestSlots: () => Promise.resolve({ data: [] }),
     uploadManuscript: (recordId: number, file: File, options: unknown) => uploadManuscript(recordId, file, options),
+    removeDocumentRequestUpload: (itemId: number, uploadId: number) => removeUpload(itemId, uploadId),
   },
 }));
 vi.mock("@/api/documents", () => ({
@@ -110,7 +112,7 @@ const GUIDE = [
 function item(overrides: Partial<DocumentRequestItem> = {}): DocumentRequestItem {
   return {
     id: 11, slot: ETHICS, label: "Ethics Clearance", state: "missing", state_label: "Missing",
-    upload: null, uploaded_at: null, rejection_reason: null, decided_at: null,
+    upload: null, uploaded_at: null, rejection_reason: null, decided_at: null, can_replace: false,
     ...overrides,
   };
 }
@@ -162,6 +164,7 @@ beforeEach(() => {
     attachments = [...attachments, attachment(70, file.name, true)];
     return Promise.resolve({ data: attachments[attachments.length - 1] });
   });
+  removeUpload.mockReset().mockResolvedValue({ data: {} });
   deleteFile.mockReset().mockImplementation((fileId: number) => {
     attachments = attachments.filter((f) => f.id !== fileId);
     return Promise.resolve({ data: null });
@@ -177,6 +180,14 @@ beforeEach(() => {
     return Promise.resolve({ data: { upload: { id: 501 }, extraction: { id: 2, status: "queued" } } });
   });
 });
+
+function uploadedAs(id: number, version: number): RecordUpload {
+  return {
+    id, record: RECORD_ID, slot: ETHICS, slot_name: "Ethics Clearance", file: "x/ethics.pdf", version,
+    status: null, status_name: null, uploaded_by: 1, uploaded_by_name: "Rhea Owner",
+    created_at: "2026-09-21T02:00:00Z", reviews: [], delete_refused: null,
+  };
+}
 
 function attachment(id: number, filename: string, canRemove = false): RecordFile {
   return {
@@ -236,6 +247,37 @@ describe("the Documents tab, for the owner of a record in review", () => {
     await waitFor(() => expect(uploadForRequestItem).toHaveBeenCalledWith(RECORD_ID, 12, file, expect.any(Object)));
     const consent = screen.getByRole("group", { name: "Consent form" });
     await waitFor(() => expect(within(consent).getByText("Uploaded · awaiting review")).toBeInTheDocument());
+  });
+
+  it("replaces an undecided document against its item, and removes it once confirmed", async () => {
+    slots[0].uploads = [uploadedAs(500, 1)];
+    requests = [openRequest([item({ state: "uploaded", state_label: "Uploaded", upload: 500, can_replace: true })])];
+    renderFiles();
+    const ethics = await screen.findByRole("group", { name: "Ethics Clearance" });
+
+    // An ordinary slot upload would leave the request on the old file.
+    expect(within(ethics).queryByRole("button", { name: /^Upload/ })).not.toBeInTheDocument();
+    const file = pdf("better.pdf");
+    fireEvent.drop(await within(ethics).findByRole("button", { name: "Replace Ethics Clearance" }), { dataTransfer: { files: [file] } });
+    await waitFor(() => expect(uploadForRequestItem).toHaveBeenCalledWith(RECORD_ID, 11, file, expect.objectContaining({ replaces: 500 })));
+    expect(upload).not.toHaveBeenCalled();
+
+    requests = [openRequest([item({ state: "uploaded", state_label: "Uploaded", upload: 500, can_replace: true })])];
+    await userEvent.click(await within(ethics).findByRole("button", { name: "Remove Ethics Clearance" }));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Remove" }));
+    await waitFor(() => expect(removeUpload).toHaveBeenCalledWith(11, 500));
+  });
+
+  it("lists an Other document once, with its file, as one row", async () => {
+    slots.push({ ...slots[0], id: 77, name: "Consent form", uploads: [uploadedAs(700, 1)] });
+    requests = [openRequest([item({ id: 12, slot: null, label: "Consent form", state: "uploaded", state_label: "Uploaded", upload: 700 })])];
+    renderFiles();
+
+    const [consent, ...rest] = await screen.findAllByRole("group", { name: "Consent form" });
+    expect(rest).toHaveLength(0);
+    expect(within(consent).getByText("Uploaded · awaiting review")).toBeInTheDocument();
+    expect(within(consent).getByRole("button", { name: /^Download Consent form/ })).toBeInTheDocument();
   });
 
   it("shows an accepted document as Accepted, with nothing more to upload", async () => {
