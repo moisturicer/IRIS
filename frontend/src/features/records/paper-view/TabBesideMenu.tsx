@@ -9,10 +9,12 @@ import { cn } from "@/lib/utils";
  * workspace wide enough to keep the paper its room, and decides what choosing
  * does. One visible button, not a "⋯" on every tab.
  */
-export function TabBesideMenu<Id extends string>({ choices, onChoose }: {
+export function TabBesideMenu<Id extends string>({ choices, onChoose, buttonId }: {
   /** Each tab that could open on the right: what the host calls it, and its words. */
   choices: readonly { id: Id; label: string }[];
   onChoose: (id: Id) => void;
+  /** The button's DOM id, so the guided tour can point at it (IR-1309). */
+  buttonId?: string;
 }) {
   const [open, setOpen] = useState(false);
   const button = useRef<HTMLButtonElement>(null);
@@ -58,7 +60,7 @@ export function TabBesideMenu<Id extends string>({ choices, onChoose }: {
   return (
     <div className="relative shrink-0">
       <button
-        ref={button} type="button" aria-haspopup="menu" aria-expanded={open} aria-controls={open ? id : undefined}
+        ref={button} id={buttonId} type="button" aria-haspopup="menu" aria-expanded={open} aria-controls={open ? id : undefined}
         aria-label="Open a tab beside this one" title="Open a tab beside this one"
         onClick={() => setOpen((o) => !o)}
         className={cn("review-control text-stone-600 hover:text-brand", FOCUS_RING)}

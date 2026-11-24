@@ -193,10 +193,35 @@ describe("New conversation, Search, Pinned and Recents", () => {
     render(<Sidebar />);
     const edge = screen.getByRole("separator", { name: "Resize conversations" });
     edge.focus();
+    // The pane is on the left: its edge faces right, so ArrowRight widens it.
     await user.keyboard("{ArrowRight}");
     expect(edge).toHaveAttribute("aria-valuenow", "304");
     await user.keyboard("{End}");
     expect(edge).toHaveAttribute("aria-valuenow", String(SIDEBAR_MAX));
-    expect(screen.getByRole("complementary", { name: "Conversations" })).toHaveStyle({ width: `${SIDEBAR_MAX}px` });
+    expect(screen.getByRole("complementary", { name: "History" })).toHaveStyle({ width: `${SIDEBAR_MAX}px` });
+  });
+});
+
+describe("the closed strip (IR-1306)", () => {
+  function Closed({ onToggle, onSearch }: { onToggle: () => void; onSearch: () => void }) {
+    return <MemoryRouter>
+      <ConversationSidebar id="pane" conversations={entries("Flood methods")} activeId={null} open={false} search={search}
+        onDelete={() => undefined} onRename={async () => null} onNewConversation={() => undefined} onSearch={onSearch}
+        onToggle={onToggle} width={280} onResize={() => undefined} />
+    </MemoryRouter>;
+  }
+
+  test("a press on its empty space opens the pane; its buttons keep their own job", async () => {
+    const onToggle = vi.fn();
+    const onSearch = vi.fn();
+    const user = userEvent.setup();
+    render(<Closed onToggle={onToggle} onSearch={onSearch} />);
+
+    await user.click(screen.getByRole("complementary", { name: "History" }));
+    expect(onToggle).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole("button", { name: "Search conversations" }));
+    expect(onSearch).toHaveBeenCalledTimes(1);
+    expect(onToggle).toHaveBeenCalledTimes(1);
   });
 });

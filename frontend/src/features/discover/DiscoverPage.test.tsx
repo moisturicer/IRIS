@@ -559,6 +559,31 @@ describe("browsing", () => {
     await expectNoBlockingA11yViolations(container);
   });
 
+  // IR-1313: a filter keeps one width from `sm` up, whatever its options, so
+  // choosing a College (which reloads Departments) moves nothing beside it.
+  it("gives each People filter a fixed width that holds its longest name, and names the choice on hover", async () => {
+    people = [discoverPerson(1)];
+    renderDiscover();
+    await userEvent.click(screen.getByRole("button", { name: "People" }));
+
+    const college = screen.getByRole("combobox", { name: "College" });
+    const department = screen.getByRole("combobox", { name: "Department" });
+    const role = screen.getByRole("combobox", { name: "Role" });
+    for (const [box, width] of [[college, "sm:w-[26rem]"], [department, "sm:w-64"], [role, "sm:w-36"]] as const) {
+      expect(box.closest("label")).toHaveClass("w-full", width);
+      expect(box).toHaveClass("w-full");
+      expect(box.className).not.toMatch(/min-w-/);
+    }
+    expect(college).toHaveAttribute("title", "All colleges");
+
+    await screen.findByRole("option", { name: "College of Engineering" });
+    await userEvent.selectOptions(college, "4");
+    expect(college).toHaveAttribute("title", "College of Engineering");
+    await userEvent.selectOptions(await screen.findByRole("combobox", { name: "Department" }), "8");
+    expect(screen.getByRole("combobox", { name: "Department" })).toHaveAttribute("title", "Computer Studies");
+    expect(screen.getByRole("combobox", { name: "College" }).closest("label")).toHaveClass("sm:w-[26rem]");
+  });
+
   it("keeps Discover usable when the people-search response has a malformed person, and offers Try again on the People tab", async () => {
     vi.mocked(peopleApi.search).mockImplementation(() => Promise.resolve({ data: { count: 1, results: [{}] } } as never));
     renderDiscover();

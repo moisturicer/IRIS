@@ -103,7 +103,7 @@ class SetupRecordTypeListView(APIView):
     def get(self, request):
         from apps.records.models import RecordType
 
-        return Response([record_type_payload(rt) for rt in RecordType.objects.order_by("pk")])
+        return Response([record_type_payload(rt) for rt in RecordType.objects.all()])
 
 
 class SetupRecordTypeView(APIView):
@@ -248,7 +248,7 @@ class GuidelinesView(APIView):
 
         return Response([
             shown_record_type(rt, [shown_requirement(slot) for slot in setup.listed_slots(rt.pk)])
-            for rt in RecordType.objects.order_by("pk")
+            for rt in RecordType.objects.all()
         ])
 
 

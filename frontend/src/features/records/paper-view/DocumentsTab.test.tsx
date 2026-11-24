@@ -7,9 +7,11 @@
  *
  * **One upload path.** Every upload goes through `UploadDropzone`. A
  * reviewer's request for a slot is answered by uploading into that slot the
- * ordinary way (ADR-022 §Amendment 1, IR-346), so the slot takes an upload
- * even while the record is in review; an "Other" item, which has no slot, takes
- * one of its own.
+ * ordinary way (ADR-022 §Amendment 1, IR-346); an "Other" item, which has no
+ * slot, takes one of its own. While anything is asked for, every slot takes an
+ * upload, and an owner's upload is held, theirs alone with a trash can, until
+ * *Submit added documents* or *Submit new version* sends it (ADR-022
+ * Amendment 8, IR-1322).
  *
  * **One vocabulary.** A requested document reads Requested → Uploaded ·
  * awaiting review → Accepted, or Replacement needed with the reviewer's reason.
@@ -20,8 +22,9 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { emitLiveHint } from "@/lib/live";
 import { expectNoBlockingA11yViolations } from "@/test/axe";
-import { fireEvent, renderScreen, screen, waitFor, within } from "@/test/render";
+import { act, fireEvent, renderScreen, screen, waitFor, within } from "@/test/render";
 import type { RecordFile, RecordUpload, SlotWithUploads } from "@/types/documents";
 import type { DocumentRequest, DocumentRequestItem, RecordDetail } from "@/types/records";
 
@@ -46,7 +49,7 @@ const uploadManuscript = vi.fn();
 const deleteFile = vi.fn();
 const deleteUpload = vi.fn();
 
-/** The server's answer to an owner's upload: every open missing item it answers. */
+/** The server's answer to a send: every open missing item it answers. */
 function answer(match: (item: DocumentRequestItem) => boolean) {
   requests = requests.map((r) => {
     if (r.state !== "open") return r;
@@ -60,8 +63,32 @@ function answer(match: (item: DocumentRequestItem) => boolean) {
   });
 }
 
+const sendDocuments = vi.fn();
+
+/** An owner's upload to a record in review: held in its slot, answering nothing yet (IR-1322). */
+function hold(slotId: number, id: number) {
+  slots = slots.map((s) => s.id !== slotId ? s : {
+    ...s,
+    uploads: [{
+      id, record: RECORD_ID, slot: slotId, slot_name: s.name, file: `/media/uploads/9/${id}.pdf`,
+      version: s.uploads.length + 1, status: null, status_name: null, uploaded_by: 50,
+      uploaded_by_name: "Sam Student", created_at: "2026-10-09T02:00:00Z", reviews: [],
+      delete_refused: null, held: true,
+    }, ...s.uploads],
+  });
+}
+
+/** *Submit added documents*: every held upload is sent and answers what it matches, by slot or name. */
+function send() {
+  const sent = slots.filter((s) => s.uploads.some((u) => u.held));
+  slots = slots.map((s) => ({ ...s, uploads: s.uploads.map((u) => ({ ...u, held: false })) }));
+  answer((i) => sent.some((s) => (i.slot != null ? s.id === i.slot : s.name === i.label)));
+  return { sent: sent.length, requests_fulfilled: requests.filter((r) => r.state === "fulfilled").length };
+}
+
 vi.mock("@/api/records", () => ({
   recordsApi: {
+    sendDocuments: (recordId: number) => sendDocuments(recordId),
     documentRequests: () => Promise.resolve({ data: structuredClone(requests) }),
     documentRequestSlots: () => Promise.resolve({ data: [] }),
     uploadManuscript: (recordId: number, file: File, options: unknown) => uploadManuscript(recordId, file, options),
@@ -168,12 +195,20 @@ beforeEach(() => {
   slots = [slot(ETHICS, "Ethics Clearance"), slot(PATENT, "Patent Draft")];
   requests = [openRequest([item(), item({ id: 12, slot: null, label: "Consent form" })])];
   upload.mockReset().mockImplementation((_record: number, slotId: number) => {
-    answer((i) => i.slot === slotId);
+    hold(slotId, 500);
     return Promise.resolve({ data: { upload: { id: 500 }, extraction: { id: 1, status: "queued" } } });
   });
+  // An Other item's file goes into a slot of this record's named for it (ADR-022 §3).
   uploadForRequestItem.mockReset().mockImplementation((_record: number, itemId: number) => {
-    answer((i) => i.id === itemId);
+    const label = requests.flatMap((r) => r.items).find((i) => i.id === itemId)?.label ?? "";
+    if (!slots.some((s) => s.name === label)) slots = [...slots, slot(90, label)];
+    hold(slots.find((s) => s.name === label)!.id, 501);
     return Promise.resolve({ data: { upload: { id: 501 }, extraction: { id: 2, status: "queued" } } });
+  });
+  sendDocuments.mockReset().mockImplementation(() => Promise.resolve({ data: send() }));
+  deleteUpload.mockReset().mockImplementation((uploadId: number) => {
+    slots = slots.map((s) => ({ ...s, uploads: s.uploads.filter((u) => u.id !== uploadId) }));
+    return Promise.resolve({ data: null });
   });
 });
 
@@ -199,21 +234,30 @@ function renderFiles(
 const pdf = (name: string) => new File(["%PDF-1.4"], name, { type: "application/pdf" });
 
 describe("the Documents tab, for the owner of a record in review", () => {
-  it("offers an upload on the requested slot only, and says who asked", async () => {
+  it("offers an upload on every slot while something is asked for, and says who asked", async () => {
     const { container } = renderFiles();
 
     const ethics = await screen.findByRole("group", { name: "Ethics Clearance" });
     expect(within(ethics).getByRole("button", { name: /^Upload Ethics Clearance/ })).toBeInTheDocument();
     expect(within(ethics).getByText(/Requested by IERC/)).toBeInTheDocument();
     expect(within(ethics).getByText("Requested")).toBeInTheDocument();
-    // Nothing asked for, nothing uploaded, and not editable: not listed at all.
-    expect(screen.queryByRole("group", { name: "Patent Draft" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /^Upload Patent Draft/ })).not.toBeInTheDocument();
+    // Nobody asked for it, and the owner may still add it (IR-1322).
+    const patent = screen.getByRole("group", { name: "Patent Draft" });
+    expect(within(patent).getByRole("button", { name: /^Upload Patent Draft/ })).toBeInTheDocument();
     await expectNoBlockingA11yViolations(container);
   });
 
-  it("uploads into the slot through the dropzone, and the item then reads Uploaded · awaiting review", async () => {
+  it("lists no unrequested slot, and offers no upload, when nothing is asked for", async () => {
+    requests = [];
     renderFiles();
+
+    await screen.findByRole("list", { name: "Documents" });
+    expect(screen.queryByRole("group", { name: "Patent Draft" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Upload/ })).not.toBeInTheDocument();
+  });
+
+  it("holds an upload until Submit added documents, which answers the request", async () => {
+    const { container } = renderFiles();
     const zone = await screen.findByRole("button", { name: /^Upload Ethics Clearance/ });
     const file = pdf("ethics.pdf");
 
@@ -221,11 +265,22 @@ describe("the Documents tab, for the owner of a record in review", () => {
 
     await waitFor(() => expect(upload).toHaveBeenCalledWith(RECORD_ID, ETHICS, file, expect.any(Object)));
     const ethics = screen.getByRole("group", { name: "Ethics Clearance" });
-    await waitFor(() => expect(within(ethics).getByText("Uploaded · awaiting review")).toBeInTheDocument());
-    expect(within(ethics).queryByRole("button", { name: /^Upload Ethics Clearance/ })).not.toBeInTheDocument();
+    expect(await within(ethics).findByText("Added, not sent yet")).toBeInTheDocument();
+    // Nothing reached IERC yet: the item still reads Requested.
+    expect(within(ethics).getByText("Requested")).toBeInTheDocument();
+    const bar = screen.getByRole("region", { name: "Changes requested by IERC" });
+    expect(bar).toHaveTextContent("1 change not sent yet: Ethics Clearance.");
+    await expectNoBlockingA11yViolations(container);
+
+    fireEvent.click(within(bar).getByRole("button", { name: "Submit added documents" }));
+
+    await waitFor(() => expect(sendDocuments).toHaveBeenCalledWith(RECORD_ID));
+    expect(await within(ethics).findByText("Uploaded · awaiting review")).toBeInTheDocument();
+    expect(within(ethics).queryByText("Added, not sent yet")).not.toBeInTheDocument();
+    expect(await screen.findByText("1 document sent to IERC.")).toBeInTheDocument();
   });
 
-  it("answers an Other item, which has no slot, with a dropzone of its own", async () => {
+  it("answers an Other item, which has no slot, with a dropzone of its own, once sent", async () => {
     renderFiles();
     const zone = await screen.findByRole("button", { name: /^Upload Consent form/ });
     const file = pdf("consent.pdf");
@@ -233,12 +288,53 @@ describe("the Documents tab, for the owner of a record in review", () => {
     fireEvent.drop(zone, { dataTransfer: { files: [file] } });
 
     await waitFor(() => expect(uploadForRequestItem).toHaveBeenCalledWith(RECORD_ID, 12, file, expect.any(Object)));
-    const consent = screen.getByRole("group", { name: "Consent form" });
-    await waitFor(() => expect(within(consent).getByText("Uploaded · awaiting review")).toBeInTheDocument());
+    const [consent] = await screen.findAllByRole("group", { name: "Consent form" });
+    expect(await within(consent).findByText("Added, not sent yet")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Submit added documents" }));
+
+    // The Other row, after the slot named for it, carries the request's state.
+    await waitFor(() => expect(within(screen.getAllByRole("group", { name: "Consent form" }).at(-1)!)
+      .getByText("Uploaded · awaiting review")).toBeInTheDocument());
+  });
+
+  it("removes a held upload with its trash can, even one nobody asked for", async () => {
+    hold(PATENT, 600);
+    renderFiles();
+
+    const patent = await screen.findByRole("group", { name: "Patent Draft" });
+    expect(within(patent).getByText("Added, not sent yet")).toBeInTheDocument();
+    fireEvent.click(within(patent).getByRole("button", { name: "Remove Patent Draft version 1" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Remove" }));
+
+    await waitFor(() => expect(deleteUpload).toHaveBeenCalledWith(600));
+    await waitFor(() => expect(within(screen.getByRole("group", { name: "Patent Draft" }))
+      .queryByText("Added, not sent yet")).not.toBeInTheDocument());
+  });
+
+  it("keeps Submit added documents grey, saying why, until something is added", async () => {
+    renderFiles();
+
+    const bar = await screen.findByRole("region", { name: "Changes requested by IERC" });
+    const submit = within(bar).getByRole("button", { name: "Submit added documents" });
+    expect(submit).toBeDisabled();
+    expect(submit).toHaveAccessibleDescription("Upload what was asked for below, then submit it. Nothing is sent until you do.");
+    expect(screen.queryByRole("button", { name: "Submit new version" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the held files and says so when the send fails", async () => {
+    hold(ETHICS, 600);
+    sendDocuments.mockReset().mockRejectedValueOnce({ response: { status: 409, data: { detail: "A revision is open: send these with your new version." } } });
+    renderFiles();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Submit added documents" }));
+
+    expect(await screen.findByText("A revision is open: send these with your new version.")).toBeInTheDocument();
+    expect(within(screen.getByRole("group", { name: "Ethics Clearance" })).getByText("Added, not sent yet")).toBeInTheDocument();
   });
 
   it("shows an accepted document as Accepted, with nothing more to upload", async () => {
-    requests = [openRequest([item({ state: "accepted", state_label: "Accepted", upload: 500 })])];
+    requests = [{ ...openRequest([item({ state: "accepted", state_label: "Accepted", upload: 500 })]), state: "fulfilled", state_label: "Fulfilled" }];
     renderFiles();
 
     const ethics = await screen.findByRole("group", { name: "Ethics Clearance" });
@@ -573,6 +669,96 @@ describe("the manuscript, while a revision is asked for (IR-273)", () => {
 
 });
 
+// IR-1318: the Documents tab is where the owner uploads what is asked for and submits.
+describe("answering a request in the Documents tab (IR-1318)", () => {
+  const ethicsUpload = (id: number) => ({
+    id, record: RECORD_ID, slot: ETHICS, slot_name: "Ethics Clearance", file: "/media/uploads/9/ethics.pdf",
+    version: 1, status: null, status_name: null, uploaded_by: 50, uploaded_by_name: "Sam Student",
+    created_at: "2026-10-09T02:00:00Z", reviews: [], delete_refused: null,
+  });
+  const inRevision = (unsent: NonNullable<RecordDetail["revision"]["new_version"]>["unsent"], blocked: string | null = null) => ({
+    ...record,
+    revision: {
+      ...record.revision,
+      open: [{
+        id: 3, party: "ierc", label: "IERC", reason: "Fix the consent section.",
+        requested_by: "Ivy Ethics", version: 2, created_at: "2026-10-08T02:00:00Z",
+      }],
+      new_version: { number: 3, rereview: ["IERC"], kept: ["KTTO"], blocked, unsent },
+    },
+  } as RecordDetail);
+
+  it("puts Submit new version at the top, naming what is not sent yet", async () => {
+    requests = [];
+    slots = [{ ...slot(ETHICS, "Ethics Clearance"), uploads: [{ ...ethicsUpload(320), held: true }] }];
+    const onSubmit = vi.fn();
+    const { container } = renderScreen(
+      <DocumentsTab
+        record={{ ...inRevision({ manuscript: true, details: false, uploads: [{ id: 320, label: "Ethics Clearance" }] }), manuscript_unsubmitted: true } as RecordDetail}
+        owner editable reviewing={false} attach={false} replaceManuscript onSubmitNewVersion={onSubmit}
+      />,
+    );
+
+    const bar = await screen.findByRole("region", { name: "Changes requested by IERC" });
+    expect(bar).toHaveTextContent("2 changes not sent yet: revised manuscript and Ethics Clearance.");
+    expect(bar).toHaveTextContent("IERC will review v3. KTTO's clearance is kept.");
+    const documents = screen.getByRole("list", { name: "Documents" });
+    const [manuscript, ethics] = within(documents).getAllByRole("listitem");
+    expect(manuscript).toHaveTextContent("Revised, not yet submitted");
+    expect(ethics).toHaveTextContent("Added, not sent yet");
+
+    fireEvent.click(within(bar).getByRole("button", { name: "Submit new version" }));
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    await expectNoBlockingA11yViolations(container);
+  });
+
+  it("says why it cannot be sent yet, describing the button, before anything changed", async () => {
+    requests = [];
+    renderScreen(
+      <DocumentsTab
+        record={inRevision({ manuscript: false, details: false, uploads: [] }, "Nothing has changed since IERC asked for a revision.")}
+        owner editable reviewing={false} attach={false} onSubmitNewVersion={vi.fn()}
+      />,
+    );
+
+    const bar = await screen.findByRole("region", { name: "Changes requested by IERC" });
+    expect(bar).not.toHaveTextContent("not sent yet");
+    const submit = within(bar).getByRole("button", { name: "Submit new version" });
+    expect(submit).toBeDisabled();
+    expect(submit).toHaveAccessibleDescription("Nothing has changed since IERC asked for a revision.");
+  });
+
+  it("offers no submit to an owner the page gave none, nor to a reviewer", async () => {
+    requests = [];
+    renderScreen(
+      <DocumentsTab record={inRevision({ manuscript: true, details: false, uploads: [] })} owner editable reviewing={false} attach={false} />,
+    );
+    await screen.findByRole("list", { name: "Documents" });
+    expect(screen.queryByRole("button", { name: "Submit new version" })).not.toBeInTheDocument();
+  });
+
+  it("names one party once when it asked for a revision and documents, and sends both as the new version", async () => {
+    renderScreen(
+      <DocumentsTab
+        record={inRevision({ manuscript: true, details: false, uploads: [] })}
+        owner editable reviewing={false} attach={false} onSubmitNewVersion={vi.fn()}
+      />,
+    );
+
+    const bar = await screen.findByRole("region", { name: "Changes requested by IERC" });
+    expect(within(bar).getByRole("button", { name: "Submit new version" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Submit added documents" })).not.toBeInTheDocument();
+  });
+
+  it("tells a reviewer nothing about uploading", async () => {
+    renderFiles({ owner: false, reviewing: true });
+
+    await screen.findByRole("list", { name: "Documents" });
+    expect(screen.queryByRole("region", { name: /Changes requested/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Submit added documents" })).not.toBeInTheDocument();
+  });
+});
+
 // IR-1203: a slot's file is saved under its own type, not always as .pdf.
 describe("downloading a document version", () => {
   it("saves it under the stored file's own extension", async () => {
@@ -601,5 +787,19 @@ describe("downloading a document version", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Download Ethics Clearance version 1" }));
     await waitFor(() => expect(downloadBlob).toHaveBeenCalledWith(expect.any(Blob), "Ethics Clearance v1.pdf"));
+  });
+});
+
+describe("DocumentsTab, live (ADR-073, IR-1287)", () => {
+  it("shows a file someone else added once a hint for its record arrives", async () => {
+    attachments = [attachment(71, "clearance-certificate.pdf")];
+    renderFiles();
+    expect(await screen.findByText("clearance-certificate.pdf")).toBeInTheDocument();
+
+    attachments = [...attachments, attachment(73, "consent-form.pdf")];
+    act(() => { emitLiveHint([`record:${RECORD_ID}`]); });
+
+    expect(await screen.findByText("consent-form.pdf")).toBeInTheDocument();
+    expect(screen.getByText("clearance-certificate.pdf")).toBeInTheDocument();
   });
 });

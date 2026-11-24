@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { authApi } from "@/api/auth";
 import { accountsApi } from "@/api/accounts";
 import { AuthAlert } from "@/components/auth/AuthAlert";
+import { EntryErrorDialog, type EntryError } from "@/components/auth/EntryErrorDialog";
 import { EntryFrame } from "@/components/auth/EntryFrame";
 import { EntrySteps, type EntryStep } from "@/components/auth/EntrySteps";
 import { Button, ButtonLink, Input, PasswordStrengthMeter, Select } from "@/components/ui";
@@ -77,12 +78,10 @@ const SERVER_FIELD: Record<string, FieldName> = {
   department_id:    "dept_id",
 };
 
-interface FormAlert { title: string; message: string; }
-
 /** A reply with nothing to say about the fields: none came, or the server failed. */
-const UNREACHABLE: FormAlert = {
-  title:   "IRIS can't be reached right now",
-  message: "This is a connection or server problem, not a problem with what you typed. Try again shortly.",
+const UNREACHABLE: EntryError = {
+  title: "IRIS can't be reached right now",
+  body:  "This is a connection or server problem, not a problem with what you typed. Try again shortly.",
 };
 
 const firstMessage = (val: unknown) => (Array.isArray(val) ? String(val[0]) : String(val));
@@ -167,7 +166,10 @@ export default function SignupPage() {
   const [notice, setNotice]         = useState<DataNotice | null>(null);
   const [answers, setAnswers]       = useState<NoticeAnswers>(NO_ANSWERS);
   const [answerErrors, setAnswerErrors] = useState<NoticeAnswerErrors>({});
-  const [formAlert, setFormAlert]   = useState<FormAlert | null>(null);
+  // Why the last Register failed, said in a dialog in front of the form so
+  // nothing inside the form moves (IR-1303).
+  const [formAlert, setFormAlert]   = useState<EntryError | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   // The server's refusals, kept apart from the screen's own checks (IR-708): a
   // blur re-runs those, and must not erase a message only the server can give.
   // Each one stays on its field, and keeps its step open, until that field changes.
@@ -176,8 +178,6 @@ export default function SignupPage() {
   // here; it belongs to Identity and stays until the role changes.
   const [roleRefusal, setRoleRefusal] = useState<string>();
   const roleRefusalId = useId();
-  // The step a refusal brought the registrant back to, which says so while open.
-  const [returnedTo, setReturnedTo] = useState<number | null>(null);
   // Set when the role changes after an affiliation was chosen, and said on
   // Affiliation until the new program or department is picked (IR-704 story 28).
   const [roleChangedTo, setRoleChangedTo] = useState<Role | null>(null);
@@ -243,10 +243,8 @@ export default function SignupPage() {
     }
   }, [errors, serverErrors, step]);
 
-  /** Moves to a step; `returned` says a refusal brought the registrant there. */
-  const goTo = (next: number, returned = false) => {
+  const goTo = (next: number) => {
     stepChanged.current = true;
-    setReturnedTo(returned ? next : null);
     setStep(next);
   };
 
@@ -344,7 +342,6 @@ export default function SignupPage() {
     }
 
     setFormAlert(null);
-    setReturnedTo(null);
     setSubmitting(true);
     try {
       await authApi.register({
@@ -377,11 +374,11 @@ export default function SignupPage() {
         setNotice(newer);
         setAnswers(NO_ANSWERS);
         setNoticeOpen(true);
-        setFormAlert({ title: "The data notice changed", message: "A newer notice was published while you were registering. Read it, then answer again." });
+        setFormAlert({ title: "The data notice changed", body: "A newer notice was published while you were registering. Read it, then answer again." });
         return;
       }
       if (response.status === 429) {
-        setFormAlert({ title: "Registration failed", message: errorDetail(err, "") });
+        setFormAlert({ title: "Registration failed", body: errorDetail(err, "") });
         return;
       }
       const onFields: FieldErrors = {};
@@ -394,20 +391,52 @@ export default function SignupPage() {
         else if (SERVER_FIELD[key]) onFields[SERVER_FIELD[key]] = allMessages(val);
         else elsewhere.push(firstMessage(val));
       }
-      focusInvalid.current = Object.keys(onFields).length > 0;
       setServerErrors(onFields);
       setRoleRefusal(onRole);
-      // Anything no field owns stays here on Security, as an alert above Register.
-      if (elsewhere.length) setFormAlert({ title: "Registration failed", message: elsewhere.join(" ") });
       // The registrant goes to the earliest step a refusal names (IR-708);
       // every answer is kept, and the steps after it stay completed.
       const earliestRefused = onRole
         ? 0
         : STEPS.findIndex((s) => s.fields.some((name) => onFields[name]));
-      if (earliestRefused !== -1 && earliestRefused < LAST_STEP) goTo(earliestRefused, true);
+      const returned = earliestRefused !== -1 && earliestRefused < LAST_STEP;
+      // Anything no field owns is said with the rest, in the dialog.
+      const unowned = elsewhere.join(" ");
+      if (returned) {
+        goTo(earliestRefused);
+        setFormAlert({
+          title: `We brought you back to ${STEPS[earliestRefused].name}`,
+          body: `IRIS couldn't register you with what's marked on this step. Change it and register again; everything else you entered is kept.${unowned ? ` ${unowned}` : ""}`,
+        });
+      } else if (unowned) {
+        setFormAlert({ title: "Registration failed", body: unowned });
+      }
+      // With no dialog, focus goes straight to the first refused field; with
+      // one, it goes there when the dialog closes, or the page would pull
+      // focus out of the dialog as it opened.
+      focusInvalid.current = !returned && !unowned && Object.keys(onFields).length > 0;
     } finally {
       setSubmitting(false);
     }
+  };
+
+  /**
+   * Closes the failure's dialog and starts the registrant where the answer is
+   * needed: the chosen role when the role was refused (it comes first on
+   * Identity and has no invalid state of its own), else the first field marked
+   * wrong, else the step's forward action. It runs after the dialog's own focus
+   * restore, which has nothing to go back to: Register was disabled while the
+   * request was in flight.
+   */
+  const closeFormAlert = () => {
+    setFormAlert(null);
+    globalThis.setTimeout(() => {
+      const form = formRef.current;
+      const target =
+        (roleRefusal ? form?.querySelector<HTMLElement>('input[name="register-role"]:checked') : null) ??
+        form?.querySelector<HTMLElement>('[aria-invalid="true"]') ??
+        form?.querySelector<HTMLElement>('button[type="submit"]');
+      target?.focus();
+    });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -436,6 +465,8 @@ export default function SignupPage() {
     onBlur:   () => handleBlur(name),
     error:    serverErrors[name] ?? (touched[name] && errors[name] ? errors[name] : undefined),
     size:     "lg" as const,
+    // A message appearing under a field must not move the step (IR-1303).
+    reserveErrorSpace: true,
   });
 
   // Feedback in words, with the check as decoration (IR-539): the hint says
@@ -552,7 +583,8 @@ export default function SignupPage() {
       wide
       tabs={<EntrySteps steps={tabs} onSelect={goTo} />}
     >
-      <form onSubmit={handleSubmit} noValidate className="grid gap-section lg:grid-cols-5 lg:gap-12">
+      <EntryErrorDialog error={formAlert} onClose={closeFormAlert} />
+      <form ref={formRef} onSubmit={handleSubmit} noValidate className="grid gap-section lg:grid-cols-5 lg:gap-12">
         <div className="lg:col-span-2">
           <h2 className="text-balance font-display text-display font-semibold text-stone-900">
             Create an Account
@@ -604,13 +636,6 @@ export default function SignupPage() {
         </div>
 
         <div key={step} className="flex flex-col gap-5 motion-safe:animate-step-fade lg:col-span-3">
-          {returnedTo === step && (
-            <AuthAlert variant="error" title={`We brought you back to ${STEPS[step].name}`}>
-              IRIS couldn&apos;t register you with what&apos;s marked below. Change it and register
-              again; everything else you entered is kept.
-            </AuthAlert>
-          )}
-
           {loadFailed && step === 1 && (
             <AuthAlert variant="error" title="Some of this form didn't load">
               IRIS couldn&apos;t load the colleges, programs and departments to choose from.
@@ -651,12 +676,15 @@ export default function SignupPage() {
                     </label>
                   ))}
                 </div>
-                {roleRefusal && (
-                  <p id={roleRefusalId} className="mt-1.5 flex items-start gap-1.5 text-small text-brand">
-                    <i className="fas fa-circle-exclamation mt-0.5 shrink-0" aria-hidden />
-                    {roleRefusal}
-                  </p>
-                )}
+                {/* The same one-line slot as the fields' (IR-1303). */}
+                <div className="mt-1.5 min-h-5">
+                  {roleRefusal && (
+                    <p id={roleRefusalId} className="flex items-start gap-1.5 text-small text-brand">
+                      <i className="fas fa-circle-exclamation mt-0.5 shrink-0" aria-hidden />
+                      {roleRefusal}
+                    </p>
+                  )}
+                </div>
               </fieldset>
 
               <div className="grid gap-5 sm:grid-cols-2 sm:gap-3">
@@ -798,12 +826,6 @@ export default function SignupPage() {
                   errors={answerErrors}
                 />
               </div>
-
-              {formAlert && (
-                <AuthAlert variant="error" title={formAlert.title}>
-                  {formAlert.message}
-                </AuthAlert>
-              )}
 
               {/* Said before anything is sent, so the wait after it surprises no one (IR-533). */}
               <div>

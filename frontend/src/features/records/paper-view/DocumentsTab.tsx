@@ -17,6 +17,14 @@
  *   awaiting review → Accepted, or Replacement needed with the reviewer's
  *   reason (`document-requests/itemStatus`).
  *
+ * - **One place to answer a request** (IR-1318, IR-1322). The owner uploads
+ *   what reviewers ask for here, not on the Overview. While anything is asked
+ *   for, every slot takes an upload, and each upload stays the owner's alone,
+ *   marked *Added, not sent yet* with a trash can, until they submit
+ *   (ADR-022 Amendment 8). The top of the tab (`SubmitChangesBar`) names who
+ *   asked and what is not sent yet: *Submit new version* while a revision is
+ *   open, *Submit added documents* otherwise, grey until there is something.
+ *
  * The page decides who is looking: `owner`, `editable` (the `edit_details`
  * capability, so a draft or a record awaiting revision), `reviewing`, and
  * `attach` (the `attach_file` capability: an office filing a supplementary
@@ -32,8 +40,9 @@ import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { UploadDropzone } from "@/components/shared/UploadDropzone";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { FOCUS_RING } from "@/components/ui/interaction";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { PILL_SECONDARY } from "@/components/ui/pillStyles";
-import { cn, downloadBlob, formatDate } from "@/lib/utils";
+import { cn, downloadBlob, formatDate, joinLabels } from "@/lib/utils";
 import type { RecordFile, RecordUpload, SlotWithUploads } from "@/types/documents";
 import type { DocumentRequest, DocumentRequestItem, RecordDetail } from "@/types/records";
 
@@ -50,6 +59,7 @@ import { useReviewPane } from "./reviewPane";
 import { extensionOf, opensInReader, readerFormat, slotUploadDocument, type ReaderDocument } from "./readerDocument";
 import { SectionHeading } from "./headings";
 import { useRowUploads } from "./rowUploads";
+import { SubmitChangesBar, unsentChanges } from "./SubmitNewVersionBar";
 
 /** What an office may attach (IR-1220, ADR-032 §10 as amended 2026-11-18). */
 const SUPPLEMENTARY_TYPES = ".pdf,.docx,.png,.jpg,.jpeg";
@@ -59,7 +69,7 @@ interface DocumentsTabProps {
     RecordDetail,
     "id" | "abstract_file" | "can_request_document" | "current_holders" | "manuscript_unsubmitted"
     | "record_type_name" | "versions"
-  >;
+  > & Partial<Pick<RecordDetail, "revision">>;
   /** The viewer owns the record: they upload what is asked for. */
   owner:     boolean;
   /** The owner may add or replace any document, not only a requested one. */
@@ -85,6 +95,22 @@ interface DocumentsTabProps {
    * where there is no reader; only PDFs offer it.
    */
   onOpen?: (document: ReaderDocument, opener: HTMLElement) => void;
+  /**
+   * Opens *Submit new version* (IR-1318), given only to an owner with the
+   * `create_version` capability. With a revision open, the tab's top bar
+   * offers it.
+   */
+  onSubmitNewVersion?: () => void;
+}
+
+/** The mark on a file no version carries yet (IR-1318). */
+function NotYetSubmitted({ children }: { children: ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 font-semibold text-brand-dark">
+      <i className="fas fa-file-pen text-2xs" aria-hidden />
+      {children}
+    </span>
+  );
 }
 
 /** A requested item, with who asked and whether that request is still open. */
@@ -134,6 +160,7 @@ export function DocumentsTab({
   replaceManuscript = false,
   onChanged,
   onOpen,
+  onSubmitNewVersion,
 }: DocumentsTabProps) {
   const pane = useReviewPane();
   const guideRead = useRequirementGuide();
@@ -143,6 +170,7 @@ export function DocumentsTab({
   const [requests, setRequests] = useState<DocumentRequest[]>([]);
   const [failed, setFailed] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
   // Every removal asks first (IR-872): a removed file is gone from storage.
   const [removing, setRemoving] = useState<{ name: string; run: () => Promise<void> } | null>(null);
   const [removeBusy, setRemoveBusy] = useState(false);
@@ -164,7 +192,8 @@ export function DocumentsTab({
     }
   };
 
-  const load = useCallback(async () => {
+  /** `quiet`: a live re-read (ADR-073, IR-1287), which keeps what is shown if it fails. */
+  const load = useCallback(async (quiet = false) => {
     try {
       const [slotsRes, filesRes] = await Promise.all([
         documentsApi.slotsForRecord(record.id),
@@ -175,7 +204,7 @@ export function DocumentsTab({
       setFiles(Array.isArray(list) ? list : list.results ?? []);
       setFailed(false);
     } catch {
-      setFailed(true);
+      if (!quiet) setFailed(true);
     }
     // Only participants may read requests (IR-349); for anyone else this
     // refuses, and there is simply nothing asked for to show.
@@ -184,7 +213,7 @@ export function DocumentsTab({
         const { data } = await recordsApi.documentRequests(record.id);
         setRequests(data);
       } catch {
-        setRequests([]);
+        if (!quiet) setRequests([]);
       }
     }
   }, [record.id, owner, reviewing]);
@@ -192,6 +221,7 @@ export function DocumentsTab({
   useEffect(() => {
     void load();
   }, [load]);
+  useLiveRefresh([`record:${record.id}`], () => { void load(true); });
 
   const changed = async () => {
     await load();
@@ -213,7 +243,35 @@ export function DocumentsTab({
   if (slots == null) return <Skeleton rows={6} label="Loading the files…" onRetry={() => void load()} />;
 
   const { bySlot, other } = askedFor(requests);
-  const shownSlots = slots.filter((s) => editable || s.uploads.length > 0 || bySlot.has(s.id));
+  // While anything is asked for, the owner may add any document, so every slot is listed (IR-1322).
+  const ownerAsked = owner && (record.revision?.open.length || requests.some((r) => r.state === "open"));
+  const shownSlots = slots.filter((s) => editable || ownerAsked || s.uploads.length > 0 || bySlot.has(s.id));
+  // What the top of the tab says to the owner (IR-1318): a revision's bar,
+  // else what reviewers still need uploaded.
+  const revision = record.revision;
+  const revisionOpen = (revision?.open.length ?? 0) > 0;
+  const hint = owner && onSubmitNewVersion && revisionOpen ? revision?.new_version ?? null : null;
+  // Who is asking, a party once whether it asked for a revision, documents or
+  // both (ADR-022 Amendment 8, IR-1322).
+  const documentAskers = requests.filter((r) => r.state === "open").map((r) => r.label);
+  const askers = [...new Set([...(revision?.open ?? []).map((r) => r.label), ...documentAskers])];
+  // While anything is asked for, the owner may add a file to any slot, not
+  // only a requested one; each stays theirs until they submit.
+  const asking = askers.length > 0;
+  const heldNames = [...new Set(slots.filter((s) => s.uploads.some((u) => u.held)).map((s) => s.name))];
+  const submitDocuments = async () => {
+    setSending(true);
+    setNotice(null);
+    try {
+      const { data } = await recordsApi.sendDocuments(record.id);
+      setNotice(`${data.sent === 1 ? "1 document" : `${data.sent} documents`} sent to ${joinLabels(documentAskers)}.`);
+      await changed();
+    } catch (err) {
+      setNotice(errorDetail(err, "Could not send your documents. Nothing was sent. Please try again."));
+    } finally {
+      setSending(false);
+    }
+  };
   const download = (fetch: () => Promise<{ data: unknown }>, filename: string) =>
     saveBlob(fetch, filename).catch(() => setNotice(`Could not download ${filename}. Please try again.`));
   const manuscript = record.versions?.[record.versions.length - 1] ?? null;
@@ -235,6 +293,17 @@ export function DocumentsTab({
 
   return (
     <div className="space-y-section">
+      {owner && hint && onSubmitNewVersion ? (
+        <SubmitChangesBar mode="version" askers={askers} hint={hint} changes={unsentChanges(hint)} onSubmit={onSubmitNewVersion} />
+      ) : owner && !revisionOpen && (documentAskers.length > 0 || heldNames.length > 0) && (
+        <SubmitChangesBar
+          mode="documents"
+          askers={documentAskers.length > 0 ? [...new Set(documentAskers)] : ["your reviewers"]}
+          changes={heldNames}
+          sending={sending}
+          onSubmit={() => void submitDocuments()}
+        />
+      )}
       {reviewing && (
         <ReviewerDocumentRequests record={record} reviewing onChanged={() => void changed()} />
       )}
@@ -248,12 +317,7 @@ export function DocumentsTab({
           latest={record.abstract_file
             ? manuscript ? byline(manuscript.number, manuscript.created_by_name, manuscript.created_at) : "Uploaded"
             : null}
-          note={record.manuscript_unsubmitted && (
-            <span className="inline-flex items-center gap-1.5 font-semibold text-brand-dark">
-              <i className="fas fa-file-pen text-2xs" aria-hidden />
-              Revised, not yet submitted
-            </span>
-          )}
+          note={record.manuscript_unsubmitted && <NotYetSubmitted>Revised, not yet submitted</NotYetSubmitted>}
           actions={(record.abstract_file || replaceManuscript) && (
             <>
               {record.abstract_file && (
@@ -273,7 +337,7 @@ export function DocumentsTab({
         {shownSlots.map((slot) => {
           const asked = bySlot.get(slot.id);
           const key = `slot:${slot.id}`;
-          const canUpload = owner && (editable || (asked != null && needsUpload(asked)));
+          const canUpload = owner && (editable || asking || (asked != null && needsUpload(asked)));
           // Newest first, as the server lists them.
           const [latest] = slot.uploads;
           const requirement = guide?.requirement(slot.id) ?? null;
@@ -285,12 +349,26 @@ export function DocumentsTab({
               template={<RequirementTemplate requirement={requirement} />}
               latest={latest ? byline(latest.version, latest.uploaded_by_name, latest.created_at) : null}
               status={asked && <ItemStatusChip item={asked.item} />}
-              note={asked && <AskedNote asked={asked} />}
+              // Who asked, and whether the newest file is still the owner's
+              // alone: added, not sent yet (ADR-022 Amendment 8, IR-1322).
+              note={(asked || latest?.held) && (
+                <>
+                  {asked && <AskedNote asked={asked} />}
+                  {latest?.held && <NotYetSubmitted>Added, not sent yet</NotYetSubmitted>}
+                </>
+              )}
               actions={(latest || canUpload) && (
                 <>
                   {latest && openVersion(slot.name, latest, true)}
                   {latest && (
                     <DownloadButton name={`${slot.name} version ${latest.version}`} onClick={() => downloadVersion(slot.name, latest)} />
+                  )}
+                  {owner && latest?.held && (
+                    <RemoveButton name={`${slot.name} version ${latest.version}`} onClick={() =>
+                      askToRemove(`${slot.name} version ${latest.version}`, async () => {
+                        await documentsApi.deleteUpload(latest.id);
+                        await changed();
+                      })} />
                   )}
                   {canUpload && pdfUpload(key, `Upload ${slot.name}`,
                     (file, onProgress) => documentsApi.upload(record.id, slot.id, file, { onProgress }))}
@@ -302,7 +380,7 @@ export function DocumentsTab({
                   <Versions
                     name={slot.name}
                     uploads={slot.uploads}
-                    removable={owner && editable}
+                    removable={(u) => owner && (editable || u.held === true)}
                     open={(u) => openVersion(slot.name, u, u.id === latest?.id)}
                     onDownload={(u) => downloadVersion(slot.name, u)}
                     onRemove={(u) =>
@@ -319,6 +397,8 @@ export function DocumentsTab({
         })}
         {other.map((asked) => {
           const key = `item:${asked.item.id}`;
+          // Its file sits in a slot named for it, held like any other (IR-1322).
+          const held = slots.some((s) => s.name === asked.item.label && s.uploads[0]?.held);
           return (
             <DocumentRow
               key={key}
@@ -326,8 +406,11 @@ export function DocumentsTab({
               // An Other item keeps no versions of its own: only whether it was answered.
               latest={itemStatus(asked.item) === "requested" ? null : "Uploaded"}
               status={<ItemStatusChip item={asked.item} />}
-              note={<AskedNote asked={asked} />}
-              actions={owner && needsUpload(asked) && pdfUpload(key, `Upload ${asked.item.label}`,
+              note={<>
+                <AskedNote asked={asked} />
+                {held && <NotYetSubmitted>Added, not sent yet</NotYetSubmitted>}
+              </>}
+              actions={owner && needsUpload(asked) && !held && pdfUpload(key, `Upload ${asked.item.label}`,
                 (file, onProgress) => documentsApi.uploadForRequestItem(record.id, asked.item.id, file, { onProgress }))}
             />
           );
@@ -438,7 +521,8 @@ function Versions({
   /** The document's name, so each version's controls are named apart. */
   name: string;
   uploads: RecordUpload[];
-  removable: boolean;
+  /** Whether this viewer may remove a version: a draft's, or one still held (IR-1322). */
+  removable: (upload: RecordUpload) => boolean;
   /** A version's Open control, where it opens in the reader (IR-1203). */
   open: (upload: RecordUpload) => ReactNode;
   onDownload: (upload: RecordUpload) => void;
@@ -457,10 +541,10 @@ function Versions({
           <span className="flex items-center gap-2">
             {open(u)}
             <DownloadButton name={`${name} version ${u.version}`} onClick={() => onDownload(u)} />
-            {removable && !u.delete_refused && (
+            {removable(u) && !u.delete_refused && (
               <RemoveButton name={`${name} version ${u.version}`} onClick={() => onRemove(u)} />
             )}
-            {removable && u.delete_refused && (
+            {removable(u) && u.delete_refused && (
               // The server's own reason (ADR-058 §2, IR-872): part of the review, so kept.
               <span className="inline-flex items-center gap-1 text-small text-stone-600">
                 <i className="fas fa-lock text-2xs" aria-hidden />

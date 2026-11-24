@@ -30,6 +30,8 @@ export function PaperGovernance({ record, full = false, showStatus = false }: {
 }) {
   const headingId = useId();
   const unset = (value: string | null | undefined): Row["value"] => value ?? "—";
+  // One completion year: the form's, else an import's (IR-1316).
+  const completed = record.year_accomplished ?? record.year_completed;
   const rows: Row[] = [
     ...(showStatus && record.pipeline_status !== "published" && record.workflow_state_label
       ? [{ label: "Status", value: record.workflow_state_label }]
@@ -38,8 +40,8 @@ export function PaperGovernance({ record, full = false, showStatus = false }: {
     { label: "Record Type", value: unset(record.record_type_name), quiet: !record.record_type_name },
     {
       label: "Year Accomplished",
-      value: record.year_accomplished ? String(record.year_accomplished) : "—",
-      quiet: !record.year_accomplished,
+      value: completed ? String(completed) : "—",
+      quiet: !completed,
     },
     // The facts the header used to carry as chips and counters (IR-1089, audit
     // LAY-03): they are held here, once. A field the record lacks gets no row.

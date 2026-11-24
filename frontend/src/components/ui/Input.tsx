@@ -24,6 +24,12 @@ type InputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "size" | "required
   error?:   string;
   /** Text, or text with a decorative glyph -- "At least 12 characters" with a check. */
   hint?:    ReactNode;
+  /**
+   * Keeps a one-line slot under the field for its hint or error, even when
+   * there is neither, so a message appearing never moves what is below it
+   * (IR-1303). Off by default: most forms let the message take its own room.
+   */
+  reserveErrorSpace?: boolean;
   size?:    Size;
   leading?: React.ReactNode;
   /**
@@ -44,6 +50,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       size = "md",
       leading,
       trailing,
+      reserveErrorSpace = false,
       required,
       optional,
       className = "",
@@ -78,6 +85,21 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     ]
       .filter(Boolean)
       .join(" ");
+
+    // Maroon (12.3:1 on white) with a glyph, so the error is readable and is
+    // not carried by colour alone (IR-359). The glyph is aria-hidden, so the
+    // description the field announces is the sentence only.
+    const message = (
+      <>
+        {error && (
+          <p id={errorId} className="flex items-start gap-1.5 text-small text-brand">
+            <i className="fas fa-circle-exclamation mt-0.5 shrink-0" aria-hidden />
+            {error}
+          </p>
+        )}
+        {hint && !error && <p id={hintId} className="text-small text-stone-600">{hint}</p>}
+      </>
+    );
 
     return (
       <div className="flex flex-col gap-1">
@@ -116,16 +138,9 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             </div>
           )}
         </div>
-        {/* Maroon (12.3:1 on white) with a glyph, so the error is readable and
-            is not carried by colour alone (IR-359). The glyph is aria-hidden,
-            so the description the field announces is the sentence only. */}
-        {error && (
-          <p id={errorId} className="flex items-start gap-1.5 text-small text-brand">
-            <i className="fas fa-circle-exclamation mt-0.5 shrink-0" aria-hidden />
-            {error}
-          </p>
-        )}
-        {hint && !error && <p id={hintId} className="text-small text-stone-600">{hint}</p>}
+        {/* One `small` line (20px) is the slot's height, so a one-line message
+            fills it exactly; a longer one still grows it (IR-1303). */}
+        {reserveErrorSpace ? <div className="min-h-5">{message}</div> : message}
       </div>
     );
   }

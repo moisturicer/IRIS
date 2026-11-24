@@ -136,7 +136,7 @@ describe("the sidebar's list", () => {
     renderAt("/records/mine");
 
     await screen.findByRole("heading", { name: "My Library" });
-    expect(mainLinks()).toEqual(["Discover", "Ask IRIS", "My Library", "Calls & Conferences", "Guidelines"]);
+    expect(mainLinks()).toEqual(["Discover", "Ask IRIS", "My Library", "Notifications", "Calls & Conferences", "Guidelines"]);
     expect(screen.queryByText("Research Exploration")).not.toBeInTheDocument();
     expect(screen.queryByText("Tools")).not.toBeInTheDocument();
   });
@@ -196,11 +196,11 @@ describe("the sidebar's list", () => {
 
     await screen.findByRole("heading", { name: "My Library" });
     const admin = screen.getByRole("list", { name: "RDCO" });
-    expect(within(admin).getAllByRole("link").map((l) => l.textContent?.trim())[0]).toBe("Import records");
-    expect(await within(admin).findByRole("link", { name: "Role requests, 3 pending" })).toHaveAttribute("href", "/rdco/role-requests");
+    expect(within(admin).getAllByRole("link").map((l) => l.textContent?.trim())[0]).toBe("Import Records");
+    expect(await within(admin).findByRole("link", { name: "Role Requests, 3 pending" })).toHaveAttribute("href", "/rdco/role-requests");
     expect(within(admin).getByRole("link", { name: "Users" })).toHaveAttribute("href", "/rdco/users");
-    expect(within(admin).getByRole("link", { name: "Download requests, 2 pending" })).toHaveAttribute("href", "/rdco/download-requests");
-    expect(within(admin).getByRole("link", { name: "Delete requests, 1 pending" })).toHaveAttribute("href", "/rdco/delete-requests");
+    expect(within(admin).getByRole("link", { name: "Download Requests, 2 pending" })).toHaveAttribute("href", "/rdco/download-requests");
+    expect(within(admin).getByRole("link", { name: "Delete Requests, 1 pending" })).toHaveAttribute("href", "/rdco/delete-requests");
     expect(screen.queryByRole("link", { name: "Audit Log" })).not.toBeInTheDocument();
   });
 
@@ -211,7 +211,7 @@ describe("the sidebar's list", () => {
     renderAt("/records/mine");
 
     const admin = await screen.findByRole("list", { name: "RDCO" });
-    expect(await within(admin).findByRole("link", { name: "Reported comments, 4 pending" }))
+    expect(await within(admin).findByRole("link", { name: "Reported Comments, 4 pending" }))
       .toHaveAttribute("href", "/moderation/comments");
   });
 
@@ -221,7 +221,7 @@ describe("the sidebar's list", () => {
     renderAt("/records/mine");
 
     const admin = await screen.findByRole("list", { name: "Administration" });
-    expect(await within(admin).findByRole("link", { name: "Reported comments, 2 pending" }))
+    expect(await within(admin).findByRole("link", { name: "Reported Comments, 2 pending" }))
       .toHaveAttribute("href", "/moderation/comments");
   });
 
@@ -232,8 +232,8 @@ describe("the sidebar's list", () => {
 
     const admin = await screen.findByRole("list", { name: "RDCO" });
     await vi.waitFor(() => expect(apiClient.get).toHaveBeenCalledWith("/dashboard/queue-counts/"));
-    expect(within(admin).getByRole("link", { name: "Download requests" })).toBeInTheDocument();
-    expect(within(admin).getByRole("link", { name: "Delete requests" })).toBeInTheDocument();
+    expect(within(admin).getByRole("link", { name: "Download Requests" })).toBeInTheDocument();
+    expect(within(admin).getByRole("link", { name: "Delete Requests" })).toBeInTheDocument();
   });
 
   it("shows no count, not a stale one, when the read fails", async () => {
@@ -243,7 +243,7 @@ describe("the sidebar's list", () => {
 
     const admin = await screen.findByRole("list", { name: "RDCO" });
     await vi.waitFor(() => expect(apiClient.get).toHaveBeenCalledWith("/dashboard/queue-counts/"));
-    expect(within(admin).getByRole("link", { name: "Download requests" })).toBeInTheDocument();
+    expect(within(admin).getByRole("link", { name: "Download Requests" })).toBeInTheDocument();
   });
 
   it("reads the counts again when a decision is made, without a reload", async () => {
@@ -251,11 +251,11 @@ describe("the sidebar's list", () => {
     signIn(ROLES.RDCO, true);
     renderAt("/records/mine");
     const admin = await screen.findByRole("list", { name: "RDCO" });
-    expect(await within(admin).findByRole("link", { name: "Download requests, 2 pending" })).toBeInTheDocument();
+    expect(await within(admin).findByRole("link", { name: "Download Requests, 2 pending" })).toBeInTheDocument();
 
     queues({ role_change_requests: 0, download_requests: 1, delete_requests: 1 });
     act(() => { queueCountsChanged(); });
-    expect(await within(admin).findByRole("link", { name: "Download requests, 1 pending" })).toBeInTheDocument();
+    expect(await within(admin).findByRole("link", { name: "Download Requests, 1 pending" })).toBeInTheDocument();
   });
 
   // The System Admin asks since IR-693: it shares the Reported comments queue.
@@ -277,7 +277,7 @@ describe("the sidebar's list", () => {
     // IR-693 adds Reported comments, after Account Deletions; IR-972 moves the Notice onto RDCO's Setup.
     // IR-974: no Guidelines link for the System Admin (ADR-063 amendment 2026-11-19).
     expect(within(nav).getAllByRole("link").map((link) => link.textContent?.trim()))
-      .toEqual(["Discover", "Users", "Audit Log", "Account Deletions", "Reported comments", "Retention"]);
+      .toEqual(["Discover", "Notifications", "Users", "Audit Log", "Account Deletions", "Reported Comments", "Retention"]);
     const admin = within(nav).getByRole("list", { name: "Administration" });
     expect(within(admin).getByRole("link", { name: "Users" })).toHaveAttribute("href", "/admin/users");
     expect(within(admin).getByRole("link", { name: "Audit Log" })).toHaveAttribute("href", "/admin/audit");
@@ -299,7 +299,7 @@ describe("the sidebar's list", () => {
     renderAt("/records/mine");
 
     await screen.findByRole("heading", { name: "My Library" });
-    expect(mainLinks()).toEqual(["Discover", "Ask IRIS", "My Library", "Calls & Conferences", "Guidelines"]);
+    expect(mainLinks()).toEqual(["Discover", "Ask IRIS", "My Library", "Notifications", "Calls & Conferences", "Guidelines"]);
     // jsdom applies no CSS, so the names above would be there whether the
     // labels were `md:sr-only` or `md:hidden`. The class is what keeps them
     // in the accessibility tree on the rail, so it is what is checked.
@@ -502,17 +502,26 @@ describe("the My Reviews count (IR-1208)", () => {
   });
 });
 
-describe("the My Library dot (IR-534, B2)", () => {
-  it("appears when a record waits on you, and says so to a screen reader", async () => {
+describe("the My Library count (IR-1310; a dot until then, IR-534 B2)", () => {
+  it("shows how many records wait on you, and says so to a screen reader", async () => {
     waitingOnYou(2);
     signIn(ROLES.STUDENT);
     renderAt("/");
 
     await screen.findByRole("heading", { name: "Discover" });
     const nav = screen.getByRole("navigation", { name: "Main" });
-    expect(
-      await within(nav).findByRole("link", { name: "My Library, something needs your action" }),
-    ).toBeInTheDocument();
+    const link = await within(nav).findByRole("link", { name: "My Library, 2 waiting on you" });
+    expect(within(link).getByText("2")).toBeInTheDocument();
+  });
+
+  it("caps the number shown at 9+, while the screen reader hears the real count", async () => {
+    waitingOnYou(14);
+    signIn(ROLES.STUDENT);
+    renderAt("/");
+
+    const nav = screen.getByRole("navigation", { name: "Main" });
+    const link = await within(nav).findByRole("link", { name: "My Library, 14 waiting on you" });
+    expect(within(link).getByText("9+")).toBeInTheDocument();
   });
 
   it("is absent when nothing waits on you", async () => {
@@ -526,7 +535,18 @@ describe("the My Library dot (IR-534, B2)", () => {
     expect(within(nav).getByRole("link", { name: "My Library" })).toBeInTheDocument();
   });
 
-  it("stays named on the collapsed rail", async () => {
+  it("shows no count, not a stale one, when the read fails", async () => {
+    vi.mocked(apiClient.get).mockRejectedValue(new Error("down"));
+    signIn(ROLES.STUDENT);
+    renderAt("/");
+
+    await screen.findByRole("heading", { name: "Discover" });
+    await vi.waitFor(() => expect(apiClient.get).toHaveBeenCalledWith("/dashboard/stats/"));
+    const nav = screen.getByRole("navigation", { name: "Main" });
+    expect(within(nav).getByRole("link", { name: "My Library" })).toBeInTheDocument();
+  });
+
+  it("stays named with the count on the collapsed rail", async () => {
     useUIStore.setState({ sidebarCollapsed: true });
     waitingOnYou(1);
     signIn(ROLES.STUDENT);
@@ -535,7 +555,7 @@ describe("the My Library dot (IR-534, B2)", () => {
     await screen.findByRole("heading", { name: "Discover" });
     const nav = screen.getByRole("navigation", { name: "Main" });
     expect(
-      await within(nav).findByRole("link", { name: "My Library, something needs your action" }),
+      await within(nav).findByRole("link", { name: "My Library, 1 waiting on you" }),
     ).toBeInTheDocument();
   });
 });
@@ -549,13 +569,13 @@ describe("pages nested under My Reviews (IR-1085, D5)", () => {
     renderAt("/records/mine");
 
     await screen.findByRole("heading", { name: "My Library" });
-    expect(linksUnder()).toEqual(["My Reviews", "Office console"]);
+    expect(linksUnder()).toEqual(["My Reviews", "Office Console"]);
     const item = within(myReviewsItem());
-    expect(item.getByRole("link", { name: "Office console" })).toHaveAttribute("href", "/review/office");
+    expect(item.getByRole("link", { name: "Office Console" })).toHaveAttribute("href", "/review/office");
     // Nested, not a second heading level: one list inside My Reviews' own row.
     expect(item.getByRole("list")).toBeInTheDocument();
     // Workflow analytics is RDCO's alone since IR-1216.
-    expect(screen.queryByRole("link", { name: "Workflow analytics" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Workflow Analytics" })).not.toBeInTheDocument();
   });
 
   it("gives an office member who is not a coordinator nothing nested, and no analytics (IR-1216)", async () => {
@@ -564,8 +584,8 @@ describe("pages nested under My Reviews (IR-1085, D5)", () => {
 
     await screen.findByRole("heading", { name: "My Library" });
     expect(linksUnder()).toEqual(["My Reviews"]);
-    expect(screen.queryByRole("link", { name: "Office console" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Workflow analytics" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Office Console" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Workflow Analytics" })).not.toBeInTheDocument();
   });
 
   it("lists Workflow analytics in RDCO's group, not under My Reviews, and marks it there (IR-1216)", async () => {
@@ -573,9 +593,9 @@ describe("pages nested under My Reviews (IR-1085, D5)", () => {
     renderAt("/rdco/analytics");
 
     await screen.findByRole("heading", { name: "Workflow analytics" });
-    expect(linksUnder()).not.toContain("Workflow analytics");
+    expect(linksUnder()).not.toContain("Workflow Analytics");
     const nav = within(screen.getByRole("navigation", { name: "Main" }));
-    const analytics = nav.getByRole("link", { name: "Workflow analytics" });
+    const analytics = nav.getByRole("link", { name: "Workflow Analytics" });
     expect(analytics).toHaveAttribute("href", "/rdco/analytics");
     expect(analytics).toHaveAttribute("aria-current", "page");
     expect(nav.getByRole("link", { name: "My Reviews" })).not.toHaveAttribute("aria-current");
@@ -590,8 +610,8 @@ describe("pages nested under My Reviews (IR-1085, D5)", () => {
     renderAt("/records/mine");
 
     await screen.findByRole("heading", { name: "My Library" });
-    expect(screen.queryByRole("link", { name: "Office console" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Workflow analytics" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Office Console" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Workflow Analytics" })).not.toBeInTheDocument();
   });
 
   it("shows neither when the user has no review work, because they hang from My Reviews", async () => {
@@ -600,7 +620,7 @@ describe("pages nested under My Reviews (IR-1085, D5)", () => {
 
     await screen.findByRole("heading", { name: "My Library" });
     expect(screen.queryByRole("link", { name: "My Reviews" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Workflow analytics" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Workflow Analytics" })).not.toBeInTheDocument();
   });
 
   it("marks the nested page you are on, and not My Reviews", async () => {
@@ -609,7 +629,7 @@ describe("pages nested under My Reviews (IR-1085, D5)", () => {
 
     await screen.findByRole("heading", { name: "Office console" });
     const nav = within(screen.getByRole("navigation", { name: "Main" }));
-    expect(nav.getByRole("link", { name: "Office console" })).toHaveAttribute("aria-current", "page");
+    expect(nav.getByRole("link", { name: "Office Console" })).toHaveAttribute("aria-current", "page");
     expect(nav.getByRole("link", { name: "My Reviews" })).not.toHaveAttribute("aria-current");
   });
 
@@ -618,7 +638,7 @@ describe("pages nested under My Reviews (IR-1085, D5)", () => {
     signIn(ROLES.ITSO, true, true);
     renderAt("/review");
 
-    await user.click(await screen.findByRole("link", { name: "Office console" }));
+    await user.click(await screen.findByRole("link", { name: "Office Console" }));
 
     expect(await screen.findByRole("heading", { name: "Office console" })).toBeInTheDocument();
   });
@@ -629,7 +649,7 @@ describe("pages nested under My Reviews (IR-1085, D5)", () => {
     const { container } = renderAt("/records/mine");
 
     await screen.findByRole("heading", { name: "My Library" });
-    for (const name of ["Office console"]) {
+    for (const name of ["Office Console"]) {
       const link = screen.getByRole("link", { name });
       expect(within(link).getByText(name)).toHaveClass("md:sr-only");
     }
@@ -678,9 +698,9 @@ describe("the account menu", () => {
     expect(screen.queryByRole("link", { name: "Settings & Profile" })).not.toBeInTheDocument();
     // Help is in Settings since IR-1217: not in this menu, nor anywhere in the sidebar.
     const menu = document.getElementById(trigger.getAttribute("aria-controls")!)!;
-    // IR-1137: Notifications is reachable from the account menu too.
-    expect(within(menu).getAllByRole("link").map((l) => l.textContent)).toEqual(["Profile", "Settings", "Notifications"]);
-    expect(within(menu).getByRole("link", { name: "Notifications" })).toHaveAttribute("href", "/notifications");
+    // Notifications left this menu for the sidebar's list (IR-1288; it was
+    // added here by IR-1137), so it is not reachable twice.
+    expect(within(menu).getAllByRole("link").map((l) => l.textContent)).toEqual(["Profile", "Settings"]);
     expect(within(menu).queryByRole("link", { name: "Help" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Help" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
@@ -810,12 +830,14 @@ describe("touch targets in the phone drawer (IR-1092)", () => {
   it("makes the account menu's Profile, Settings and Sign out at least 44px tall", async () => {
     const { user, sidebar } = await openDrawer();
 
-    await user.click(within(sidebar).getByRole("button", { name: /account menu/ }));
+    const trigger = within(sidebar).getByRole("button", { name: /account menu/ });
+    await user.click(trigger);
+    // The account menu's own links, not the nav's.
+    const menu = within(document.getElementById(trigger.getAttribute("aria-controls")!)!);
 
     for (const item of [
-      screen.getByRole("link", { name: "Profile" }),
-      screen.getByRole("link", { name: "Settings" }),
-      screen.getByRole("link", { name: "Notifications" }),
+      menu.getByRole("link", { name: "Profile" }),
+      menu.getByRole("link", { name: "Settings" }),
       screen.getByRole("button", { name: "Sign out" }),
     ]) {
       expect(item).toHaveClass("min-h-11", "md:min-h-0", "touch:min-h-11");
@@ -893,7 +915,9 @@ describe.each([768, 1023])("the tablet icon rail at %i px (IR-1086)", (width) =>
       expect(label).toHaveClass("md:sr-only");
     }
     expect(within(sidebar).getByRole("button", { name: "Expand sidebar" })).toBeInTheDocument();
-    expect(within(sidebar).getByRole("button", { name: /^Notifications/ })).toBeInTheDocument();
+    // Notifications is a link in the list above, not a bell in the header.
+    expect(within(nav).getByRole("link", { name: /^Notifications/ })).toBeInTheDocument();
+    expect(within(sidebar).queryByRole("button", { name: /^Notifications/ })).not.toBeInTheDocument();
     expect(within(sidebar).getByRole("button", { name: /account menu/ })).toBeInTheDocument();
     expect(sidebar).toHaveClass("md:w-rail");
     expect(sidebar).not.toHaveAttribute("inert");
@@ -909,8 +933,8 @@ describe.each([768, 1023])("the tablet icon rail at %i px (IR-1086)", (width) =>
     const content = screen.getByRole("main").parentElement!;
     expect(content).toHaveClass("md:ml-rail");
     // The full sidebar's margin starts at lg (1024 px), not at md.
-    expect(content).toHaveClass("lg:ml-60");
-    expect(content).not.toHaveClass("md:ml-60");
+    expect(content).toHaveClass("lg:ml-64");
+    expect(content).not.toHaveClass("md:ml-64");
   });
 
   it("shows a tooltip naming each link on hover and on keyboard focus", async () => {
@@ -928,7 +952,7 @@ describe.each([768, 1023])("the tablet icon rail at %i px (IR-1086)", (width) =>
     await user.unhover(nav.getByRole("link", { name: "Ask IRIS" }));
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
 
-    // Tab past the mark and the bell to the first link.
+    // Tab past the mark to the first link.
     while (!navElement.contains(document.activeElement)) await user.tab();
     const focused = document.activeElement as HTMLElement;
     expect(focused).toHaveAccessibleName("Discover");
@@ -937,7 +961,7 @@ describe.each([768, 1023])("the tablet icon rail at %i px (IR-1086)", (width) =>
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   });
 
-  it("gives the IRIS mark (the expand button), the bell and the account button a tooltip too", async () => {
+  it("gives the IRIS mark (the expand button) and the account button a tooltip too", async () => {
     const user = userEvent.setup();
     atWidth(width);
     signIn(ROLES.STUDENT);
@@ -946,8 +970,6 @@ describe.each([768, 1023])("the tablet icon rail at %i px (IR-1086)", (width) =>
     const sidebar = within(await screen.findByRole("complementary", { name: "Sidebar" }));
     await user.hover(sidebar.getByRole("button", { name: "Expand sidebar" }));
     expect(await screen.findByRole("tooltip")).toHaveTextContent("Expand sidebar");
-    await user.hover(sidebar.getByRole("button", { name: /^Notifications/ }));
-    expect(await screen.findByRole("tooltip")).toHaveTextContent("Notifications");
     await user.hover(sidebar.getByRole("button", { name: /account menu/ }));
     expect(await screen.findByRole("tooltip")).toHaveTextContent("Ana Adviser");
   });
@@ -980,7 +1002,7 @@ describe.each([768, 1023])("the tablet icon rail at %i px (IR-1086)", (width) =>
     await user.click(screen.getByRole("button", { name: "Expand sidebar" }));
 
     const sidebar = screen.getByRole("complementary", { name: "Sidebar" });
-    expect(sidebar).toHaveClass("md:w-60");
+    expect(sidebar).toHaveClass("md:w-64");
     const nav = within(sidebar).getByRole("navigation", { name: "Main" });
     for (const label of within(nav).getAllByText(LABELS)) {
       expect(label).not.toHaveClass("md:sr-only");
@@ -1045,9 +1067,9 @@ describe("the full sidebar from 1024 px (IR-1086)", () => {
 
     await screen.findByRole("heading", { name: "My Library" });
     const sidebar = screen.getByRole("complementary", { name: "Sidebar" });
-    expect(sidebar).toHaveClass("md:w-60");
+    expect(sidebar).toHaveClass("md:w-64");
     expect(screen.getByRole("button", { name: "Collapse sidebar" })).toBeInTheDocument();
-    expect(screen.getByRole("main").parentElement).toHaveClass("lg:ml-60");
+    expect(screen.getByRole("main").parentElement).toHaveClass("lg:ml-64");
   });
 
   it("still collapses to the rail when the reader chose that", async () => {
@@ -1058,7 +1080,7 @@ describe("the full sidebar from 1024 px (IR-1086)", () => {
 
     await screen.findByRole("heading", { name: "My Library" });
     expect(screen.getByRole("complementary", { name: "Sidebar" })).toHaveClass("md:w-rail");
-    expect(screen.getByRole("main").parentElement).not.toHaveClass("lg:ml-60");
+    expect(screen.getByRole("main").parentElement).not.toHaveClass("lg:ml-64");
   });
 });
 

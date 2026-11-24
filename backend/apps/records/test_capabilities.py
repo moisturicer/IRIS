@@ -325,14 +325,14 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
     # (state, viewer) -> the exact offer, or None where the record is a 404.
     # Office staff are offered `tag_ip` on every record they can see (decided
     # 2026-10-11: the offer follows `tags/`, not published records alone).
-    OFFICE = {"cite", "tag_ip"}
+    OFFICE = {"tag_ip"}
     # The review discussion is its participants', on a submitted record
     # (ADR-032 §7, IR-419). A reviewer whose part is done still writes in
     # Conversation and replies, so the Adviser keeps that after routing, ITSO
     # after clearing and RDCO after deciding; starting a thread takes an open
     # seat (IR-1226, 2026-11-19). An owner starts threads on a passage only;
     # an open seat on no passage too (IR-1194).
-    TAKES_PART = {"cite", "comment_review"}
+    TAKES_PART = {"comment_review"}
     OPENS_THREADS = {"comment_review", "start_thread", "open_general_thread"}
     # Every paper starts embargoed (ADR-052, IR-882). Once it is submitted, the
     # Adviser and RDCO may date it, and release it while it is held (§5-6 as
@@ -343,11 +343,11 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
     # carries is its own key as well.
     SEATED = {"finish_review"}
     ADVISER_AT_ENTRY = {
-        "cite", "open_review", "send_to_rdco", "reject",
+        "open_review", "send_to_rdco", "reject",
         "request_document", "request_revision",
     } | OPENS_THREADS | EMBARGO_ACTS | SEATED
     ITSO_SEATED = {
-        "cite", "tag_ip", "attach_file", "request_document", "open_review",
+        "tag_ip", "attach_file", "request_document", "open_review",
         "office_review", "add_reviewer", "route",
     } | OPENS_THREADS | SEATED
     # Any owner names the Contact person, on every paper in every state, and
@@ -355,8 +355,8 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
     NAMES_CONTACT = {"change_contact_person"}
     # An owner is offered the one delete its record's status names (IR-508).
     OWNER_TALK = {"comment_review", "start_thread"}
-    OWNER_IN_REVIEW = {"cite", "withdraw_submission"} | OWNER_TALK | NAMES_CONTACT
-    OWNER_AFTER_REVIEW = {"cite", "request_deletion"} | OWNER_TALK | NAMES_CONTACT
+    OWNER_IN_REVIEW = {"withdraw_submission"} | OWNER_TALK | NAMES_CONTACT
+    OWNER_AFTER_REVIEW = {"request_deletion"} | OWNER_TALK | NAMES_CONTACT
     # RDCO publishes only a released paper (ADR-052 §14 as amended), so while
     # these are held it keeps them unlisted or rejects them. Record detail still
     # offers *publish* to the seated RDCO, held with the embargo's reason, so the
@@ -366,14 +366,18 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
     # replace the Adviser while the Adviser's review is still open.
     RDCO_ACTS = {"add_owner", "withdraw_paper"}
     RDCO_ADVISER_OPEN = RDCO_UNSEATED | RDCO_ACTS | {"replace_adviser"}
-    RDCO_SEATED = {"cite", "tag_ip", "attach_file", "request_document", "open_review",
+    RDCO_SEATED = {"tag_ip", "attach_file", "request_document", "open_review",
                    "add_reviewer", "route", "request_revision",
                    "keep_unlisted", "reject", "accept_publish"} | OPENS_THREADS | EMBARGO_ACTS | SEATED | RDCO_ACTS
+    # A citation is for published work (IR-1305): only a `published` paper
+    # offers `cite`. A Proposal, a draft, a paper in review or kept unlisted
+    # never does.
+    CITE = {"cite"}
     EXPECTED = {
         # A draft is its owner's alone (IR-1227, ADR-009 decision 6): its
         # Adviser and every office get the 404 a missing record gets.
         "draft": {
-            "owner": {"cite", "continue_draft", "edit_details", "delete_record"} | NAMES_CONTACT, "adviser": None,
+            "owner": {"continue_draft", "edit_details", "delete_record"} | NAMES_CONTACT, "adviser": None,
             "itso": None, "ierc": None, "rdco": None, "stranger": None,
         },
         "with_adviser_unopened": {
@@ -416,18 +420,20 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
             "ierc": OFFICE, "rdco": RDCO_SEATED, "stranger": None,
         },
         # Published once its Adviser released it, so nothing is left to release.
+        # Only a published paper offers `cite`, to everyone who reads it (IR-1305).
         "published": {
-            "owner": OWNER_AFTER_REVIEW,
-            "adviser": TAKES_PART | {"set_embargo"},
-            "itso": OFFICE, "ierc": OFFICE, "rdco": OFFICE | {"comment_review", "set_embargo"},
-            "stranger": {"cite"},
+            "owner": OWNER_AFTER_REVIEW | CITE,
+            "adviser": TAKES_PART | {"set_embargo"} | CITE,
+            "itso": OFFICE | CITE, "ierc": OFFICE | CITE,
+            "rdco": OFFICE | {"comment_review", "set_embargo"} | CITE,
+            "stranger": CITE,
         },
         # A stranger reading the paper learns nothing of its embargo.
         "under_embargo": {
-            "owner": OWNER_AFTER_REVIEW,
-            "adviser": ADVISER_TAKES_PART,
-            "itso": OFFICE, "ierc": OFFICE,
-            "rdco": OFFICE | {"comment_review"} | EMBARGO_ACTS, "stranger": {"cite"},
+            "owner": OWNER_AFTER_REVIEW | CITE,
+            "adviser": ADVISER_TAKES_PART | CITE,
+            "itso": OFFICE | CITE, "ierc": OFFICE | CITE,
+            "rdco": OFFICE | {"comment_review"} | EMBARGO_ACTS | CITE, "stranger": CITE,
         },
         # Unlisted (IR-878): any RDCO member is offered the later publish, held
         # back while the embargo is Active so its reason can be shown.
@@ -447,7 +453,7 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
         "proposal_with_adviser": {
             "owner": OWNER_IN_REVIEW,
             "adviser": {
-                "cite", "open_review", "accept_proposal", "reject",
+                "open_review", "accept_proposal", "reject",
                 "request_document", "request_revision",
             } | OPENS_THREADS | EMBARGO_ACTS | SEATED,
             "itso": OFFICE, "ierc": OFFICE, "rdco": RDCO_ADVISER_OPEN, "stranger": None,

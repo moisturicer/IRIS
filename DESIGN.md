@@ -189,9 +189,19 @@ Decided by **Lee Jasmin Adolfo** (project lead and frontend owner) on 2026-11-14
   | Match (search, Find) | **Highlight Yellow** (#f7e08f); the current match **#f2c94c**; Ink text on it is 14:1 |
   | Pen (a reviewer's mark) | **Pen Rose**: fill #fbeaea, 2 px underline #b4474b, a numbered pin; the open thread's passage #f5d5d6 |
   | Highlight (the reader's own) | Binding Maroon at 15% opacity, multiplied, no edge or underline; a swatch of it names it in the selection menu and Notes (IR-581) |
-  | Status | White chip, tone in text and outline; only Attention is filled |
+  | Status | White chip, tone in text and outline; none is filled (IR-1290 reverses "only Attention is filled") |
 
   **Maroon Wash (#fdf2f2) is retired from the interface** and stops being the "on" tint. **Maroon Press** (#5a0c0f) is the pressed state of a filled button. Yellow is reserved for matches and rose for a reviewer's marks, and nothing else uses either. The **Four Inks Rule** becomes: white, black, stone and maroon, plus one yellow highlighter for matches and one rose pen for a reviewer's marks. The tokens are `hl`, `hl-now`, `pen`, `pen-wash`, `pen-now` and `brand-press` in `tailwind.config.js`, and the roles are class strings in `frontend/src/components/ui/highlightRoles.ts`. `palette.test.ts` keeps `brand-50`, `brand-100`, `brand-200`, gold, cream and the loose hexes out of the source. IR-1097 also edited this file's rules below.
+- **D7, status colours (IR-1290) — built.** Part of D6 is reversed, by the project lead. Maroon marked the main action, the overdue warning, "in review", errors and the focus ring, so on the RDCO review card a solid maroon "10 working days overdue" chip sat beside a solid maroon "Claim review" button and looked the same, and the three cleared offices were the quietest text on the card. Two status hues are added, a green and an amber, and **solid maroon is left to the one primary action**:
+
+  | Meaning | Look | Token |
+  |---|---|---|
+  | Cleared, kept (an office's clearance carried over) | Green text, green outline | `cleared` #1E6B3F (text, 6.5:1 on white), `cleared-line` #3F8A5A (outline, glyph, 4.2:1), `cleared-wash` #EAF3EC |
+  | In review, reset (an office that must review the new version) | Amber text, amber outline | `review` #8A5300 (text, 6.3:1), `review-line` #B07A1E (outline, glyph, 3.7:1), `review-wash` #FBF0DA |
+  | Attention (overdue, declined, an error) | **Maroon outline on white, with its icon, never filled** | `ring-brand` on `surface` |
+  | Quiet, settled | Unchanged | `stone` |
+
+  The clearance strip reads `kept` and `cleared` green, `reviewing` amber, `unclaimed` stone, and `revision` and `not_cleared` maroon, so a resubmission that kept two offices and reset one reads green, amber, green at a glance. Its words still come only from the server (IR-1083). **Amber is only ever an outline, a glyph and a word on white, never a flat fill behind text**, so it cannot be mistaken for the search-match yellow (`hl`). **Gold is not part of this change** and stays out of the interface. Every status keeps an icon plus a word, so in greyscale every state can still be told apart. The tokens are in `tailwind.config.js` and the tones in `frontend/src/components/ui/statusTones.ts`.
 
 ## Overview
 
@@ -216,13 +226,15 @@ Rejected outright: cards wrapped around reading content, controls floating over 
 A monochrome stone volume with one maroon binding; no other hue exists in the interface.
 
 ### Primary
-- **Binding Maroon** (#6B0F12): the institution's identity. The one filled action in a row (View, Continue, Send), the selected section thumb, the Ask IRIS icon, error and rejection states, and the focus ring. 12.3:1 on white.
+- **Binding Maroon** (#6B0F12): the institution's identity. The one filled action in a row (View, Continue, Send), the selected section thumb, the Ask IRIS icon, the focus ring, and, as an outline or text only and never a fill, error, rejection and overdue states (IR-1290). 12.3:1 on white.
 - **Binding Maroon Light** (#8B1316): hover on maroon fills only.
 - **Binding Maroon Dark** (#4A0A0C): destructive actions (with a warning glyph) and dark accents.
 - **Maroon Thread** (#f9b8b9): the browser's text selection. **Maroon Wash (#fdf2f2) is retired** (IR-1097): the "on" tint did about fifteen jobs, and each now has its own look (see Decided changes, D6).
 - **Maroon Press** (#5a0c0f): the pressed state of a filled maroon button.
 - **Highlight Yellow** (#f7e08f, current match #f2c94c): a word a search or Find matched, and nothing else. Ink on it is 14:1.
 - **Pen Rose** (underline #b4474b, fill #fbeaea, open thread #f5d5d6): a reviewer's mark on a passage, and nothing else.
+- **Cleared Green** (text #1E6B3F, outline #3F8A5A, wash #EAF3EC): an office that cleared a record or whose clearance was kept, and nothing else (IR-1290).
+- **Review Amber** (text #8A5300, outline #B07A1E, wash #FBF0DA): a review in progress, or an office reset by a new version. An outline, glyph and word on white, never a flat fill behind text (IR-1290).
 
 ### Neutral
 - **Endpaper** (#fafaf9): a section fill (`stone-50`) where white on white would lose an edge, such as the Ask IRIS conversation list and table headers. Since IR-1132 the ground under every screen (`canvas`) is white, not Endpaper.
@@ -236,9 +248,9 @@ A monochrome stone volume with one maroon binding; no other hue exists in the in
 - **Ink** (#1c1917): titles, section headings and the *settled* status.
 
 ### Named Rules
-**The Binding Rule.** Maroon marks at most the one filled action, the current section and citations on any screen. If two filled maroon things compete in one row, one of them is wrong.
+**The Binding Rule.** Maroon marks at most the one filled action, the current section and citations on any screen. If two filled maroon things compete in one row, one of them is wrong. A status is never a solid maroon fill (IR-1290), so nothing that is only a status can look like the action.
 
-**The Four Inks Rule.** The palette is white, black, stone and maroon (light, dark and press), plus one yellow highlighter for matches and one rose pen for a reviewer's marks. `brand-400` to `brand-600` are bright reds, not maroon, and are never used. Status is carried by four tones plus a word, never by a new hue (`palette.test.ts` enforces this).
+**The Four Inks Rule.** The palette is white, black, stone and maroon (light, dark and press), plus one yellow highlighter for matches and one rose pen for a reviewer's marks, plus, for status only, one green and one amber (IR-1290). `brand-400` to `brand-600` are bright reds, not maroon, and are never used. Status is carried by five tones plus an icon and a word, never by any other hue (`palette.test.ts` enforces this).
 
 Gold and cream are gone (IR-1097): the thumbnail ring and the other decoration were off palette, and the Folio Ribbon logo never used them.
 
@@ -256,7 +268,7 @@ Gold and cream are gone (IR-1097): the thumbnail ring and the other decoration w
 - **Display** (EB Garamond 600, tight tracking, balanced wrap): a record's title on the Overview. The one line the page exists to name. Its size follows its length (IR-1264), read from the `overview` container, never the window: up to 80 characters 48 px (36 px below 40 rem), up to 160 characters 36 px (28 px), longer 30 px (24 px). It is never cut.
 - **Headline** (EB Garamond 600, 20/28 px): section headings on the Overview (Abstract, AI Overview, Related works, Comments) and the Ask IRIS heading. Ink, never maroon.
 - **Title** (EB Garamond 600, 20/28 px): the paper's title in the record bar, wrapping onto as many lines as it needs (the Full Text Rule; it was one truncated line before IR-1218); dialog and card titles.
-- **Reading** (Inter 400, 16 px, line-height 1.8): the AI Overview's prose, filling the Overview column. The first paragraph is the lead at 17 px, darker. Markdown section headings inside it are Ink Garamond with space above and no rule; list markers are maroon. The Abstract reads at 17 px with 1.75 leading.
+- **Reading** (Inter 400, 16 px, line-height 1.8): the AI Overview's prose, filling the Overview column. Every paragraph reads at 16 px with 1.75 leading, the same as an Ask IRIS answer (IR-1306; the 17 px lead is retired). Markdown section headings inside it are maroon Garamond (21 / 19 / 18 / 17 px, IR-1306) with space above and no rule; list markers are maroon. The Abstract reads at 17 px with 1.75 leading.
 - **Body** (Inter 400, 15/24 px): interface text.
 - **Label** (Inter 600, 13/20 px): every control's text. Metadata is the 13 px `small` role at weight 400; field labels are 12/16 px.
 
@@ -376,7 +388,7 @@ A column on Endpaper behind one Rule Stone line, never a card. A Bar Stone heade
 The rail beside the Overview says what the record is held under and, for those in its review, where it stands. **Status** is drawn here, never under the title: the first line of **Review & routing** for a participant (one line per party with its outcome and the *Preserved* mark, then *See review history*, which opens Review), a *Status* row in **About this record** for anyone outside the review while the record is not published, and nothing on a published paper. **About this record** shows only the rows that say something (no em dash, *Not declared* or *Not flagged*) to anyone outside the review; its owners and reviewers see every row, decided by participation, never by role (IR-411). The owner's waiting work is the revision banner and document requests at the top of the Overview; there is no separate summary card.
 
 ### Overview sections (signature)
-Abstract, AI Overview, Related works and Comments, each under one Desk Stone hairline, each with a Garamond headline. The AI Overview has no card and no provenance label: just the heading with the IRIS mark, a ghost Copy, and the article. Comments are drawn and plainly closed (disabled field and Post, "Not open yet") until the feature exists.
+Abstract, AI Overview, Related works and Comments, each under one Desk Stone hairline, each with a Garamond headline. The AI Overview is the one exception to no cards (IR-1306): a `rounded-card` with a white header (maroon mark disc, Garamond heading, a ghost Copy), a `stone-50` body and a footer line saying AI wrote it, so a reader never mistakes it for the authors' text. Comments are drawn and plainly closed (disabled field and Post, "Not open yet") until the feature exists.
 
 ### Entry frame: the Dossier Folder (signature)
 Sign in, register, email verification and the pending and declined screens share one frame (`EntryFrame`, IR-704), read like a file handed across a registry desk.
@@ -390,10 +402,13 @@ Sign in, register, email verification and the pending and declined screens share
 Replaced the split screen with its "shelf of bound work" brand panel (IR-535, IR-586), deleted in IR-711.
 
 ### Profile and Settings (IR-933)
-Two pages. **Profile** reads like a short typeset entry: an initials avatar (112 px, maroon with white Garamond initials) or the person's photo beside a Garamond name, the role and the affiliation, then About and Research interests, each under one hairline. A field left empty is left out. On your own profile a Bar Stone **note** strip says this is how others see you and holds the page's one filled pill, Edit profile. **Edit profile** is the same sections as fields, closed by Cancel and Save, and returns to Profile with a "Profile saved." line. **Settings** holds the account only: sign-in and password, consent, and role.
+Two pages. **Profile** reads like a short typeset entry: an initials avatar (112 px, maroon with white Garamond initials) or the person's photo beside a Garamond name, the role and the affiliation, then About and Research interests, each under one hairline. A field left empty is left out. On your own profile a Bar Stone **note** strip says this is how others see you and that it is changed in Settings; it holds no control (IR-1304). **Settings** opens on its **Profile** section, the same sections as fields (photo and name, About you), closed by Discard changes and Save; Save stays on the section with a "Profile saved." line and a link to the Profile. The other Settings sections hold the account: sign-in and password, consent, and role.
 
 ### Another person's Profile (IR-700)
 The same typeset entry as your own, at `/people/:id`, with a second column. **Collaborators** (a 40 px avatar, a name link and "N shared papers") sit beside the sections once the page's own width reaches 48rem, behind one vertical hairline, and fall under them behind the same hairline laid flat; the layout reads the `profile` container, never the window. Research and Advised are compact `ResearchCard`s with only their own views, ten at a time with Show more, and Collaborators load twelve at a time. There are no totals, no citation counts and no email; a section with nothing in it is left out. A name with no visible Profile is plain text, and a hidden person is the standard not-found screen.
+
+### Handbook pages (2026-11-23)
+Setup and Workflow analytics share one layout (`Handbook`): a Contents rail beside one typeset column, read from the page's own `handbook` container (52rem), never the window. Below that the rail becomes a wrapping row of pills. The item being read or edited takes the Here look. Setup's requirement rows are numbered in RDCO's order with their controls and Template slot. **Guidelines shows one record type at a time**, chosen from a segmented control (the choice is the address's `#type`), and answers in reading order: What you submit (the Manuscript), Have these ready (Required), Only if they apply (Optional, folded away); the group names Required or Optional once, so rows carry no badge or number. Sections are Garamond headings over one hairline, never cards; analytics tables are ruled with hairlines, zeros step back to Faint Ink, and time in stage draws a thin decorative bar beside each figure. Full detail: `docs/ui-ux/01-design-system.md`, Handbook amendment.
 
 ### Identity (IR-744)
 **Folio Ribbon.** The mark is a serif I standing in the gutter of an open folio: four maroon pieces (two leaves, two ribbons), with the I as the white space between them. `IrisMark`, `IrisWordmark`, `IrisLoader`, `SearchGlyph` and `AskIrisGlyph` (`frontend/src/components/brand/IrisBrand.tsx`) fill with `currentColor`: maroon on white, white only on maroon. The loader replays the concept's storyboard (one leaf, its partner, the ribbons, then the I) on a 2 s loop; Ask IRIS is a speech bubble with the mark's serif I cut out of it; answering sets that I in type (top serif, stem, bottom serif). Both fade instead under reduced motion. Assets and their build: `docs/brand/folio-ribbon/final/`.
@@ -410,11 +425,11 @@ The same typeset entry as your own, at `/people/:id`, with a second column. **Co
 - **Do** keep motion to opacity and transform, 150–320 ms, and none under reduced motion.
 
 ### Don't:
-- **Don't** wrap reading content (the AI Overview, the Abstract, the reader, Ask IRIS) in a card.
+- **Don't** wrap reading content (the Abstract, the reader, Ask IRIS) in a card. The AI Overview is the one exception, so its provenance is unmistakable (IR-1306).
 - **Don't** float controls over content. Controls live in a bar or toolbar. The two corner icons are Notes, above Ask IRIS, and both keep clear of the reading text: Overview and Paper reserve bottom padding so the last line scrolls past them.
 - **Don't** use any colour outside maroon, stone, white and black: no green, amber, blue, gradients or glows, and no `brand-400` to `brand-600`.
 - **Don't** use a `lg:` (window) breakpoint to size or arrange anything on the record page.
 - **Don't** give reading text its own narrow measure inside the Overview column, or leave a gap between it and the Ask IRIS panel.
 - **Don't** cut text off with an ellipsis, a line clamp or a fixed height, or cap it narrower than its box. The seven allowed cuts are named in the Full Text Rule.
-- **Don't** add a label explaining how AI text was made, or an outlined button where a ghost one is enough.
+- **Don't** add an outlined button where a ghost one is enough. The AI Overview does say it is AI-generated (IR-1306).
 - **Don't** put a thick accent border on a rounded shape. The one recorded exception is the entry folder's tab joined to the sheet (`EntryTab`, and register's current step), whose 2 px maroon top edge is the approved Dossier direction (the `border-accent-on-rounded` exception in `.impeccable/config.json`).

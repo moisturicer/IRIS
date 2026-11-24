@@ -121,7 +121,7 @@ test("a student's screens report no CSP violation", async ({ page }) => {
   await walk(page, EMAIL.student, [
     "/", "/?publish=new", `/records/${paperId}`, `/records/${paperId}?page=2`, `/records/${inReviewId}`,
     "/records/mine", "/opportunities", "/notifications", "/ai", "/ai/conversations/00000000-0000-4000-8000-000000000000",
-    "/settings?tab=help", "/profile", "/profile/edit", `/people/${adviser.userId}`, "/settings", "/there-is-no-such-page",
+    "/settings?tab=help", "/profile", "/settings?tab=profile", `/people/${adviser.userId}`, "/settings?tab=security", "/there-is-no-such-page",
   ]);
 });
 

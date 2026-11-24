@@ -177,6 +177,9 @@ class User(AbstractBaseUser, PermissionsMixin):
         self.role = role
         self.is_office_coordinator = False
         self.save(update_fields=["role", "is_office_coordinator"])
+        # Their open tabs read the account again and listen on the new role (IR-1289).
+        from apps.live.signals import account_changed
+        account_changed(self.pk)
 
 
 class DataNoticeQuerySet(models.QuerySet):

@@ -1,6 +1,6 @@
 import { useEffect, useState, type CSSProperties } from "react";
 
-import { SlowLoadNotice, useLoadStage } from "./slowLoad";
+import { SlowLoadNotice, useLoadStage, usePlaceholderDelay } from "./slowLoad";
 
 /**
  * The one loading placeholder (IR-158).
@@ -66,26 +66,33 @@ export function Skeleton({ rows = 3, label = "Loading…", className = "", onRet
   const [announce, setAnnounce] = useState(false);
   useEffect(() => setAnnounce(true), []);
   const { stage, restart } = useLoadStage();
+  // The bars, and the padding and size around them, wait 400 ms (IR-1314), so a
+  // fast or empty answer never flashes lines of text it won't have.
+  const showShapes = usePlaceholderDelay();
 
   return (
     <div
       role="status"
       aria-live="polite"
       aria-busy="true"
-      className={`p-8 ${className}`}
+      className={showShapes ? `p-8 ${className}` : undefined}
     >
       <span className="sr-only">{announce ? label : ""}</span>
-      <div className="flex flex-col gap-3" aria-hidden="true">
-        {Array.from({ length: rows }, (_, i) => (
-          <SkeletonBlock
-            key={i}
-            tone="strong"
-            className="h-4"
-            // Ragged widths read as content rather than as a loading bar chart.
-            style={{ width: `${100 - i * 8}%` }}
-          />
-        ))}
-      </div>
+      {showShapes ? (
+        <div className="flex flex-col gap-3" aria-hidden="true">
+          {Array.from({ length: rows }, (_, i) => (
+            <SkeletonBlock
+              key={i}
+              tone="strong"
+              className="h-4"
+              // Ragged widths read as content rather than as a loading bar chart.
+              style={{ width: `${100 - i * 8}%` }}
+            />
+          ))}
+        </div>
+      ) : (
+        <div aria-hidden="true" />
+      )}
       <SlowLoadNotice stage={stage} onRetry={onRetry} onRestart={restart} className="mt-4" />
     </div>
   );

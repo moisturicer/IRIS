@@ -41,4 +41,19 @@ describe("Input", () => {
     const field = screen.getByRole("textbox", { name: "Middle initial (optional)" });
     expect(field).not.toBeRequired();
   });
+
+  it("keeps one slot under the field for its hint or error, so neither moves the form (IR-1303)", () => {
+    const { rerender } = renderScreen(<Input label="Password" reserveErrorSpace hint="At least 12 characters" />);
+    const slot = screen.getByText("At least 12 characters").parentElement;
+
+    rerender(<Input label="Password" reserveErrorSpace hint="At least 12 characters" error="Password is required." />);
+    expect(screen.getByText("Password is required.").parentElement).toBe(slot);
+    expect(screen.getByRole("textbox", { name: "Password" })).toHaveAccessibleDescription("Password is required.");
+
+    // With nothing to say, the slot stays, empty, and describes nothing.
+    rerender(<Input label="Password" reserveErrorSpace />);
+    expect(slot).toBeInTheDocument();
+    expect(slot).toBeEmptyDOMElement();
+    expect(screen.getByRole("textbox", { name: "Password" })).not.toHaveAttribute("aria-describedby");
+  });
 });

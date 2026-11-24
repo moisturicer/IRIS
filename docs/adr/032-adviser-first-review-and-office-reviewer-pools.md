@@ -143,7 +143,7 @@ Party = adviser | itso | ierc | ktto | rdco
 
 | Adviser action | Result |
 |---|---|
-| **Request revision** | `ResubmissionRequest` opened. The owner uploads a new **version** of the *same* record (§5). |
+| **Request revision** (shown as *Request changes* since IR-1322; [ADR-022](022-explicit-document-requests.md) Amendment 8) | `ResubmissionRequest` opened. The owner uploads a new **version** of the *same* record (§5). |
 | **Reject** | `rejected`, shown as **Archived**. Terminal. To try again, the student submits a new Proposal. |
 | **Accept** | `approved`, shown as **Accepted**. The owner may now **continue it as a Thesis or a Project** (§6). |
 
@@ -500,6 +500,8 @@ Moving an anchor never resolves a thread, and a removed passage still needs reso
 - **The composer preselects *Suggestion*.** This is a deviation from "defaults to *Must fix* in a review finished with *Request revision*" above. The composer comes before the verdict is known, and the backend's default is *Suggestion*. The reviewer chooses *Must fix* there, or changes a draft's severity before finishing. *Rejected:* leaving severity unset until *Finish review* sets it by verdict. That is a client-only state, and it costs a call per draft.
 
 **Amendment, 2026-11-21 (IR-1254; decided by Hermoine Zozobrado, accepted when its pull request merges): *Request documents* is the Documents tab's.** Transcribed by an agent. It changes one clause of the note above: of the two acts that "stay in the footer, since they are not verdicts", only *Withdraw revision request* stays. *Request documents* leaves the footer and its *More review actions* menu, and is offered only on the Review pane's Documents tab. That tab is where a reviewer lands, and it already holds the requests that act makes (*Documents you requested*: Accept, Reject, Withdraw), so everything about a paper's documents is in one place. The Documents tab offers it to exactly the viewers the footer did: those the server names a party for (`can_request_document`). *Rejected: keeping both.* The two opened the same dialog, on the same screen, for every reviewer who opened Review. *Rejected: keeping only the footer's.* On the tab about documents, the act would sit behind ⋯.
+
+**Amendment, 2026-11-24 (IR-1322; decided by Hermoine Zozobrado, accepted when its pull request merges): *Request changes*.** Transcribed by an agent. The *Request revision* verdict is shown as *Request changes*, and may ask for documents in the same act, or for documents alone. Its value, capability and service are unchanged. [ADR-022](022-explicit-document-requests.md) Amendment 8 holds the decision and its reasons.
 
 **Build notes, 2026-11-09 (Hermoine Zozobrado, IR-876 design session; Accepted): Outdated threads, suggested wording and the response to reviewers.** Transcribed by an agent. They settle what the amendment above left open.
 

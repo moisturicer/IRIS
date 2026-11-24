@@ -5,7 +5,7 @@ type Kind = Toast["type"];
 
 // A kind is carried three ways (IR-359): its tone, its glyph, and a word a
 // screen reader hears before the message. Success is an Ink outline on white
-// and error the one filled tone (IR-1097), but the word is what a screen reader hears.
+// and error a maroon outline (IR-1097, IR-1290), but the word is what a screen reader hears.
 //
 // A toast floats over whatever is on the page, so its tone must be opaque
 // (IR-558): the quiet tone has no fill of its own, and an outline over page
@@ -19,7 +19,7 @@ const KIND: Record<Kind, { tone: string; icon: string; word: string; dismiss: st
   },
   error: {
     tone: TONES.attention, icon: "fa-circle-xmark", word: "Error:",
-    dismiss: "text-white/70 hover:text-white",
+    dismiss: "text-stone-600 hover:text-stone-900",
   },
   info: {
     tone: INFO_TONE, icon: "fa-circle-info", word: "Notice:",

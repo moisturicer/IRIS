@@ -32,13 +32,16 @@ class RecordUploadSerializer(serializers.ModelSerializer):
     #: Why this file can't be deleted, or null -- the delete service's own
     #: rule (ADR-058 §2, IR-872), so Paper View never offers a delete that fails.
     delete_refused   = serializers.SerializerMethodField()
+    #: Held until its owner sends it (ADR-022 Amendment 8, IR-1322); only an
+    #: owner is ever served a held upload.
+    held             = serializers.BooleanField(read_only=True)
 
     class Meta:
         model  = RecordUpload
         fields = [
             "id", "record", "slot", "slot_name", "file", "version",
             "status", "status_name", "uploaded_by", "uploaded_by_name",
-            "created_at", "reviews", "delete_refused",
+            "created_at", "reviews", "delete_refused", "held", "sent_at",
         ]
         read_only_fields = ["version", "uploaded_by"]
 
@@ -73,14 +76,28 @@ class SlotWithUploadsSerializer(serializers.ModelSerializer):
     def get_hidden(self, slot):
         return slot.hidden_at is not None
 
+    def _owner_reads(self, record_id, request) -> bool:
+        """Whether the reader owns the record, asked once per listing."""
+        if "_owner_reads" not in self.context:
+            from apps.records.models import Record
+            from core.permissions import is_record_owner
+
+            record = Record.objects.filter(pk=record_id).first()
+            self.context["_owner_reads"] = bool(
+                record and request is not None and is_record_owner(request.user, record)
+            )
+        return self.context["_owner_reads"]
+
     def get_uploads(self, slot):
         record_id = self.context.get("record_id")
         request   = self.context.get("request")
         if not record_id:
             return []
-        uploads = RecordUpload.objects.filter(
-            slot=slot, record_id=record_id
-        ).select_related("uploaded_by").order_by("-version")
+        uploads = RecordUpload.objects.filter(slot=slot, record_id=record_id)
+        if not self._owner_reads(record_id, request):
+            # A held upload is its owners' alone (ADR-022 Amendment 8, IR-1322).
+            uploads = uploads.sent()
+        uploads = uploads.select_related("uploaded_by").order_by("-version")
         return RecordUploadSerializer(uploads, many=True, context={"request": request}).data
 
 

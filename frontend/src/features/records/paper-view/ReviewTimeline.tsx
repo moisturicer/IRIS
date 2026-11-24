@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 import { recordsApi } from "@/api/records";
@@ -6,6 +6,7 @@ import { ClearanceStrip } from "@/components/shared/ClearanceStrip";
 import { Button } from "@/components/ui";
 import { LABEL, LOAD_ERROR, fieldClasses } from "@/components/ui/fieldClasses";
 import { FOCUS_RING } from "@/components/ui/interaction";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { errorDetail } from "@/lib/errorDetail";
 import { isRequestTimeout } from "@/api/requestPolicy";
 import { cn, formatDate } from "@/lib/utils";
@@ -120,18 +121,24 @@ export function ReviewTimeline({
   const viewer = useAuthStore((s) => s.user);
   const viewerName = viewer ? `${viewer.first_name} ${viewer.last_name}`.trim() : "";
 
+  /** A live re-read (ADR-073, IR-1287): a failure keeps the timeline shown. */
+  const quiet = useRef(false);
+
   useEffect(() => {
     let cancelled = false;
-    setFailed(null);
+    const isQuiet = quiet.current;
+    quiet.current = false;
+    if (!isQuiet) setFailed(null);
     recordsApi
       .tracker(recordId)
       .then(({ data: payload }) => {
         if (cancelled) return;
         setData(payload);
+        setFailed(null);
         loadedRef.current?.(payload);
       })
       .catch((error: unknown) => {
-        if (!cancelled) setFailed(isRequestTimeout(error) ? "interrupted" : "failed");
+        if (!cancelled && !isQuiet) setFailed(isRequestTimeout(error) ? "interrupted" : "failed");
       });
     return () => {
       cancelled = true;
@@ -139,6 +146,11 @@ export function ReviewTimeline({
   }, [recordId, attempt]);
 
   const reread = () => setAttempt((n) => n + 1);
+  const rereadQuietly = useCallback(() => {
+    quiet.current = true;
+    setAttempt((n) => n + 1);
+  }, []);
+  useLiveRefresh([`record:${recordId}`], rereadQuietly);
   const discussion: Discussion = {
     canComment,
     recordId,

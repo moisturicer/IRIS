@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useSearchParams } from "react-router-dom";
 import { libraryApi, type FolderEntry, type ReadingHistoryEntry, type ReadingStatus, type SavedRecordEntry } from "@/api/library";
 import { recordsApi } from "@/api/records";
@@ -188,7 +189,7 @@ describe("My Library: an author's research", () => {
     const { container } = renderScreen(<MyLibraryPage />, SUBMISSIONS);
 
     // The whole row is the link: a draft's opens Publish over this tab
-    // (IR-1258), with no separate "Continue draft" button beside it.
+    // (IR-1258), so it has no separate "Continue draft" button (IR-1279).
     expect(await screen.findByRole("link", { name: "Community Water Monitoring" }))
       .toHaveAttribute("href", "/records/mine?section=research&publish=12");
     expect(within(section("Drafts")).getByText("Draft: not yet submitted")).toBeInTheDocument();
@@ -203,8 +204,7 @@ describe("My Library: an author's research", () => {
     const user = userEvent.setup();
     renderScreen(<MyLibraryPage />, SUBMISSIONS);
 
-    await user.click(await screen.findByRole("button", { name: "Actions for “Community Water Monitoring”" }));
-    await user.click(screen.getByRole("menuitem", { name: "Delete draft" }));
+    await user.click(await screen.findByRole("button", { name: "Delete draft “Community Water Monitoring”" }));
     const dialog = screen.getByRole("dialog", { name: "Delete this draft?" });
     expect(within(dialog).getByRole("button", { name: "Cancel" })).toHaveFocus();
     expect(recordsApi.delete).not.toHaveBeenCalled();
@@ -215,7 +215,7 @@ describe("My Library: an author's research", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     // Only a draft offers it.
     expect(screen.getByRole("link", { name: "Still with the offices" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /^Actions for/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Delete draft/ })).not.toBeInTheDocument();
   });
 
   it("keeps the draft and says why when the delete fails", async () => {
@@ -224,8 +224,7 @@ describe("My Library: an author's research", () => {
     const user = userEvent.setup();
     renderScreen(<MyLibraryPage />, SUBMISSIONS);
 
-    await user.click(await screen.findByRole("button", { name: "Actions for “Community Water Monitoring”" }));
-    await user.click(screen.getByRole("menuitem", { name: "Delete draft" }));
+    await user.click(await screen.findByRole("button", { name: "Delete draft “Community Water Monitoring”" }));
     await user.click(screen.getByRole("button", { name: "Delete draft" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("A delete decision is already pending for this record.");
@@ -234,8 +233,8 @@ describe("My Library: an author's research", () => {
   });
 
   it("puts what waits on the author first, each request linking straight to the act that answers it", async () => {
-    const revision = { kind: "revision", party: "ierc", label: "Revision requested by IERC", action_label: "Submit a new version" } as const;
-    const document = { kind: "document", party: "adviser", label: "Documents requested by Adviser", action_label: "Upload the documents" } as const;
+    const revision = { kind: "revision", party: "ierc", label: "Changes requested by IERC", action_label: "Submit a new version" } as const;
+    const document = { kind: "document", party: "adviser", label: "Changes requested by Adviser", action_label: "Upload the documents" } as const;
     mine([
       ownRecord({ id: 13, title: "Still with the offices", pipeline_status: "in_review", workflow_state: "in_review", workflow_state_label: "In review", holders: [{ party: "ierc", label: "IERC" }], submitter_status: { line: "In specialist review: IERC", waiting_on_you: [] } }),
       ownRecord({ id: 14, title: "Asked to revise", pipeline_status: "in_review", workflow_state: "awaiting_resubmission", workflow_state_label: "Awaiting resubmission", holders: [{ party: "ierc", label: "IERC" }], submitter_status: { line: "Revision requested by IERC: action needed", waiting_on_you: [revision, document] } }),
@@ -249,14 +248,15 @@ describe("My Library: an author's research", () => {
 
     const waiting = section("Needs your action");
     expect(within(waiting).getByText("Revision requested by IERC: action needed")).toBeInTheDocument();
-    expect(within(waiting).getByRole("link", { name: "Submit a new version (Revision requested by IERC)" }))
-      .toHaveAttribute("href", "/records/14?section=overview#revision-requested");
-    const uploads = within(waiting).getAllByRole("link", { name: "Upload the documents (Documents requested by Adviser)" });
-    expect(uploads.map((link) => link.getAttribute("href"))).toEqual([
-      "/records/14?section=overview#documents-requested",
-      "/records/15?section=overview#documents-requested",
-    ]);
+    // The row itself opens Review's Documents tab, where both are answered
+    // (IR-1318); it carries no per-request button (IR-1321).
+    expect(within(waiting).getByRole("link", { name: "Asked to revise" }))
+      .toHaveAttribute("href", "/records/14?section=review&documents=open");
+    expect(within(waiting).getByRole("link", { name: "Asked for a form" }))
+      .toHaveAttribute("href", "/records/15?section=review&documents=open");
+    expect(within(waiting).queryByRole("link", { name: /^Submit a new version|^Upload the documents/ })).not.toBeInTheDocument();
     expect(within(waiting).queryByRole("link", { name: "Still with the offices" })).not.toBeInTheDocument();
+    expect(within(section("In review")).getByRole("link", { name: "Still with the offices" })).toHaveAttribute("href", "/records/13");
     expect(within(section("In review")).getByText("In specialist review: IERC")).toBeInTheDocument();
     await expectNoBlockingA11yViolations(container);
   });
@@ -322,8 +322,36 @@ describe("My Library: an author's research", () => {
     expect(screen.getByRole("heading", { name: "Nothing matches “soilzzz”" })).toBeInTheDocument();
   });
 
-  it("opens an author on Overview: what waits on them, counted, and a tab to every submission", async () => {
-    const document = { kind: "document", party: "adviser", label: "Documents requested by Adviser", action_label: "Upload the documents" } as const;
+  it("says nothing is waiting on an author only once their research has loaded, with no counter (IR-1321)", async () => {
+    mine([ownRecord({ id: 12 })]);
+    const { container } = renderScreen(<MyLibraryPage />, { route: "/records/mine" });
+
+    const waiting = await screen.findByRole("region", { name: "Waiting on you" });
+    expect(await within(waiting).findByText(/^Nothing needs your action\./)).toBeInTheDocument();
+    expect(within(waiting).queryByText(/^\d+$/)).not.toBeInTheDocument();
+    await expectNoBlockingA11yViolations(container);
+  });
+
+  // IR-1323: each side card is a fixed rectangle whose list scrolls, so none is cut short.
+  it("lists every paper waiting on the author in a card that scrolls, and an empty Recently opened says so", async () => {
+    const document = { kind: "document", party: "adviser", label: "Changes requested by Adviser", action_label: "Upload the documents" } as const;
+    mine(Array.from({ length: 7 }, (_, i) => ownRecord({
+      id: 40 + i, title: `Waiting paper ${i + 1}`, pipeline_status: "in_review", workflow_state: "awaiting_document",
+      workflow_state_label: "Awaiting document", holders: [{ party: "adviser", label: "Adviser" }],
+      submitter_status: { line: "Documents requested by Adviser: action needed", waiting_on_you: [document] },
+    })));
+    const { container } = renderScreen(<MyLibraryPage />, { route: "/records/mine" });
+
+    const waiting = await screen.findByRole("region", { name: "Waiting on you" });
+    expect(await within(waiting).findByRole("link", { name: "Waiting paper 7" })).toBeInTheDocument();
+    expect(within(waiting).getAllByRole("link", { name: /^Waiting paper/ })).toHaveLength(7);
+    expect(within(waiting).queryByRole("button", { name: /Show all/ })).not.toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "Recently opened" })).getByText("Papers you open appear here.")).toBeInTheDocument();
+    await expectNoBlockingA11yViolations(container);
+  });
+
+  it("opens an author on Overview: what waits on them, counted, in the right column, and a tab to every submission", async () => {
+    const document = { kind: "document", party: "adviser", label: "Changes requested by Adviser", action_label: "Upload the documents" } as const;
     mine([
       ownRecord({ id: 15, title: "Asked for a form", pipeline_status: "in_review", workflow_state: "awaiting_document", workflow_state_label: "Awaiting document", holders: [{ party: "adviser", label: "Adviser" }], submitter_status: { line: "Documents requested by Adviser: action needed", waiting_on_you: [document] } }),
       ownRecord({ id: 12 }),
@@ -334,11 +362,19 @@ describe("My Library: an author's research", () => {
     const waiting = screen.getByRole("region", { name: "Waiting on you" });
     expect(within(waiting).getByText("1")).toBeInTheDocument();
     expect(within(waiting).getByRole("link", { name: /^Upload the documents/ }))
-      .toHaveAttribute("href", "/records/15?section=overview#documents-requested");
+      .toHaveAttribute("href", "/records/15?section=review&documents=open");
     // The draft's title opens Publish over My Library (IR-1258).
     expect(within(screen.getByRole("region", { name: "Recent submissions" })).getByRole("link", { name: "Community Water Monitoring" }))
       .toHaveAttribute("href", "/records/mine?publish=12");
-    expect(screen.getByRole("region", { name: "Reading shelf" })).toHaveTextContent("Saved papers follow your account.");
+    // The Reading shelf is gone (IR-1321); its reading stays, its folders do not.
+    expect(screen.queryByRole("region", { name: "Reading shelf" })).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Continue reading" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Your folders" })).not.toBeInTheDocument();
+    // The side cards in order, first on a phone, then the author's records (IR-1323).
+    expect(screen.getAllByRole("heading", { level: 2 }).slice(0, 4).map((h) => h.textContent))
+      .toEqual(["Waiting on you", "Continue reading", "Recently opened", "Recent submissions"]);
+    // A brief row carries no per-request button either.
+    expect(within(screen.getByRole("region", { name: "Recent submissions" })).queryByRole("link", { name: /^Upload the documents/ })).not.toBeInTheDocument();
     await expectNoBlockingA11yViolations(container);
 
     await userEvent.click(screen.getByRole("tab", { name: "My submissions" }));
@@ -392,7 +428,9 @@ describe("My Library: an author's research", () => {
   });
 });
 
-describe("My Library: what each paper waits on (IR-1084)", () => {
+// IR-1306 removed the sentence under each title (IR-1084's "… Nothing to do yet."): the status label,
+// the clearance strip and the one action carry it.
+describe("My Library: what each paper waits on (IR-1084, IR-1306)", () => {
   const inReview = (overrides: Partial<MyResearchItem> = {}) => ownRecord({
     id: 13, title: "Still with the offices", pipeline_status: "in_review", workflow_state: "in_review",
     workflow_state_label: "In review", holders: [{ party: "ierc", label: "IERC" }],
@@ -401,24 +439,24 @@ describe("My Library: what each paper waits on (IR-1084)", () => {
     ...overrides,
   });
 
-  it("says on each Overview row what the paper waits on, and offers one action", async () => {
+  it("shows each Overview row's status without a sentence about it, and offers one action", async () => {
     mine([ownRecord({}), inReview()]);
     renderScreen(<MyLibraryPage />);
 
     const recent = await screen.findByRole("region", { name: "Recent submissions" });
     const review = within(recent).getByRole("link", { name: "Still with the offices" }).closest("li") as HTMLElement;
-    expect(within(review).getByText("IERC is reviewing your version 2. Nothing to do yet.")).toBeInTheDocument();
+    expect(within(review).queryByText(/Nothing to do yet/)).not.toBeInTheDocument();
     // The row itself opens the review; there is no "Open review" button to add.
     expect(within(recent).getByRole("link", { name: "Still with the offices" })).toHaveAttribute("href", "/records/13");
     expect(within(review).queryByRole("link", { name: /^Open review/ })).not.toBeInTheDocument();
     expect(within(review).queryByRole("button")).not.toBeInTheDocument();
 
     const draft = within(recent).getByRole("link", { name: "Community Water Monitoring" }).closest("li") as HTMLElement;
-    expect(within(draft).getByText("Not submitted yet. It waits on you to finish and send it.")).toBeInTheDocument();
-    // The row reopens Publish; Delete waits in the draft's "⋯" menu.
+    expect(within(draft).queryByText(/waits on you/)).not.toBeInTheDocument();
+    // The row reopens Publish; the trash can is its one button.
     expect(within(recent).getByRole("link", { name: "Community Water Monitoring" })).toHaveAttribute("href", "/?publish=12");
     expect(within(draft).queryByRole("link", { name: /^Continue draft/ })).not.toBeInTheDocument();
-    expect(within(draft).getByRole("button", { name: "Actions for “Community Water Monitoring”" })).toBeInTheDocument();
+    expect(within(draft).getByRole("button", { name: "Delete draft “Community Water Monitoring”" })).toBeInTheDocument();
   });
 
   it("deletes a draft from the Overview after the same question, and drops its row (IR-1256)", async () => {
@@ -428,8 +466,7 @@ describe("My Library: what each paper waits on (IR-1084)", () => {
     renderScreen(<MyLibraryPage />);
 
     const recent = await screen.findByRole("region", { name: "Recent submissions" });
-    await user.click(within(recent).getByRole("button", { name: "Actions for “Community Water Monitoring”" }));
-    await user.click(screen.getByRole("menuitem", { name: "Delete draft" }));
+    await user.click(within(recent).getByRole("button", { name: "Delete draft “Community Water Monitoring”" }));
     const dialog = screen.getByRole("dialog", { name: "Delete this draft?" });
     expect(recordsApi.delete).not.toHaveBeenCalled();
     await user.click(within(dialog).getByRole("button", { name: "Delete draft" }));
@@ -438,7 +475,7 @@ describe("My Library: what each paper waits on (IR-1084)", () => {
     expect(recordsApi.delete).toHaveBeenCalledWith(12);
   });
 
-  it("names every office still reviewing, and the Adviser or RDCO when they hold it", async () => {
+  it("labels each row by the server's status alone, with no sentence about who holds it", async () => {
     mine([
       inReview({ id: 21, title: "Two offices", holders: [{ party: "ierc", label: "IERC" }, { party: "ktto", label: "KTTO" }],
         clearance_strip: [{ ...RESET }, { ...RESET, party: "ktto", label: "KTTO" }] }),
@@ -449,44 +486,108 @@ describe("My Library: what each paper waits on (IR-1084)", () => {
     renderScreen(<MyLibraryPage />, SUBMISSIONS);
 
     await screen.findByRole("link", { name: "Two offices" });
-    expect(screen.getByText("IERC and KTTO are reviewing your version 2. Nothing to do yet.")).toBeInTheDocument();
-    expect(screen.getByText("Your Adviser is reviewing this. Nothing to do yet.")).toBeInTheDocument();
-    expect(screen.getByText("RDCO is making the final decision. Nothing to do yet.")).toBeInTheDocument();
-    expect(screen.getByText("Nothing is waiting on this paper.")).toBeInTheDocument();
+    expect(screen.getAllByText("In specialist review: IERC").length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Nothing to do yet|Nothing is waiting/)).not.toBeInTheDocument();
   });
 
-  it("says what the author owes, in the server's words, where a request is open", async () => {
-    const revision = { kind: "revision", party: "ierc", label: "Revision requested by IERC", action_label: "Submit a new version" } as const;
+  it("opens a paper with an open request straight on its Documents tab, with no button of its own (IR-1321)", async () => {
+    const revision = { kind: "revision", party: "ierc", label: "Changes requested by IERC", action_label: "Submit a new version" } as const;
     mine([inReview({ id: 14, title: "Asked to revise", workflow_state: "awaiting_resubmission",
       submitter_status: { line: "Revision requested by IERC: action needed", waiting_on_you: [revision] } })]);
     renderScreen(<MyLibraryPage />, SUBMISSIONS);
 
     await screen.findByRole("link", { name: "Asked to revise" });
-    expect(screen.getByText("Waiting on you: Revision requested by IERC.")).toBeInTheDocument();
-    // Its own act stays the one action; "Open review" is not added beside it.
-    expect(screen.getByRole("link", { name: "Submit a new version (Revision requested by IERC)" })).toBeInTheDocument();
+    expect(screen.getByText("Revision requested by IERC: action needed")).toBeInTheDocument();
+    expect(screen.queryByText(/^Waiting on you:/)).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Asked to revise" })).toHaveAttribute("href", "/records/14?section=review&documents=open");
+    expect(screen.queryByRole("link", { name: /^Submit a new version/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /^Open review/ })).not.toBeInTheDocument();
   });
 
-  it("offers Delete draft in the row's ⋯ menu, named for the draft, before it asks", async () => {
+  it("puts a red trash can alone under the draft's Updated date, and it asks once (IR-1279)", async () => {
     mine([ownRecord({})]);
     const user = userEvent.setup();
     renderScreen(<MyLibraryPage />, SUBMISSIONS);
 
     const row = (await screen.findByRole("link", { name: "Community Water Monitoring" })).closest("li") as HTMLElement;
-    const more = within(row).getByRole("button", { name: "Actions for “Community Water Monitoring”" });
-    expect(more).toHaveAttribute("aria-haspopup", "menu");
-    expect(screen.queryByRole("menuitem")).not.toBeInTheDocument();
+    const updated = within(row).getByText(/^Updated /);
+    const remove = within(row).getByRole("button", { name: "Delete draft “Community Water Monitoring”" });
+    // After the date, in the same column, and the row's only button.
+    expect(updated.compareDocumentPosition(remove) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(updated.parentElement?.contains(remove)).toBe(true);
+    expect(within(row).getAllByRole("button")).toEqual([remove]);
+    expect(within(row).queryByRole("link", { name: /^Continue draft/ })).not.toBeInTheDocument();
+    // A red trash can, not a menu.
+    expect(remove).toHaveClass("text-brand");
+    expect(remove).not.toHaveAttribute("aria-haspopup");
+    expect(within(row).queryByRole("button", { name: /^Actions for/ })).not.toBeInTheDocument();
 
-    await user.click(more);
-    const remove = screen.getByRole("menuitem", { name: "Delete draft" });
-    expect(remove).toHaveFocus();
-    expect(remove).toHaveClass("text-brand-dark");
-
+    // One press, then the one question.
     await user.click(remove);
     const dialog = screen.getByRole("dialog", { name: "Delete this draft?" });
     expect(dialog).toHaveTextContent("“Community Water Monitoring” and its files will be removed.");
     expect(recordsApi.delete).not.toHaveBeenCalled();
+  });
+});
+
+describe("My Library: withdrawing a paper in review (IR-1282)", () => {
+  const inReview = (overrides: Partial<MyResearchItem> = {}) => ownRecord({
+    id: 13, title: "Still with the offices", pipeline_status: "in_review", workflow_state: "in_review",
+    workflow_state_label: "In review", holders: [{ party: "ierc", label: "IERC" }],
+    submitter_status: { line: "In specialist review: IERC", waiting_on_you: [] },
+    delete_act: "withdraw_submission",
+    ...overrides,
+  });
+
+  it("puts the same red trash can on a paper in review, asks once in withdrawal's words, then drops the row", async () => {
+    mine([inReview()]);
+    vi.mocked(recordsApi.delete).mockResolvedValue({} as Awaited<ReturnType<typeof recordsApi.delete>>);
+    const user = userEvent.setup();
+    renderScreen(<MyLibraryPage />, SUBMISSIONS);
+
+    const row = (await screen.findByRole("link", { name: "Still with the offices" })).closest("li") as HTMLElement;
+    const remove = within(row).getByRole("button", { name: "Withdraw and delete “Still with the offices”" });
+    expect(within(row).getByText(/^Updated /).parentElement?.contains(remove)).toBe(true);
+    expect(remove).toHaveClass("text-brand");
+
+    await user.click(remove);
+    const dialog = screen.getByRole("dialog", { name: "Withdraw and delete this paper?" });
+    expect(dialog).toHaveTextContent("“Still with the offices” leaves review and is removed with its files.");
+    expect(dialog).toHaveTextContent("Your Adviser and any office reviewing it stop, and are told.");
+    expect(within(dialog).getByRole("button", { name: "Cancel" })).toHaveFocus();
+    expect(recordsApi.delete).not.toHaveBeenCalled();
+
+    await user.click(within(dialog).getByRole("button", { name: "Withdraw and delete" }));
+    await waitFor(() => expect(screen.queryByRole("link", { name: "Still with the offices" })).not.toBeInTheDocument());
+    expect(recordsApi.delete).toHaveBeenCalledWith(13);
+  });
+
+  it("keeps the paper and says why when the withdrawal fails", async () => {
+    mine([inReview()]);
+    vi.mocked(recordsApi.delete).mockRejectedValue({ response: { status: 403, data: { detail: "Only an owner can delete this record." } } });
+    const user = userEvent.setup();
+    renderScreen(<MyLibraryPage />, SUBMISSIONS);
+
+    await user.click(await screen.findByRole("button", { name: "Withdraw and delete “Still with the offices”" }));
+    await user.click(screen.getByRole("button", { name: "Withdraw and delete" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Only an owner can delete this record.");
+    expect(screen.getByRole("dialog", { name: "Withdraw and delete this paper?" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Still with the offices" })).toBeInTheDocument();
+  });
+
+  it("offers no trash can on accepted work, a rejected paper, or one awaiting RDCO's delete decision", async () => {
+    mine([
+      inReview({ id: 31, title: "Published work", pipeline_status: "published", workflow_state: "published", holders: [], delete_act: "request_deletion" }),
+      inReview({ id: 32, title: "Rejected work", pipeline_status: "rejected", workflow_state: "rejected", holders: [], delete_act: "delete_record" }),
+      inReview({ id: 33, title: "Awaiting RDCO", pipeline_status: "pending_delete", workflow_state: "pending_delete", holders: [], delete_act: null }),
+    ]);
+    renderScreen(<MyLibraryPage />, SUBMISSIONS);
+
+    for (const title of ["Published work", "Rejected work", "Awaiting RDCO"]) {
+      const row = (await screen.findByRole("link", { name: title })).closest("li") as HTMLElement;
+      expect(within(row).queryByRole("button", { name: /^(Withdraw and delete|Delete draft)/ })).not.toBeInTheDocument();
+    }
   });
 });
 
@@ -538,7 +639,11 @@ describe("My Library: reading", () => {
     // History is back in the picker (IR-756): it now follows the account, and
     // its pause switch lives in the History view, which every reader must reach.
     expect(within(screen.getByRole("combobox", { name: "Folder" })).getByRole("option", { name: "History" })).toBeInTheDocument();
+    // IR-1313: one width, whatever the folders are, and the new-folder field takes the same.
+    expect(screen.getByRole("combobox", { name: "Folder" })).toHaveClass("w-full", "sm:w-72");
+    expect(screen.getByRole("combobox", { name: "Folder" })).toHaveAttribute("title", "All saved papers");
     await userEvent.selectOptions(screen.getByRole("combobox", { name: "Folder" }), "+ New folder…");
+    expect(screen.getByRole("textbox", { name: "New folder name" })).toHaveClass("w-full", "sm:w-72");
     await userEvent.type(screen.getByRole("textbox", { name: "New folder name" }), "Methods{Enter}");
     expect(await screen.findByRole("heading", { name: "Methods" })).toBeInTheDocument();
     expect(libraryApi.createFolder).toHaveBeenCalledWith("Methods");
@@ -570,6 +675,55 @@ describe("My Library: reading", () => {
     expect(await screen.findByRole("heading", { name: "No saved papers yet" })).toBeInTheDocument();
     // Audit LAY-06 (IR-1098): an empty page names the next useful step.
     expect(screen.getByRole("link", { name: "Browse Discover" })).toHaveAttribute("href", "/");
+  });
+});
+
+// IR-1314: an empty library used to draw research and saved cards for a moment,
+// then swap them for its empty state. A load answered inside 400 ms now goes
+// straight to the empty state.
+/**
+ * Records whether a loader ever put a placeholder shape on the page, however
+ * briefly: anything inside a `role="status"` region's `aria-hidden` wrapper.
+ * The shapes are decoration with no role or name, so this reads the mutation
+ * records, which keep a node's subtree even after React has removed it.
+ */
+function watchForPlaceholders() {
+  let seen = false;
+  const SHAPES = "[role='status'] > [aria-hidden='true'] > *";
+  const check = (records: MutationRecord[]) => {
+    for (const record of records) {
+      const target = record.target as Element;
+      for (const node of Array.from(record.addedNodes)) {
+        if (!(node instanceof Element)) continue;
+        const wrapperFilled = target.getAttribute("role") === "status"
+          && node.getAttribute("aria-hidden") === "true" && node.childElementCount > 0;
+        const regionWithShapes = node.getAttribute("role") === "status"
+          && node.querySelector(":scope > [aria-hidden='true'] > *") !== null;
+        if (wrapperFilled || regionWithShapes || node.querySelector(SHAPES)) seen = true;
+      }
+    }
+  };
+  const observer = new MutationObserver(check);
+  observer.observe(document.body, { childList: true, subtree: true });
+  return { seen: () => { check(observer.takeRecords()); return seen; }, stop: () => observer.disconnect() };
+}
+
+describe("My Library: an empty library that answers at once", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it.each([
+    ["Overview", undefined, "You haven’t published anything yet"],
+    ["Saved", { route: "/records/mine?section=saved" }, "No saved papers yet"],
+  ] as const)("never draws a placeholder on %s", async (_tab, route, empty) => {
+    vi.useFakeTimers();
+    const placeholders = watchForPlaceholders();
+    renderScreen(<MyLibraryPage />, route);
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+
+    expect(screen.getByRole("heading", { name: empty })).toBeInTheDocument();
+    await act(async () => { await vi.advanceTimersByTimeAsync(5_000); });
+    expect(placeholders.seen()).toBe(false);
+    placeholders.stop();
   });
 });
 
@@ -757,8 +911,7 @@ describe("My Library: reading history follows the account (IR-756)", () => {
     history([visitEntry(rice), { record_id: 77, available: false }, visitEntry(water, "2026-11-01T08:00:00Z")]);
     renderScreen(<MyLibraryPage />);
 
-    const recent = await screen.findByRole("heading", { name: "Recently opened" });
-    const block = recent.parentElement as HTMLElement;
+    const block = await screen.findByRole("region", { name: "Recently opened" });
     expect(within(block).getAllByRole("link").map((l) => l.textContent)).toEqual([rice.title, water.title]);
   });
 

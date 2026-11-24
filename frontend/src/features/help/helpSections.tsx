@@ -247,9 +247,9 @@ export const HELP_SECTIONS: HelpSection[] = [
         <p>The RDCO part of the sidebar holds the research office&rsquo;s coordination tools:</p>
         <ul>
           <li><strong>Users</strong>: give Student or Adviser roles and lock or unlock accounts. Office roles and coordinator assignments belong to the System Admin.</li>
-          <li><strong>Role requests</strong>: approve or decline the Student or Adviser role someone requested at registration.</li>
-          <li><strong>Download requests</strong> and <strong>Delete requests</strong>: decide requests to download or delete a paper.</li>
-          <li><strong>Import records</strong>: file research on someone&rsquo;s behalf.</li>
+          <li><strong>Role Requests</strong>: approve or decline the Student or Adviser role someone requested at registration.</li>
+          <li><strong>Download Requests</strong> and <strong>Delete Requests</strong>: decide requests to download or delete a paper.</li>
+          <li><strong>Import Records</strong>: file research on someone&rsquo;s behalf.</li>
         </ul>
         <p>The System Admin alone reads the Audit Log. RDCO cannot change a System Admin account.</p>
       </>
@@ -278,8 +278,9 @@ export const HELP_SECTIONS: HelpSection[] = [
       <>
         <p>
           The menu under your name has two pages. <strong>Profile</strong> is what other people signed in to
-          IRIS see of you, and where you edit it. <strong>Settings</strong> holds your account and security,
-          data privacy and consent, and your role.
+          IRIS see of you. <strong>Settings</strong> is where you change it, in its <strong>Profile</strong> section
+          (your photo, name, bio and research interests), and where your account and security, data privacy and
+          consent, and your role are.
         </p>
         <p>
           Notifications arrive under the bell at the top of the sidebar; <strong>View all

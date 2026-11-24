@@ -135,15 +135,15 @@ describe("the frame sign in opens in", () => {
     expect(within(header).queryByRole("heading")).not.toBeInTheDocument();
   });
 
-  it("offers one Create an account link under the form and Help in the masthead", () => {
+  it("offers one Create an account link under the form and nothing in the masthead (IR-1281)", () => {
     renderScreen(<LoginPage />, { route: "/login" });
 
     const links = screen.getAllByRole("link", { name: "Create an account" });
     expect(links).toHaveLength(1);
     links.forEach((link) => expect(link).toHaveAttribute("href", "/signup"));
     const header = screen.getByRole("banner");
-    expect(within(header).getAllByRole("link")).toHaveLength(1);
-    expect(within(header).getByRole("link", { name: "Help" })).toHaveAttribute("aria-haspopup", "dialog");
+    expect(within(header).queryAllByRole("link")).toHaveLength(0);
+    expect(screen.queryByRole("link", { name: "Help" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /sign up/i })).not.toBeInTheDocument();
   });
 
@@ -188,7 +188,7 @@ describe("the frame sign in opens in", () => {
     expect(screen.getByRole("textbox", { name: "Email address" })).toHaveValue("reader@example.edu");
   });
 
-  it("announces a failed sign-in once, by the banner, and only marks the fields", async () => {
+  it("says a failed sign-in in a dialog in front of the form, and only marks the fields (IR-1303)", async () => {
     vi.spyOn(authApi, "login").mockRejectedValueOnce(
       Object.assign(new Error("Request failed with status code 401"), {
         isAxiosError: true,
@@ -202,16 +202,41 @@ describe("the frame sign in opens in", () => {
     await user.type(screen.getByLabelText("Password"), "IrisDemo123!");
     await user.click(screen.getByRole("button", { name: "Sign in" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Invalid email or password");
-    // One live region in the whole page: the banner. The fields say nothing.
-    // `aria-live` has no role to query by, so the live-region semantics are
-    // read as attributes -- still the accessible tree, never a class or test id.
-    expect(container.ownerDocument.querySelectorAll('[role="alert"], [role="status"], [aria-live]')).toHaveLength(1);
+    const dialog = await screen.findByRole("alertdialog", { name: "Invalid email or password" });
+    expect(dialog).toHaveAccessibleDescription(/check your credentials/);
+    // Nothing is added inside the page, so the form does not move. The dialog
+    // is the one thing that speaks; the fields say nothing. `aria-live` has no
+    // role to query by, so live regions are read as attributes -- still the
+    // accessible tree, never a class or test id.
+    expect(container.ownerDocument.querySelectorAll('[role="alert"], [role="status"], [aria-live]')).toHaveLength(0);
     const email = screen.getByRole("textbox", { name: "Email address" });
     expect(email).toBeInvalid();
     expect(email).not.toHaveAccessibleDescription();
     expect(screen.getByLabelText("Password")).toBeInvalid();
     expect(screen.getByLabelText("Password")).not.toHaveAccessibleDescription();
+  });
+
+  it("returns to the password on Close, with both fields still marked wrong (IR-1303)", async () => {
+    vi.spyOn(HTMLElement.prototype, "getClientRects").mockReturnValue([{}] as unknown as DOMRectList);
+    vi.spyOn(authApi, "login").mockRejectedValueOnce(
+      Object.assign(new Error("Request failed with status code 401"), {
+        isAxiosError: true,
+        response: { status: 401, data: { detail: "Invalid credentials." }, headers: {} },
+      }),
+    );
+    const user = userEvent.setup();
+    renderScreen(<LoginPage />, { route: "/login" });
+
+    await user.type(screen.getByRole("textbox", { name: "Email address" }), "student@cit.edu");
+    await user.type(screen.getByLabelText("Password"), "IrisDemo123!");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    await screen.findByRole("alertdialog");
+    await user.click(screen.getByRole("button", { name: "Close" }));
+
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Password")).toHaveFocus();
+    expect(screen.getByRole("textbox", { name: "Email address" })).toBeInvalid();
+    expect(screen.getByLabelText("Password")).toBeInvalid();
   });
 });
 
@@ -666,7 +691,7 @@ describe("what a failed sign-in says", () => {
 
     await signIn();
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Invalid email or password");
+    expect(await screen.findByRole("alertdialog")).toHaveTextContent("Invalid email or password");
     expect(screen.getByRole("textbox", { name: "Email address" })).toBeInvalid();
   });
 
@@ -676,7 +701,7 @@ describe("what a failed sign-in says", () => {
 
     await signIn();
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Invalid email or password");
+    expect(await screen.findByRole("alertdialog")).toHaveTextContent("Invalid email or password");
   });
 
   it("counts down truthfully to the lock", async () => {
@@ -688,13 +713,14 @@ describe("what a failed sign-in says", () => {
     renderScreen(<LoginPage />, { route: "/login" });
 
     const user = await signIn();
-    expect(await screen.findByRole("alert")).toHaveTextContent(
+    expect(await screen.findByRole("alertdialog")).toHaveTextContent(
       "2 more failed attempts will lock your account.",
     );
+    await user.click(screen.getByRole("button", { name: "Close" }));
 
     await user.click(screen.getByRole("button", { name: "Sign in" }));
     await waitFor(() => {
-      expect(screen.getByRole("alert")).toHaveTextContent(
+      expect(screen.getByRole("alertdialog")).toHaveTextContent(
         "One more failed attempt will lock your account.",
       );
     });
@@ -706,7 +732,7 @@ describe("what a failed sign-in says", () => {
 
     await signIn();
 
-    const alert = await screen.findByRole("alert");
+    const alert = await screen.findByRole("alertdialog");
     expect(alert).toHaveTextContent("Email not verified");
     expect(alert).not.toHaveTextContent(/password/i);
     // ADR-045 §7: a resend, never "register again" (IR-643).
@@ -754,7 +780,7 @@ describe("what a failed sign-in says", () => {
 
       await signIn();
 
-      const alert = await screen.findByRole("alert");
+      const alert = await screen.findByRole("alertdialog");
       expect(alert).toHaveTextContent("IRIS can't be reached right now");
       expect(alert).not.toHaveTextContent(/email|password|credential/i);
       // The fields were never judged, so they are not marked wrong either.
@@ -769,15 +795,18 @@ describe("what a failed sign-in says", () => {
     renderScreen(<LoginPage />, { route: "/login" });
 
     const user = await signIn();
-    await screen.findByRole("alert");
+    await screen.findByRole("alertdialog");
+    await user.click(screen.getByRole("button", { name: "Close" }));
     await user.click(screen.getByRole("button", { name: "Sign in" }));
+    await screen.findByRole("alertdialog");
+    await user.click(screen.getByRole("button", { name: "Close" }));
     await user.click(screen.getByRole("button", { name: "Sign in" }));
 
     await waitFor(() => {
       expect(authApi.login).toHaveBeenCalledTimes(3);
     });
     expect(screen.queryByRole("dialog", { name: "Account Locked" })).not.toBeInTheDocument();
-    expect(screen.getByRole("alert")).toHaveTextContent("IRIS can't be reached right now");
+    expect(screen.getByRole("alertdialog")).toHaveTextContent("IRIS can't be reached right now");
   });
 
   it("says 'Unable to sign in' with the server's detail for anything else", async () => {
@@ -786,7 +815,7 @@ describe("what a failed sign-in says", () => {
 
     await signIn();
 
-    const alert = await screen.findByRole("alert");
+    const alert = await screen.findByRole("alertdialog");
     expect(alert).toHaveTextContent("Unable to sign in");
     expect(alert).toHaveTextContent("This sign-in could not be read.");
   });
@@ -799,7 +828,7 @@ describe("what a failed sign-in says", () => {
 
     await signIn();
 
-    const alert = await screen.findByRole("alert");
+    const alert = await screen.findByRole("alertdialog");
     expect(alert).toHaveTextContent("Too many requests");
     expect(alert).toHaveTextContent("about 30 minutes");
     expect(alert).not.toHaveTextContent("throttled");
@@ -812,15 +841,18 @@ describe("what a failed sign-in says", () => {
     renderScreen(<LoginPage />, { route: "/login" });
 
     const user = await signIn();
-    await screen.findByRole("alert");
+    await screen.findByRole("alertdialog");
+    await user.click(screen.getByRole("button", { name: "Close" }));
     await user.click(screen.getByRole("button", { name: "Sign in" }));
+    await screen.findByRole("alertdialog");
+    await user.click(screen.getByRole("button", { name: "Close" }));
     await user.click(screen.getByRole("button", { name: "Sign in" }));
 
     await waitFor(() => {
       expect(authApi.login).toHaveBeenCalledTimes(3);
     });
     expect(screen.queryByRole("dialog", { name: "Account Locked" })).not.toBeInTheDocument();
-    expect(screen.getByRole("alert")).toHaveTextContent("Too many requests");
+    expect(screen.getByRole("alertdialog")).toHaveTextContent("Too many requests");
   });
 
   it("has no serious or critical accessibility violations while an error shows", async () => {
@@ -828,7 +860,7 @@ describe("what a failed sign-in says", () => {
     const { container } = renderScreen(<LoginPage />, { route: "/login" });
 
     await signIn();
-    await screen.findByRole("alert");
+    await screen.findByRole("alertdialog");
 
     await expectNoBlockingA11yViolations(container);
   });
@@ -907,20 +939,25 @@ describe("what a failed sign-in says", () => {
       renderScreen(<LoginPage />, { route: "/login" });
 
       const user = await signIn();
-      await screen.findByRole("alert");
+      await screen.findByRole("alertdialog");
+      await user.click(screen.getByRole("button", { name: "Close" }));
       await user.click(screen.getByRole("button", { name: "Sign in" }));
       await screen.findByText(/2 of 3/);
+      await user.click(screen.getByRole("button", { name: "Close" }));
       await user.click(screen.getByRole("button", { name: "Sign in" }));
 
       const dialog = await screen.findByRole("dialog", { name: "Account Locked" });
       expect(dialog).toHaveTextContent(/try again in (15:00|14:59)/i);
     });
 
+    // Each reply is built when its test runs, not when the file is collected:
+    // an unlock time fixed at collection had passed by the time a slow run
+    // reached it, and the dialog had already closed itself (IR-1303).
     it.each([
-      ["an axes lockout", serverReplied(429, { code: "too_many_attempts", detail: "Locked.", unlock_at: new Date(Date.now() + 60_000).toISOString() })],
-      ["an RDCO lock", serverReplied(403, { detail: "Account is locked.", code: "locked_by_admin" })],
-    ])("has no serious or critical accessibility violations for %s", async (_label, error) => {
-      failSignInWith(error);
+      ["an axes lockout", () => serverReplied(429, { code: "too_many_attempts", detail: "Locked.", unlock_at: new Date(Date.now() + 60_000).toISOString() })],
+      ["an RDCO lock", () => serverReplied(403, { detail: "Account is locked.", code: "locked_by_admin" })],
+    ])("has no serious or critical accessibility violations for %s", async (_label, reply) => {
+      failSignInWith(reply());
       const { container } = renderScreen(<LoginPage />, { route: "/login" });
 
       await signIn();

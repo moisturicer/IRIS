@@ -53,16 +53,16 @@ test("a reader with no conversations is told so, not that a search failed", asyn
   expect(await screen.findByText("Your past conversations will appear here.")).toBeInTheDocument();
 });
 
-test("Load more reaches older conversations and keeps the search", async () => {
+test("Show older conversations reaches older conversations and keeps the search", async () => {
   const get = serve(reply(["First"], "cursor-1"), reply(["Older"]));
   const user = userEvent.setup();
   render(<History />);
   await screen.findByRole("link", { name: /First/ });
-  await user.click(screen.getByRole("button", { name: "Load more" }));
+  await user.click(screen.getByRole("button", { name: "Show older conversations" }));
   expect(await screen.findByRole("link", { name: /Older/ })).toBeInTheDocument();
   expect(screen.getByRole("link", { name: /First/ })).toBeInTheDocument();
   expect(get).toHaveBeenLastCalledWith("/ai/runtime/conversations", expect.objectContaining({ params: { before: "cursor-1" } }));
-  expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Show older conversations" })).not.toBeInTheDocument();
 });
 
 test("a failed load says so, and Try again asks for the list once more (IR-1238)", async () => {

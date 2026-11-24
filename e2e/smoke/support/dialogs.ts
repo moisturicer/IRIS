@@ -236,6 +236,8 @@ export const DIALOGS: DialogCase[] = [
   },
   {
     id: "notifications", screen: "help", sources: ["components/layout/NotificationBell.tsx"],
+    // The bell is the phone bar's since IR-1288; from md the sidebar has a link instead.
+    viewport: { width: 390, height: 844 },
     open: press(/^Notifications/), dialog: (page) => page.getByRole("dialog", { name: "Notifications" }),
   },
   {
@@ -374,6 +376,17 @@ export const DIALOGS: DialogCase[] = [
     dialog: (page) => page.getByRole("dialog"),
   },
   {
+    // A failed sign-in is said in a dialog in front of the form (IR-1303).
+    id: "sign-in failed", screen: "login", sources: ["components/auth/EntryErrorDialog.tsx"],
+    override: (api) => api.on("POST", "/auth/login/", { detail: "Invalid credentials." }, 401),
+    open: async (page) => {
+      await page.getByLabel("Email Address").fill("student@cit.edu");
+      await page.getByLabel("Password", { exact: true }).fill("not-the-password");
+      await page.getByRole("button", { name: "Sign In" }).click();
+    },
+    dialog: (page) => page.getByRole("alertdialog", { name: "Invalid email or password" }),
+  },
+  {
     // Why the session ended opens by itself on arrival (IR-1197).
     id: "session ended on arrival at sign-in", screen: "login", path: "/login?reason=session_expired&code=session_idle",
     sources: ["components/auth/SessionNoticeDialog.tsx"],
@@ -391,7 +404,7 @@ export const DIALOGS: DialogCase[] = [
   },
   {
     id: "delete a draft", screen: "my-library", path: "/records/mine?section=research",
-    sources: ["features/library/DeleteDraft.tsx"],
+    sources: ["features/library/DeleteRecord.tsx"],
     override: (api) => api.on("GET", "/records/mine/", [{
       id: 12, title: "Community Water Monitoring", authors: [{ id: 1, name: "Lee Cruz", role: null }],
       adviser_name: "Dr Santos", record_type_name: "Thesis / Research", pipeline_status: "draft",
@@ -399,10 +412,10 @@ export const DIALOGS: DialogCase[] = [
       submitter_status: { line: "Draft: not yet submitted", waiting_on_you: [] },
       created_at: "2026-11-01T08:00:00+08:00", updated_at: "2026-11-02T08:00:00+08:00",
     }]),
-    open: fromRowMenu("Delete draft"), dialog: anyDialog,
+    open: press(/^Delete draft/), dialog: anyDialog,
   },
   {
-    id: "crop a profile photo", screen: "profile-edit", sources: ["features/profile/PhotoCropDialog.tsx"],
+    id: "crop a profile photo", screen: "profile-settings", sources: ["features/profile/PhotoCropDialog.tsx"],
     open: async (page) => {
       await page.locator('input[type="file"]').first().setInputFiles({ name: "me.png", mimeType: "image/png", buffer: PNG });
     },
@@ -449,7 +462,10 @@ export const DIALOGS: DialogCase[] = [
     open: press(button), dialog: anyDialog,
   })),
   {
-    id: "submit a new version", screen: "paper-view", sources: ["features/records/paper-view/NewVersionDialog.tsx"],
+    id: "submit a new version", screen: "paper-view",
+    sources: ["features/records/paper-view/NewVersionDialog.tsx"],
+    // Submitted from Review's Documents tab, where the owner uploads (IR-1318).
+    path: `/records/${PAPER.id}?section=review&documents=open`,
     override: (api) => {
       api.on("GET", `/records/${PAPER.id}/tracker/`, { ...TRACKER, workflow_state: "revision_requested", workflow_state_label: "Revision requested" });
       api.on("GET", `/records/${PAPER.id}/document-requests/`, []);
@@ -469,8 +485,8 @@ export const DIALOGS: DialogCase[] = [
   {
     id: "ask iris chat history on a narrow screen", screen: "ask-iris-conversation", sources: ["features/ai/components/ChatDrawer.tsx", "features/ai/RAGChatPage.tsx"],
     viewport: { width: 640, height: 900 },
-    // IR-1233: the one pane toggle, "Show conversations", opens this dialog at 640px and below.
-    open: press("Show conversations"), dialog: (page) => page.getByRole("dialog", { name: "Conversations" }),
+    // IR-1233: the one pane toggle, "Show history", opens this dialog at 640px and below.
+    open: press("Show history"), dialog: (page) => page.getByRole("dialog", { name: "History" }),
   },
   consoleAction("assign a reviewer", "Assign", "pool", "features/review/AssignReviewerDialog.tsx"),
   consoleAction("reassign a reviewer", "Reassign", "seat", "features/review/ReassignDialog.tsx"),

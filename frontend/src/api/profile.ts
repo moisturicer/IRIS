@@ -1,5 +1,5 @@
 /**
- * The profile fields a person edits on the Edit profile page (IR-699, IR-933).
+ * The profile fields a person edits in Settings' Profile section (IR-699, IR-933, IR-1304).
  *
  * This is the only module that speaks IR-695's API contract (the comment on
  * IR-695 in Jira), so if a field or path changes there, it changes here and

@@ -57,6 +57,7 @@ from .serializers import (
     DownloadRequestSerializer,
     DeleteRequestSerializer,
 )
+from .completion import with_completion_year
 from .filters import RecordFilter, RecordOrderingFilter
 from .services import ImportChoices, check_import_pdf, check_import_row, soft_delete_record, parse_excel_import
 from apps.notifications.services import (
@@ -1196,6 +1197,23 @@ class RecordViewSet(viewsets.ModelViewSet):
             finish_review.FinishError, revisions.RevisionError, routing.RoutingError,
             office_review.OfficeReviewError, decisions.DecisionError,
         )
+        # *Request changes* may carry documents (ADR-022 Amendment 8, IR-1322),
+        # checked against the picklist as a document request's are.
+        documents = request.data.get("documents") or []
+        new_version = request.data.get("new_version", True)
+        if not isinstance(new_version, bool):
+            return Response({"new_version": ["Say true or false."]}, status=status.HTTP_400_BAD_REQUEST)
+        specs = []
+        if documents:
+            from apps.documents.request_serializers import DocumentRequestCreateSerializer
+
+            checked = DocumentRequestCreateSerializer(
+                data={"message": finish_review.DOCUMENTS_MESSAGE, "items": documents},
+                context={"record": record},
+            )
+            if not checked.is_valid():
+                return Response(checked.errors, status=status.HTTP_400_BAD_REQUEST)
+            specs = checked.validated_data["items"]
         try:
             finish_review.finish_review(
                 record, request.user,
@@ -1204,6 +1222,8 @@ class RecordViewSet(viewsets.ModelViewSet):
                 to=request.data.get("to"),
                 suggested_offices=request.data.get("suggested_offices"),
                 token=request.data.get("token"),
+                documents=specs,
+                new_version=new_version,
             )
         except finish_review.FinishNotFound:
             raise Http404(f"No {Record._meta.object_name} matches the given query.")
@@ -1513,6 +1533,52 @@ class RecordViewSet(viewsets.ModelViewSet):
         record.refresh_from_db()
         return Response(tracker_payload(record, request.user))
 
+    @action(detail=True, methods=["post"], url_path="documents/send")
+    def send_documents(self, request, pk=None):
+        """
+        POST /records/<id>/documents/send/  (no body)
+
+        *Submit added documents* (ADR-022 Amendment 8, IR-1322): an owner sends
+        every upload they are holding, which answers the document requests
+        they fulfil, each asking party told once. No Version is written and no
+        review round starts. 404 for a record the caller cannot see, 403 for
+        a caller who does not own it, 409 while a revision is open (the owner
+        sends with *Submit new version*), 400 when nothing is held. Answers
+        with how many uploads went and how many requests they fulfilled.
+        """
+        from django.db import transaction
+
+        from apps.audit.services import create_audit_event
+        from apps.documents.models import RecordUpload
+        from apps.documents.requests import may_fulfil, send_held_uploads
+        from apps.reviews import revisions
+
+        record = self.get_object()
+        if not may_fulfil(record, request.user):
+            return Response(
+                {"detail": "Only the record's owners can send its documents."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        with transaction.atomic():
+            if revisions.open_requests(record).exists():
+                return Response(
+                    {"detail": "A revision is asked for, so these go with the new version. "
+                               "Use Submit new version."},
+                    status=status.HTTP_409_CONFLICT,
+                )
+            if not RecordUpload.objects.filter(record=record).held().exists():
+                return Response(
+                    {"detail": "There's nothing to send: upload a document first."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            sent = send_held_uploads(record, request.user)
+            # Recorded as an upload event: what reached the reviewers, and when.
+            create_audit_event(
+                "UPLOAD", request.user, record=record,
+                metadata={"sent": sent.uploads, "requests_fulfilled": [r.pk for r in sent.fulfilled]},
+            )
+        return Response({"sent": sent.uploads, "requests_fulfilled": len(sent.fulfilled)})
+
     @action(detail=True, methods=["post"], url_path="discard-revised-manuscript")
     def discard_revised_manuscript(self, request, pk=None):
         """
@@ -1724,15 +1790,15 @@ class RecordViewSet(viewsets.ModelViewSet):
         """GET /records/facets/ -- the filter choices Discover offers (IR-560).
 
         Drawn from the whole catalogue `list` serves, so a year held only by
-        Records beyond the first page is still offered. `year_accomplished`
+        Records beyond the first page is still offered. The completion year
         is what `year_from`/`year_to` filter on, so every year returns a
         Record. Distinct values only: no count of anything is exposed.
         """
         years = (
-            self.get_queryset()
-            .exclude(year_accomplished__isnull=True)
-            .order_by("-year_accomplished")
-            .values_list("year_accomplished", flat=True)
+            with_completion_year(self.get_queryset())
+            .exclude(completion_year__isnull=True)
+            .order_by("-completion_year")
+            .values_list("completion_year", flat=True)
             .distinct()
         )
         return Response({"years": list(years)})

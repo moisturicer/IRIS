@@ -130,7 +130,7 @@ def unchanged_reason(record, requests) -> Optional[str]:
         return None
     if RecordUpload.objects.filter(
         record=record, created_at__gt=since, uploaded_by__owned_records__record=record,
-    ).exists():
+    ).exists() or RecordUpload.objects.filter(record=record).held().exists():
         return None
     who = revisions.join_labels([_label(p) for p in _parties(requests)])
     return (
@@ -181,6 +181,29 @@ def _kept_offices(record, reset) -> list[str]:
     )
 
 
+def unsent(record) -> dict:
+    """
+    What the owner has changed that no version carries yet (IR-1318), so the
+    Documents tab can mark it *not yet submitted*: a revised manuscript, edited
+    details, and every upload still held (ADR-022 Amendment 8, IR-1322), which
+    the next send carries.
+    """
+    from apps.documents.models import RecordUpload
+
+    latest = latest_version(record)
+    if latest is None:
+        return {"manuscript": False, "details": False, "uploads": []}
+    uploads = (
+        RecordUpload.objects.filter(record=record).held()
+        .select_related("slot").order_by("created_at", "pk")
+    )
+    return {
+        "manuscript": stored_manuscript_unsubmitted(record),
+        "details": record.details_edited_at is not None and record.details_edited_at > latest.created_at,
+        "uploads": [{"id": u.pk, "label": u.slot.name} for u in uploads],
+    }
+
+
 def new_version_hint(record, user) -> Optional[dict]:
     """
     What record detail tells an owner about the version they would submit
@@ -193,7 +216,8 @@ def new_version_hint(record, user) -> Optional[dict]:
       `RESTART_ALL` the completed offices it reopens;
     - `kept`: the offices whose `cleared` clearance it keeps;
     - `blocked`: why it cannot be submitted yet;
-    - `letter`: the response to reviewers it would carry (IR-876).
+    - `letter`: the response to reviewers it would carry (IR-876);
+    - `unsent`: what it would carry that no version does yet (IR-1318).
     """
     if not routing.is_in_review(record) or not is_record_owner(user, record):
         return None
@@ -211,6 +235,7 @@ def new_version_hint(record, user) -> Optional[dict]:
         "kept": [_label(o) for o in kept],
         "blocked": unchanged_reason(record, requests) or new_version_blocked_reason(record, requests),
         "letter": response_letter.assemble(record, requests),
+        "unsent": unsent(record),
     }
 
 
@@ -291,6 +316,11 @@ def submit_new_version(record, actor):
     now = timezone.now()
 
     previous = latest_version(record)
+    # Every held upload goes with this version, so it names them, and they
+    # answer what they answer (ADR-022 Amendment 8, point 4; IR-1322).
+    from apps.documents.requests import send_held_uploads
+
+    send_held_uploads(record, actor)
     version = write_version(record, actor, VersionCause.REVISION)
     # Frozen before the requests resolve, from the same open threads the
     # owner was shown (ADR-032 §7, IR-876).

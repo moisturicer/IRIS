@@ -99,6 +99,26 @@ class UploadStatus(models.Model):
     def __str__(self): return self.name
 
 
+class RecordUploadQuerySet(models.QuerySet):
+    """
+    Held and sent uploads (ADR-022 Amendment 8, IR-1322). An owner's upload to
+    a submitted Record is *held* (`sent_at` null) until *Submit new version*
+    or *Submit added documents* sends it; until then it is the owners' alone.
+    """
+
+    def sent(self):
+        return self.filter(sent_at__isnull=False)
+
+    def held(self):
+        return self.filter(sent_at__isnull=True)
+
+    def visible_to(self, user, record):
+        """The one predicate: every upload for an owner, the sent ones for anyone else."""
+        from core.permissions import is_record_owner
+
+        return self if is_record_owner(user, record) else self.sent()
+
+
 class RecordUpload(models.Model):
     """
     A versioned file uploaded to a specific UploadSlot for a Record.
@@ -115,6 +135,17 @@ class RecordUpload(models.Model):
         "accounts.User", on_delete=models.SET_NULL, null=True, related_name="uploaded_documents"
     )
     created_at  = models.DateTimeField(auto_now_add=True)
+    #: When it reached the reviewers (ADR-022 Amendment 8, IR-1322). Null while
+    #: an owner's upload to a submitted Record is held, unsent. Sent unless
+    #: `create_upload` holds it, so a file stored any other way (seed_demo, a
+    #: test) is never hidden from reviewers by accident.
+    sent_at     = models.DateTimeField(null=True, blank=True, default=timezone.now)
+
+    objects = RecordUploadQuerySet.as_manager()
+
+    @property
+    def held(self) -> bool:
+        return self.sent_at is None
 
     class Meta:
         ordering = ["-version"]

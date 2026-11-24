@@ -100,6 +100,8 @@ It was **not** run on a real CIT-U thesis, and it didn't test figures, equations
 4. **Every other removal asks first.** Paper View confirms before deleting a document version or an office file, and it offers no Remove at all on a file the server says is kept (`delete_refused`), showing the server's reason instead.
 5. **The reconstructed label is one flag per Version** (`RecordVersion.documents_reconstructed`), true for every Version written before IR-872, because within one old Version every row is equally a guess.
 
+**Amendment, 2026-11-24 (IR-1322; decided by Hermoine Zozobrado, accepted when its pull request merges).** An owner's upload to a submitted Record is held until *Submit new version* or *Submit added documents* sends it ([ADR-022](022-explicit-document-requests.md) Amendment 8). A held upload joins no Version, is seen only by the Record's owners and may be deleted by them. Point 2's "added during vN" reads the time it was sent (`RecordUpload.sent_at`), not the time it was stored.
+
 ### 3. Comparison
 
 - **A pure comparison** (`apps/reviews/comparison.py`) aligns two Versions' texts by section heading, then compares the passages in each section sentence by sentence. Each section reads unchanged, changed, added, removed or moved, and each passage added, removed or changed, with its page and regions in *both* Versions (ADR-031's region format).

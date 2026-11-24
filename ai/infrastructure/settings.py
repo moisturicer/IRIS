@@ -40,6 +40,8 @@ class Settings(BaseSettings):
     RUNS_AGENT_MODEL: str = ""
     RUNS_AGENT_BOUNDS: str = ""
     RUNS_AGENT_RESERVES: str = ""
+    # Resends of a model attempt that failed in transit, 0 to 3 (IR-1286). Required.
+    RUNS_AGENT_PROVIDER_RETRIES: str = ""
     #: Optional (IR-734); blank never compacts.
     RUNS_AGENT_COMPACTION: str = ""
     RUNS_AGENT_CHECKS: str = "enforce"

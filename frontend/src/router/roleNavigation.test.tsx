@@ -102,7 +102,7 @@ describe("the office console address (IR-1085)", () => {
 
   it.each([ROLES.ITSO, ROLES.RDCO])("opens for %s, and the sidebar links to it", async (role) => {
     const router = visit("/review/office", role, false, REVIEWS);
-    expect(await screen.findByRole("link", { name: "Office console" })).toHaveAttribute("href", "/review/office");
+    expect(await screen.findByRole("link", { name: "Office Console" })).toHaveAttribute("href", "/review/office");
     expect(screen.queryByRole("heading", { name: "Access denied" })).not.toBeInTheDocument();
     expect(router.state.location.pathname).toBe("/review/office");
   });

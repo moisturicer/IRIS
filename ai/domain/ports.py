@@ -9,6 +9,9 @@ class UnsupportedCapability(Exception):
 class TransientProviderError(Exception):
     """A sent attempt failed in a way another attempt may not (IR-725)."""
 
+    #: False when part of the attempt already reached the reader (IR-1286).
+    replayable = True
+
 
 class ProviderRejected(Exception):
     """The vendor refused a sent attempt; another attempt would be refused too (IR-860)."""

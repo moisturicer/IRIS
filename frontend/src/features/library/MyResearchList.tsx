@@ -38,7 +38,7 @@ function Group({ group, open, onDeleted }: { group: FilterGroup; open: boolean; 
           {waiting && <i className="fas fa-circle-exclamation text-small" aria-hidden />}
           {group.title}
         </h2>
-        <span className="col-start-2 text-small text-stone-600">{group.note}</span>
+        {group.note && <span className="col-start-2 text-small text-stone-600">{group.note}</span>}
       </summary>
       <div className="mt-3">
         <SubmissionPanel tone={waiting ? "waiting" : "plain"}>

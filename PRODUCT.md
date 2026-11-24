@@ -45,11 +45,11 @@ IRIS has two mechanisms a neighbouring product could not truthfully claim:
 
 ## Brand Commitments
 
-- **The maroon brand (`#6B0F12`) is the institution's identity** and stays. The interface uses white, black, grey (`stone`) and maroon only.
+- **The maroon brand (`#6B0F12`) is the institution's identity** and stays. The interface uses white, black, grey (`stone`) and maroon, plus a green and an amber for status only (IR-1290, reversing part of IR-1097's Four Inks Rule): green for cleared and kept, amber for in review and reset, and a maroon outline, never a solid fill, for what needs someone. Solid maroon is the one primary action.
 - **Type:** Inter for the interface, EB Garamond for titles.
 - **The project lead's direction:** user-friendly, modern, artistic yet simple, like other education institutions' websites.
 - **Pinned redesign brief:** refine the existing IRIS interface within its fixed tokens; do not replace its visual identity or introduce a new palette, type scale or webfont.
-- **Gold is decorative only.** Its contrast is about 2.8:1 on white, so it is never text or the only status signal.
+- **Gold is decorative only.** Its contrast is about 2.8:1 on white, so it is never text or the only status signal. IR-1290 adds no gold: it stays out of the interface.
 - **Design system changes are recorded in `docs/ui-ux/01-design-system.md`** in the same change.
 
 ## Evidence on Hand

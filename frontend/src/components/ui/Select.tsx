@@ -27,6 +27,12 @@ type SelectProps = Omit<SelectHTMLAttributes<HTMLSelectElement>, "size" | "requi
   label?:    string;
   error?:    string;
   hint?:     ReactNode;
+  /**
+   * Keeps a one-line slot under the field for its hint or error, even when
+   * there is neither, so a message appearing never moves what is below it
+   * (IR-1303). Off by default: most forms let the message take its own room.
+   */
+  reserveErrorSpace?: boolean;
   size?:     Size;
   /**
    * Puts the label beside the control instead of above it, for a toolbar
@@ -52,6 +58,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       hint,
       size = "md",
       inline = false,
+      reserveErrorSpace = false,
       required,
       optional,
       className = "",
@@ -80,11 +87,26 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       .filter(Boolean)
       .join(" ");
 
+    const message = (
+      <>
+        {error && (
+          <p id={errorId} className="flex items-start gap-1.5 text-small text-brand">
+            <i className="fas fa-circle-exclamation mt-0.5 shrink-0" aria-hidden />
+            {error}
+          </p>
+        )}
+        {hint && !error && <p id={hintId} className="text-small text-stone-600">{hint}</p>}
+      </>
+    );
+
     return (
       <div className="flex flex-col gap-1">
         <div className={inline ? "flex items-center gap-2" : "flex flex-col gap-1"}>
           {label && <FieldLabel htmlFor={selectId} label={label} optional={optional} />}
-          <div className="relative">
+          {/* Inline, the control takes the rest of its row, so a caller that
+              sizes the row sizes the box: it then keeps that width whatever its
+              options are (IR-1313). Not inline, it already fills its column. */}
+          <div className={inline ? "relative min-w-0 flex-1" : "relative"}>
             <select
               ref={ref}
               id={selectId}
@@ -114,13 +136,9 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
             </span>
           </div>
         </div>
-        {error && (
-          <p id={errorId} className="flex items-start gap-1.5 text-small text-brand">
-            <i className="fas fa-circle-exclamation mt-0.5 shrink-0" aria-hidden />
-            {error}
-          </p>
-        )}
-        {hint && !error && <p id={hintId} className="text-small text-stone-600">{hint}</p>}
+        {/* One `small` line (20px) is the slot's height, so a one-line message
+            fills it exactly; a longer one still grows it (IR-1303). */}
+        {reserveErrorSpace ? <div className="min-h-5">{message}</div> : message}
       </div>
     );
   }

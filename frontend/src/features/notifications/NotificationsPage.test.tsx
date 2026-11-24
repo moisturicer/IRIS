@@ -1,7 +1,7 @@
 /**
  * Notifications when its list fails to load (IR-745): "No notifications yet"
  * after an error would be untrue. And the page's shape (IR-1137): All / Unread
- * segments, day groups, an Open button on each record's row.
+ * segments, day groups, each record's row a link to it.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -47,7 +47,7 @@ describe("Notifications", () => {
     expect(await screen.findByRole("heading", { name: "No notifications yet." })).toBeInTheDocument();
   });
 
-  it("gives a record's notification an Open button, and opening it marks it read", async () => {
+  it("makes a record's notification a link to it, and opening it marks it read", async () => {
     markRead.mockResolvedValue({});
     list.mockResolvedValueOnce({
       data: {
@@ -61,9 +61,8 @@ describe("Notifications", () => {
     });
     renderScreen(<NotificationsPage />);
 
-    const link = await screen.findByRole("link", { name: /Open: .*ITSO finished its review of "Tide Gauge"/ });
+    const link = await screen.findByRole("link", { name: /ITSO finished its review of "Tide Gauge"/ });
     expect(link).toHaveAttribute("href", "/records/42");
-    expect(link).toHaveTextContent("Open");
 
     await userEvent.click(link);
     expect(markRead).toHaveBeenCalledWith(7);
@@ -80,7 +79,7 @@ describe("Notifications", () => {
     });
     renderScreen(<NotificationsPage />);
 
-    const link = await screen.findByRole("link", { name: /Open: RDCO did not confirm your call/ });
+    const link = await screen.findByRole("link", { name: /RDCO did not confirm your call/ });
     expect(link).toHaveAttribute("href", "/opportunities/mine");
     expect(screen.queryByRole("button", { name: "Mark as read" })).toBeNull();
   });
@@ -202,7 +201,7 @@ describe("Notifications", () => {
       // The settled one says what happened, from the server's words alone,
       // in a pill beside its date; it is still openable.
       expect(screen.getByText("Reviewed by you on 20 Oct")).toBeInTheDocument();
-      expect(screen.getAllByRole("link", { name: /^Open:/ })).toHaveLength(2);
+      expect(screen.getAllByRole("link")).toHaveLength(2);
     });
 
     it("is not counted as unread, nor shown under the Unread filter", async () => {
@@ -211,7 +210,7 @@ describe("Notifications", () => {
 
       await userEvent.click(await screen.findByRole("button", { name: "Unread 1" }));
 
-      expect(screen.getByRole("link", { name: /Open: .*It waits in ITSO's pool/ })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /It waits in ITSO's pool/ })).toBeInTheDocument();
       expect(screen.queryByRole("link", { name: /Review the new version/ })).not.toBeInTheDocument();
     });
 

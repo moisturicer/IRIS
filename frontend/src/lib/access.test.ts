@@ -98,12 +98,12 @@ test("whether someone authors is the server's flag, never their role (IR-1096)",
   assertEqual(canAuthor({ role_name: ROLES.ITSO, can_author: true } as never), true, "ITSO, flag true");
 });
 
-test("Notifications is the bell, not a sidebar link, and its page stays open (IR-519)", () => {
-  // The bell at the top of the sidebar is the one notification entry; a link
-  // beside it said the same thing twice. Its "View all" still reaches the page.
+test("Notifications is a sidebar link for every role, and its page stays open", () => {
+  // It replaced the bell in the sidebar's header, which crowded the logo and
+  // the collapse button. The phone bar keeps a bell of its own.
   for (const role of EVERY_ROLE) {
     assertEqual(
-      navFor(role).some((item) => item.key === "notifications"), false,
+      navFor(role).some((item) => item.key === "notifications" && item.to === "/notifications"), true,
       `${role} sidebar lists Notifications`,
     );
     assertEqual(canAccess(role, "notifications"), true, `${role} may open /notifications`);
@@ -120,20 +120,20 @@ const labels = (role: RoleName, access?: { my_reviews: boolean; is_coordinator?:
 
 test("every role shares one short main list, in the spec's order", () => {
   expect(labels(ROLES.STUDENT)).toEqual([
-    "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: Calls & Conferences", "Main: Guidelines",
+    "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: Notifications", "Main: Calls & Conferences", "Main: Guidelines",
   ]);
   // The Adviser included since IR-534: Discover is its home, so the Submit
   // Disclosure shortcut it kept until then is gone. No office, so nothing
   // nests under My Reviews. My Templates is the Adviser's alone (IR-975).
   expect(labels(ROLES.ADVISER, REVIEW_WORK)).toEqual([
-    "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: My Reviews", "Main: My Templates",
+    "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: Notifications", "Main: My Reviews", "Main: My Templates",
     "Main: Calls & Conferences", "Main: Guidelines",
   ]);
   // An office member has the same list: Workflow analytics is RDCO's alone
   // since IR-1216, and the console is the coordinator's alone.
   for (const role of [ROLES.ITSO, ROLES.IERC, ROLES.KTTO]) {
     expect(labels(role, REVIEW_WORK)).toEqual([
-      "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: My Reviews", "Main: Calls & Conferences",
+      "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: Notifications", "Main: My Reviews", "Main: Calls & Conferences",
       "Main: Guidelines",
     ]);
   }
@@ -142,10 +142,10 @@ test("every role shares one short main list, in the spec's order", () => {
 test("RDCO's coordination screens, Import records included, are one RDCO group", () => {
   // Workflow analytics is in this group since IR-1216, not under My Reviews.
   expect(labels(ROLES.RDCO, REVIEW_WORK)).toEqual([
-    "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: My Reviews", "Main: Calls & Conferences",
-    "Main: Guidelines", "RDCO: Import records", "RDCO: Users", "RDCO: Role requests", "RDCO: Download requests",
-    "RDCO: Call requests", "RDCO: Delete requests", "RDCO: Reported comments",
-    "RDCO: Workflow analytics", "RDCO: Setup",
+    "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: Notifications", "Main: My Reviews", "Main: Calls & Conferences",
+    "Main: Guidelines", "RDCO: Import Records", "RDCO: Users", "RDCO: Role Requests", "RDCO: Download Requests",
+    "RDCO: Call Requests", "RDCO: Delete Requests", "RDCO: Reported Comments",
+    "RDCO: Workflow Analytics", "RDCO: Setup",
   ]);
 });
 
@@ -160,12 +160,12 @@ describe("the pages nested under My Reviews (IR-1085, D5)", () => {
 
   test("a coordinator reaches the console at its existing address, and nothing else nests", () => {
     expect(nested(ROLES.ITSO, COORDINATOR_WORK)).toEqual([
-      { label: "Office console", to: "/review/office" },
+      { label: "Office Console", to: "/review/office" },
     ]);
   });
 
   test("RDCO's coordinator gets it too, and a missing flag is not a coordinator", () => {
-    expect(nested(ROLES.RDCO, COORDINATOR_WORK).map((i) => i.label)).toEqual(["Office console"]);
+    expect(nested(ROLES.RDCO, COORDINATOR_WORK).map((i) => i.label)).toEqual(["Office Console"]);
     expect(nested(ROLES.RDCO, { my_reviews: true, is_coordinator: undefined })).toEqual([]);
   });
 
@@ -190,12 +190,12 @@ describe("the pages nested under My Reviews (IR-1085, D5)", () => {
   });
 });
 
-test("the System Admin's nav is Discover, Users, Audit Log, Account Deletions, Reported comments and Retention (IR-783, IR-788, IR-693, IR-795, IR-972)", () => {
+test("the System Admin's nav is Discover, Notifications, Users, Audit Log, Account Deletions, Reported comments and Retention (IR-783, IR-788, IR-693, IR-795, IR-972)", () => {
   // No Guidelines link (IR-974, ADR-063 amendment 2026-11-19).
   expect(labels(ROLES.SYSTEM_ADMIN)).toEqual([
-    "Main: Discover",
+    "Main: Discover", "Main: Notifications",
     "Administration: Users", "Administration: Audit Log", "Administration: Account Deletions",
-    "Administration: Reported comments", "Administration: Retention",
+    "Administration: Reported Comments", "Administration: Retention",
   ]);
 });
 
@@ -203,7 +203,7 @@ test("the System Admin's nav is Discover, Users, Audit Log, Account Deletions, R
 // System Admin's navigation and nobody else's.
 test("the Reported comments page is RDCO's and the System Admin's alone, at /moderation/comments", () => {
   for (const role of Object.values(ROLES)) {
-    const page = navFor(role).filter((item) => item.label === "Reported comments");
+    const page = navFor(role).filter((item) => item.label === "Reported Comments");
     const allowed = role === ROLES.RDCO || role === ROLES.SYSTEM_ADMIN;
     expect(page.map((item) => item.to), role).toEqual(allowed ? ["/moderation/comments"] : []);
   }
@@ -353,14 +353,14 @@ test("Student sees no administration section at all", () => {
 // IR-783: each office has its own addresses and named section.
 test("RDCO coordination links use the RDCO section and addresses", () => {
   expect(navFor(ROLES.RDCO).filter((item) => item.section !== "Main").map(({ label, to, section }) => ({ label, to, section }))).toEqual([
-    { label: "Import records", to: "/records/import", section: "RDCO" },
+    { label: "Import Records", to: "/records/import", section: "RDCO" },
     { label: "Users", to: "/rdco/users", section: "RDCO" },
-    { label: "Role requests", to: "/rdco/role-requests", section: "RDCO" },
-    { label: "Download requests", to: "/rdco/download-requests", section: "RDCO" },
-    { label: "Call requests", to: "/rdco/call-requests", section: "RDCO" },
-    { label: "Delete requests", to: "/rdco/delete-requests", section: "RDCO" },
-    { label: "Reported comments", to: "/moderation/comments", section: "RDCO" },
-    { label: "Workflow analytics", to: "/rdco/analytics", section: "RDCO" },
+    { label: "Role Requests", to: "/rdco/role-requests", section: "RDCO" },
+    { label: "Download Requests", to: "/rdco/download-requests", section: "RDCO" },
+    { label: "Call Requests", to: "/rdco/call-requests", section: "RDCO" },
+    { label: "Delete Requests", to: "/rdco/delete-requests", section: "RDCO" },
+    { label: "Reported Comments", to: "/moderation/comments", section: "RDCO" },
+    { label: "Workflow Analytics", to: "/rdco/analytics", section: "RDCO" },
     { label: "Setup", to: "/rdco/setup", section: "RDCO" },
   ]);
 });

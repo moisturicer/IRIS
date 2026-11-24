@@ -1,4 +1,5 @@
 import { forwardRef, useEffect, useRef, useState } from "react";
+import { isControl } from "@/components/ui/isControl";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { dashboardApi, type QueueCounts } from "@/api/dashboard";
 import { onQueueCountsChanged } from "@/lib/queueCounts";
@@ -9,7 +10,7 @@ import { selectSidebarCollapsed, useUIStore } from "@/store/ui.store";
 import { cn } from "@/lib/utils";
 import { ASK_PATH } from "@/lib/askHandoff";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
-import { NotificationBell } from "./NotificationBell";
+import { useNotificationsStore } from "@/store/notifications.store";
 import { AccountMenu } from "./AccountMenu";
 import { ASK_IRIS_ICON, navFor, canAccess, NAV_SECTION_ORDER, type NavEntry, type NavSectionName } from "@/lib/access";
 import { AskIrisGlyph, IrisMark, IrisWordmark } from "@/components/brand/IrisBrand";
@@ -24,15 +25,11 @@ interface NavItem {
   label:  string;
   icon:   string;
   badge?: number;
+  /** What a screen reader hears after the badge's number: "pending" unless set. */
+  badgeWord?: string;
   /**
-   * An attention dot with no number, for something that is waiting on the
-   * user rather than a count worth reading (IR-534). The string is what a
-   * screen reader hears in its place.
-   */
-  dot?: string;
-  /**
-   * Pages listed under this row (IR-1085, D5): My Reviews' Office console
-   * (Workflow analytics moved to the RDCO group, IR-1216). A list inside the
+   * Pages listed under this row (IR-1085, D5): My Reviews' Office Console
+   * (Workflow Analytics moved to the RDCO group, IR-1216). A list inside the
    * row, so it reads as part of it.
    */
   children?: NavItem[];
@@ -46,7 +43,6 @@ interface NavItem {
 
 function NavItemLink({ item, collapsed, onNavigate, nested }: { item: NavItem; collapsed: boolean; onNavigate?: () => void; nested?: boolean }) {
   const badge = item.badge != null && item.badge > 0 ? item.badge : null;
-  const dot = badge == null ? item.dot : undefined;
   return (
     <li>
       {/* A tooltip for the rail, on hover and focus. Not the accessible name:
@@ -65,7 +61,7 @@ function NavItemLink({ item, collapsed, onNavigate, nested }: { item: NavItem; c
           cn(
             // 44px on the phone drawer; compact from md, where a pointer is (IR-1092).
             // A nested row gives up some padding and gap so a name like "Workflow
-            // analytics" fits at 240px without being cut short (IR-1180).
+            // Analytics" fits without being cut short (IR-1180).
             "group relative flex min-h-11 md:min-h-0 touch:min-h-11 items-center rounded-control py-2 text-sm",
             nested ? "gap-2 px-2" : "gap-3 px-3",
             collapsed && "md:h-10 md:justify-center md:px-0",
@@ -102,21 +98,12 @@ function NavItemLink({ item, collapsed, onNavigate, nested }: { item: NavItem; c
                 )}
               >
                 <span aria-hidden>{badge > 9 ? "9+" : badge}</span>
-                <span className="sr-only">, {badge} pending</span>
+                <span className="sr-only">, {badge} {item.badgeWord ?? "pending"}</span>
               </span>
-            )}
-            {dot != null && (
-              <>
-                <span
-                  aria-hidden
-                  className={cn("h-2 w-2 flex-shrink-0 rounded-full bg-brand", collapsed && "md:hidden")}
-                />
-                <span className="sr-only">, {dot}</span>
-              </>
             )}
             {/* The rail has no room for the number, so a dot marks it; the
                 count itself is still read out from the sr-only badge above. */}
-            {collapsed && (badge != null || dot != null) && (
+            {collapsed && badge != null && (
               <span aria-hidden className="absolute right-2 top-1.5 hidden h-2 w-2 rounded-full bg-brand ring-2 ring-white md:block" />
             )}
           </>
@@ -235,16 +222,17 @@ interface SidebarProps {
  * The app's navigation (IR-413, spec §4.1).
  *
  * Discover and research links, RDCO's coordination group, and the System
- * Admin's Administration group. My Reviews carries the Office console under
- * it for coordinators (IR-1085, D5); Workflow analytics is RDCO's (IR-1216). The
- * bell is at the top (IR-519); the account menu is at the bottom, and Help is
+ * Admin's Administration group. My Reviews carries the Office Console under
+ * it for coordinators (IR-1085, D5); Workflow Analytics is RDCO's (IR-1216). The
+ * Notifications is a link of its own with the unread count, not a bell in the
+ * header; the account menu is at the bottom, and Help is
  * in Settings (IR-1217). Below `md` it is a
  * drawer `AppShell` opens and closes. From 768 to 1023 px it is the 76 px icon
  * rail, and the sidebar button opens the full sidebar over the page (IR-1086).
  * From 1024 px it is at full width, or as the rail if the user chooses (stored
  * per browser; the choice is not read below 1024 px).
  *
- * The sidebar button (IR-1260) is a visible control beside the bell, and `[`
+ * The sidebar button (IR-1260) is a visible control beside the wordmark, and `[`
  * does the same. On the rail the IRIS mark is the expand button: the logo at
  * rest, the sidebar icon on hover or focus, so it shows what it does before
  * it is pressed. On the full sidebar the mark is the logo, a link home.
@@ -289,8 +277,10 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [mode]);
+  const unreadCount = useNotificationsStore((s) => s.unreadCount);
   const [queueCounts, setQueueCounts] = useState<QueueCounts>(NO_QUEUES);
-  const [needsAction, setNeedsAction] = useState(false);
+  /** My Library's count: the user's records waiting on them (IR-1310). */
+  const [libraryWaiting, setLibraryWaiting] = useState<number | undefined>(undefined);
   /** My Reviews' To review count, from the same stats read (IR-1208). */
   const [reviewsWaiting, setReviewsWaiting] = useState<number | undefined>(undefined);
   const { pathname, search } = useLocation();
@@ -305,7 +295,7 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
 
   // The queues' counts, in one call (IR-1138): RDCO's three and the Reported
   // comments queue RDCO shares with the System Admin (IR-693). Read again when
-  // the address changes, as the Library dot is, and when a decision is made on
+  // the address changes, as the Library count is, and when a decision is made on
   // a queue page. Only those two roles ask; a failed read shows no count
   // rather than a stale one.
   const showsQueues = canAccess(roleName as never, "roleRequests")
@@ -329,26 +319,27 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
     return () => { live = false; off(); };
   }, [showsQueues, pathname, search, queuesTick]);
 
-  // My Library's dot: some record of the user's waits on them -- a revision or
-  // a document was asked for (B2, `needs_action_mine`). The same read carries
+  // My Library's count: the user's records waiting on them -- a revision or
+  // a document was asked for (B2, `needs_action_mine`; a dot until IR-1310).
+  // The same read carries
   // My Reviews' count, the reviews waiting on the user (IR-1208, the To review
   // tab's own number, `reviews_waiting_mine`). Asked again whenever
   // the address changes, query string included -- Paper View's sections are
   // `?section=` -- so answering the request clears it without a reload.
-  // A failed read shows no dot rather than a stale one.
+  // A failed read shows no count rather than a stale one.
   const showsLibrary = nav.some((entry) => entry.key === "library");
   useEffect(() => {
-    if (!showsLibrary) { setNeedsAction(false); setReviewsWaiting(undefined); return; }
+    if (!showsLibrary) { setLibraryWaiting(undefined); setReviewsWaiting(undefined); return; }
     let live = true;
     dashboardApi
       .stats()
       .then(({ data }) => {
         if (!live) return;
-        setNeedsAction((data.needs_action_mine ?? 0) > 0);
+        setLibraryWaiting(data.needs_action_mine);
         // The same number as My Reviews' To review tab (IR-1208).
         setReviewsWaiting(data.reviews_waiting_mine);
       })
-      .catch(() => { if (live) { setNeedsAction(false); setReviewsWaiting(undefined); } });
+      .catch(() => { if (live) { setLibraryWaiting(undefined); setReviewsWaiting(undefined); } });
     return () => { live = false; };
   }, [pathname, search, showsLibrary, statsTick]);
 
@@ -358,22 +349,32 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
   const BADGES: Partial<Record<NavEntry["key"], number | undefined>> = {
     // Reviews waiting on the user, for every reviewer with work (IR-1208).
     reviewQueue: reviewsWaiting,
+    // The user's records waiting on them (IR-1310), a number like the others.
+    library: libraryWaiting,
     roleRequests: queueCounts.role_change_requests,
     downloadRequests: queueCounts.download_requests,
     deleteRequests: queueCounts.delete_requests,
     reportedComments: queueCounts.reported_comments,
     adminReportedComments: queueCounts.reported_comments,
+    // Unread notifications, from the store AppShell fills (IR-370), so the
+    // count and the phone bar's bell always agree.
+    notifications: unreadCount,
   };
-  // A dot, not a count: what matters is that something waits (spec §4.2).
-  const DOTS: Partial<Record<NavEntry["key"], string | undefined>> = {
-    library: needsAction ? "something needs your action" : undefined,
+
+  // What a screen reader hears after a count, where "pending" is not it.
+  // Notifications are unread (IR-370); My Library's records wait on the user
+  // (IR-1310), worded so one reads as well as many.
+  const BADGE_WORDS: Partial<Record<NavEntry["key"], string>> = {
+    notifications: "unread",
+    library: "waiting on you",
   };
 
   const toItem = (entry: NavEntry): NavItem => {
     const children = nav.filter((child) => child.parent === entry.key).map(toItem);
     return {
       to: entry.to, label: entry.label, icon: entry.icon,
-      badge: BADGES[entry.key], dot: DOTS[entry.key],
+      badge: BADGES[entry.key],
+      badgeWord: BADGE_WORDS[entry.key],
       ...(children.length > 0 ? { children } : {}),
     };
   };
@@ -397,15 +398,21 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
       aria-label="Sidebar"
       // React 18 has no `inert` prop; an empty string sets the attribute.
       {...(inert ? { inert: "" } : {})}
+      // Collapsed, a press on its empty space opens it again (IR-1306). Links,
+      // buttons and the account menu keep their own job; the toggle stays the
+      // keyboard's way in.
+      onClick={collapsed ? (e) => { if (!isControl(e.target)) onToggle(); } : undefined}
       className={cn(
-        // Below md: a 240px drawer over the page. From md: 240px, or the 76px
+        // Below md: a 256px drawer over the page. From md: 256px, or the 76px
         // rail when collapsed. AppShell's left margin follows the same widths,
         // except that an opened tablet sidebar overlaps the page instead.
-        "fixed left-0 top-0 z-50 flex h-screen w-60 flex-col border-r border-stone-200 bg-surface",
+        // 256, not 240 (IR-1276): at 240 "Download Requests" and "Reported
+        // Comments" wrapped to two lines beside their count badge.
+        "fixed left-0 top-0 z-50 flex h-screen w-64 flex-col border-r border-stone-200 bg-surface",
         // `shell` carries transform (the drawer's slide) and width (the rail)
         // together; AppShell sets the translate classes, not a transition.
         "transition-shell duration-200 ease-out motion-reduce:transition-none",
-        collapsed ? "md:w-rail" : "md:w-60",
+        collapsed ? "md:w-rail md:cursor-e-resize" : "md:w-64",
         mode === "rail" && !collapsed && "shadow-card-md",
         className,
       )}
@@ -462,12 +469,9 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
             <IrisWordmark className="h-4 w-auto" />
             <span className="sr-only">IRIS</span>
           </p>
-          {/* From md only: below it the phone bar carries the bell, and a
-              second one in the drawer would put two on screen at once. The
-              phone's drawer has Close menu instead of the sidebar button. */}
+          {/* From md only: the phone's drawer has Close menu instead. */}
           {!collapsed && (
-            <div className="hidden flex-shrink-0 items-center gap-1 md:flex">
-              <NotificationBell align="start" />
+            <div className="hidden flex-shrink-0 items-center md:flex">
               <Tooltip label={toggleLabel} shortcut={SIDEBAR_KEY} className="block">
                 <button
                   type="button"
@@ -505,17 +509,9 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
             <i className="fas fa-xmark text-base" aria-hidden />
           </button>
         </div>
-        {/* Its own line, under the wordmark, so it never wraps beside the bell. */}
         <p className={cn("mt-1.5 break-words pl-12 text-3xs text-stone-500", collapsed && "md:hidden")}>
           Research-to-IP Platform
         </p>
-        {collapsed && (
-          <div className="mt-2.5 hidden justify-center md:flex">
-            <Tooltip label="Notifications">
-              <NotificationBell align="start" showTitle={false} />
-            </Tooltip>
-          </div>
-        )}
       </div>
 
       {/* ── Navigation ─────────────────────────────────────────────────── */}
