@@ -89,7 +89,7 @@ if [ -e "$FAKE/stale_frontend" ] && [ ! -e "$FAKE/restart_ran" ] && [[ "$url" ==
 exit "$(cat "$FAKE/curl_rc" 2>/dev/null || echo 0)"
 EOF
     chmod +x "$FAKE/bin/docker" "$FAKE/bin/curl"
-    printf '%s\n' db migrate backend frontend > "$FAKE/services"
+    printf '%s\n' db migrate ai-migrate backend frontend > "$FAKE/services"
     healthy > "$FAKE/ps"
 }
 
@@ -99,6 +99,7 @@ healthy() {
     printf '%s\n' \
         "db|running|healthy|0" \
         "migrate|exited||0" \
+        "ai-migrate|exited||0" \
         "backend|running||0" \
         "frontend|running||0"
 }
@@ -210,6 +211,37 @@ deploy; rc=$?
 check "the next run, with nothing new, rebuilds"  ran "up -d --build"
 check "and says why"                              said "hasn't been deployed by this script"
 check "and succeeds once migrate does"            [ "$rc" -eq 0 ]
+
+# IR-1320: the AI schema update is a one-shot too, and fails a deploy the same way.
+new_case ai-migrate-fails
+push_change "second"
+old="$(git -C "$CLONE" rev-parse HEAD)"
+echo 1 > "$FAKE/up_rc"
+healthy | sed 's/^ai-migrate|exited||0$/ai-migrate|exited||1/' > "$FAKE/ps_after_up"
+deploy; rc=$?
+check "fails"                                     [ "$rc" -ne 0 ]
+check "names the step"                            said "FAILED at step 3/5 (rebuild)"
+check "says the AI schema update failed"          said "ai-migrate didn't finish (exited 1): the AI schema update (iris_ai) failed"
+check "shows ai-migrate's log"                    said "last lines of ai-migrate"
+check "doesn't blame Django's migrate"            not_said "migrate didn't finish (exited 1): the database update"
+check "says how to go back to the old commit"     said "git checkout --detach ${old:0:8}"
+check "never checks the site"                     not_ran "curl"
+
+new_case migrate-fails-first
+push_change "second"
+echo 1 > "$FAKE/up_rc"
+healthy | sed -e 's/^migrate|exited||0$/migrate|exited||1/' -e '/^ai-migrate|/d' > "$FAKE/ps_after_up"
+deploy; rc=$?
+check "fails"                                     [ "$rc" -ne 0 ]
+check "names Django's migrate, which ran first"   said "migrate didn't finish (exited 1): the database update failed"
+check "not ai-migrate, which never started"       not_said "ai-migrate didn't finish"
+
+new_case ai-migrate-fails-after-up
+push_change "second"
+healthy | sed 's/^ai-migrate|exited||0$/ai-migrate|exited||3/' > "$FAKE/ps_after_up"
+deploy; rc=$?
+check "fails when the health check finds it failed" [ "$rc" -ne 0 ]
+check "at once, naming it"                        said "ai-migrate exited 3: the AI schema update (iris_ai) failed"
 
 new_case never-healthy
 push_change "second"
