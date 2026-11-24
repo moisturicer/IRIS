@@ -1,4 +1,4 @@
-import { useId, useState, type FormEvent } from "react";
+import { useCallback, useId, useState, type FormEvent } from "react";
 
 import { recordsApi } from "@/api/records";
 import { Button, Modal } from "@/components/ui";
@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import type { DecisionFlags, RecordDetail, ReviewComment, ReviewVerdict } from "@/types/records";
 
 import { closingLines } from "../DecisionDialog";
+import { RequestChangesFields, asksNothing, type ChangesAsked } from "./RequestChangesFields";
 import { plural, verdictOptions, type Thread } from "./threadModel";
 
 export interface FinishReviewDialogProps {
@@ -32,7 +33,7 @@ export interface FinishReviewDialogProps {
 
 const SUBMIT_WORDS: Record<ReviewVerdict, string> = {
   comment_only: "Send review",
-  request_revision: "Request revision",
+  request_revision: "Request changes",
   send_to_rdco: "Choose offices…",
   cleared: "Clear",
   finding: "Record finding",
@@ -44,7 +45,7 @@ const SUBMIT_WORDS: Record<ReviewVerdict, string> = {
 
 const DONE_WORDS: Record<Exclude<ReviewVerdict, "send_to_rdco">, string> = {
   comment_only: "Review sent. The authors and the other reviewers have been told.",
-  request_revision: "Revision requested. The owner has been notified.",
+  request_revision: "Changes requested. The authors have been notified.",
   cleared: "Cleared.",
   finding: "Finding recorded.",
   accept: "Accepted.",
@@ -73,12 +74,17 @@ export function FinishReviewDialog({ record, can, drafts, sent = [], initialVerd
   const [summary, setSummary] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  // *Request changes*' own fields (ADR-022 Amendment 8, IR-1322).
+  const [changes, setChanges] = useState<ChangesAsked>({ newVersion: true, documents: [] });
+  const onChanges = useCallback((asked: ChangesAsked) => setChanges(asked), []);
   const chosen = options.find((o) => o.verdict === verdict) ?? options[0];
+  const requestingChanges = chosen.verdict === "request_revision";
   const mustFix = drafts.filter((d) => d.severity === "must_fix").length;
 
   const missingReason = chosen.reasonRequired && summary.trim() === "";
   const empty = chosen.verdict === "comment_only" && summary.trim() === "" && drafts.length === 0;
-  const ready = chosen.unavailable === null && !missingReason && !empty;
+  const asksNone = requestingChanges && asksNothing(changes);
+  const ready = chosen.unavailable === null && !missingReason && !empty && !asksNone;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -94,6 +100,7 @@ export function FinishReviewDialog({ record, can, drafts, sent = [], initialVerd
         verdict: chosen.verdict,
         summary: summary.trim(),
         ...(chosen.decision ? { token: decision.token ?? "" } : {}),
+        ...(requestingChanges ? { new_version: changes.newVersion, documents: changes.documents } : {}),
       });
       onDone(DONE_WORDS[chosen.verdict as Exclude<ReviewVerdict, "send_to_rdco">]);
     } catch (err) {
@@ -152,6 +159,15 @@ export function FinishReviewDialog({ record, can, drafts, sent = [], initialVerd
             );
           })}
         </fieldset>
+
+        {requestingChanges && (
+          <RequestChangesFields recordId={record.id} offerDocuments={record.can_request_document.length > 0} onChange={onChanges} />
+        )}
+        {asksNone && (
+          <p className="text-small text-brand">
+            Choose a document, or say the paper itself needs changes. To send comments alone, choose Comment only.
+          </p>
+        )}
 
         <div>
           <label htmlFor={summaryId} className="mb-1.5 block text-small font-semibold text-stone-900">

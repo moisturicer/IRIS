@@ -146,7 +146,7 @@ export interface ClearanceStripEntry {
 export interface WaitingItem {
   kind:         "revision" | "document";
   party:        Party;
-  /** "Revision requested by IERC". */
+  /** "Changes requested by IERC" (IR-1322). */
   label:        string;
   /** The act that answers it: "Submit a new version". */
   action_label: string;
@@ -1257,6 +1257,9 @@ export interface FinishReviewRequest {
   to?:                RouteRequest["to"];
   suggested_offices?: string[];
   token?:             string;
+  /** *Request changes* only (ADR-022 Amendment 8, IR-1322). */
+  new_version?:       boolean;
+  documents?:         DocumentRequestItemInput[];
 }
 
 /** One finished review, on the tracker (IR-874). Review content. */

@@ -21,7 +21,7 @@ from django.db import transaction
 from rest_framework import status
 
 from apps.accounts.models import Role
-from apps.documents.requests import fulfil_item, resolve_item_for_upload
+from apps.documents.requests import resolve_item_for_upload, send_held_uploads
 from apps.documents.services import create_upload
 from apps.records.models import Record
 from core.enums import PipelineStatus, RoleName
@@ -36,11 +36,11 @@ SECOND = "Still unsigned on page 2."
 class RejectionHistoryTests(DecisionTestBase):
 
     def upload_directly(self, record, item_id):
-        """The owner answers `item_id`, as `documents/submit/` would."""
+        """The owner answers `item_id`: uploads, then sends it (ADR-022 Amendment 8)."""
         with self.captureOnCommitCallbacks(execute=True), transaction.atomic():
-            item, slot = resolve_item_for_upload(record, item_id)
+            _, slot = resolve_item_for_upload(record, item_id)
             upload = create_upload(record, slot, pdf(), self.owner)
-            fulfil_item(item, upload, uploaded_by=self.owner)
+            send_held_uploads(record, self.owner)
         return upload
 
     def rejected_twice(self):

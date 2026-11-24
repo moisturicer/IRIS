@@ -18,7 +18,13 @@ import { groupThreads } from "./threadModel";
 
 const finishReview = vi.fn();
 vi.mock("@/api/records", () => ({
-  recordsApi: { finishReview: (id: number, body: unknown) => finishReview(id, body) },
+  recordsApi: {
+    finishReview: (id: number, body: unknown) => finishReview(id, body),
+    documentRequestSlots: () => Promise.resolve({ data: [
+      { id: 3, name: "Ethics Clearance", is_required: true },
+      { id: 4, name: "Consent Paper", is_required: false },
+    ] }),
+  },
 }));
 
 beforeEach(() => {
@@ -34,6 +40,7 @@ const DECISION: DecisionFlags = {
 function record(over: Partial<RecordDetail> = {}): RecordDetail {
   return {
     id: 9,
+    can_request_document: [],
     revision: { party: "itso", label: "ITSO", blocked: null, withdrawable: null, decision_blocked: null, open: [], new_version: null },
     routing: { send_to_rdco: false, send_to_rdco_blocked: null, route_as: null, targets: [] },
     office_review: { party: "itso", label: "ITSO", blocked: null, clear_blocked: null, assignment: 3 },
@@ -58,15 +65,65 @@ describe("Finish review", () => {
     const { onDone } = open(["request_revision", "office_review"], [comment({ is_draft: true, severity: "must_fix" })]);
     expect(screen.getByText("1 draft comment, 1 Must fix, will be sent with it.")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("radio", { name: /Request revision/ }));
-    const send = screen.getByRole("button", { name: "Request revision" });
+    await user.click(screen.getByRole("radio", { name: /Request changes/ }));
+    const send = screen.getByRole("button", { name: "Request changes" });
     expect(send).toBeDisabled();
     await user.type(screen.getByRole("textbox", { name: /Summary/ }), "The methods need the calibration detail.");
     await user.click(send);
 
     expect(finishReview).toHaveBeenCalledTimes(1);
-    expect(finishReview).toHaveBeenCalledWith(9, { verdict: "request_revision", summary: "The methods need the calibration detail." });
-    expect(onDone).toHaveBeenCalledWith("Revision requested. The owner has been notified.");
+    expect(finishReview).toHaveBeenCalledWith(9, {
+      verdict: "request_revision", summary: "The methods need the calibration detail.", new_version: true, documents: [],
+    });
+    expect(onDone).toHaveBeenCalledWith("Changes requested. The authors have been notified.");
+  });
+
+  // ADR-022 Amendment 8 (IR-1322): one act asks for a revision, documents, or both.
+  it("asks for a new version and documents in one Request changes", async () => {
+    const user = userEvent.setup();
+    const { container } = open(["request_revision", "office_review"], [], record({ can_request_document: ["itso"] } as Partial<RecordDetail>));
+
+    await user.click(screen.getByRole("radio", { name: /Request changes/ }));
+    expect(screen.getByRole("checkbox", { name: /The paper itself needs changes/ })).toBeChecked();
+    await user.click(await screen.findByRole("checkbox", { name: "Consent Paper" }));
+    await user.type(screen.getByRole("textbox", { name: /Other document/ }), "Signed forms");
+    await user.type(screen.getByRole("textbox", { name: /Summary/ }), "Revise the methods and send the consent paper.");
+    await expectNoBlockingA11yViolations(container);
+    await user.click(screen.getByRole("button", { name: "Request changes" }));
+
+    expect(finishReview).toHaveBeenCalledWith(9, {
+      verdict: "request_revision", summary: "Revise the methods and send the consent paper.",
+      new_version: true, documents: [{ slot: 4 }, { label: "Signed forms" }],
+    });
+  });
+
+  it("asks for documents alone, and refuses to ask for nothing", async () => {
+    const user = userEvent.setup();
+    open(["request_revision", "office_review"], [], record({ can_request_document: ["itso"] } as Partial<RecordDetail>));
+
+    await user.click(screen.getByRole("radio", { name: /Request changes/ }));
+    await user.click(screen.getByRole("checkbox", { name: /The paper itself needs changes/ }));
+    await user.type(screen.getByRole("textbox", { name: /Summary/ }), "Send the ethics clearance.");
+    const send = screen.getByRole("button", { name: "Request changes" });
+    expect(send).toBeDisabled();
+    expect(screen.getByText(/Choose a document, or say the paper itself needs changes/)).toBeInTheDocument();
+
+    await user.click(await screen.findByRole("checkbox", { name: "Ethics Clearance" }));
+    await user.click(send);
+
+    expect(finishReview).toHaveBeenCalledWith(9, {
+      verdict: "request_revision", summary: "Send the ethics clearance.", new_version: false, documents: [{ slot: 3 }],
+    });
+  });
+
+  it("offers no documents to a reviewer who may not request them", async () => {
+    const user = userEvent.setup();
+    open(["request_revision", "office_review"]);
+
+    await user.click(screen.getByRole("radio", { name: /Request changes/ }));
+
+    expect(screen.getByRole("checkbox", { name: /The paper itself needs changes/ })).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Documents you need" })).not.toBeInTheDocument();
   });
 
   it("offers only the granted verdicts, and says why a held one is unavailable", () => {

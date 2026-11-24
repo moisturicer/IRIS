@@ -764,7 +764,7 @@ describe("the new-version control follows revision requests", () => {
 
     await userEvent.click(within(banner).getByRole("button", { name: "Go to Documents" }));
 
-    const bar = await screen.findByRole("region", { name: "Revision requested by IERC" });
+    const bar = await screen.findByRole("region", { name: "Changes requested by IERC" });
     expect(bar).toHaveTextContent("1 change not sent yet: revised manuscript.");
     expect(bar).toHaveTextContent("IERC will review v3. ITSO's clearance is kept.");
   });
@@ -774,26 +774,23 @@ describe("the new-version control follows revision requests", () => {
     signInAs(OWNER_ID, "Student");
     renderPaper(`/records/${RECORD_ID}?section=review&documents=open`);
 
-    const bar = await screen.findByRole("region", { name: "Revision requested by IERC" });
+    const bar = await screen.findByRole("region", { name: "Changes requested by IERC" });
     await userEvent.click(within(bar).getByRole("button", { name: "Submit new version" }));
 
     expect(await screen.findByRole("dialog", { name: "Submit new version" })).toBeInTheDocument();
   });
 
-  it("holds the new version, saying why, until something has changed (IR-273)", async () => {
+  // Changed deliberately by IR-1322: Submit new version is grey and does
+  // nothing until something has changed. It used to open the dialog anyway,
+  // which held its own Submit (IR-876).
+  it("holds the new version, saying why, until something has changed (IR-273, IR-1322)", async () => {
     shownRecord = asked("Nothing has changed since IERC asked for a revision.");
     signInAs(OWNER_ID, "Student");
     renderPaper(`/records/${RECORD_ID}?section=review&documents=open`);
 
     const open = await screen.findByRole("button", { name: "Submit new version" });
+    expect(open).toBeDisabled();
     expect(open).toHaveAccessibleDescription("Nothing has changed since IERC asked for a revision.");
-    // The dialog opens anyway, so the owner can read the response to
-    // reviewers it would carry, and holds Submit there (IR-876).
-    await userEvent.click(open);
-    const dialog = await screen.findByRole("dialog", { name: "Submit new version" });
-    const submit = within(dialog).getByRole("button", { name: /^Submit v\d+$/ });
-    expect(submit).toBeDisabled();
-    expect(submit).toHaveAccessibleDescription("Nothing has changed since IERC asked for a revision.");
   });
 });
 
@@ -1028,8 +1025,8 @@ describe("the submitter's own status (IR-625)", () => {
     submitter_status: {
       line: "Revision requested by IERC: action needed",
       waiting_on_you: [
-        { kind: "revision", party: "ierc", label: "Revision requested by IERC", action_label: "Submit a new version" },
-        { kind: "document", party: "adviser", label: "Documents requested by Adviser", action_label: "Upload the documents" },
+        { kind: "revision", party: "ierc", label: "Changes requested by IERC", action_label: "Submit a new version" },
+        { kind: "document", party: "adviser", label: "Changes requested by Adviser", action_label: "Upload the documents" },
       ],
       history: [
         {
@@ -2931,7 +2928,10 @@ describe("the Review section (IR-412)", () => {
       expect(screen.queryByRole("dialog", { name: "All documents" })).not.toBeInTheDocument();
     });
 
-    it("offers the owner Upload on a requested slot while the record is in review, and on no other", async () => {
+    // Changed deliberately by IR-1322: while anything is asked for, every
+    // slot takes an upload, held until the owner submits. Only the requested
+    // slot did (IR-1203).
+    it("offers the owner Upload on every slot while a request on the record in review is open", async () => {
       workspaceAt(1600);
       documentRequests.mockResolvedValue({ data: [{
         id: 1, party: "ierc", label: "IERC", state: "open", state_label: "Open", message: "The signed form, please.",
@@ -2952,8 +2952,8 @@ describe("the Review section (IR-412)", () => {
       const consent = await within(panel).findByRole("group", { name: "Consent Paper" });
       expect(await within(consent).findByText("Requested by IERC.")).toBeInTheDocument();
       expect(within(consent).getByRole("button", { name: /^Upload Consent Paper/ })).toBeInTheDocument();
-      expect(within(within(panel).getByRole("group", { name: "Ethics Clearance" })).queryByRole("button", { name: /^Upload/ }))
-        .not.toBeInTheDocument();
+      expect(within(within(panel).getByRole("group", { name: "Ethics Clearance" })).getByRole("button", { name: /^Upload Ethics Clearance/ }))
+        .toBeInTheDocument();
     });
 
     it("opens a reviewer's pane on Documents at 320px, reached by keyboard, with no serious axe violations", async () => {
