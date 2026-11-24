@@ -3776,6 +3776,14 @@ describe("the Overview's header (IR-569)", () => {
     expect(within(header).queryByText(/\d+ views?$/)).not.toBeInTheDocument();
   });
 
+  it("shows an import's completion year when the form recorded none (IR-1316)", async () => {
+    shownRecord = { ...record, year_accomplished: null, year_completed: 2019 };
+    renderPaperView();
+    await waitForRecord(record.title);
+    const details = screen.getByRole("complementary", { name: "Record details" });
+    expect(within(details).getByText("Year Accomplished").parentElement).toHaveTextContent("2019");
+  });
+
   it("lists no documents in Record details: they are Review's to show (IR-1244)", async () => {
     shownRecord = {
       ...record,

@@ -17,6 +17,7 @@ from typing import Optional
 
 from ai.agent.prompts import REPAIR_FEEDBACK as _FEEDBACK, REPAIR_NOTE, UNSEEN_DRAFT
 from ai.agent.tools import Investigation, counted
+from ai.research import recency
 from ai.research.metadata import fold
 from ai.research.tools import Count
 from ai.runs.executor import Citation
@@ -115,7 +116,8 @@ def findings(text: str, investigation: Investigation, *, prior=(), excluded=(),
                 supported.add(Decimal(passage.page))
     for _, title in investigation.papers.values():
         supported |= numbers(title)
-    for value in sorted(numbers(body) - supported):
+    # A recorded date is allowed as a date, never its day or month as a bare number (IR-1316).
+    for value in sorted(numbers(recency.without(body, investigation.dates)) - supported):
         fail("unsupported_number", format(value, "f"))
     # Area and other catalogue names an exact count used may be quoted like titles (IR-750).
     titles = {fold(t) for t in investigation.titles() | investigation.terms}

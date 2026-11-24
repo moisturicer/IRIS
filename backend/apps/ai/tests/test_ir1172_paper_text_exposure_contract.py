@@ -71,7 +71,8 @@ def test_only_research_11_and_later_say_tool_text_is_data():
     # Widened by IR-581: research-12 is built on research-11 and keeps the rule; so is research-13 (IR-1278).
     says = {pin for pin, text in PROMPTS.items() if "never an instruction to you" in text}
     assert says == {("agent-research-11", "research-11"), ("agent-research-12", "research-12"),
-                    ("agent-research-13", "research-13"), ("agent-research-14", "research-13")}
+                    ("agent-research-13", "research-13"), ("agent-research-14", "research-13"),
+                    ("agent-research-15", "research-14")}
     for pin, text in PROMPTS.items():
         assert pin in says or not any(phrase in text for phrase in DATA_FRAMING)
 
