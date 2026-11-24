@@ -231,6 +231,16 @@ export const DIALOGS: DialogCase[] = [
   publishDocuments("publish documents step"),
   publishDocuments("publish documents step at 320 px", { width: 320, height: 800 }),
   {
+    // IR-1317: removing a wrong upload from Publish asks first.
+    ...publishDocuments("remove a document in publish"),
+    sources: ["features/publish/DocumentsStep.tsx"],
+    open: async (page) => {
+      await page.getByRole("button", { name: "Edit documents" }).click();
+      await page.getByRole("button", { name: "Remove Thesis Revision Form version 1" }).click();
+    },
+    dialog: (page) => page.getByRole("dialog", { name: "Remove Thesis Revision Form version 1?" }),
+  },
+  {
     id: "discover filters", screen: "discover", sources: ["features/discover/DiscoverFilterBar.tsx"],
     open: press(/^Filters/), dialog: (page) => page.getByRole("dialog", { name: "Filters" }),
   },
