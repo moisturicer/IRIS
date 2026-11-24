@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.http import FileResponse
 from django.db import transaction
+from core.enums import DocumentRequestState
 from core.permissions import IsStaff, hides_draft, may_read_record_documents, owns_or_staffs_record
 from core.text_limits import too_long, too_long_message
 from .models import RecordUpload, UploadSlot, UploadStatus, UploadReview, RecordFile
@@ -732,7 +733,7 @@ def _apply(document_request, user, body, change):
     except DocumentRequestError as exc:
         return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
     return Response(serialize_request(
-        requests_for(document_request.record).get(pk=document_request.pk), user
+        requests_for(document_request.record, user).get(pk=document_request.pk), user
     ))
 
 
@@ -752,6 +753,19 @@ class DocumentRequestDecisionView(APIView):
         document_request, refused = _managed_request(pk, request.user)
         if refused:
             return refused
+        if document_request.state == DocumentRequestState.DRAFT:
+            # Never sent, so undone without a trace (ADR-022 Amendment 9, IR-1325).
+            from .request_serializers import first_error
+            from .requests import DocumentRequestError, discard_draft
+
+            body = WithdrawSerializer(data=request.data)
+            if not body.is_valid():
+                return Response({"detail": first_error(body.errors)}, status=status.HTTP_400_BAD_REQUEST)
+            try:
+                discard_draft(document_request, request.user)
+            except DocumentRequestError as exc:
+                return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(status=status.HTTP_204_NO_CONTENT)
         return _apply(
             document_request, request.user, WithdrawSerializer(data=request.data),
             lambda data: withdraw_request(document_request, request.user),

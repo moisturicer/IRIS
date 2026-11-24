@@ -1197,23 +1197,6 @@ class RecordViewSet(viewsets.ModelViewSet):
             finish_review.FinishError, revisions.RevisionError, routing.RoutingError,
             office_review.OfficeReviewError, decisions.DecisionError,
         )
-        # *Request changes* may carry documents (ADR-022 Amendment 8, IR-1322),
-        # checked against the picklist as a document request's are.
-        documents = request.data.get("documents") or []
-        new_version = request.data.get("new_version", True)
-        if not isinstance(new_version, bool):
-            return Response({"new_version": ["Say true or false."]}, status=status.HTTP_400_BAD_REQUEST)
-        specs = []
-        if documents:
-            from apps.documents.request_serializers import DocumentRequestCreateSerializer
-
-            checked = DocumentRequestCreateSerializer(
-                data={"message": finish_review.DOCUMENTS_MESSAGE, "items": documents},
-                context={"record": record},
-            )
-            if not checked.is_valid():
-                return Response(checked.errors, status=status.HTTP_400_BAD_REQUEST)
-            specs = checked.validated_data["items"]
         try:
             finish_review.finish_review(
                 record, request.user,
@@ -1222,8 +1205,6 @@ class RecordViewSet(viewsets.ModelViewSet):
                 to=request.data.get("to"),
                 suggested_offices=request.data.get("suggested_offices"),
                 token=request.data.get("token"),
-                documents=specs,
-                new_version=new_version,
             )
         except finish_review.FinishNotFound:
             raise Http404(f"No {Record._meta.object_name} matches the given query.")
@@ -1291,14 +1272,15 @@ class RecordViewSet(viewsets.ModelViewSet):
         POST body: `{"message": str, "items": [{"slot": id} | {"label": str}],
         "party"?: str}`. `party` is needed only by someone holding the record
         as two parties at once (RDCO as Intake and as RDCO Final).
+
+        A new request is a **draft** (ADR-022 Amendment 9, IR-1325): only its
+        asker sees it, nobody is told, and their *Finish review* sends it with
+        Request changes or Comment only.
         """
         from apps.documents import requests as document_requests
         from apps.documents.request_serializers import (
             DocumentRequestCreateSerializer, first_error, serialize_request, serialize_requests,
         )
-        from apps.notifications.services import notify_document_requested
-        from apps.reviews.tracker import party_label
-
         record = self.get_object()
 
         if request.method == "GET":
@@ -1309,7 +1291,7 @@ class RecordViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_403_FORBIDDEN,
                 )
             return Response(serialize_requests(
-                record, request.user, document_requests.requests_for(record)
+                record, request.user, document_requests.requests_for(record, request.user)
             ))
 
         # Who may ask comes before what they asked: a non-holder is a 403
@@ -1333,15 +1315,13 @@ class RecordViewSet(viewsets.ModelViewSet):
                 record, request.user, party=party,
                 message=body.validated_data["message"],
                 specs=body.validated_data["items"],
+                draft=True,
             )
         except document_requests.NotAHolder as exc:
             # The party's turn closed after the check above -- a Decision (IR-270).
             return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
 
-        notify_document_requested(
-            created, party_label=party_label(created.party, staff_viewer=False)
-        )
-        created = document_requests.requests_for(record).get(pk=created.pk)
+        created = document_requests.requests_for(record, request.user).get(pk=created.pk)
         return Response(
             serialize_request(created, request.user), status=status.HTTP_201_CREATED
         )

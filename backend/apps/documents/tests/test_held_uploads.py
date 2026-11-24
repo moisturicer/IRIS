@@ -4,8 +4,9 @@ Held uploads and *Request changes* (ADR-022 Amendment 8, IR-1322).
 An owner's upload to a submitted Record is held until they send it: with
 *Submit new version*, or *Submit added documents*
 (`POST /records/<id>/documents/send/`). Until then it is the owners' alone,
-answers no request and can be deleted by them. A reviewer's *Request changes*
-may ask for a revision and documents in one act, or for documents alone.
+answers no request and can be deleted by them. A reviewer's document
+requests wait as drafts until their *Finish review* sends them (Amendment 9,
+IR-1325).
 
 **Seam: the HTTP API**, except the owner's upload, which is made through
 `_store_slot_upload` (what both upload routes call) because the PDF check only
@@ -17,6 +18,7 @@ from django.db import transaction
 from django.urls import reverse
 from rest_framework import status
 
+from apps.audit.models import AuditEvent
 from apps.documents.models import DocumentRequest, DocumentRequestItem, RecordUpload
 from apps.documents.views import _store_slot_upload
 from apps.notifications.models import Notification
@@ -241,68 +243,128 @@ class SubmitAddedDocumentsTests(HeldUploadTestBase):
         self.assertTrue(RecordVersionDocument.objects.filter(upload=held).exists())
 
 
-class RequestChangesTests(HeldUploadTestBase):
+class DraftRequestsGoWithFinishReviewTests(HeldUploadTestBase):
+    """
+    ADR-022 Amendment 9 (IR-1325), which replaces Amendment 8's documents in
+    *Request changes*: a reviewer asks for documents in the Documents tab, each
+    request waits as their draft, and their *Finish review* sends it.
+    """
 
-    def test_one_act_asks_for_a_revision_and_documents_from_the_same_party(self):
+    def owners_notices(self, record):
+        return Notification.objects.filter(recipient=self.owner, record=record).count()
+
+    def test_a_new_request_is_a_draft_only_its_asker_sees_and_nobody_is_told(self):
+        record = self.at_parallel_review()
+        ethics = self.slot(record, "Ethics Clearance")
+        before = self.owners_notices(record)
+
+        data = self.drafted(record, self.ierc, [{"slot": ethics.pk}])
+
+        self.assertEqual(data["state"], "draft")
+        self.assertEqual([r["id"] for r in self.listed(record, self.ierc)], [data["id"]])
+        self.assertEqual(self.listed(record, self.owner), [])
+        self.assertEqual(self.owners_notices(record), before)
+        self.assertFalse(AuditEvent.objects.filter(
+            event_type=AuditEvent.DOCUMENT_REQUESTED, record=record).exists())
+
+    def test_request_changes_sends_the_drafts_with_the_revision(self):
         record = self.at_parallel_review()
         ethics = self.slot(record, "Ethics Clearance")
         self.open_seat(record, self.ierc)
+        data = self.drafted(record, self.ierc, [{"slot": ethics.pk}], message="The signed form, please.")
+        before = self.owners_notices(record)
 
-        response = self.finish(
-            record, self.ierc, verdict="request_revision", documents=[{"slot": ethics.pk}],
-        )
+        response = self.finish(record, self.ierc, verdict="request_revision")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertTrue(ResubmissionRequest.objects.filter(
             record=record, party="ierc", state=ResubmissionRequestState.OPEN).exists())
-        request = DocumentRequest.objects.get(record=record, party="ierc")
-        self.assertEqual(request.state, DocumentRequestState.OPEN)
-        self.assertEqual(request.message, "Please revise.")
-        self.assertEqual(list(request.items.values_list("slot_id", flat=True)), [ethics.pk])
+        [listed] = self.listed(record, self.owner)
+        self.assertEqual((listed["id"], listed["state"], listed["message"]),
+                         (data["id"], "open", "The signed form, please."))
+        self.assertGreater(self.owners_notices(record), before)
+        self.assertTrue(AuditEvent.objects.filter(
+            event_type=AuditEvent.DOCUMENT_REQUESTED, record=record).exists())
 
-    def test_documents_alone_open_no_revision(self):
+    def test_comment_only_sends_the_drafts_alone_with_no_revision(self):
         record = self.at_parallel_review()
-        ethics = self.slot(record, "Ethics Clearance")
         self.open_seat(record, self.ierc)
+        self.drafted(record, self.ierc, [{"label": "Signed consent form"}])
 
-        response = self.finish(
-            record, self.ierc, verdict="request_revision", new_version=False,
-            documents=[{"slot": ethics.pk}],
-        )
+        # No summary and no comment: the drafted request is what it sends.
+        response = self.finish(record, self.ierc, verdict="comment_only", summary="")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertFalse(ResubmissionRequest.objects.filter(record=record).exists())
-        self.assertTrue(DocumentRequest.objects.filter(record=record, party="ierc", state="open").exists())
         self.assertEqual(ReviewRound.objects.get(record=record, party="ierc").verdict, "comment_only")
+        self.assertTrue(DocumentRequest.objects.filter(
+            record=record, party="ierc", state=DocumentRequestState.OPEN).exists())
 
-    def test_no_new_version_and_no_documents_is_refused_and_changes_nothing(self):
+    def test_every_other_verdict_is_refused_while_drafts_wait(self):
         record = self.at_parallel_review()
         self.open_seat(record, self.ierc)
+        self.drafted(record, self.ierc, [{"label": "Signed consent form"}])
 
-        response = self.finish(record, self.ierc, verdict="request_revision", new_version=False)
+        response = self.finish(record, self.ierc, verdict="cleared")
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("1 document request waiting", response.data["detail"])
         self.assertFalse(ReviewRound.objects.filter(record=record, party="ierc").exists())
-        self.assertFalse(DocumentRequest.objects.filter(record=record).exists())
+        self.assertEqual(DocumentRequest.objects.get(record=record).state, DocumentRequestState.DRAFT)
 
-    def test_a_document_off_the_picklist_refuses_the_whole_act(self):
+    def test_its_asker_removes_a_draft_and_it_is_gone(self):
         record = self.at_parallel_review()
         self.open_seat(record, self.ierc)
+        data = self.drafted(record, self.ierc, [{"label": "Signed consent form"}])
 
-        response = self.finish(record, self.ierc, verdict="request_revision", documents=[{"slot": 999999}])
+        self.client.force_authenticate(self.ierc)
+        removed = self.client.patch(
+            f"/api/v1/document-requests/{data['id']}/", {"action": "withdraw"}, format="json")
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertFalse(ResubmissionRequest.objects.filter(record=record).exists())
-        self.assertFalse(DocumentRequest.objects.filter(record=record).exists())
+        self.assertEqual(removed.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(DocumentRequest.objects.filter(pk=data["id"]).exists())
+        # With nothing waiting, an approval goes through again.
+        self.assertEqual(self.finish(record, self.ierc, verdict="cleared").status_code, status.HTTP_200_OK)
 
-    def test_only_request_changes_asks_for_documents(self):
+    def test_someone_elses_draft_reads_as_missing(self):
+        record = self.at_parallel_review()
+        data = self.drafted(record, self.ierc, [{"label": "Signed consent form"}])
+
+        self.client.force_authenticate(self.owner)
+        response = self.client.patch(
+            f"/api/v1/document-requests/{data['id']}/", {"action": "withdraw"}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertTrue(DocumentRequest.objects.filter(pk=data["id"]).exists())
+
+    def test_a_draft_takes_no_upload(self):
+        from apps.documents.requests import DocumentRequestError, resolve_item_for_upload
+
+        record = self.at_parallel_review()
+        data = self.drafted(record, self.ierc, [{"label": "Signed consent form"}])
+
+        with transaction.atomic(), self.assertRaises(DocumentRequestError):
+            resolve_item_for_upload(record, data["items"][0]["id"])
+
+    def test_taking_a_reviewer_off_the_paper_discards_their_draft_requests(self):
+        from apps.reviews.removal import discard_drafts
+
+        record = self.at_parallel_review()
+        data = self.drafted(record, self.ierc, [{"label": "Signed consent form"}])
+
+        with transaction.atomic():
+            discard_drafts(record, self.ierc, "ierc")
+
+        self.assertFalse(DocumentRequest.objects.filter(pk=data["id"]).exists())
+
+    def test_request_changes_no_longer_carries_documents(self):
         record = self.at_parallel_review()
         ethics = self.slot(record, "Ethics Clearance")
         self.open_seat(record, self.ierc)
 
-        response = self.finish(record, self.ierc, verdict="comment_only", documents=[{"slot": ethics.pk}])
+        response = self.finish(record, self.ierc, verdict="request_revision", documents=[{"slot": ethics.pk}])
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertFalse(DocumentRequest.objects.filter(record=record).exists())
 
 

@@ -17,19 +17,30 @@ import { comment } from "./threadFixtures";
 import { groupThreads } from "./threadModel";
 
 const finishReview = vi.fn();
+const documentRequests = vi.fn();
 vi.mock("@/api/records", () => ({
   recordsApi: {
     finishReview: (id: number, body: unknown) => finishReview(id, body),
-    documentRequestSlots: () => Promise.resolve({ data: [
-      { id: 3, name: "Ethics Clearance", is_required: true },
-      { id: 4, name: "Consent Paper", is_required: false },
-    ] }),
+    documentRequests: (id: number) => documentRequests(id),
   },
 }));
 
 beforeEach(() => {
   finishReview.mockReset().mockResolvedValue({ data: {} });
+  documentRequests.mockReset().mockResolvedValue({ data: [] });
 });
+
+/** A document request this reviewer drafted in the Documents tab (ADR-022 Amendment 9). */
+function drafted(id: number, labels: string[]) {
+  return {
+    id, party: "itso", label: "ITSO", state: "draft", state_label: "Draft", message: "Please.",
+    requested_by: "Ivy", created_at: "2026-11-24T02:00:00Z", closed_at: null, can_manage: true,
+    items: labels.map((label, i) => ({
+      id: id * 10 + i, slot: null, label, state: "missing", state_label: "Missing", upload: null,
+      uploaded_at: null, rejection_reason: null, decided_at: null,
+    })),
+  };
+}
 
 const DECISION: DecisionFlags = {
   party: "rdco", outcomes: ["publish", "keep_unlisted", "reject"], blocked: null,
@@ -73,57 +84,50 @@ describe("Finish review", () => {
 
     expect(finishReview).toHaveBeenCalledTimes(1);
     expect(finishReview).toHaveBeenCalledWith(9, {
-      verdict: "request_revision", summary: "The methods need the calibration detail.", new_version: true, documents: [],
+      verdict: "request_revision", summary: "The methods need the calibration detail.",
     });
     expect(onDone).toHaveBeenCalledWith("Changes requested. The authors have been notified.");
   });
 
-  // ADR-022 Amendment 8 (IR-1322): one act asks for a revision, documents, or both.
-  it("asks for a new version and documents in one Request changes", async () => {
-    const user = userEvent.setup();
-    const { container } = open(["request_revision", "office_review"], [], record({ can_request_document: ["itso"] } as Partial<RecordDetail>));
-
-    await user.click(screen.getByRole("radio", { name: /Request changes/ }));
-    expect(screen.getByRole("checkbox", { name: /The paper itself needs changes/ })).toBeChecked();
-    await user.click(await screen.findByRole("checkbox", { name: "Consent Paper" }));
-    await user.type(screen.getByRole("textbox", { name: /Other document/ }), "Signed forms");
-    await user.type(screen.getByRole("textbox", { name: /Summary/ }), "Revise the methods and send the consent paper.");
-    await expectNoBlockingA11yViolations(container);
-    await user.click(screen.getByRole("button", { name: "Request changes" }));
-
-    expect(finishReview).toHaveBeenCalledWith(9, {
-      verdict: "request_revision", summary: "Revise the methods and send the consent paper.",
-      new_version: true, documents: [{ slot: 4 }, { label: "Signed forms" }],
-    });
-  });
-
-  it("asks for documents alone, and refuses to ask for nothing", async () => {
+  // ADR-022 Amendment 9 (IR-1325): documents are asked for in the Documents tab
+  // and wait as drafts; Request changes and Comment only send them, and no
+  // other verdict goes while any wait.
+  it("asks for no documents itself: Request changes is a new version, nothing to tick", async () => {
     const user = userEvent.setup();
     open(["request_revision", "office_review"], [], record({ can_request_document: ["itso"] } as Partial<RecordDetail>));
 
     await user.click(screen.getByRole("radio", { name: /Request changes/ }));
-    await user.click(screen.getByRole("checkbox", { name: /The paper itself needs changes/ }));
-    await user.type(screen.getByRole("textbox", { name: /Summary/ }), "Send the ethics clearance.");
-    const send = screen.getByRole("button", { name: "Request changes" });
-    expect(send).toBeDisabled();
-    expect(screen.getByText(/Choose a document, or say the paper itself needs changes/)).toBeInTheDocument();
 
-    await user.click(await screen.findByRole("checkbox", { name: "Ethics Clearance" }));
-    await user.click(send);
-
-    expect(finishReview).toHaveBeenCalledWith(9, {
-      verdict: "request_revision", summary: "Send the ethics clearance.", new_version: false, documents: [{ slot: 3 }],
-    });
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Documents you need" })).not.toBeInTheDocument();
   });
 
-  it("offers no documents to a reviewer who may not request them", async () => {
+  it("names the drafted document requests it sends, and sends them with Request changes", async () => {
     const user = userEvent.setup();
-    open(["request_revision", "office_review"]);
+    documentRequests.mockResolvedValue({ data: [drafted(1, ["Ethics Clearance", "Consent Paper"])] });
+    const { container } = open(["request_revision", "office_review"], [], record({ can_request_document: ["itso"] } as Partial<RecordDetail>));
 
+    expect(await screen.findByText("2 document requests will be sent with it: Ethics Clearance, Consent Paper.")).toBeInTheDocument();
     await user.click(screen.getByRole("radio", { name: /Request changes/ }));
+    await user.type(screen.getByRole("textbox", { name: /Summary/ }), "Revise the methods.");
+    await expectNoBlockingA11yViolations(container);
+    await user.click(screen.getByRole("button", { name: "Request changes" }));
 
-    expect(screen.getByRole("checkbox", { name: /The paper itself needs changes/ })).toBeInTheDocument();
-    expect(screen.queryByRole("group", { name: "Documents you need" })).not.toBeInTheDocument();
+    expect(finishReview).toHaveBeenCalledWith(9, { verdict: "request_revision", summary: "Revise the methods." });
+  });
+
+  it("holds every other verdict while drafted requests wait, saying how to free it", async () => {
+    documentRequests.mockResolvedValue({ data: [drafted(1, ["Ethics Clearance"])] });
+    open(["request_revision", "office_review"], [], record({ can_request_document: ["itso"] } as Partial<RecordDetail>), "cleared");
+
+    const clear = screen.getByRole("radio", { name: /Clear for ITSO/ });
+    await vi.waitFor(() => expect(clear).toBeDisabled());
+    expect(clear).toHaveAccessibleDescription(
+      "Unavailable: You have 1 document request waiting. Remove it in the Documents tab first, or choose Request changes or Comment only.",
+    );
+    // It falls back to Comment only, which sends the request on its own.
+    expect(screen.getByRole("radio", { name: "Comment only" })).toBeChecked();
+    expect(screen.getByRole("button", { name: "Send review" })).toBeEnabled();
   });
 
   it("offers only the granted verdicts, and says why a held one is unavailable", () => {

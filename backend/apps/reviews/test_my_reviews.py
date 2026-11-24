@@ -228,6 +228,10 @@ class InReviewTests(MyReviewsTestBase):
             {"message": "The consent forms.", "items": [{"label": "Consent forms"}]},
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        # A draft until Finish review sends it (ADR-022 Amendment 9, IR-1325).
+        from apps.documents.testing import send_drafted_requests
+
+        send_drafted_requests(self, record, self.ierc, "ierc")
         self.assertEqual(self.rows(self.itso, tab="in_review")[0]["waiting_on"], "document")
 
         response = self.post(

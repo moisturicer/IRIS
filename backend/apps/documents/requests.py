@@ -75,9 +75,13 @@ def requesting_party(record, user, party=None) -> str:
     return party
 
 
-def create_request(record, user, *, party, message, specs: list[ItemSpec]) -> DocumentRequest:
+def create_request(record, user, *, party, message, specs: list[ItemSpec], draft: bool = False) -> DocumentRequest:
     """
     Open a request as `party`, which `requesting_party` has already vetted.
+
+    `draft` (ADR-022 Amendment 9, IR-1325) keeps it the asker's alone until
+    their *Finish review* sends it (`send_drafts`): no audit event and no
+    notification yet, since nobody else has been asked anything.
 
     Under the record's row lock, re-checking that `party` still holds it: a
     Decision (IR-270) takes the same lock and closes every assignment, so a
@@ -101,13 +105,68 @@ def create_request(record, user, *, party, message, specs: list[ItemSpec]) -> Do
             party=party,
             requested_by=user,
             message=message,
+            state=DocumentRequestState.DRAFT if draft else DocumentRequestState.OPEN,
         )
         DocumentRequestItem.objects.bulk_create(
             DocumentRequestItem(request=request, slot=s.slot, label=s.label, sort_order=i)
             for i, s in enumerate(specs)
         )
-        audit.document_requested(request, user)
+        if not draft:
+            audit.document_requested(request, user)
     return request
+
+
+def drafts_of(record, user, party):
+    """`user`'s unsent requests on `record` as `party`, oldest first (Amendment 9)."""
+    return DocumentRequest.objects.filter(
+        record=record, requested_by=user, party=party, state=DocumentRequestState.DRAFT,
+    ).order_by("created_at", "pk")
+
+
+def send_drafts(record, user, party) -> list[DocumentRequest]:
+    """
+    Send `user`'s draft requests as `party` (ADR-022 Amendment 9, IR-1325):
+    each opens, dated now, under the party's current assignment, with its
+    audit event, and the owners are told once the transaction commits.
+    *Finish review* calls this inside its transaction, under the record lock.
+    """
+    from apps.notifications.services import notify_document_requested
+    from apps.reviews.models import RecordAssignment
+    from apps.reviews.tracker import party_label
+    from core.enums import AssignmentState
+
+    drafts = list(drafts_of(record, user, party).select_for_update())
+    if not drafts:
+        return []
+    assignment = RecordAssignment.objects.filter(
+        record=record, party=party, state=AssignmentState.ACTIVE
+    ).first()
+    if assignment is None:
+        raise NotAHolder("You no longer hold this record as that party.")
+    now = timezone.now()
+    for request in drafts:
+        request.state = DocumentRequestState.OPEN
+        request.assignment = assignment
+        request.created_at = now
+        request.save(update_fields=["state", "assignment", "created_at"])
+        audit.document_requested(request, user)
+        transaction.on_commit(lambda r=request: notify_document_requested(
+            r, party_label=party_label(r.party, staff_viewer=False)
+        ))
+    return drafts
+
+
+def discard_draft(request: DocumentRequest, user) -> None:
+    """
+    Undo a draft request (Amendment 9): it was never sent, so it is deleted,
+    not withdrawn, and leaves no history. Only its asker reaches it
+    (`request_on_visible_record`).
+    """
+    with transaction.atomic():
+        request = DocumentRequest.objects.select_for_update().get(pk=request.pk)
+        if request.state != DocumentRequestState.DRAFT or request.requested_by_id != user.pk:
+            raise DocumentRequestError("Only your own unsent request can be removed.")
+        request.delete()
 
 
 def slot_accepts_uploads_for(slot: UploadSlot, record) -> bool:
@@ -331,8 +390,10 @@ def may_read_requests(record, user) -> bool:
     staffable = staffable_parties(record, user)
     if not staffable:
         return False
+    # A draft asked nobody anything yet (Amendment 9), so it makes no one a participant.
     requesting = set(
-        DocumentRequest.objects.filter(record=record).values_list("party", flat=True)
+        DocumentRequest.objects.filter(record=record)
+        .exclude(state=DocumentRequestState.DRAFT).values_list("party", flat=True)
     )
     return bool(staffable & (participating_parties(record) | requesting))
 
@@ -379,6 +440,9 @@ def request_on_visible_record(request_id, user) -> Optional[DocumentRequest]:
     except (DocumentRequest.DoesNotExist, TypeError, ValueError):
         return None
     if not Record.objects.visible_to(user).filter(pk=request.record_id).exists():
+        return None
+    # Someone else's draft reads as missing (Amendment 9): it is its asker's alone.
+    if request.state == DocumentRequestState.DRAFT and request.requested_by_id != getattr(user, "pk", None):
         return None
     return request
 
@@ -482,10 +546,18 @@ def withdraw_request(request: DocumentRequest, user) -> DocumentRequest:
     return request
 
 
-def requests_for(record):
-    """Every request on `record`, oldest first, ready for `payload`."""
+def requests_for(record, viewer=None):
+    """
+    Every request on `record`, oldest first, ready for `payload`. Drafts
+    (Amendment 9) only for `viewer`, who asked them; for nobody else.
+    """
+    from django.db.models import Q
+
+    drafts = Q(state=DocumentRequestState.DRAFT)
+    if viewer is not None and getattr(viewer, "pk", None) is not None:
+        drafts &= ~Q(requested_by=viewer)
     return (
-        DocumentRequest.objects.filter(record=record)
+        DocumentRequest.objects.filter(record=record).exclude(drafts)
         .select_related("requested_by")
         .prefetch_related("items__upload")
         .order_by("created_at", "pk")

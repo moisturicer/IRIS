@@ -41,7 +41,7 @@ import { UploadDropzone } from "@/components/shared/UploadDropzone";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
-import { PILL_SECONDARY } from "@/components/ui/pillStyles";
+import { SMALL_ACTION_PILL, SMALL_ACTION_TARGET } from "@/components/ui/pillStyles";
 import { cn, downloadBlob, formatDate, joinLabels } from "@/lib/utils";
 import type { RecordFile, RecordUpload, SlotWithUploads } from "@/types/documents";
 import type { DocumentRequest, DocumentRequestItem, RecordDetail } from "@/types/records";
@@ -69,7 +69,7 @@ interface DocumentsTabProps {
     RecordDetail,
     "id" | "abstract_file" | "can_request_document" | "current_holders" | "manuscript_unsubmitted"
     | "record_type_name" | "versions"
-  > & Partial<Pick<RecordDetail, "revision">>;
+  > & Partial<Pick<RecordDetail, "revision" | "pipeline_status">>;
   /** The viewer owns the record: they upload what is asked for. */
   owner:     boolean;
   /** The owner may add or replace any document, not only a requested one. */
@@ -133,8 +133,9 @@ const needsUpload = (asked: Asked) => {
 function askedFor(requests: DocumentRequest[]): { bySlot: Map<number, Asked>; other: Asked[] } {
   const bySlot = new Map<number, Asked>();
   const other: Asked[] = [];
+  // A draft asks nobody anything until its reviewer finishes (ADR-022 Amendment 9).
   const live = requests
-    .filter((r) => r.state !== "withdrawn")
+    .filter((r) => r.state !== "withdrawn" && r.state !== "draft")
     .sort((a, b) => Number(a.state === "open") - Number(b.state === "open"));
   for (const r of live) {
     for (const item of r.items) {
@@ -243,9 +244,11 @@ export function DocumentsTab({
   if (slots == null) return <Skeleton rows={6} label="Loading the files…" onRetry={() => void load()} />;
 
   const { bySlot, other } = askedFor(requests);
-  // While anything is asked for, the owner may add any document, so every slot is listed (IR-1322).
-  const ownerAsked = owner && (record.revision?.open.length || requests.some((r) => r.state === "open"));
-  const shownSlots = slots.filter((s) => editable || ownerAsked || s.uploads.length > 0 || bySlot.has(s.id));
+  // Upload only where it was asked for (IR-1325): every document while the
+  // paper is a draft, otherwise just what a reviewer requested. A revision
+  // asks for the manuscript, which its own row takes (`replaceManuscript`).
+  const drafting = editable && record.pipeline_status === "draft";
+  const shownSlots = slots.filter((s) => drafting || s.uploads.length > 0 || bySlot.has(s.id));
   // What the top of the tab says to the owner (IR-1318): a revision's bar,
   // else what reviewers still need uploaded.
   const revision = record.revision;
@@ -255,9 +258,6 @@ export function DocumentsTab({
   // both (ADR-022 Amendment 8, IR-1322).
   const documentAskers = requests.filter((r) => r.state === "open").map((r) => r.label);
   const askers = [...new Set([...(revision?.open ?? []).map((r) => r.label), ...documentAskers])];
-  // While anything is asked for, the owner may add a file to any slot, not
-  // only a requested one; each stays theirs until they submit.
-  const asking = askers.length > 0;
   const heldNames = [...new Set(slots.filter((s) => s.uploads.some((u) => u.held)).map((s) => s.name))];
   const submitDocuments = async () => {
     setSending(true);
@@ -277,19 +277,22 @@ export function DocumentsTab({
   const manuscript = record.versions?.[record.versions.length - 1] ?? null;
   const downloadVersion = (name: string, u: RecordUpload) =>
     download(() => documentsApi.downloadUpload(u.id), `${name} v${u.version}.${extensionOf(u.file)}`);
-  /** A slot version's Open, when there is a reader and the version is a PDF. */
   /** Shows `document` in the reader, making room for it when the pane covers the paper. */
   const open = (document: ReaderDocument, opener: HTMLElement) => {
     onOpen?.(document, opener);
     pane?.showReader();
   };
-  /** A slot version's Open, when there is a reader and the version is a PDF. */
-  // A slot's upload is a PDF, served as one, so only a PDF version opens (images are attachments only).
-  // `newest`: the version a reviewer may open a thread on from the reader (IR-1204).
-  const openVersion = (name: string, u: RecordUpload, newest: boolean) => onOpen && readerFormat(u.file) === "pdf" && (
-    <RowAction icon="fa-book-open" verb="Open" name={`${name} version ${u.version}`}
-      onClick={(opener) => open(slotUploadDocument(name, u, extensionOf(u.file), newest), opener)} />
-  );
+  /**
+   * Opening a slot version, when there is a reader and the version is a PDF:
+   * its title in the versions list opens it (IR-1325), with no Open button.
+   * A slot's upload is a PDF, served as one, so only a PDF version opens
+   * (images are attachments only). `newest`: the version a reviewer may open
+   * a thread on from the reader (IR-1204).
+   */
+  const openVersion = (name: string, u: RecordUpload, newest: boolean) =>
+    onOpen && readerFormat(u.file) === "pdf"
+      ? (opener: HTMLElement) => open(slotUploadDocument(name, u, extensionOf(u.file), newest), opener)
+      : null;
 
   return (
     <div className="space-y-section">
@@ -337,7 +340,7 @@ export function DocumentsTab({
         {shownSlots.map((slot) => {
           const asked = bySlot.get(slot.id);
           const key = `slot:${slot.id}`;
-          const canUpload = owner && (editable || asking || (asked != null && needsUpload(asked)));
+          const canUpload = owner && (drafting || (asked != null && needsUpload(asked)));
           // Newest first, as the server lists them.
           const [latest] = slot.uploads;
           const requirement = guide?.requirement(slot.id) ?? null;
@@ -359,7 +362,6 @@ export function DocumentsTab({
               )}
               actions={(latest || canUpload) && (
                 <>
-                  {latest && openVersion(slot.name, latest, true)}
                   {latest && (
                     <DownloadButton name={`${slot.name} version ${latest.version}`} onClick={() => downloadVersion(slot.name, latest)} />
                   )}
@@ -381,7 +383,7 @@ export function DocumentsTab({
                     name={slot.name}
                     uploads={slot.uploads}
                     removable={(u) => owner && (editable || u.held === true)}
-                    open={(u) => openVersion(slot.name, u, u.id === latest?.id)}
+                    openable={(u) => openVersion(slot.name, u, u.id === latest?.id)}
                     onDownload={(u) => downloadVersion(slot.name, u)}
                     onRemove={(u) =>
                       askToRemove(`${slot.name} version ${u.version}`, async () => {
@@ -446,14 +448,13 @@ export function DocumentsTab({
                 <DocumentRow
                   key={f.id}
                   name={f.filename}
+                  // Its name opens it (IR-1325), as a version's title does.
+                  onOpenName={onOpen && opensInReader(f.filename, "") ? (opener) => open({
+                    kind: "file", id: f.id, label: f.filename, fileName: f.filename,
+                  }, opener) : undefined}
                   latest={[f.uploaded_by_name, formatDate(f.created_at)].filter(Boolean).join(" · ")}
                   actions={
                     <>
-                      {onOpen && opensInReader(f.filename, "") && (
-                        <RowAction icon="fa-book-open" verb="Open" name={f.filename} onClick={(opener) => open({
-                          kind: "file", id: f.id, label: f.filename, fileName: f.filename,
-                        }, opener)} />
-                      )}
                       <DownloadButton name={f.filename} onClick={() => download(() => documentsApi.downloadFile(f.id), f.filename)} />
                       {f.can_remove && (
                         <RemoveButton
@@ -514,7 +515,7 @@ function Versions({
   name,
   uploads,
   removable,
-  open,
+  openable,
   onDownload,
   onRemove,
 }: {
@@ -523,23 +524,35 @@ function Versions({
   uploads: RecordUpload[];
   /** Whether this viewer may remove a version: a draft's, or one still held (IR-1322). */
   removable: (upload: RecordUpload) => boolean;
-  /** A version's Open control, where it opens in the reader (IR-1203). */
-  open: (upload: RecordUpload) => ReactNode;
+  /** Opens a version in the reader (IR-1203), where it can be: its title is the control (IR-1325). */
+  openable: (upload: RecordUpload) => ((opener: HTMLElement) => void) | null;
   onDownload: (upload: RecordUpload) => void;
   onRemove: (upload: RecordUpload) => void;
 }) {
   if (uploads.length === 0) return null;
   return (
     <ul aria-label={`Versions of ${name}`} className="divide-y divide-stone-100">
-      {uploads.map((u) => (
+      {uploads.map((u) => {
+        const opens = openable(u);
+        return (
         <li key={u.id} className="flex flex-wrap items-center justify-between gap-2 py-2 first:pt-0 last:pb-0">
           <span className="text-small text-stone-700">
-            <span className="font-semibold text-stone-900">Version {u.version}</span>
+            {opens ? (
+              <button
+                type="button"
+                onClick={(e) => opens(e.currentTarget)}
+                aria-label={`Open ${name} version ${u.version}`}
+                className={cn(CONTROL_SIZE, "rounded-control font-semibold text-brand underline-offset-2 hover:underline", FOCUS_RING)}
+              >
+                Version {u.version}
+              </button>
+            ) : (
+              <span className="font-semibold text-stone-900">Version {u.version}</span>
+            )}
             {" · "}
             {[u.uploaded_by_name, formatDate(u.created_at)].filter(Boolean).join(" · ")}
           </span>
           <span className="flex items-center gap-2">
-            {open(u)}
             <DownloadButton name={`${name} version ${u.version}`} onClick={() => onDownload(u)} />
             {removable(u) && !u.delete_refused && (
               <RemoveButton name={`${name} version ${u.version}`} onClick={() => onRemove(u)} />
@@ -554,15 +567,17 @@ function Versions({
             )}
           </span>
         </li>
-      ))}
+        );
+      })}
     </ul>
   );
 }
 
 /**
  * One action on a row's document: an icon and a verb, named for the document
- * it acts on ("Open Consent Paper version 2"). Hands back the button pressed,
- * so a caller can return focus to it.
+ * it acts on ("Download Consent Paper version 2"), drawn as a small pill in a
+ * full-size target (IR-1325). Hands back the button pressed, so a caller can
+ * return focus to it.
  */
 function RowAction({ icon, verb, name, onClick }: {
   icon: string;
@@ -575,10 +590,12 @@ function RowAction({ icon, verb, name, onClick }: {
       type="button"
       onClick={(e) => onClick(e.currentTarget)}
       aria-label={`${verb} ${name}`}
-      className={cn(PILL_SECONDARY, FOCUS_RING, CONTROL_SIZE, "px-3")}
+      className={cn(SMALL_ACTION_TARGET, FOCUS_RING)}
     >
-      <i className={cn("fas text-2xs", icon)} aria-hidden />
-      {verb}
+      <span className={SMALL_ACTION_PILL}>
+        <i className={cn("fas text-2xs", icon)} aria-hidden />
+        {verb}
+      </span>
     </button>
   );
 }

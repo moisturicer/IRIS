@@ -418,6 +418,8 @@ export const SCREENS: Screen[] = [
       api.on("GET", "/documents/uploads/9/download/", pdfReply);
     }),
     open: async (page) => {
+      // A version opens by its title in the row's versions list (IR-1325): the arrow shows it first.
+      await page.getByRole("button", { name: /versions? of Ethics clearance$/ }).filter({ visible: true }).first().click();
       await page.getByRole("button", { name: "Open Ethics clearance version 1" }).filter({ visible: true }).first().click();
     },
     heading: PAPER.title,

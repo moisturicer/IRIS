@@ -92,7 +92,7 @@ describe("ReviewerDocumentRequests", () => {
     expect(await screen.findByRole("button", { name: "Request documents" })).toBeInTheDocument();
   });
 
-  it("confirms a request once the dialog sends it", async () => {
+  it("says a request waits for Finish review once the dialog adds it", async () => {
     const user = userEvent.setup();
     const onChanged = vi.fn();
     documentRequests.mockResolvedValue({ data: [] });
@@ -102,9 +102,11 @@ describe("ReviewerDocumentRequests", () => {
     const dialog = await screen.findByRole("dialog");
     await user.click(await within(dialog).findByRole("checkbox", { name: "Ethics Clearance" }));
     await user.type(within(dialog).getByRole("textbox", { name: /message to the owner/i }), "Missing.");
-    await user.click(within(dialog).getByRole("button", { name: /send request/i }));
+    await user.click(within(dialog).getByRole("button", { name: /add to review/i }));
 
-    expect(await screen.findByRole("status")).toHaveTextContent("Documents requested.");
+    // A draft until the reviewer finishes (ADR-022 Amendment 9, IR-1325).
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Added to your review. It is sent when you finish your review with Request changes or Comment only.");
     expect(onChanged).toHaveBeenCalled();
   });
 
