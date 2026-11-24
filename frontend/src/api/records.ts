@@ -221,6 +221,9 @@ export const recordsApi = {
    */
   submitNewVersion: (id: number) =>
     apiClient.post<RecordTracker>(`/records/${id}/new-version/`),
+  /** *Submit added documents* (ADR-022 Amendment 8, IR-1322): send every held upload. */
+  sendDocuments: (id: number) =>
+    apiClient.post<{ sent: number; requests_fulfilled: number }>(`/records/${id}/documents/send/`),
   /** The picklist: the record type's upload slots. */
   documentRequestSlots: (id: number) =>
     apiClient.get<DocumentRequestSlot[]>(`/records/${id}/document-requests/slots/`),

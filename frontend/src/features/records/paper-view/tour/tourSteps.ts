@@ -191,7 +191,7 @@ export function reviewTourSteps({
     items: [
       { name: "1. Claim or open it", text: "If the review is offered to your office, claim it first. Then press Open review to start." },
       { name: "2. Read and comment", text: "Comment on passages in the paper and on the whole record in Conversation or Threads." + (drafting ? " Your comments wait as drafts." : "") },
-      { name: "3. Finish review", text: "Choose a verdict, such as Comment only, Request revision or Accept, add a summary, and your drafts are sent with it in one go. Send comments sends drafts without a verdict." },
+      { name: "3. Finish review", text: "Choose a verdict, such as Comment only, Request changes or Accept, add a summary, and your drafts are sent with it in one go. Send comments sends drafts without a verdict." },
     ],
   });
   return steps;

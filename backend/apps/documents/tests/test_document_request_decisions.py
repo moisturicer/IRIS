@@ -418,6 +418,9 @@ class RejectedThenSlotUploadTests(DecisionTestBase):
             )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        # Held until the owner sends it (ADR-022 Amendment 8, IR-1322).
+        self.assertEqual(self.item_state(item["id"]), "missing")
+        self.send_what_is_held(record, self.owner, response)
         self.assertEqual(self.item_state(item["id"]), "uploaded")
         self.assertEqual(self.request_state(data["id"]), "fulfilled")
         self.assertEqual(

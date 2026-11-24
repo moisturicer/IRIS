@@ -107,23 +107,22 @@ def waiting_on_you(*, workflow_state: str, revision_parties: Iterable, document_
     What the owner owes, one item per asking party. Empty outside
     `OWNER_ACTION_STATES`: a request on a record no longer in review waits on
     nobody.
+
+    A party that asked for a revision and for documents is one item, *Changes
+    requested by {party}* (ADR-022 Amendment 8, point 3; IR-1322). Its `kind`
+    is `revision` while that party's revision is open, since a new version
+    answers both, otherwise `document`.
     """
     if workflow_state not in OWNER_ACTION_STATES:
         return []
+    revising = {str(p) for p in revision_parties}
     return [
         {
-            "kind": "revision", "party": p,
-            "label": f"Revision requested by {party_label(p)}",
-            "action_label": "Submit a new version",
+            "kind": "revision" if p in revising else "document", "party": p,
+            "label": f"Changes requested by {party_label(p)}",
+            "action_label": "Submit a new version" if p in revising else "Upload the documents",
         }
-        for p in _ordered(revision_parties)
-    ] + [
-        {
-            "kind": "document", "party": p,
-            "label": f"Documents requested by {party_label(p)}",
-            "action_label": "Upload the documents",
-        }
-        for p in _ordered(document_parties)
+        for p in _ordered(set(revising) | set(document_parties))
     ]
 
 

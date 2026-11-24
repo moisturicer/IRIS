@@ -73,7 +73,7 @@ describe("ReviewFooterActions", () => {
 
     const menu = await openMenu();
     expect(menu.getAllByRole("menuitem").map((m) => m.textContent)).toEqual([
-      "Request revision…", "Reject…",
+      "Request changes…", "Reject…",
     ]);
     await userEvent.click(menu.getByRole("menuitem", { name: "Reject…" }));
     expect(onFinish).toHaveBeenCalledWith("reject");

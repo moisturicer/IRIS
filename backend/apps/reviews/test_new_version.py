@@ -21,6 +21,7 @@ from rest_framework import status
 from rest_framework.test import APITransactionTestCase
 
 from apps.documents.models import RecordUpload, UploadSlot
+from apps.documents.services import create_upload
 from apps.notifications.models import Notification
 from apps.documents.testing import real_pdf_bytes
 from apps.records import lifecycle
@@ -456,9 +457,9 @@ class UnsentTests(NewVersionTestBase):
     def test_each_change_since_the_latest_version_is_named_until_it_is_submitted(self):
         record = self.itso_cleared_and_ierc_asked()
         slot = UploadSlot.objects.create(name="Consent form", record_type=record.record_type)
-        upload = RecordUpload.objects.create(
-            record=record, slot=slot, file=_pdf(b"%PDF-1.7 consent"), uploaded_by=self.owner,
-        )
+        # The owner's upload to a submitted record is held until it is sent
+        # (ADR-022 Amendment 8, IR-1322), which is what makes it unsent.
+        upload = create_upload(record, slot, _pdf(b"%PDF-1.7 consent"), self.owner)
         self.upload_manuscript(record)
         self.edit_title(record)
 

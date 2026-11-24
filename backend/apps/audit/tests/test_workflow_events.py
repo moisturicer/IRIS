@@ -136,7 +136,12 @@ class AuditTestBase(NewVersionTestBase, DecisionTestBase):
                 {"record": record.pk, "file": _pdf(real_pdf_bytes(b"requested"), "form.pdf"), **target},
                 format="multipart",
             )
-        return self.ok(response, status.HTTP_201_CREATED)
+        stored = self.ok(response, status.HTTP_201_CREATED)
+        # The owner sends it, as the Documents tab has them do: a held upload
+        # answers nothing (ADR-022 Amendment 8, IR-1322).
+        with self.captureOnCommitCallbacks(execute=True):
+            self.ok(self.client.post(f"/api/v1/records/{record.pk}/documents/send/", format="json"), status.HTTP_200_OK)
+        return stored
 
     def item_decision(self, item_id, user, body):
         self.client.force_authenticate(user)

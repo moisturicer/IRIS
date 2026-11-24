@@ -91,7 +91,7 @@ export function ActionRequiredPanel({ recordId, id, onOpenDocuments }: ActionReq
           <i className="fas fa-folder-open text-2xs" aria-hidden />
           Upload in Documents
         </button>
-        <p className="text-xs text-stone-600">Each document is sent to its reviewer as soon as you upload it.</p>
+        <p className="text-xs text-stone-600">Nothing is sent until you submit in Documents.</p>
       </div>
     </section>
   );

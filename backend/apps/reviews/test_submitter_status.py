@@ -66,16 +66,19 @@ class WaitingOnYouTests(MyResearchListTestBase):
     def waiting(self, record):
         return self.mine()[record.pk]["submitter_status"]["waiting_on_you"]
 
+    # IR-1322 (ADR-022 Amendment 8): one item per party, labelled *Changes
+    # requested*, whether it asked for a revision, documents or both. They read
+    # "Revision requested by" and "Documents requested by" before.
     def test_a_revision_request_is_one_item_answered_by_a_new_version(self):
         self.assertEqual(self.waiting(self.revision_requested()), [{
             "kind": "revision", "party": "ierc",
-            "label": "Revision requested by IERC", "action_label": "Submit a new version",
+            "label": "Changes requested by IERC", "action_label": "Submit a new version",
         }])
 
     def test_a_document_request_is_one_item_answered_by_an_upload(self):
         self.assertEqual(self.waiting(self.document_requested()), [{
             "kind": "document", "party": "adviser",
-            "label": "Documents requested by Adviser", "action_label": "Upload the documents",
+            "label": "Changes requested by Adviser", "action_label": "Upload the documents",
         }])
 
     def test_a_record_only_in_review_waits_on_nobody(self):

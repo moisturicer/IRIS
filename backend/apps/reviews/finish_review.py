@@ -19,6 +19,14 @@ and that service's own checks and refusals stand:
 **Comment only** is a recorded review round with no outcome: it writes a
 `ReviewRound` and no `Review`, changes no Clearance and leaves the Seat open.
 
+**Request changes** (`request_revision`, ADR-022 Amendment 8, IR-1322) may
+carry `documents`, the §2 picklist items a document request takes, and
+`new_version` (default true). With `new_version` it opens the revision and,
+for any documents, a document request from the same party, in this same
+transaction, so a refusal of either makes neither. Without it, it opens the
+document request alone: the round is then *Comment only* plus that request,
+since no revision was asked for. Neither, with no documents, is refused.
+
 **In one transaction**, after the record lock: the caller's drafts are sent,
 the verdict is taken, and a `ReviewRound` records the round, naming the
 `Review` the verdict wrote. A refused verdict sends nothing. Before
@@ -113,8 +121,12 @@ def _take_verdict(record, actor, verdict, summary, *, to, suggested_offices, tok
 
 @transaction.atomic
 def finish_review(record, actor, *, verdict, summary="", to=None, suggested_offices=None,
-                  token=None) -> ReviewRound:
-    """Finish the caller's review of `record` (module note). Returns the round."""
+                  token=None, documents=None, new_version=True) -> ReviewRound:
+    """
+    Finish the caller's review of `record` (module note). Returns the round.
+    `documents` is a list of `requests.ItemSpec`, already checked against the
+    picklist; only *Request changes* takes it.
+    """
     record = routing._locked(record)
     if not may_read_review(actor, record):
         raise FinishNotFound
@@ -137,7 +149,17 @@ def finish_review(record, actor, *, verdict, summary="", to=None, suggested_offi
                 kind=ReviewCommentKind.THREAD)
         .order_by("created_at", "pk")
     )
-    if verdict == ReviewVerdict.COMMENT_ONLY and not summary and not drafts:
+    documents = list(documents or [])
+    if documents and verdict != ReviewVerdict.REQUEST_REVISION:
+        raise FinishError("Only Request changes can ask for documents.")
+    if verdict == ReviewVerdict.REQUEST_REVISION and not new_version:
+        if not documents:
+            raise FinishError(
+                "Choose the documents you need, or say the paper itself needs changes."
+            )
+        # Documents alone: no revision is asked for, so the round has no outcome.
+        verdict = ReviewVerdict.COMMENT_ONLY
+    if verdict == ReviewVerdict.COMMENT_ONLY and not summary and not drafts and not documents:
         raise FinishError("Write a summary or a comment first.")
     must_fix = sum(1 for d in drafts if d.severity == ThreadSeverity.MUST_FIX)
     if verdict in APPROVALS and must_fix:
@@ -168,6 +190,8 @@ def finish_review(record, actor, *, verdict, summary="", to=None, suggested_offi
             record, actor, verdict, summary,
             to=to, suggested_offices=suggested_offices, token=token, threads=len(drafts),
         )
+    if documents:
+        _request_documents(record, actor, party, summary, documents)
     round_ = ReviewRound.objects.create(
         record=record, actor=actor, party=party, version=version,
         verdict=verdict, summary=summary, review=review,
@@ -183,6 +207,25 @@ def finish_review(record, actor, *, verdict, summary="", to=None, suggested_offi
         # so the comments it sent are told on their own.
         _notify_unannounced(record, actor, round_, len(drafts), comment_only=False)
     return round_
+
+
+#: A document request needs a message (ADR-022 §1); a review sent with no
+#: summary still says where the request came from.
+DOCUMENTS_MESSAGE = "Asked for with this review."
+
+
+def _request_documents(record, actor, party, summary, documents) -> None:
+    """Open the document request *Request changes* carries, as the seat's party."""
+    from apps.documents import requests
+
+    try:
+        requests.create_request(
+            record, actor, party=party, message=summary or DOCUMENTS_MESSAGE, specs=documents,
+        )
+    except requests.NotAHolder as exc:
+        raise FinishRefused(str(exc))
+    except requests.DocumentRequestError as exc:
+        raise FinishError(str(exc))
 
 
 def _notify_unannounced(record, actor, round_, threads, *, comment_only):

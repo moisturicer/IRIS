@@ -439,6 +439,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-1321** | My Library's Overview puts Waiting on you in the right column, drops the Reading shelf card (Continue reading and Recently opened stay) and the rows' request buttons; no FR- id | [details](traceability/IR-1321.md) | **IMPLEMENTED** |
 | **IR-1319** | An Adviser opening an empty My Library in-app gets its data in under 400 ms at the median; measured at 146–206 ms with no code change (IR-1314's 526 ms not reproduced); no FR- id | [details](traceability/IR-1319.md) | **PARTIAL** |
 | **IR-1320** | A deploy updates the AI's own tables (`iris_ai`): a one-shot `ai-migrate` runs after Django's `migrate`, the AI gateway and workers wait for it, and `deploy.sh` stops naming it if it fails — no FR- id | [details](traceability/IR-1320.md) | **IMPLEMENTED** |
+| **IR-1322** | *Request changes*: one reviewer act asks for a new version, documents or both; an owner's uploads to a submitted paper are held, theirs alone with a trash can, until *Submit new version* or *Submit added documents* sends them — ADR-022 Amendment 8; no FR- id | [details](traceability/IR-1322.md) | **IMPLEMENTED** |
 | NFR-U3 | Responsive at 360 px, no horizontal scroll | [details](traceability/NFR-U3.md) | **PARTIAL** |
 | NFR-A1 | WCAG 2.1 AA on interactive controls | [details](traceability/NFR-A1.md) | **PARTIAL** |
 

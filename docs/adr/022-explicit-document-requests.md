@@ -13,7 +13,7 @@
 >
 > Uploads answering a request now join the current Version ([ADR-058](058-each-version-keeps-its-text-and-its-files.md) §2).
 
-> **Amended 2026-11-24 ([IR-1322](https://citiris.atlassian.net/browse/IR-1322); decided by Hermoine Zozobrado, accepted when its pull request merges; security review of point 4 pending).** A reviewer's *Request revision* is shown as *Request changes* and may ask for documents in the same act. An owner's uploads to a submitted record are held, seen by its owners only, until *Submit new version* or *Submit added documents* sends them. See *Amendment 8*.
+> **Amended 2026-11-24 ([IR-1322](https://citiris.atlassian.net/browse/IR-1322); decided by Hermoine Zozobrado; accepted 2026-11-24 when PR #1006 merged, with Ashlee Sean's security review of point 4).** A reviewer's *Request revision* is shown as *Request changes* and may ask for documents in the same act. An owner's uploads to a submitted record are held, seen by its owners only, until *Submit new version* or *Submit added documents* sends them. See *Amendment 8*.
 
 > **Amended 2026-11-18 ([IR-1226](https://citiris.atlassian.net/browse/IR-1226); accepted 2026-11-18 with PR #895's merge; security review approved verbally by Ashlee Sean, relayed by Hermoine Zozobrado).** Creating, deciding and withdrawing a request takes a seat on the requesting party, not membership of it. See *Amendment 7*.
 
@@ -353,7 +353,7 @@ Decided by Hermoine Zozobrado on 2026-11-18 for [IR-1226](https://citiris.atlass
 
 ## Amendment 8 — 2026-11-24: *Request changes*, and the owner sends what they added
 
-Decided by Hermoine Zozobrado on 2026-11-24 for [IR-1322](https://citiris.atlassian.net/browse/IR-1322); accepted when this amendment's pull request merges. **Point 4 changes who may read a file, so it needs a security review** (Ashlee Sean) before it is built. Transcribed by an agent. It amends §3 and the 2026-09-24 Amendment's point 1 (fulfilment), [ADR-032](032-adviser-first-review-and-office-reviewer-pools.md) §7 (the verdict's name) and [ADR-058](058-each-version-keeps-its-text-and-its-files.md) §2 (when a file joins a Version).
+Decided by Hermoine Zozobrado on 2026-11-24 for [IR-1322](https://citiris.atlassian.net/browse/IR-1322); **accepted 2026-11-24**, when its pull request (#1006) merged. Point 4 changes who may read a file; Ashlee Sean reviewed it for security before it was built. Transcribed by an agent. It amends §3 and the 2026-09-24 Amendment's point 1 (fulfilment), [ADR-032](032-adviser-first-review-and-office-reviewer-pools.md) §7 (the verdict's name) and [ADR-058](058-each-version-keeps-its-text-and-its-files.md) §2 (when a file joins a Version).
 
 **The problem.**
 - **Two acts, two items.** A reviewer who wanted both a revision and a form made two acts, and the owner saw two items for one reviewer: *Revision requested by Adviser* and *Documents requested by Adviser*.

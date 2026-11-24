@@ -303,7 +303,7 @@ def current_uploads(record) -> list:
 
     latest = {}
     for upload in (
-        RecordUpload.objects.filter(record=record).select_related("slot")
+        RecordUpload.objects.filter(record=record).sent().select_related("slot")
         .order_by("slot_id", "-version", "-pk")
     ):
         latest.setdefault(upload.slot_id, upload)
@@ -312,22 +312,24 @@ def current_uploads(record) -> list:
 
 def documents_added_during(version, next_version=None) -> list:
     """
-    Uploads made while `version` was the latest: after it was submitted and,
-    if there is one, before `next_version` was. Read from upload times, never
-    stored (ADR-058 §2, IR-872); an upload a version names, or one that
-    answered a document request, cannot be deleted, so the times stay true.
+    Uploads sent while `version` was the latest: after it was submitted and,
+    if there is one, before `next_version` was. Read from the time each was
+    sent (ADR-058 §2 as amended by ADR-022 Amendment 8, IR-1322), never
+    stored; a held upload is added when it is sent. An upload a version
+    names, or one that answered a document request, cannot be deleted, so
+    the times stay true.
     """
     from apps.documents.models import RecordUpload
 
     uploads = RecordUpload.objects.filter(
-        record_id=version.record_id, created_at__gt=version.created_at,
+        record_id=version.record_id, sent_at__gt=version.created_at,
     )
     if next_version is not None:
-        uploads = uploads.filter(created_at__lte=next_version.created_at)
+        uploads = uploads.filter(sent_at__lte=next_version.created_at)
     return list(
         uploads.select_related("slot")
         .prefetch_related("rejections__rejected_by", "rejections__item__request")
-        .order_by("created_at", "pk")
+        .order_by("sent_at", "pk")
     )
 
 

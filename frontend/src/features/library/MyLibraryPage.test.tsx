@@ -233,8 +233,8 @@ describe("My Library: an author's research", () => {
   });
 
   it("puts what waits on the author first, each request linking straight to the act that answers it", async () => {
-    const revision = { kind: "revision", party: "ierc", label: "Revision requested by IERC", action_label: "Submit a new version" } as const;
-    const document = { kind: "document", party: "adviser", label: "Documents requested by Adviser", action_label: "Upload the documents" } as const;
+    const revision = { kind: "revision", party: "ierc", label: "Changes requested by IERC", action_label: "Submit a new version" } as const;
+    const document = { kind: "document", party: "adviser", label: "Changes requested by Adviser", action_label: "Upload the documents" } as const;
     mine([
       ownRecord({ id: 13, title: "Still with the offices", pipeline_status: "in_review", workflow_state: "in_review", workflow_state_label: "In review", holders: [{ party: "ierc", label: "IERC" }], submitter_status: { line: "In specialist review: IERC", waiting_on_you: [] } }),
       ownRecord({ id: 14, title: "Asked to revise", pipeline_status: "in_review", workflow_state: "awaiting_resubmission", workflow_state_label: "Awaiting resubmission", holders: [{ party: "ierc", label: "IERC" }], submitter_status: { line: "Revision requested by IERC: action needed", waiting_on_you: [revision, document] } }),
@@ -333,7 +333,7 @@ describe("My Library: an author's research", () => {
   });
 
   it("opens an author on Overview: what waits on them, counted, in the right column, and a tab to every submission", async () => {
-    const document = { kind: "document", party: "adviser", label: "Documents requested by Adviser", action_label: "Upload the documents" } as const;
+    const document = { kind: "document", party: "adviser", label: "Changes requested by Adviser", action_label: "Upload the documents" } as const;
     mine([
       ownRecord({ id: 15, title: "Asked for a form", pipeline_status: "in_review", workflow_state: "awaiting_document", workflow_state_label: "Awaiting document", holders: [{ party: "adviser", label: "Adviser" }], submitter_status: { line: "Documents requested by Adviser: action needed", waiting_on_you: [document] } }),
       ownRecord({ id: 12 }),
@@ -472,7 +472,7 @@ describe("My Library: what each paper waits on (IR-1084, IR-1306)", () => {
   });
 
   it("opens a paper with an open request straight on its Documents tab, with no button of its own (IR-1321)", async () => {
-    const revision = { kind: "revision", party: "ierc", label: "Revision requested by IERC", action_label: "Submit a new version" } as const;
+    const revision = { kind: "revision", party: "ierc", label: "Changes requested by IERC", action_label: "Submit a new version" } as const;
     mine([inReview({ id: 14, title: "Asked to revise", workflow_state: "awaiting_resubmission",
       submitter_status: { line: "Revision requested by IERC: action needed", waiting_on_you: [revision] } })]);
     renderScreen(<MyLibraryPage />, SUBMISSIONS);

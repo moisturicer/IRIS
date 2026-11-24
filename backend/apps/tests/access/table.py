@@ -305,6 +305,13 @@ RECORDS: dict[str, Entry | Shadowed] = {
     "record-discard-revised-manuscript": Entry({
         "POST": _case(OWNER_ACTS, kwargs={"pk": Ref("revising")}, data={}),
     }),
+    # *Submit added documents* (ADR-022 Amendment 8, IR-1322): owner only. On
+    # `record` the owner holds nothing, so is authorized and told so (400). A
+    # held upload is the owners' alone, a 404 to anyone else: the world's upload
+    # is sent, and `documents/tests/test_held_uploads.py` covers a held one.
+    "record-send-documents": Entry({
+        "POST": _case(OWNER_ACTS, kwargs=RECORD, data={}),
+    }),
     # The review discussion (IR-419, ADR-032 §7): read under `may_read_review`
     # (participants, and the pool of a party holding the record now), written by
     # participants alone, so ITSO's unseated pool reads and is refused. RDCO
