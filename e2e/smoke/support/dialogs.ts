@@ -463,7 +463,7 @@ export const DIALOGS: DialogCase[] = [
   })),
   {
     id: "submit a new version", screen: "paper-view",
-    sources: ["features/records/paper-view/NewVersionDialog.tsx", "features/records/paper-view/SubmitNewVersionBar.tsx"],
+    sources: ["features/records/paper-view/NewVersionDialog.tsx"],
     // Submitted from Review's Documents tab, where the owner uploads (IR-1318).
     path: `/records/${PAPER.id}?section=review&documents=open`,
     override: (api) => {
