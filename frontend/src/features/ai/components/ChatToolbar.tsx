@@ -1,6 +1,8 @@
 import { NotificationBell } from "@/components/layout/NotificationBell";
 import { DownloadConversation } from "./DownloadConversation";
 import type { ConversationFile } from "@/api/runtimeReader";
+import { PANE_TITLE } from "@/components/layout/paneTitle";
+import { cn } from "@/lib/utils";
 import { ConversationsToggle } from "./ConversationSidebar";
 
 interface ChatToolbarProps {
@@ -37,11 +39,10 @@ export function ChatToolbar({
     <header className="shrink-0 flex items-center gap-2 px-3 py-2.5 min-h-[56px] border-b border-stone-200/80">
       {phoneHistory && <ConversationsToggle open={phoneHistory.open} onClick={phoneHistory.onOpen} asDialog />}
 
-      <div className="min-w-0 flex-1 px-1">
-        {eyebrow && <p className="text-label font-semibold text-stone-600">
-          Ask IRIS
-        </p>}
-        <h1 className="break-words text-body font-semibold text-stone-900">{sessionTitle}</h1>
+      {/* The tool's name in the pane's title face; an open conversation's own title follows it. */}
+      <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 px-1">
+        {eyebrow && <p className={cn("shrink-0", PANE_TITLE)}>Ask IRIS</p>}
+        <h1 className={cn("min-w-0 break-words", eyebrow ? "text-body font-medium text-stone-600" : PANE_TITLE)}>{sessionTitle}</h1>
       </div>
 
       {onNewConversation && <button type="button" onClick={onNewConversation} aria-label="New conversation"
