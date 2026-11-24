@@ -287,7 +287,6 @@ export default function MyLibraryPage() {
             onRetry={() => void loadResearch()}
             library={library}
             history={history}
-            folders={folders}
             onOpenSubmissions={openSubmissions}
             onOpenSaved={openSaved}
             onDeleted={dropDeleted}

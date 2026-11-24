@@ -248,15 +248,15 @@ describe("My Library: an author's research", () => {
 
     const waiting = section("Needs your action");
     expect(within(waiting).getByText("Revision requested by IERC: action needed")).toBeInTheDocument();
-    expect(within(waiting).getByRole("link", { name: "Submit a new version (Revision requested by IERC)" }))
-      // Both answered in Review's Documents tab since IR-1318 (it was the Overview's card).
+    // The row itself opens Review's Documents tab, where both are answered
+    // (IR-1318); it carries no per-request button (IR-1321).
+    expect(within(waiting).getByRole("link", { name: "Asked to revise" }))
       .toHaveAttribute("href", "/records/14?section=review&documents=open");
-    const uploads = within(waiting).getAllByRole("link", { name: "Upload the documents (Documents requested by Adviser)" });
-    expect(uploads.map((link) => link.getAttribute("href"))).toEqual([
-      "/records/14?section=review&documents=open",
-      "/records/15?section=review&documents=open",
-    ]);
+    expect(within(waiting).getByRole("link", { name: "Asked for a form" }))
+      .toHaveAttribute("href", "/records/15?section=review&documents=open");
+    expect(within(waiting).queryByRole("link", { name: /^Submit a new version|^Upload the documents/ })).not.toBeInTheDocument();
     expect(within(waiting).queryByRole("link", { name: "Still with the offices" })).not.toBeInTheDocument();
+    expect(within(section("In review")).getByRole("link", { name: "Still with the offices" })).toHaveAttribute("href", "/records/13");
     expect(within(section("In review")).getByText("In specialist review: IERC")).toBeInTheDocument();
     await expectNoBlockingA11yViolations(container);
   });
@@ -322,7 +322,17 @@ describe("My Library: an author's research", () => {
     expect(screen.getByRole("heading", { name: "Nothing matches “soilzzz”" })).toBeInTheDocument();
   });
 
-  it("opens an author on Overview: what waits on them, counted, and a tab to every submission", async () => {
+  it("says nothing is waiting on an author only once their research has loaded, with no counter (IR-1321)", async () => {
+    mine([ownRecord({ id: 12 })]);
+    const { container } = renderScreen(<MyLibraryPage />, { route: "/records/mine" });
+
+    const waiting = await screen.findByRole("region", { name: "Waiting on you" });
+    expect(await within(waiting).findByText(/^Nothing needs your action\./)).toBeInTheDocument();
+    expect(within(waiting).queryByText(/^\d+$/)).not.toBeInTheDocument();
+    await expectNoBlockingA11yViolations(container);
+  });
+
+  it("opens an author on Overview: what waits on them, counted, in the right column, and a tab to every submission", async () => {
     const document = { kind: "document", party: "adviser", label: "Documents requested by Adviser", action_label: "Upload the documents" } as const;
     mine([
       ownRecord({ id: 15, title: "Asked for a form", pipeline_status: "in_review", workflow_state: "awaiting_document", workflow_state_label: "Awaiting document", holders: [{ party: "adviser", label: "Adviser" }], submitter_status: { line: "Documents requested by Adviser: action needed", waiting_on_you: [document] } }),
@@ -338,7 +348,14 @@ describe("My Library: an author's research", () => {
     // The draft's title opens Publish over My Library (IR-1258).
     expect(within(screen.getByRole("region", { name: "Recent submissions" })).getByRole("link", { name: "Community Water Monitoring" }))
       .toHaveAttribute("href", "/records/mine?publish=12");
-    expect(screen.getByRole("region", { name: "Reading shelf" })).toHaveTextContent("Saved papers follow your account.");
+    // The Reading shelf is gone (IR-1321); its reading stays, its folders do not.
+    expect(screen.queryByRole("region", { name: "Reading shelf" })).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Continue reading" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Your folders" })).not.toBeInTheDocument();
+    // On a phone, the first thing an author reads.
+    expect(screen.getAllByRole("heading", { level: 2 })[0]).toHaveTextContent("Waiting on you");
+    // A brief row carries no per-request button either.
+    expect(within(screen.getByRole("region", { name: "Recent submissions" })).queryByRole("link", { name: /^Upload the documents/ })).not.toBeInTheDocument();
     await expectNoBlockingA11yViolations(container);
 
     await userEvent.click(screen.getByRole("tab", { name: "My submissions" }));
@@ -454,7 +471,7 @@ describe("My Library: what each paper waits on (IR-1084, IR-1306)", () => {
     expect(screen.queryByText(/Nothing to do yet|Nothing is waiting/)).not.toBeInTheDocument();
   });
 
-  it("offers what the author owes as its one action, in the server's words, where a request is open", async () => {
+  it("opens a paper with an open request straight on its Documents tab, with no button of its own (IR-1321)", async () => {
     const revision = { kind: "revision", party: "ierc", label: "Revision requested by IERC", action_label: "Submit a new version" } as const;
     mine([inReview({ id: 14, title: "Asked to revise", workflow_state: "awaiting_resubmission",
       submitter_status: { line: "Revision requested by IERC: action needed", waiting_on_you: [revision] } })]);
@@ -463,8 +480,8 @@ describe("My Library: what each paper waits on (IR-1084, IR-1306)", () => {
     await screen.findByRole("link", { name: "Asked to revise" });
     expect(screen.getByText("Revision requested by IERC: action needed")).toBeInTheDocument();
     expect(screen.queryByText(/^Waiting on you:/)).not.toBeInTheDocument();
-    // Its own act stays the one action; "Open review" is not added beside it.
-    expect(screen.getByRole("link", { name: "Submit a new version (Revision requested by IERC)" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Asked to revise" })).toHaveAttribute("href", "/records/14?section=review&documents=open");
+    expect(screen.queryByRole("link", { name: /^Submit a new version/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /^Open review/ })).not.toBeInTheDocument();
   });
 
