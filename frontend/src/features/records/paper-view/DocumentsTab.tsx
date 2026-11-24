@@ -361,11 +361,10 @@ export function DocumentsTab({
                   {latest?.held && <NotYetSubmitted>Added, not sent yet</NotYetSubmitted>}
                 </>
               )}
-              actions={(latest || canUpload) && (
+              // No Download here: each version, the newest too, is downloaded
+              // from its own row in the versions list (IR-1330).
+              actions={((owner && latest?.held) || canUpload) && (
                 <>
-                  {latest && (
-                    <DownloadButton name={`${slot.name} version ${latest.version}`} onClick={() => downloadVersion(slot.name, latest)} />
-                  )}
                   {owner && latest?.held && (
                     <RemoveButton name={`${slot.name} version ${latest.version}`} onClick={() =>
                       askToRemove(`${slot.name} version ${latest.version}`, async () => {
