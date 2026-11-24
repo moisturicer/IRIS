@@ -1076,16 +1076,28 @@ describe("Ask IRIS beside a paper not yet published (IR-1252)", () => {
     useUIStore.setState({ sidebarCollapsed: false, sidebarOpen: false, readingRail: null });
   });
 
-  it("isn't opened on entering Paper, offered as an icon, or linked from Notes", async () => {
+  // Changed deliberately by IR-1326: Notes went with Ask IRIS here, and this
+  // test opened it. A paper not yet published now offers neither.
+  it("isn't opened on entering Paper or offered as an icon, and neither is Notes", async () => {
     renderPaper(`/records/${RECORD_ID}?section=paper`);
     await screen.findByText(/paper reader open/i);
 
     expect(screen.queryByRole("complementary", { name: "Ask IRIS" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Ask IRIS" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Notes" })).not.toBeInTheDocument();
+  });
 
-    await userEvent.click(screen.getByRole("button", { name: "Notes" }));
-    await screen.findByRole("heading", { name: "Notes" });
-    expect(screen.queryByRole("button", { name: "Ask IRIS" })).not.toBeInTheDocument();
+  // IR-1326 (ADR-064/065 as amended 2026-11-24): private notes and highlights
+  // are kept on published papers only.
+  it("offers no Save highlight, and reads no note or highlight", async () => {
+    vi.mocked(libraryApi.note).mockClear();
+    vi.mocked(libraryApi.highlights).mockClear();
+    renderPaper(`/records/${RECORD_ID}?section=paper`);
+    await screen.findByText(/paper reader open/i);
+
+    expect(screen.queryByRole("button", { name: "Selection: Save highlight" })).not.toBeInTheDocument();
+    expect(libraryApi.note).not.toHaveBeenCalled();
+    expect(libraryApi.highlights).not.toHaveBeenCalled();
   });
 
   it("is offered again once the paper is published", async () => {
@@ -3022,7 +3034,9 @@ describe("the Review section (IR-412)", () => {
       await userEvent.click(within(shown).getByRole("button", { name: "Back to the manuscript" }));
       expect(await screen.findByText(/reading the current paper/)).toBeInTheDocument();
       expect(screen.queryByRole("group", { name: "Shown in the reader" })).not.toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Selection: Save highlight" })).toBeInTheDocument();
+      // Changed deliberately by IR-1326: the manuscript in Review offers no
+      // Save highlight either; selecting text there is for a review comment.
+      expect(screen.queryByRole("button", { name: /^Selection:/ })).not.toBeInTheDocument();
     });
 
     it("opens an author's older version and PDF attachment, while a Word file only downloads", async () => {
@@ -4663,6 +4677,22 @@ describe("highlights on the paper (IR-583)", () => {
 
     expect(await screen.findByText(/open at page 3, 1 region\(s\) to highlight, reading v1/i)).toBeInTheDocument();
     expect(screen.getByText("1 saved highlight(s) drawn")).toBeInTheDocument();
+  });
+
+  // IR-1326: in Review, selecting text is for a review comment alone, so even
+  // a published paper offers no Save highlight there and draws none.
+  it("offers no Save highlight in Review, and draws and reads none there", async () => {
+    workspaceAt(1600);
+    list(entry());
+    // A reviewer's Review of a published paper: the tab, not the status, withholds it.
+    shownRecord = { ...inReview, ...reviewing, pipeline_status: "published" };
+    signInAs(2, "ITSO");
+    renderPaper(`/records/${RECORD_ID}?section=review`);
+    await screen.findByText(/reading the current paper/);
+
+    expect(screen.queryByRole("button", { name: "Selection: Save highlight" })).not.toBeInTheDocument();
+    expect(screen.getByText("0 saved highlight(s) drawn")).toBeInTheDocument();
+    expect(libraryApi.highlights).not.toHaveBeenCalled();
   });
 
   it("asks for no highlights while only the overview is showing", async () => {

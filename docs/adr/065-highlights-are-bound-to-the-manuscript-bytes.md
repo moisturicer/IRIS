@@ -4,6 +4,8 @@
 
 **Proposed** — 2026-11-12 (IR-583, under IR-553), awaiting acceptance by Lee Jasmin Adolfo. It completes the retention rule [ADR-064](064-private-reading-notes.md) §6 left open ("when IR-583 adds a quotation, it is withheld whenever the Record is unreadable, while the reader's own text stays"). Nothing in it is authorised until it is accepted.
 
+> **Amended 2026-11-24 ([IR-1326](https://citiris.atlassian.net/browse/IR-1326); decided by Hermoine Zozobrado; Proposed until its PR merges after review).** Highlights are kept only on a **published** paper, and never in Review. See *Amendment — 2026-11-24*.
+
 ## Context
 
 IR-553 User Stories 12–13 ask for highlights that keep their meaning: a passage the reader saved from a paper must never end up pointing at different text because the paper was replaced, and must not hand the paper's words to someone who may no longer read it.
@@ -33,6 +35,19 @@ The system already has an identity for those bytes. Every accepted Manuscript up
 7. **The reader's data rights cover highlights.** Account deletion deletes them. The personal-data export includes each highlight's page and, while the reader may still read the Record, its quotation and the Record's title.
 
 8. **The selection menu is shared.** Selecting text in the reader (or taking find's current match, the keyboard's way to a passage) opens one menu whose actions are data the page hands the reader (`SelectionAction`). IR-583 supplies *Save highlight*; IR-581's *Ask about selection* adds its own entry to the same list. The menu is offered on the current paper only, never on an earlier Version viewed beside it.
+
+## Amendment — 2026-11-24: published papers only, and none in Review
+
+**Status: Proposed.** It is accepted when IR-1326's pull request merges after review. Decided by Hermoine Zozobrado on 2026-11-24, in chat. Transcribed by an agent. It narrows §3 and §5 (the Record gate).
+
+**The problem.** In Review, selecting text offered both *Comment*, which is shared and part of the review ([ADR-032](032-adviser-first-review-and-office-reviewer-pools.md) §7), and *Highlight*, which is private and goes nowhere. The two look alike on the PDF, so a reviewer could think they had flagged a passage for the authors when they hadn't. Highlight's optional note also went to Notes, which Review doesn't open.
+
+**The decision.**
+1. **Only a published paper takes highlights.** The server's gate is `annotatable(user)`: `Record.objects.visible_to(user)` narrowed to `pipeline_status = published`. A draft or a paper in review answers the same `404` as a missing Record, to its owner too. This is the rule Ask IRIS already follows ([ADR-052](052-each-paper-states-its-embargo-and-a-person-ends-it.md) as amended for IR-1252).
+2. **Nothing is deleted.** A highlight on a paper that is not published is kept and withheld, listed as `{id, record_id, available: false}` as §5 lists one whose access is revoked, and it returns when the paper is published. Its reader can still remove it (§5's `204`).
+3. **Review shows none.** The selection menu offers no *Save highlight* there and no private highlight is drawn, so selecting text in Review is for a review comment alone. Notes is not offered there, as before.
+
+**Cost.** An author or Adviser can no longer keep private notes or highlights on their own draft or a paper in review; review comments are the tool for that stage.
 
 ## Alternatives Considered
 

@@ -443,6 +443,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-1323** | My Library's Overview stacks Waiting on you, Continue reading and Recently opened as fixed-size cards in the right column, each list scrolling inside its card; Recent submissions alone on the left; no FR- id | [details](traceability/IR-1323.md) | **IMPLEMENTED** |
 | **IR-1324** | My Library's tabs: Title Case names, open search and underlined filters, plain group headings on My Submissions, folder tiles with + Folder on Saved Papers, search on Saved Calls, and the Overview without Continue reading; no FR- id | [details](traceability/IR-1324.md) | **IMPLEMENTED** |
 | **IR-1325** | My Library layout tweaks, plus document requests as drafts that *Finish review* sends, *Upload* only on what was asked, and smaller Download/Upload with no Open button — ADR-022 Amendment 9; no FR- id | [details](traceability/IR-1325.md) | **IMPLEMENTED** |
+| **IR-1326** | Private notes and highlights on published papers only, and none in Review, where selecting text is for a review comment — ADR-064 and ADR-065 amended 2026-11-24; no FR- id | [details](traceability/IR-1326.md) | **IMPLEMENTED** |
 | NFR-U3 | Responsive at 360 px, no horizontal scroll | [details](traceability/NFR-U3.md) | **PARTIAL** |
 | NFR-A1 | WCAG 2.1 AA on interactive controls | [details](traceability/NFR-A1.md) | **PARTIAL** |
 

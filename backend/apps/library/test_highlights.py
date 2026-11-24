@@ -353,6 +353,34 @@ class RevokedAccessTests(HighlightTestCase):
         for secret in (QUOTE, "Results. ", "regions", "quote", "manuscript"):
             self.assertNotIn(secret, body)
 
+    # IR-1326 (ADR-065 as amended 2026-11-24): a paper that isn't published
+    # takes no highlight, even from its owner, and lists one as unavailable.
+    def test_an_unpublished_record_takes_no_highlight_even_its_owners(self):
+        for status in (PipelineStatus.DRAFT, PipelineStatus.IN_REVIEW):
+            mine = self.identified(f"My {status} paper", status=status, owner=self.reader)
+            missing_id = mine.id + 10_000
+
+            for call in (
+                lambda r: self.client.get(record_url(r)),
+                lambda r: self.client.post(record_url(r), self.payload(mine), format="json"),
+            ):
+                hidden, missing = call(mine), call(missing_id)
+                self.assertEqual((hidden.status_code, missing.status_code), (404, 404), status)
+                self.assertEqual(hidden.data, missing.data)
+        self.assertFalse(ReadingHighlight.objects.exists())
+
+    def test_a_highlight_on_a_paper_back_in_review_is_listed_unavailable_and_still_removable(self):
+        record = self.identified("Published, then revised", owner=self.reader)
+        made = self.make(record).data["id"]
+        Record.objects.filter(pk=record.pk).update(pipeline_status=PipelineStatus.IN_REVIEW)
+
+        everything = self.client.get(HIGHLIGHTS)
+        self.assertEqual(everything.data["results"], [{"id": made, "record_id": record.id, "available": False}])
+        self.assertNotIn(QUOTE, everything.content.decode())
+        # ADR-065 §5: a reader can always drop their own row.
+        self.assertEqual(self.client.delete(f"{record_url(record)}{made}/").status_code, 204)
+        self.assertFalse(ReadingHighlight.objects.exists())
+
     def test_a_revoked_highlight_is_kept_and_comes_back_with_access(self):
         record = self.identified("Restricted for a while")
         self.make(record)
