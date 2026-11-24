@@ -2,7 +2,7 @@
  "kind": "sequence",
  "format": "portrait",
  "title": "Q-3.2  Sequence: RDCO routes, then decides",
- "caption": "SDD v2 §3.3.2. From apps/reviews/routing.py, decisions.py, ADR-047 at a46d7fc4 (IR-1275).",
+ "caption": "SDD v2 §3.3.2. From apps/reviews/routing.py, decisions.py, ADR-047 at c01f0ef1 (IR-1275).",
  "participants": [
   {
    "id": "rdco",

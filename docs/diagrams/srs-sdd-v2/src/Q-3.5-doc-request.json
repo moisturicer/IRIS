@@ -2,7 +2,7 @@
  "kind": "sequence",
  "format": "portrait",
  "title": "Q-3.5  Sequence: a document request",
- "caption": "SDD v2 §3.3.5. From apps/documents/requests.py, ADR-022 at a46d7fc4 (IR-1275).",
+ "caption": "SDD v2 §3.3.5. From apps/documents/requests.py, records/views.py send_documents, ADR-022 Amendment 8 at c01f0ef1 (IR-1275).",
  "participants": [
   {
    "id": "rv",
@@ -28,7 +28,7 @@
   {
    "from": "rv",
    "to": "dj",
-   "label": "POST /records/<id>/document-requests/ (items)"
+   "label": "POST /records/<id>/document-requests/ (items), or finish-review without a new version"
   },
   {
    "from": "dj",
@@ -44,7 +44,23 @@
   {
    "from": "o",
    "to": "dj",
-   "label": "upload against each item"
+   "label": "upload each item: RecordUpload, sent_at null (held, owners only)"
+  },
+  {
+   "from": "o",
+   "to": "dj",
+   "label": "POST /records/<id>/documents/send/ (409 if a revision is open)"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "send_held_uploads: set sent_at; answer missing items; fulfil; restart the clock"
+  },
+  {
+   "from": "dj",
+   "to": "rv",
+   "label": "after commit: one notification per party",
+   "dash": true
   },
   {
    "from": "rv",
@@ -54,7 +70,7 @@
   {
    "from": "dj",
    "to": "db",
-   "label": "all accepted: fulfilled; restart the clock"
+   "label": "reject: item missing again; the request reopens"
   }
  ],
  "legend": [

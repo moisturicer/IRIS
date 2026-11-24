@@ -2,7 +2,7 @@
  "kind": "sequence",
  "format": "portrait",
  "title": "Q-5.7  Sequence: when AI is unavailable",
- "caption": "SDD v2 §3.5.7. From GET /ai/status/, apps/ai/resilience at a46d7fc4 (IR-1275).",
+ "caption": "SDD v2 §3.5.7. From GET /ai/status/, apps/ai/resilience at c01f0ef1 (IR-1275).",
  "participants": [
   {
    "id": "spa",

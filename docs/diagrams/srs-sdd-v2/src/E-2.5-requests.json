@@ -1,6 +1,6 @@
 {
  "title": "E-2.5  Schema: download and delete requests",
- "caption": "SDD v2 §3.2.5, 3.2.6. Generated from backend/apps/*/models*.py at a46d7fc4; all keys and up to four other fields per table; the full schema is D-8 to D-15.",
+ "caption": "SDD v2 §3.2.5, 3.2.6. Generated from backend/apps/*/models*.py at c01f0ef1; all keys and up to four other fields per table; the full schema is D-8 to D-15.",
  "kind": "erd",
  "format": "portrait",
  "nodes": [

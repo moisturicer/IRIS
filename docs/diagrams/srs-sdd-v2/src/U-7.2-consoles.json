@@ -2,7 +2,7 @@
  "kind": "usecase",
  "format": "portrait",
  "title": "U-7.2  Use cases: System Admin and RDCO consoles (FR-7.2)",
- "caption": "SRS v2 §3.2.7.2. From features/admin, features/accounts, features/setup, ADR-051 at a46d7fc4 (IR-1275).",
+ "caption": "SRS v2 §3.2.7.2. From features/admin, features/accounts, features/setup, ADR-051 at c01f0ef1 (IR-1275).",
  "system": "Consoles",
  "left": [
   {

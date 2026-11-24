@@ -2,7 +2,7 @@
  "format": "portrait",
  "direction": "DOWN",
  "title": "A-1.1b  Activity: verify the email address",
- "caption": "SRS v2 §3.2.1.1. From apps/accounts/recovery, ADR-045 at a46d7fc4 (IR-1275).",
+ "caption": "SRS v2 §3.2.1.1. From apps/accounts/recovery, ADR-045 at c01f0ef1 (IR-1275).",
  "elk": {
   "elk.layered.spacing.nodeNodeBetweenLayers": "16",
   "elk.spacing.nodeNode": "22",

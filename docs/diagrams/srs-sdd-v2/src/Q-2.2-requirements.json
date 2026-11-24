@@ -2,7 +2,7 @@
  "kind": "sequence",
  "format": "portrait",
  "title": "Q-2.2  Sequence: set requirements and templates",
- "caption": "SDD v2 §3.2.2. From apps/documents/setup_views.py, template_files.py at a46d7fc4 (IR-1275).",
+ "caption": "SDD v2 §3.2.2. From apps/documents/setup_views.py, template_files.py at c01f0ef1 (IR-1275).",
  "participants": [
   {
    "id": "r",

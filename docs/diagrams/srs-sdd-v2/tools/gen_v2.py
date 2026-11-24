@@ -248,7 +248,7 @@ def schema(d):
                 tail, head = g.ends(f["relation"], f.get("null"))
                 edges.append({"from": g.alias(g.key(m)), "to": g.alias(f["ref"]), "field": f["name"],
                               "tail": tail, "head": head})
-    return {"title": d["title"], "caption": d["caption"] + " Generated from backend/apps/*/models*.py at a46d7fc4; "
+    return {"title": d["title"], "caption": d["caption"] + " Generated from backend/apps/*/models*.py at c01f0ef1; "
             "all keys and up to four other fields per table; the full schema is D-8 to D-15.",
             "kind": "erd", "format": d.get("format", "portrait"),
             "nodes": nodes, "edges": edges, "legend": g.LEGEND[:3] + ["FK → Name (D-n): drawn in full on figure D-n"]}

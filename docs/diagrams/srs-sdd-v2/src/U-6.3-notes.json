@@ -2,7 +2,7 @@
  "kind": "usecase",
  "format": "portrait",
  "title": "U-6.3  Use cases: private notes and highlights (FR-6.3)",
- "caption": "SRS v2 §3.2.6.3. From apps/library (notes, highlights.py), ADR-064, ADR-065 (proposed) at a46d7fc4 (IR-1275).",
+ "caption": "SRS v2 §3.2.6.3. From apps/library (notes, highlights.py), ADR-064, ADR-065 (proposed) at c01f0ef1 (IR-1275).",
  "system": "Notes and highlights",
  "left": [
   {

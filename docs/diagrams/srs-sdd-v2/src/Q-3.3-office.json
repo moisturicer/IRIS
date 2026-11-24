@@ -2,7 +2,7 @@
  "kind": "sequence",
  "format": "portrait",
  "title": "Q-3.3  Sequence: an office claims and clears",
- "caption": "SDD v2 §3.3.3. From apps/reviews/seats.py, office_review.py, finish_review.py at a46d7fc4 (IR-1275).",
+ "caption": "SDD v2 §3.3.3. From apps/reviews/seats.py, office_review.py, finish_review.py at c01f0ef1 (IR-1275).",
  "participants": [
   {
    "id": "m",

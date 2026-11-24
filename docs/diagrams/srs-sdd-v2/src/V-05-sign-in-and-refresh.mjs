@@ -5,7 +5,7 @@ export default {
   kind: 'sequence',
   format: 'portrait',
   title: 'V-5  Sign in, stay signed in, and the inactivity limit',
-  caption: 'From apps/accounts/views.py (LoginView, RefreshView, LogoutView), apps/accounts/refresh_cookie.py and apps/accounts/sessions.py at a46d7fc4 (IR-1275). ADR-072, NFR-S2. The refresh token never appears in a response body or in browser storage.',
+  caption: 'From apps/accounts/views.py (LoginView, RefreshView, LogoutView), apps/accounts/refresh_cookie.py and apps/accounts/sessions.py at c01f0ef1 (IR-1275). ADR-072, NFR-S2. The refresh token never appears in a response body or in browser storage.',
   participants: [
     { id: 'person', label: 'Person', tone: 'plain' },
     { id: 'spa', label: 'React', sub: 'access token in memory' },

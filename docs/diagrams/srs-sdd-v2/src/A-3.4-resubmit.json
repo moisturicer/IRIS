@@ -2,7 +2,7 @@
  "format": "portrait",
  "direction": "DOWN",
  "title": "A-3.4  Activity: clearance-aware resubmission",
- "caption": "SRS v2 §3.2.3.4. From apps/reviews/new_version.py, ADR-003, ADR-004 at a46d7fc4 (IR-1275).",
+ "caption": "SRS v2 §3.2.3.4. From apps/reviews/finish_review.py, new_version.py, ADR-003, ADR-004, ADR-022 Amendment 8 at c01f0ef1 (IR-1275).",
  "elk": {
   "elk.layered.spacing.nodeNodeBetweenLayers": "16",
   "elk.spacing.nodeNode": "22",
@@ -19,7 +19,7 @@
    "id": "a1",
    "shape": "box",
    "tag": "Reviewer",
-   "label": "Request revision on the Version reviewed",
+   "label": "Finish review: Request changes, the paper needs a new version",
    "plain": true,
    "tone": "plain",
    "wrap": 150
@@ -28,7 +28,7 @@
    "id": "a2",
    "shape": "box",
    "tag": "IRIS",
-   "label": "Open a ResubmissionRequest; record awaiting_resubmission",
+   "label": "Open a ResubmissionRequest (and any documents asked for) in one transaction",
    "plain": true,
    "tone": "core",
    "wrap": 150
@@ -37,7 +37,7 @@
    "id": "a3",
    "shape": "box",
    "tag": "Owner",
-   "label": "Answer each Must fix thread; upload changes",
+   "label": "Answer each Must fix thread",
    "plain": true,
    "tone": "plain",
    "wrap": 150
@@ -46,34 +46,43 @@
    "id": "a4",
    "shape": "box",
    "tag": "Owner",
-   "label": "Submit the new Version",
+   "label": "Upload in the Documents tab: held, seen by the owners only",
    "plain": true,
    "tone": "plain",
    "wrap": 150
   },
   {
-   "id": "q5",
+   "id": "a5",
+   "shape": "box",
+   "tag": "Owner",
+   "label": "Submit new version",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "q6",
    "shape": "diamond",
    "wrap": 150,
    "label": "Changed, and every Must fix answered?"
   },
   {
-   "id": "a6",
+   "id": "a7",
    "shape": "box",
    "tag": "IRIS",
-   "label": "Write Version n+1; resolve the requests",
+   "label": "Send the held uploads; write Version n+1 naming them; resolve the requests",
    "plain": true,
    "tone": "core",
    "wrap": 150
   },
   {
-   "id": "q7",
+   "id": "q8",
    "shape": "diamond",
    "wrap": 150,
    "label": "Policy?"
   },
   {
-   "id": "a8",
+   "id": "a9",
    "shape": "box",
    "tag": "IRIS",
    "label": "Reset ONLY the asking parties' clearances; keep every other",
@@ -82,7 +91,7 @@
    "wrap": 150
   },
   {
-   "id": "a9",
+   "id": "a10",
    "shape": "box",
    "tag": "IRIS",
    "label": "Reset every office's clearance",
@@ -91,7 +100,7 @@
    "wrap": 150
   },
   {
-   "id": "a10",
+   "id": "a11",
    "shape": "box",
    "tag": "IRIS",
    "label": "Reopen the asking parties' Seats",
@@ -100,7 +109,7 @@
    "wrap": 150
   },
   {
-   "id": "a11",
+   "id": "a12",
    "shape": "box",
    "tag": "Reviewer",
    "label": "Review the new Version",
@@ -109,7 +118,7 @@
    "wrap": 150
   },
   {
-   "id": "a12",
+   "id": "a13",
    "shape": "box",
    "tag": "IRIS",
    "label": "Refuse, saying what is missing",
@@ -118,7 +127,7 @@
    "wrap": 150
   },
   {
-   "id": "end13",
+   "id": "end14",
    "shape": "end"
   },
   {
@@ -145,50 +154,54 @@
   },
   {
    "from": "a4",
-   "to": "q5"
+   "to": "a5"
   },
   {
-   "from": "q5",
-   "to": "a6",
+   "from": "a5",
+   "to": "q6"
+  },
+  {
+   "from": "q6",
+   "to": "a7",
    "label": "yes"
   },
   {
-   "from": "a6",
-   "to": "q7"
+   "from": "a7",
+   "to": "q8"
   },
   {
-   "from": "q7",
-   "to": "a8",
+   "from": "q8",
+   "to": "a9",
    "label": "clearance-aware"
   },
   {
-   "from": "q7",
-   "to": "a9",
+   "from": "q8",
+   "to": "a10",
    "label": "restart-all"
   },
   {
-   "from": "a8",
-   "to": "a10"
-  },
-  {
    "from": "a9",
-   "to": "a10"
+   "to": "a11"
   },
   {
    "from": "a10",
    "to": "a11"
   },
   {
-   "from": "q5",
-   "to": "a12",
+   "from": "a11",
+   "to": "a12"
+  },
+  {
+   "from": "q6",
+   "to": "a13",
    "label": "no"
   },
   {
-   "from": "a12",
-   "to": "end13"
+   "from": "a13",
+   "to": "end14"
   },
   {
-   "from": "a11",
+   "from": "a12",
    "to": "stop"
   }
  ],

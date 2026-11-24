@@ -2,7 +2,7 @@
  "kind": "usecase",
  "format": "portrait",
  "title": "U-1.2  Use cases: sign in, stay signed in, sign out (FR-1.2)",
- "caption": "SRS v2 §3.2.1.2. From apps/accounts (LoginView, RefreshView, LogoutView, refresh_cookie.py, sessions.py), ADR-072 at a46d7fc4 (IR-1275).",
+ "caption": "SRS v2 §3.2.1.2. From apps/accounts (LoginView, RefreshView, LogoutView, refresh_cookie.py, sessions.py), ADR-072 at c01f0ef1 (IR-1275).",
  "system": "Sessions",
  "left": [
   {

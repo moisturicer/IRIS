@@ -2,7 +2,7 @@
  "format": "portrait",
  "direction": "DOWN",
  "title": "A-5.5  Activity: Paper Chat",
- "caption": "SRS v2 §3.2.5.5. From PaperChatDock.tsx, apps/ai/grants at a46d7fc4 (IR-1275).",
+ "caption": "SRS v2 §3.2.5.5. From PaperChatDock.tsx, apps/ai/grants at c01f0ef1 (IR-1275).",
  "elk": {
   "elk.layered.spacing.nodeNodeBetweenLayers": "16",
   "elk.spacing.nodeNode": "22",

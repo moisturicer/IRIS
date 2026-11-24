@@ -2,7 +2,7 @@
  "kind": "usecase",
  "format": "portrait",
  "title": "U-5.5  Use cases: Paper Chat (FR-5.5)",
- "caption": "SRS v2 §3.2.5.5. From features/records/paper-view/PaperChatDock.tsx, apps/ai/grants, ADR-049 at a46d7fc4 (IR-1275).",
+ "caption": "SRS v2 §3.2.5.5. From features/records/paper-view/PaperChatDock.tsx, apps/ai/grants, ADR-049 at c01f0ef1 (IR-1275).",
  "system": "Paper Chat",
  "left": [
   {

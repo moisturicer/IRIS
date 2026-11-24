@@ -2,7 +2,7 @@
  "kind": "sequence",
  "format": "portrait",
  "title": "Q-2.7  Sequence: import records from Excel",
- "caption": "SDD v2 §3.2.7. From RecordViewSet.import_excel, apps/records/services.py at a46d7fc4 (IR-1275).",
+ "caption": "SDD v2 §3.2.7. From RecordViewSet.import_excel, apps/records/services.py at c01f0ef1 (IR-1275).",
  "participants": [
   {
    "id": "s",

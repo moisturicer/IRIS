@@ -2,7 +2,7 @@
  "kind": "sequence",
  "format": "portrait",
  "title": "Q-3.4  Sequence: clearance-aware resubmission",
- "caption": "SDD v2 §3.3.4. From apps/reviews/revisions.py, new_version.py, ADR-003 at a46d7fc4 (IR-1275).",
+ "caption": "SDD v2 §3.3.4. From apps/reviews/finish_review.py, new_version.py, documents/requests.py, ADR-003, ADR-022 Amendment 8 at c01f0ef1 (IR-1275).",
  "participants": [
   {
    "id": "rv",
@@ -17,7 +17,7 @@
   {
    "id": "dj",
    "label": "Django",
-   "sub": "new_version"
+   "sub": "finish_review · new_version"
   },
   {
    "id": "db",
@@ -33,12 +33,17 @@
   {
    "from": "rv",
    "to": "dj",
-   "label": "POST /records/<id>/request-revision/"
+   "label": "POST /records/<id>/finish-review/ (request_revision, new_version, documents?)"
   },
   {
    "from": "dj",
    "to": "db",
-   "label": "ResubmissionRequest (itso); clearances untouched"
+   "label": "ResubmissionRequest (+ DocumentRequest) in one transaction; clearances untouched"
+  },
+  {
+   "from": "o",
+   "to": "dj",
+   "label": "upload in the Documents tab: RecordUpload, sent_at null (held)"
   },
   {
    "from": "o",
@@ -53,7 +58,7 @@
   {
    "from": "dj",
    "to": "db",
-   "label": "write Version n+1; resolve requests"
+   "label": "send held uploads (sent_at); write Version n+1; resolve requests"
   },
   {
    "from": "dj",

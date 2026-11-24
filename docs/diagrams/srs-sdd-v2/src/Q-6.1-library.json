@@ -2,7 +2,7 @@
  "kind": "sequence",
  "format": "portrait",
  "title": "Q-6.1  Sequence: save, file and annotate",
- "caption": "SDD v2 §3.6.1–3.6.3. From apps/library/views.py, folders.py, highlights.py at a46d7fc4 (IR-1275).",
+ "caption": "SDD v2 §3.6.1–3.6.3. From apps/library/views.py, folders.py, highlights.py at c01f0ef1 (IR-1275).",
  "participants": [
   {
    "id": "r",

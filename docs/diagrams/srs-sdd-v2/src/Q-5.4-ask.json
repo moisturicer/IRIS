@@ -2,7 +2,7 @@
  "kind": "sequence",
  "format": "portrait",
  "title": "Q-5.4  Sequence: an Ask IRIS run",
- "caption": "SDD v2 §3.5.4. From frontend/runtime-edge.conf, apps/ai/grants, ai/api/runs.py, ai/runs, ai/agent at a46d7fc4 (IR-1275).",
+ "caption": "SDD v2 §3.5.4. From frontend/runtime-edge.conf, apps/ai/grants, ai/api/runs.py, ai/runs, ai/agent at c01f0ef1 (IR-1275).",
  "participants": [
   {
    "id": "spa",
@@ -77,7 +77,7 @@
     {
      "from": "w",
      "to": "db",
-     "label": "search / open / read under the row policy"
+     "label": "search / read / count / list / paper_details under the row policy"
     },
     {
      "from": "w",

@@ -5,7 +5,7 @@ operations are the module's functions (the upper box is empty for a module).
 Workflow (§3.3.1–3.3.4) reuses D-20 and the AI runtime (§3.5.4–3.5.5) D-21.
 """
 
-C = "at a46d7fc4 (IR-1275)."
+C = "at c01f0ef1 (IR-1275)."
 MOD = {"stereotype": "module"}
 VIEW = {"stereotype": "view"}
 
@@ -106,7 +106,7 @@ FIGURES = {
         ("validators", [], ["pdf_upload_problem()", "supplementary_file_problem()"], MOD),
         ("scanning", [], ["current_scanner()", "scan_verdict()", "upload_problem()"], MOD),
         ("ClamdScanner", ["MALWARE_SCAN_HOST", "TCP 3310"], ["scan(stream) → Verdict  (zINSTREAM)"]),
-        ("RecordUpload", ["record → Record", "slot → UploadSlot", "file", "version", "uploaded_by"]),
+        ("RecordUpload", ["record → Record", "slot → UploadSlot", "file", "version", "uploaded_by", "sent_at (null: held)"]),
         ("RecordFile", ["record → Record", "file", "party", "uploaded_by"]),
     ], [["validators", "scanning"], ["ClamdScanner"], ["RecordUpload", "RecordFile"]], [
         ("scanning", "ClamdScanner", "uses"),
@@ -143,7 +143,7 @@ FIGURES = {
     ]),
     "C-3.5-doc-requests": fig("3.5", "3.3.5", "document requests",
         "apps/documents (models.py, requests.py), ADR-022", [
-        ("requests", [], ["create_request()", "accept_item()", "reject_item()", "withdraw_request()"], MOD),
+        ("requests", [], ["create_request()", "send_held_uploads()", "accept_item()", "reject_item()", "withdraw_request()"], MOD),
         ("DocumentRequest", ["record → Record", "assignment → RecordAssignment", "party", "state", "closed_by_decision"]),
         ("DocumentRequestItem", ["request → DocumentRequest", "slot → UploadSlot", "upload", "state", "rejection_reason"]),
     ], [["requests"], ["DocumentRequest"], ["DocumentRequestItem"]], [

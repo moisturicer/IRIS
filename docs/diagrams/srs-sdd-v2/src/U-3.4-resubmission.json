@@ -2,7 +2,7 @@
  "kind": "usecase",
  "format": "portrait",
  "title": "U-3.4  Use cases: clearance-aware resubmission (FR-3.4)",
- "caption": "SRS v2 §3.2.3.4. From apps/reviews/revisions.py, new_version.py, ADR-003, ADR-004 at a46d7fc4 (IR-1275).",
+ "caption": "SRS v2 §3.2.3.4. From apps/reviews/finish_review.py, revisions.py, new_version.py, ADR-003, ADR-004, ADR-022 Amendment 8 at c01f0ef1 (IR-1275).",
  "system": "Resubmission",
  "left": [
   {
@@ -18,7 +18,7 @@
  "cases": [
   {
    "id": "UC1",
-   "label": "Request revision on the Version reviewed",
+   "label": "Request changes: the paper needs a new version",
    "wrap": 160
   },
   {
@@ -28,21 +28,26 @@
   },
   {
    "id": "UC3",
-   "label": "Submit a new Version",
+   "label": "Upload in the Documents tab (held until sent)",
    "wrap": 160
   },
   {
    "id": "UC4",
-   "label": "Reset only the asking parties' clearances",
+   "label": "Submit new version",
    "wrap": 160
   },
   {
    "id": "UC5",
-   "label": "Keep every other clearance",
+   "label": "Reset only the asking parties' clearances",
    "wrap": 160
   },
   {
    "id": "UC6",
+   "label": "Keep every other clearance",
+   "wrap": 160
+  },
+  {
+   "id": "UC7",
    "label": "Reviewers who asked look again",
    "wrap": 160
   }
@@ -51,29 +56,35 @@
   [
    "Reviewer",
    "UC1",
-   "UC6"
+   "UC7"
   ],
   [
    "Owner",
    "UC2",
-   "UC3"
+   "UC3",
+   "UC4"
   ]
  ],
  "deps": [
   {
-   "from": "UC3",
-   "to": "UC4",
+   "from": "UC4",
+   "to": "UC5",
    "label": "«include»"
   },
   {
-   "from": "UC3",
-   "to": "UC5",
+   "from": "UC4",
+   "to": "UC6",
    "label": "«include»"
   }
  ],
  "notes": [
   {
    "on": "UC4",
+   "text": "sends every held upload with the Version",
+   "wrap": 130
+  },
+  {
+   "on": "UC5",
    "text": "restart-all resets every office (comparison arm)",
    "wrap": 130
   }

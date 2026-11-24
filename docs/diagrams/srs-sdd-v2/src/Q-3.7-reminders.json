@@ -2,7 +2,7 @@
  "kind": "sequence",
  "format": "portrait",
  "title": "Q-3.7  Sequence: reminders and escalation",
- "caption": "SDD v2 §3.3.7. From apps/reviews/tasks.py send_deadline_notifications, reminders.py at a46d7fc4 (IR-1275).",
+ "caption": "SDD v2 §3.3.7. From apps/reviews/tasks.py send_deadline_notifications, reminders.py at c01f0ef1 (IR-1275).",
  "participants": [
   {
    "id": "beat",

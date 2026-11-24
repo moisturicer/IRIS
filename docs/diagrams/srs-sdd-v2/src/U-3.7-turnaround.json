@@ -2,7 +2,7 @@
  "kind": "usecase",
  "format": "portrait",
  "title": "U-3.7  Use cases: turnaround, reminders and escalation (FR-3.7)",
- "caption": "SRS v2 §3.2.3.7. From apps/reviews/deadlines.py, reminders.py, tasks.py, ADR-043 at a46d7fc4 (IR-1275).",
+ "caption": "SRS v2 §3.2.3.7. From apps/reviews/deadlines.py, reminders.py, tasks.py, ADR-043 at c01f0ef1 (IR-1275).",
  "system": "Turnaround",
  "left": [
   {

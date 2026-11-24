@@ -6,7 +6,7 @@ UML alternative instead: each action names who does it on its first line.
 
 ACTORS = {"Guest", "Person", "Author", "Owner", "Adviser", "RDCO", "KTTO", "Reviewer", "Office member",
           "Coordinator", "Reader", "Staff", "System Admin", "Contact person", "Browser"}
-C = "at a46d7fc4 (IR-1275)."
+C = "at c01f0ef1 (IR-1275)."
 
 
 def fig(fid, sec, name, src, steps, aspect=0.7):
@@ -189,12 +189,12 @@ FIGURES = {
         ("Adviser", "Open the record from To review"),
         ("?", "A Proposal?", [
             ("?", "Accept?", [(S, "Set approved (Accepted); notify the owners")],
-             [("Adviser", "Request revision or reject (with a reason)")]),
+             [("Adviser", "Request changes or reject (with a reason)")]),
         ], [
             ("?", "Accept?", [
                 ("Adviser", "Give a reason; maybe nominate RDCO officers and suggest offices"),
                 (S, "Complete the Adviser's assignment; open RDCO's; notify RDCO"),
-            ], [("Adviser", "Request revision or reject (with a reason)")]),
+            ], [("Adviser", "Request changes or reject (with a reason)")]),
         ]),
     ]),
     "A-3.2-rdco": fig("3.2", "3.2.3.2", "RDCO routes and decides", "apps/reviews/routing.py, decisions.py, ADR-047", [
@@ -219,25 +219,30 @@ FIGURES = {
         ("?", "Outcome?", [(S, "Clearance: cleared")], [(S, "Clearance: not cleared (finding)")], ("clear", "finding")),
         (S, "Complete the office's assignment; notify RDCO"),
     ]),
-    "A-3.4-resubmit": fig("3.4", "3.2.3.4", "clearance-aware resubmission", "apps/reviews/new_version.py, ADR-003, ADR-004", [
-        ("Reviewer", "Request revision on the Version reviewed"),
-        (S, "Open a ResubmissionRequest; record awaiting_resubmission"),
-        ("Owner", "Answer each Must fix thread; upload changes"),
-        ("Owner", "Submit the new Version"),
+    "A-3.4-resubmit": fig("3.4", "3.2.3.4", "clearance-aware resubmission", "apps/reviews/finish_review.py, new_version.py, ADR-003, ADR-004, ADR-022 Amendment 8", [
+        ("Reviewer", "Finish review: Request changes, the paper needs a new version"),
+        (S, "Open a ResubmissionRequest (and any documents asked for) in one transaction"),
+        ("Owner", "Answer each Must fix thread"),
+        ("Owner", "Upload in the Documents tab: held, seen by the owners only"),
+        ("Owner", "Submit new version"),
         ("?", "Changed, and every Must fix answered?", [
-            (S, "Write Version n+1; resolve the requests"),
+            (S, "Send the held uploads; write Version n+1 naming them; resolve the requests"),
             ("?", "Policy?", [(S, "Reset ONLY the asking parties' clearances; keep every other")],
              [(S, "Reset every office's clearance")], ("clearance-aware", "restart-all")),
             (S, "Reopen the asking parties' Seats"),
             ("Reviewer", "Review the new Version"),
         ], [(S, "Refuse, saying what is missing"), "end"]),
     ]),
-    "A-3.5-doc-request": fig("3.5", "3.2.3.5", "a document request", "apps/documents/requests.py, ADR-022", [
-        ("Reviewer", "Ask for missing documents"),
+    "A-3.5-doc-request": fig("3.5", "3.2.3.5", "a document request", "apps/documents/requests.py, records/views.py send_documents, ADR-022 Amendment 8", [
+        ("?", "Asked how?", [("Reviewer", "Request documents on the Documents tab")],
+         [("Reviewer", "Finish review: Request changes, documents only")], ("Documents tab", "Finish review")),
         (S, "Open the request; awaiting_document; pause this party's clock"),
-        ("Owner", "Upload each item"),
-        ("Reviewer", "Accept or reject each item, with a reason"),
-        ("?", "All accepted?", [(S, "Fulfil the request; restart the clock")], [("Owner", "Upload again")]),
+        ("Owner", "Upload each item: held, seen by the owners only"),
+        ("Owner", "Submit added documents"),
+        (S, "Send the held uploads; answer the items; fulfil the request; notify the party once"),
+        ("Reviewer", "Accept or reject each upload, with a reason"),
+        ("?", "Any rejected?", [(S, "Reopen the request: the item is missing again"), ("Owner", "Upload again and send")],
+         [(S, "Request stays fulfilled")]),
     ]),
     "A-3.6-thread": fig("3.6", "3.2.3.6", "a review thread", "apps/reviews/threads.py, ADR-032 §7", [
         ("Reviewer", "Select a passage; open a thread (Must fix or Suggestion)"),
@@ -311,7 +316,7 @@ FIGURES = {
         (S, "nginx edge: Django issues a reader grant"),
         ("ai-gateway", "Store the run as queued; wake a worker"),
         ("ai-runs-worker", "Claim the run (lease)"),
-        ("ai-runs-worker", "Search and read passages the reader may read"),
+        ("ai-runs-worker", "Search, read passages and recorded details the reader may read"),
         ("Language model", "Draft the answer"),
         ("?", "Every cited sentence supported?", [], [("ai-runs-worker", "Repair once")]),
         ("ai-runs-worker", "Recheck sources; commit the Turn and citations"),

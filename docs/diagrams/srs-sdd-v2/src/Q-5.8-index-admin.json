@@ -2,7 +2,7 @@
  "kind": "sequence",
  "format": "portrait",
  "title": "Q-5.8  Sequence: re-embed records",
- "caption": "SDD v2 §3.5.8. From apps/ai/views/embedding.py, tasks.embed_record at a46d7fc4 (IR-1275).",
+ "caption": "SDD v2 §3.5.8. From apps/ai/views/embedding.py, tasks.embed_record at c01f0ef1 (IR-1275).",
  "participants": [
   {
    "id": "s",

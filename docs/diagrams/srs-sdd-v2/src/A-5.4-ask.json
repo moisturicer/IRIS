@@ -2,7 +2,7 @@
  "format": "portrait",
  "direction": "DOWN",
  "title": "A-5.4  Activity: answer an Ask IRIS question",
- "caption": "SRS v2 §3.2.5.4. From ai/runs, ai/agent, ai/research, ADR-049 at a46d7fc4 (IR-1275).",
+ "caption": "SRS v2 §3.2.5.4. From ai/runs, ai/agent, ai/research, ADR-049 at c01f0ef1 (IR-1275).",
  "elk": {
   "elk.layered.spacing.nodeNodeBetweenLayers": "16",
   "elk.spacing.nodeNode": "22",
@@ -55,7 +55,7 @@
    "id": "a5",
    "shape": "box",
    "tag": "ai-runs-worker",
-   "label": "Search and read passages the reader may read",
+   "label": "Search, read passages and recorded details the reader may read",
    "plain": true,
    "tone": "ai",
    "wrap": 150

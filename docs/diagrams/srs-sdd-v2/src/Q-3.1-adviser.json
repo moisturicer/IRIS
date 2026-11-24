@@ -2,7 +2,7 @@
  "kind": "sequence",
  "format": "portrait",
  "title": "Q-3.1  Sequence: the Adviser accepts and sends to RDCO",
- "caption": "SDD v2 §3.3.1. From apps/reviews/routing.py accept_and_route, decisions.py at a46d7fc4 (IR-1275).",
+ "caption": "SDD v2 §3.3.1. From apps/reviews/routing.py accept_and_route, decisions.py at c01f0ef1 (IR-1275).",
  "participants": [
   {
    "id": "adv",
@@ -42,7 +42,7 @@
   {
    "from": "rt",
    "to": "db",
-   "label": "lock; refuse if a revision request is open"
+   "label": "lock; refuse if a revision is open"
   },
   {
    "from": "rt",

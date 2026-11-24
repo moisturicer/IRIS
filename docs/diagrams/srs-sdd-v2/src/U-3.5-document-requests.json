@@ -2,7 +2,7 @@
  "kind": "usecase",
  "format": "portrait",
  "title": "U-3.5  Use cases: explicit document requests (FR-3.5)",
- "caption": "SRS v2 §3.2.3.5. From apps/documents/requests.py, ADR-022 at a46d7fc4 (IR-1275).",
+ "caption": "SRS v2 §3.2.3.5. From apps/documents/requests.py, records/views.py send_documents, ADR-022 Amendment 8 at c01f0ef1 (IR-1275).",
  "system": "Document requests",
  "left": [
   {
@@ -18,21 +18,31 @@
  "cases": [
   {
    "id": "UC1",
-   "label": "Ask for a missing document",
+   "label": "Request documents (Documents tab)",
    "wrap": 160
   },
   {
    "id": "UC2",
-   "label": "Upload against the request",
+   "label": "Request changes: documents only",
    "wrap": 160
   },
   {
    "id": "UC3",
-   "label": "Accept or reject each item",
+   "label": "Upload; held, seen by the owners only",
    "wrap": 160
   },
   {
    "id": "UC4",
+   "label": "Submit added documents",
+   "wrap": 160
+  },
+  {
+   "id": "UC5",
+   "label": "Accept or reject each upload",
+   "wrap": 160
+  },
+  {
+   "id": "UC6",
    "label": "Pause the requesting party's clock",
    "wrap": 160
   }
@@ -41,24 +51,36 @@
   [
    "Reviewer",
    "UC1",
-   "UC3"
+   "UC2",
+   "UC5"
   ],
   [
    "Owner",
-   "UC2"
+   "UC3",
+   "UC4"
   ]
  ],
  "deps": [
   {
    "from": "UC1",
-   "to": "UC4",
+   "to": "UC6",
+   "label": "«include»"
+  },
+  {
+   "from": "UC2",
+   "to": "UC6",
    "label": "«include»"
   }
  ],
  "notes": [
   {
-   "on": "UC1",
-   "text": "no clearance resets; no resubmission",
+   "on": "UC2",
+   "text": "no clearance resets; no new Version",
+   "wrap": 130
+  },
+  {
+   "on": "UC4",
+   "text": "refused (409) while a revision is open",
    "wrap": 130
   }
  ],

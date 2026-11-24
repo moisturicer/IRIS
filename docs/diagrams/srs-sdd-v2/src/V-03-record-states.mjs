@@ -7,7 +7,7 @@ export default {
   format: 'portrait',
   direction: 'DOWN',
   title: 'V-3  Record lifecycle and review states',
-  caption: 'From core/enums.py (PipelineStatus, WorkflowState) and apps/reviews/tracker.py derive_workflow_state at a46d7fc4 (IR-1275). ADR-021 §4, ADR-032 §2-§3, ADR-047 §1 and §5, ADR-052 decision 14. Shown names in brackets are what readers see.',
+  caption: 'From core/enums.py (PipelineStatus, WorkflowState) and apps/reviews/tracker.py derive_workflow_state at c01f0ef1 (IR-1275). ADR-021 §4, ADR-032 §2-§3, ADR-047 §1 and §5, ADR-052 decision 14. Shown names in brackets are what readers see.',
   elk: {
     'elk.layered.spacing.nodeNodeBetweenLayers': '30',
     'elk.spacing.nodeNode': '18',

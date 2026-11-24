@@ -2,7 +2,7 @@
  "kind": "usecase",
  "format": "portrait",
  "title": "U-2.3  Use cases: upload checks (FR-2.3)",
- "caption": "SRS v2 §3.2.2.3. From apps/documents/validators.py, apps/documents/scanning.py, apps/records/duplicates.py, ADR-074 at a46d7fc4 (IR-1275).",
+ "caption": "SRS v2 §3.2.2.3. From apps/documents/validators.py, apps/documents/scanning.py, apps/records/duplicates.py, ADR-074 at c01f0ef1 (IR-1275).",
  "system": "Upload checks",
  "left": [
   {

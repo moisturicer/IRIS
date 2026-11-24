@@ -2,7 +2,7 @@
  "kind": "usecase",
  "format": "portrait",
  "title": "U-3.1  Use cases: adviser-first review (FR-3.1)",
- "caption": "SRS v2 §3.2.3.1. From apps/reviews/decisions.py, routing.py (accept_and_route), ADR-032 §2-§3, ADR-047 §1 at a46d7fc4 (IR-1275).",
+ "caption": "SRS v2 §3.2.3.1. From apps/reviews/decisions.py, routing.py (accept_and_route), ADR-032 §2-§3, ADR-047 §1 at c01f0ef1 (IR-1275).",
  "system": "Adviser review",
  "left": [
   {
@@ -19,7 +19,7 @@
   },
   {
    "id": "UC2",
-   "label": "Request revision",
+   "label": "Request changes (new version, documents or both)",
    "wrap": 160
   },
   {
@@ -57,7 +57,7 @@
  "notes": [
   {
    "on": "UC4",
-   "text": "not a Decision; refused while a revision request is open",
+   "text": "not a Decision; refused while a revision is open",
    "wrap": 130
   }
  ],

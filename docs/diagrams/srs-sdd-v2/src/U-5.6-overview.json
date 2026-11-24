@@ -2,7 +2,7 @@
  "kind": "usecase",
  "format": "portrait",
  "title": "U-5.6  Use cases: AI Overview (FR-5.6)",
- "caption": "SRS v2 §3.2.5.6. From apps/ai/overview, tasks.generate_record_overview, ADR-020 at a46d7fc4 (IR-1275).",
+ "caption": "SRS v2 §3.2.5.6. From apps/ai/overview, tasks.generate_record_overview, ADR-020 at c01f0ef1 (IR-1275).",
  "system": "AI Overview",
  "left": [
   {

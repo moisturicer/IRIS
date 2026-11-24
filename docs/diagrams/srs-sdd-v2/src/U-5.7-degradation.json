@@ -2,7 +2,7 @@
  "kind": "usecase",
  "format": "portrait",
  "title": "U-5.7  Use cases: degradation when AI is unavailable (FR-5.7)",
- "caption": "SRS v2 §3.2.5.7. From GET /ai/status/, apps/ai/resilience, ADR-008 at a46d7fc4 (IR-1275).",
+ "caption": "SRS v2 §3.2.5.7. From GET /ai/status/, apps/ai/resilience, ADR-008 at c01f0ef1 (IR-1275).",
  "system": "Degradation",
  "left": [
   {

@@ -1,6 +1,6 @@
 {
  "title": "E-1.1  Schema: accounts, notice and recovery",
- "caption": "SDD v2 §3.1.1–3.1.4. Generated from backend/apps/*/models*.py at a46d7fc4; all keys and up to four other fields per table; the full schema is D-8 to D-15.",
+ "caption": "SDD v2 §3.1.1–3.1.4. Generated from backend/apps/*/models*.py at c01f0ef1; all keys and up to four other fields per table; the full schema is D-8 to D-15.",
  "kind": "erd",
  "format": "portrait",
  "nodes": [

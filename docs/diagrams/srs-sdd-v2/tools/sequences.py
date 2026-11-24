@@ -4,7 +4,7 @@ participants: (id, label, sub, tone); steps: ("m"|"r", from, to, label) or
 ("loop", label, [steps]). "r" draws a dashed response.
 """
 
-C = "at a46d7fc4 (IR-1275)."
+C = "at c01f0ef1 (IR-1275)."
 P = lambda i, l, s=None: (i, l, s, "plain")  # a person
 DB = ("db", "PostgreSQL", None)
 
@@ -187,7 +187,7 @@ FIGURES = {
         [P("adv", "Adviser"), DJ("RecordViewSet"), ("rt", "routing", None), DB, P("rdco", "RDCO")], [
         ("m", "adv", "dj", "POST /records/<id>/accept-and-route/ (reason, nominees, suggestions)"),
         ("m", "dj", "rt", "accept_and_route()"),
-        ("m", "rt", "db", "lock; refuse if a revision request is open"),
+        ("m", "rt", "db", "lock; refuse if a revision is open"),
         ("m", "rt", "db", "complete the Adviser's assignment and Seat"),
         ("m", "rt", "db", "open RDCO's assignment (Pool or nominated Seats); RoutingEvent"),
         ("m", "rt", "db", "audit"),
@@ -216,26 +216,30 @@ FIGURES = {
         ("m", "dj", "db", "complete the assignment; audit"),
         ("r", "dj", "rdco", "the office is done"),
     ]),
-    "Q-3.4-resubmission": fig("3.4", "3.3.4", "clearance-aware resubmission", "apps/reviews/revisions.py, new_version.py, ADR-003",
-        [P("rv", "Reviewer (ITSO)"), P("o", "Owner"), DJ("new_version"), DB, P("peers", "IERC, KTTO (cleared)")], [
-        ("m", "rv", "dj", "POST /records/<id>/request-revision/"),
-        ("m", "dj", "db", "ResubmissionRequest (itso); clearances untouched"),
+    "Q-3.4-resubmission": fig("3.4", "3.3.4", "clearance-aware resubmission", "apps/reviews/finish_review.py, new_version.py, documents/requests.py, ADR-003, ADR-022 Amendment 8",
+        [P("rv", "Reviewer (ITSO)"), P("o", "Owner"), DJ("finish_review · new_version"), DB, P("peers", "IERC, KTTO (cleared)")], [
+        ("m", "rv", "dj", "POST /records/<id>/finish-review/ (request_revision, new_version, documents?)"),
+        ("m", "dj", "db", "ResubmissionRequest (+ DocumentRequest) in one transaction; clearances untouched"),
+        ("m", "o", "dj", "upload in the Documents tab: RecordUpload, sent_at null (held)"),
         ("m", "o", "dj", "POST /records/<id>/new-version/"),
         ("m", "dj", "db", "lock; changed? Must fix answered?"),
-        ("m", "dj", "db", "write Version n+1; resolve requests"),
+        ("m", "dj", "db", "send held uploads (sent_at); write Version n+1; resolve requests"),
         ("m", "dj", "db", "reset ONLY ITSO's clearance to pending"),
         ("m", "dj", "db", "reopen ITSO's Seats; audit (preserved offices)"),
         ("r", "dj", "rv", "after commit: review the new Version"),
         ("r", "dj", "peers", "nothing: their clearances stand"),
     ]),
-    "Q-3.5-doc-request": fig("3.5", "3.3.5", "a document request", "apps/documents/requests.py, ADR-022",
+    "Q-3.5-doc-request": fig("3.5", "3.3.5", "a document request", "apps/documents/requests.py, records/views.py send_documents, ADR-022 Amendment 8",
         [P("rv", "Reviewer"), DJ("document requests"), DB, P("o", "Owner")], [
-        ("m", "rv", "dj", "POST /records/<id>/document-requests/ (items)"),
+        ("m", "rv", "dj", "POST /records/<id>/document-requests/ (items), or finish-review without a new version"),
         ("m", "dj", "db", "DocumentRequest (open); pause the party's clock"),
         ("r", "dj", "o", "notification"),
-        ("m", "o", "dj", "upload against each item"),
+        ("m", "o", "dj", "upload each item: RecordUpload, sent_at null (held, owners only)"),
+        ("m", "o", "dj", "POST /records/<id>/documents/send/ (409 if a revision is open)"),
+        ("m", "dj", "db", "send_held_uploads: set sent_at; answer missing items; fulfil; restart the clock"),
+        ("r", "dj", "rv", "after commit: one notification per party"),
         ("m", "rv", "dj", "PATCH /document-request-items/<id>/ (accept / reject + reason)"),
-        ("m", "dj", "db", "all accepted: fulfilled; restart the clock"),
+        ("m", "dj", "db", "reject: item missing again; the request reopens"),
     ]),
     "Q-3.6-threads": fig("3.6", "3.3.6", "a review thread", "apps/reviews/threads.py, comments.py, mentions.py",
         [P("rv", "Reviewer"), DJ("review-comments"), DB, P("o", "Owner")], [
@@ -320,7 +324,7 @@ FIGURES = {
         ("m", "gw", "db", "verify grant; ask_run queued"),
         ("m", "w", "db", "claim (lease, fence)"),
         ("loop", "research steps within Bounds", [
-            ("m", "w", "db", "search / open / read under the row policy"),
+            ("m", "w", "db", "search / read / count / list / paper_details under the row policy"),
             ("m", "w", "llm", "admitted model call"),
         ]),
         ("m", "w", "db", "check citations; commit Turn + citations"),

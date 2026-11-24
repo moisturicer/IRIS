@@ -2,7 +2,7 @@
  "kind": "sequence",
  "format": "portrait",
  "title": "Q-2.6  Sequence: a delete request",
- "caption": "SDD v2 §3.2.6. From DeleteRequestViewSet at a46d7fc4 (IR-1275).",
+ "caption": "SDD v2 §3.2.6. From DeleteRequestViewSet at c01f0ef1 (IR-1275).",
  "participants": [
   {
    "id": "o",

@@ -2,7 +2,7 @@
  "kind": "columns",
  "format": "portrait",
  "title": "C-2.3  Classes: upload checks",
- "caption": "SDD v2 §3.2.3. From apps/documents (validators.py, scanning.py, models.py) at a46d7fc4 (IR-1275).",
+ "caption": "SDD v2 §3.2.3. From apps/documents (validators.py, scanning.py, models.py) at c01f0ef1 (IR-1275).",
  "gutter": 60,
  "vgap": 30,
  "nodes": [
@@ -57,7 +57,8 @@
      "slot → UploadSlot",
      "file",
      "version",
-     "uploaded_by"
+     "uploaded_by",
+     "sent_at (null: held)"
     ]
    ]
   },

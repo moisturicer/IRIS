@@ -2,7 +2,7 @@
  "kind": "usecase",
  "format": "portrait",
  "title": "U-7.1  Use cases: audit log (FR-7.1)",
- "caption": "SRS v2 §3.2.7.1. From apps/audit (workflow.py, views.py), NFR-S5 at a46d7fc4 (IR-1275).",
+ "caption": "SRS v2 §3.2.7.1. From apps/audit (workflow.py, views.py), NFR-S5 at c01f0ef1 (IR-1275).",
  "system": "Audit log",
  "left": [
   {

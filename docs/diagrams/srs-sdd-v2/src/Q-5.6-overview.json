@@ -2,7 +2,7 @@
  "kind": "sequence",
  "format": "portrait",
  "title": "Q-5.6  Sequence: the AI Overview",
- "caption": "SDD v2 §3.5.6. From apps/ai/tasks.py generate_record_overview, apps/ai/overview at a46d7fc4 (IR-1275).",
+ "caption": "SDD v2 §3.5.6. From apps/ai/tasks.py generate_record_overview, apps/ai/overview at c01f0ef1 (IR-1275).",
  "participants": [
   {
    "id": "ce",
