@@ -526,8 +526,8 @@ class RecordFileUploadView(APIView):
 class RecordUploadDeleteView(APIView):
     """
     DELETE /documents/uploads/<id>/
-    Owners may delete any version > 1.  Staff may delete any version (force=True).
-    The physical file is removed from storage before the DB row is deleted.
+    An owner or office deletes any version, the first included, unless the
+    review relied on it (ADR-058 §2, IR-1317). The stored file goes too.
     Refusals follow ADR-022 §Amendment 4 (IR-627): see `_on_visible_record`.
     """
     permission_classes = [IsAuthenticated]
@@ -540,15 +540,8 @@ class RecordUploadDeleteView(APIView):
         if not owns_or_staffs_record(request.user, upload.record):
             return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
 
-        # Read separately and on purpose: `force` answers "is this an office
-        # overriding the normal delete rules", which is a different question
-        # from "may you touch this record at all". Collapsing the two would let
-        # a future widening of the access rule silently widen the override too.
-        from core.permissions import STAFF_ROLES, get_role_name
-        is_office_override = get_role_name(request.user) in STAFF_ROLES
-
         try:
-            delete_upload(upload, deleted_by=request.user, force=is_office_override)
+            delete_upload(upload, deleted_by=request.user)
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 

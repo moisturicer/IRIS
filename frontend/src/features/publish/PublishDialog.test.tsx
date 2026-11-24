@@ -56,7 +56,7 @@ vi.mock("@/api/accounts", () => ({
 }));
 
 vi.mock("@/api/documents", () => ({
-  documentsApi: { slots: vi.fn(), slotsForRecord: vi.fn(), upload: vi.fn() },
+  documentsApi: { slots: vi.fn(), slotsForRecord: vi.fn(), upload: vi.fn(), deleteUpload: vi.fn() },
 }));
 
 vi.mock("@/api/guidelines", () => ({
@@ -823,6 +823,40 @@ describe("documents", () => {
 
     await waitFor(() => expect(documentsApi.upload).toHaveBeenCalledWith(42, APPROVAL, expect.any(File), expect.any(Object)));
     expect(await within(row("Approval Sheet")).findByText(/^v1 · Ada Reyes/)).toBeInTheDocument();
+  });
+
+  // IR-1317: a wrong upload, its first version included, is removed here after asking.
+  it("removes a wrong upload after asking, and the row is empty again", async () => {
+    vi.mocked(documentsApi.deleteUpload).mockImplementation(() => {
+      draftSlots = draftSlots.map((slot) => ({ ...slot, uploads: [] }));
+      return Promise.resolve({}) as never;
+    });
+    const user = userEvent.setup();
+    await openNew();
+    await completeManuscript(user);
+    await toDocuments(user);
+    dropOn("Approval Sheet", pdf("wrong.pdf"));
+    await within(row("Approval Sheet")).findByText(/^v1 · Ada Reyes/);
+
+    await user.click(within(row("Approval Sheet")).getByRole("button", { name: "Remove Approval Sheet version 1" }));
+    const dialog = await screen.findByRole("dialog", { name: "Remove Approval Sheet version 1?" });
+    await user.click(within(dialog).getByRole("button", { name: "Remove" }));
+
+    await waitFor(() => expect(documentsApi.deleteUpload).toHaveBeenCalledWith(600));
+    await waitFor(() => expect(within(row("Approval Sheet")).queryByText(/^v1 · Ada Reyes/)).not.toBeInTheDocument());
+  });
+
+  it("offers no Remove on a file the review relied on, and says it is kept", async () => {
+    draftSlots = draftSlots.map((slot) => slot.id === APPROVAL
+      ? { ...slot, uploads: [{ id: 602, record: 42, slot: APPROVAL, slot_name: "Approval Sheet", file: "uploads/a.pdf", version: 1, status: null, status_name: null, uploaded_by: SELF_ID, uploaded_by_name: "Ada Reyes", created_at: "2026-11-19T02:00:00Z", reviews: [], delete_refused: "v1 was submitted with this file, so it can't be deleted." }] }
+      : slot);
+    const user = userEvent.setup();
+    await openNew();
+    await completeManuscript(user);
+    await toDocuments(user);
+
+    expect(within(row("Approval Sheet")).queryByRole("button", { name: /^Remove/ })).not.toBeInTheDocument();
+    expect(within(row("Approval Sheet")).getByText(/v1 was submitted with this file/)).toBeInTheDocument();
   });
 
   it("continues and submits with a Required document still missing", async () => {

@@ -506,6 +506,6 @@ function DownloadButton({ name, onClick }: { name: string; onClick: () => void }
   return <RowAction icon="fa-download" verb="Download" name={name} onClick={onClick} />;
 }
 
-function RemoveButton({ name, onClick }: { name: string; onClick: () => void }) {
+export function RemoveButton({ name, onClick }: { name: string; onClick: () => void }) {
   return <RowAction icon="fa-trash-can" verb="Remove" name={name} onClick={onClick} />;
 }
