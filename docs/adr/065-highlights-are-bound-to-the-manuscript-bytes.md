@@ -44,7 +44,7 @@ The system already has an identity for those bytes. Every accepted Manuscript up
 
 **The decision.**
 1. **Only a published paper takes highlights.** The server's gate is `annotatable(user)`: `Record.objects.visible_to(user)` narrowed to `pipeline_status = published`. A draft or a paper in review answers the same `404` as a missing Record, to its owner too. This is the rule Ask IRIS already follows ([ADR-052](052-each-paper-states-its-embargo-and-a-person-ends-it.md) as amended for IR-1252).
-2. **Nothing is deleted.** A highlight on a paper that is not published is kept and withheld, listed as `{id, record_id, available: false}` as §5 lists one whose access is revoked, and it returns when the paper is published. Its reader can still remove it (§5's `204`).
+2. **Highlights already made on an unpublished paper are deleted.** Highlighting there means commenting, so the ones stored before this amendment are removed, not hidden: migration `library/0009` deletes every highlight whose paper isn't published, once, with no way back. Notes are not touched. A highlight on a paper that later leaves publication (sent back for revision) is kept and withheld, listed as `{id, record_id, available: false}` as §5 lists one whose access is revoked, and returns when the paper is published again. Its reader can still remove it (§5's `204`).
 3. **Review shows none.** The selection menu offers no *Save highlight* there and no private highlight is drawn, so selecting text in Review is for a review comment alone. Notes is not offered there, as before.
 
 **Cost.** An author or Adviser can no longer keep private notes or highlights on their own draft or a paper in review; review comments are the tool for that stage.

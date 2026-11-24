@@ -424,6 +424,38 @@ class RevokedAccessTests(HighlightTestCase):
         self.assertFalse(ReadingHighlight.objects.exists())
 
 
+class DeleteUnpublishedHighlightsMigrationTests(HighlightTestCase):
+    """IR-1326: migration 0009 deletes highlights on papers that aren't published, and only those."""
+
+    def run_migration(self):
+        import importlib
+
+        from django.apps import apps
+
+        module = importlib.import_module("apps.library.migrations.0009_delete_unpublished_highlights")
+        module.delete_unpublished_highlights(apps, None)
+
+    def test_it_deletes_highlights_on_unpublished_papers_and_keeps_the_rest(self):
+        published = self.identified("Published")
+        in_review = self.identified("Back in review")
+        kept = self.make(published).data["id"]
+        self.make(in_review)
+        self.make(in_review, page=4)
+        # Made while it was published; it went back into review after.
+        Record.objects.filter(pk=in_review.pk).update(pipeline_status=PipelineStatus.IN_REVIEW)
+        draft = self.identified("A draft", status=PipelineStatus.DRAFT, owner=self.reader)
+        ReadingHighlight.objects.create(
+            owner=self.reader, record=draft, manuscript_revision=draft.manuscript_revision,
+            manuscript_sha256=draft.manuscript_sha256, page=1, quote="From before IR-1326", regions=[REGION],
+        )
+        ReadingNote.objects.create(owner=self.reader, record=draft, body="My note stays")
+
+        self.run_migration()
+
+        self.assertEqual(list(ReadingHighlight.objects.values_list("id", flat=True)), [kept])
+        self.assertEqual(ReadingNote.objects.get(record=draft).body, "My note stays")
+
+
 class NoOtherSurfaceReadsHighlightsTests(HighlightTestCase):
     """A highlight quotes a paper for one reader: it is never a signal or an input."""
 
