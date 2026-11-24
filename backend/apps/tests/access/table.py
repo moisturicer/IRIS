@@ -954,6 +954,11 @@ LIBRARY = {
         "GET": _case(SIGNED_IN),
         "DELETE": _case(SIGNED_IN),
     }),
+    # IR-1331: removing chosen papers touches only the caller's own rows, so it
+    # is anyone's and answers 204 whatever the ids name.
+    "library-history-remove": Entry({
+        "POST": _case(SIGNED_IN, data={"record_ids": [Ref("record")]}),
+    }),
     "library-visit": Entry({
         "PUT": _case(READS_RECORD, kwargs={"record_id": Ref("record")}, data={}),
     }),

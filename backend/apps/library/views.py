@@ -658,6 +658,34 @@ class ReadingHistoryView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+class ReadingHistoryRemoveView(APIView):
+    """
+    POST /library/history/remove/ -- `{"record_ids": [1, 2]}` deletes those
+    papers from the caller's history, in one transaction (IR-1331). Only the
+    caller's own rows are touched, so an id that is not in their history, or a
+    Record they can no longer read, is simply removed or skipped: the answer is
+    the same 204 and discloses nothing. The ids must be a non-empty list of
+    integers, no longer than the history can hold, so a mistake never reads as
+    "clear everything".
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        ids = _body(request).get("record_ids")
+        valid = (
+            isinstance(ids, list)
+            and 0 < len(ids) <= MAX_HISTORY_ENTRIES
+            and all(isinstance(i, int) and not isinstance(i, bool) for i in ids)
+        )
+        if not valid:
+            raise ValidationError({"record_ids": [
+                f"Send a list of 1 to {MAX_HISTORY_ENTRIES} paper ids to remove from your history.",
+            ]})
+        ReadingVisit.objects.filter(owner=request.user, record_id__in=ids).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 class ReadingVisitView(APIView):
     """
     PUT /library/history/<record_id>/ -- the paper view says the reader opened
