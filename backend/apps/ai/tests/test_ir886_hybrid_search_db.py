@@ -251,7 +251,7 @@ def test_vector_reads_scan_policy_filtered_rows_exactly_and_never_an_hnsw_index(
     embed(space, flood, record_axis=0, chunk_axes=[0])
     sql = getattr(research_tools, name)
     vector = json.dumps(axis(0))
-    args = [space.pk, None, vector, 20, *([20] if name == "PAPER_FIRST_SQL" else []), *([None] * 6)]
+    args = [space.pk, None, vector, 20, *([20] if name == "PAPER_FIRST_SQL" else []), *([None] * research_tools.FILTER_PARAMS)]
     with probe_login("iris_ai_runtime") as conn:
         try:
             with conn.cursor() as cursor:
