@@ -39,7 +39,8 @@ import { recordsApi } from "@/api/records";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { UploadDropzone } from "@/components/shared/UploadDropzone";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { FOCUS_RING } from "@/components/ui/interaction";
+import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
+import { Tooltip } from "@/components/ui/Tooltip";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { SMALL_ACTION_PILL, SMALL_ACTION_TARGET } from "@/components/ui/pillStyles";
 import { cn, downloadBlob, formatDate, joinLabels } from "@/lib/utils";
@@ -604,6 +605,28 @@ function DownloadButton({ name, onClick }: { name: string; onClick: () => void }
   return <RowAction icon="fa-download" verb="Download" name={name} onClick={onClick} />;
 }
 
+/**
+ * Remove is a trash can alone (IR-1332), the one a draft has in My Library
+ * (`DeleteRecord`): maroon, no fill or outline at rest, "Remove" as its
+ * tooltip, and named for what it removes. Its target is the row actions' own,
+ * 44px on touch and 36px beside a pointer, so the row does not grow.
+ */
 function RemoveButton({ name, onClick }: { name: string; onClick: () => void }) {
-  return <RowAction icon="fa-trash-can" verb="Remove" name={name} onClick={onClick} />;
+  return (
+    <Tooltip label="Remove">
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label={`Remove ${name}`}
+        className={cn(
+          "inline-flex min-h-11 min-w-11 reading-split:min-h-9 reading-split:min-w-9 items-center justify-center rounded-full",
+          "text-brand hover:bg-stone-100 hover:text-brand-dark",
+          COLOUR_TRANSITION,
+          FOCUS_RING,
+        )}
+      >
+        <i className="fas fa-trash-can" aria-hidden />
+      </button>
+    </Tooltip>
+  );
 }

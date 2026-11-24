@@ -500,6 +500,17 @@ describe("removing a document version", () => {
   const openVersions = async () =>
     fireEvent.click(await screen.findByRole("button", { name: "2 versions of Ethics Clearance" }));
 
+  // IR-1332: Remove is a trash can alone, like a draft's in My Library: its
+  // name says what it removes, and the word "Remove" is its tooltip, not text.
+  it("draws Remove as a trash can with no word, and Download with its word", async () => {
+    renderFiles({ editable: true }, drafting);
+    await openVersions();
+
+    const versions = await screen.findByRole("list", { name: "Versions of Ethics Clearance" });
+    expect(within(versions).getByRole("button", { name: "Remove Ethics Clearance version 2" })).toHaveTextContent(/^$/);
+    expect(within(versions).getByRole("button", { name: "Download Ethics Clearance version 2" })).toHaveTextContent("Download");
+  });
+
   it("offers no Remove on a kept version, and says why", async () => {
     const { container } = renderFiles({ editable: true }, drafting);
     await openVersions();
