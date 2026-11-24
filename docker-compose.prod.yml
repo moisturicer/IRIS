@@ -124,6 +124,36 @@ services:
       db:
         condition: service_healthy
 
+  # The AI runtime's own schema, iris_ai (IR-1320). `python -m ai.runs.migrate`
+  # applies each pending ai/runs/migrations/*.sql once, then exits; a rerun
+  # applies nothing. It is the only holder of the maintenance login (ADR-014,
+  # IR-826): the database owner from the repo-root .env, given to this
+  # one-shot container and no running service. No ./ai/.env here, so it never
+  # sees the runtime's login or a vendor key. The password goes in PGPASSWORD,
+  # which asyncpg reads, so it needs no URL quoting. After Django's migrate,
+  # because iris_ai reads what Django's migrations create.
+  ai-migrate:
+    networks:
+      - private
+    build:
+      context: ./ai
+      dockerfile: Dockerfile
+    restart: "no"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    command: python -m ai.runs.migrate
+    environment:
+      - RUNS_MIGRATION_DATABASE_URL=postgresql://${DB_USER:?set DB_USER in the repo-root .env}@db:5432/${DB_NAME:?set DB_NAME in the repo-root .env}
+      - PGPASSWORD=${DB_PASSWORD:?set DB_PASSWORD in the repo-root .env}
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
   backend:
     networks:
       - private
@@ -207,6 +237,9 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      # New code never starts against an older iris_ai (IR-1320).
+      ai-migrate:
+        condition: service_completed_successfully
     healthcheck:
       test: [ "CMD-SHELL", "curl -sf http://localhost:8001/health || exit 1" ]
       interval: 10s
@@ -242,6 +275,9 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      # New code never starts against an older iris_ai (IR-1320).
+      ai-migrate:
+        condition: service_completed_successfully
     deploy:
       # Five workers x 24 slots: 100 readers at once with headroom (IR-1012).
       replicas: 5
