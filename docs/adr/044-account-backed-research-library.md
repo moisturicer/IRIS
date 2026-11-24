@@ -101,7 +101,7 @@ They stay in `lib/opportunityLibrary.ts`, labelled browser-only, and keep their 
 4. **Reads go through `visible_to`.** A visit to a Record the reader can no longer read shows only as unavailable. No title is copied into the browser.
 5. **Clear history deletes the rows**, not just hides them.
 6. **History is never a discovery signal.** No For you, ranking or count reads it, as IR-557 promised. A guard test fails if a recommender reads the model.
-7. **The reader can pause history.** `LibraryPreferences.keep_history` defaults to on and is created lazily. It is toggled in the History view beside a notice that history is stored on the account and only the reader sees it. Pausing stops new entries and keeps existing ones. The server enforces it: the `PUT` returns 204 and records nothing.
+7. **The reader can pause history.** `LibraryPreferences.keep_history` defaults to on and is created lazily. It is toggled in the History view beside a notice that history is stored on the account and only the reader sees it. Pausing stops new entries and keeps existing ones. The server enforces it: the `PUT` returns 204 and records nothing. *(The toggle is removed by the amendment of 2026-11-24 b (IR-1331) below; the server setting stays.)*
 8. **Existing browser history is never uploaded automatically.** IR-579 offers it for import with saves and stars, for the same reason as §7. *(Changed by the amendment below: it is dropped, not offered.)*
 
 ## Amendment — 2026-11-16 (IR-756): old browser history is dropped, and the account-data rules
@@ -145,7 +145,26 @@ IR-553 asks for a per-Record reading position, keyed by owner, Record and Manusc
 1. **This replaces point 3 of the IR-756 amendment.** IR-1324 replaces Saved Papers' Folder picker with folder tiles, and History is not a folder.
    - **An author** opens the History view from **Manage history** under the Overview's *Recently opened*, which already shows the top of that list. Its back link returns to the Overview.
    - **A reader with no Overview** opens it from **Manage reading history**, beside *Saves and folders follow your account* on Saved Papers.
-2. **Nothing else changes.** Point 5 (Clear history deletes the rows) and point 7 (the reader can pause history, with the notice) still apply. Their controls stay in the History view, and every reader, author or not, can still reach it.
+2. **Nothing else changes.** Point 5 (Clear history deletes the rows) and point 7 (the reader can pause history, with the notice) still apply. *(Changed by the amendment of 2026-11-24 b (IR-1331) below: History is a pop-up, cleared by choice, with no pause.)* Their controls stay in the History view, and every reader, author or not, can still reach it.
+
+## Amendment — 2026-11-24 b (IR-1331): History is a pop-up, cleared by choice, with no pause
+
+**Status of this amendment: Proposed.** Decided by Hermoine Zozobrado on 2026-11-24 (option C of three weighed in chat), while building IR-1331. It becomes Accepted when IR-1331's PR merges after review.
+
+**Why.** History opened inside the *Saved Papers* tab, so the tab highlight jumped there from the Overview and History looked misplaced.
+
+1. **History is a pop-up.** *Manage history* under the Overview's *Recently opened*, and *Manage reading history* on Saved Papers for a reader with no Overview, open it over the page, and the tab does not change. This replaces the 2026-11-24 amendment's History view.
+2. **Compact rows.** Each paper the reader opened is one row: a tick box, its title, wrapping rather than cut (DESIGN.md's Full Text Rule), as a link that opens the paper and closes the pop-up, and the day it was opened. A paper the reader can no longer read is a row with no title and no link, so it can still be cleared (§4 still holds: nothing about it is disclosed).
+3. **Clearing is by choice, and asked twice.** The reader ticks papers, or *Select all*, then *Clear history*, which asks once more and names how many. Only the ticked rows are deleted, through `POST /library/history/remove/` with `{"record_ids": [...]}`: owner-scoped, one transaction, the same 204 whatever the ids name, and a 400 for anything but 1 to 50 integer ids, so a mistake never reads as "clear everything". Point 5 of the IR-756 amendment (the rows are deleted, not hidden) still applies. `DELETE /library/history/` stays on the server, unused by the screens.
+4. **There is no pause control.** This reverses the *toggle* in point 7 of the IR-756 amendment. The server keeps `LibraryPreferences.keep_history` and still refuses to record while it is off, so nothing already stored changes meaning. A reader who paused before IR-1331 sees *History is paused* in the pop-up with **Turn history back on**, so nobody is left paused with no way out.
+
+| Option | Benefits | Drawbacks |
+|---|---|---|
+| A. History in place on the Overview tab | Smallest change; the highlight stays put | No address; the Overview shows two different things; readers keep a different path |
+| B. A History tab | An address that survives a reload; one path for every reader | A sixth tab for authors, so the bar scrolls sooner on a phone |
+| **C. A pop-up (chosen)** | Never leaves the page the reader was on; one pop-up for authors and readers | A long list is shown in a dialog; no address of its own |
+
+**What this gives up.** A reader can no longer stop history being kept; they can only clear what was kept, paper by paper or all at once. That is a privacy control removed, which the reviewer should weigh.
 
 ## Alternatives Considered
 

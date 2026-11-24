@@ -15,15 +15,14 @@ import { RowMenu } from "@/features/accounts/RowMenu";
  * Which part of My Library the main column shows. `research` is the owner's
  * own records. `saved` and `status` are the account's saves (IR-566,
  * ADR-044), `folder` one of the reader's own folders, which follow the
- * account too (IR-572, ADR-070), and `history` the account's reading history
- * (IR-756).
+ * account too (IR-572, ADR-070). Reading history is a pop-up, not a view
+ * (IR-1331).
  */
 export type LibraryView =
   | { kind: "research" }
   | { kind: "saved" }
   | { kind: "status"; status: ReadingStatus }
-  | { kind: "folder"; id: number }
-  | { kind: "history" };
+  | { kind: "folder"; id: number };
 
 export function isSameView(a: LibraryView, b: LibraryView): boolean {
   if (a.kind !== b.kind) return false;
@@ -43,8 +42,8 @@ interface FolderShelfProps {
   /** How many folders the account may hold, when the server has said. */
   limit:        number | null;
   /**
-   * A reader with no Overview reaches History from here (IR-1324); an author
-   * reaches it from the Overview's Recently opened.
+   * A reader with no Overview opens the History pop-up from here (IR-1324,
+   * IR-1331); an author opens it from the Overview's Recently opened.
    */
   onManageHistory?: () => void;
   onOpen:       (view: LibraryView) => void;
@@ -130,9 +129,9 @@ function FolderNameDialog({ open, title, initial = "", submitLabel, onClose, onS
 /**
  * Saved Papers' folders as tiles (IR-1324), replacing the Folder picker
  * (IR-1313): each of the reader's own folders (IR-572) with its name and how
- * many papers it holds. History (IR-756) is not a folder: it opens from the
- * Overview's Recently opened, or from here for a reader with no Overview
- * (ADR-044 amendment 2026-11-24). **+ Folder** names a new
+ * many papers it holds. History (IR-756) is not a folder: its pop-up opens
+ * from the Overview's Recently opened, or from here for a reader with no
+ * Overview (ADR-044 amendments of 2026-11-24). **+ Folder** names a new
  * folder in a dialog and is greyed once the account has no room for another.
  * Each folder's "⋯" menu renames it (in a dialog) or deletes it; deleting a
  * folder never unsaves its papers.
@@ -152,7 +151,7 @@ export function FolderShelf({ folders, limit, onManageHistory, onOpen, onCreate,
             {onManageHistory && (
               <>
                 {" "}
-                <button type="button" onClick={onManageHistory} className={cn("rounded-control font-semibold text-brand underline-offset-2 hover:underline", FOCUS_RING)}>
+                <button type="button" onClick={onManageHistory} aria-haspopup="dialog" className={cn("rounded-control font-semibold text-brand underline-offset-2 hover:underline", FOCUS_RING)}>
                   Manage reading history
                 </button>
               </>

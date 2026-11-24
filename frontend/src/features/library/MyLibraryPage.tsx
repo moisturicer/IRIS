@@ -21,6 +21,7 @@ import { isSameView, viewKey, type LibraryView } from "./ReadingPanel";
 import type { ResearchFilter } from "./researchSections";
 import { isRequestTimeout } from "@/api/requestPolicy";
 import { SavedCallsSection } from "@/features/opportunities/SavedCallsSection";
+import { HistoryDialog } from "./HistoryDialog";
 import { SavedView } from "./SavedView";
 import { useLibrary, useReadingHistory } from "./useLibrary";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
@@ -80,6 +81,8 @@ export default function MyLibraryPage() {
   const tab: Tab = tabFromSection(section, mayAuthor);
   const tabs = mayAuthor ? AUTHOR_TABS : READER_TABS;
   const [savedView, setSavedView] = useState<SavedViewKind>(ALL_SAVED);
+  /* History is a pop-up over whichever tab opened it (IR-1331). */
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [researchFilter, setResearchFilter] = useState<ResearchFilter>("all");
   useReadingHistory();
   const history = useHistoryStore((s) => s.items);
@@ -197,10 +200,9 @@ export default function MyLibraryPage() {
           folderLimit={folderLimit}
           onOpenView={setSavedView}
           onCreateFolder={(name) => void createFolder(name)}
-          // History opens from the Overview's Recently opened; a reader with
-          // no Overview gets the link on the folders (ADR-044 amendment 2026-11-24).
-          onManageHistory={mayAuthor ? undefined : () => setSavedView({ kind: "history" })}
-          historyBack={mayAuthor ? { label: "Back to Overview", onClick: () => { setSavedView(ALL_SAVED); selectTab("overview"); } } : undefined}
+          // History's pop-up opens from the Overview's Recently opened; a reader
+          // with no Overview gets the link on the folders (IR-1324, IR-1331).
+          onManageHistory={mayAuthor ? undefined : () => setHistoryOpen(true)}
           filters={
             <UnderlineFilters
               label="Reading status"
@@ -275,10 +277,7 @@ export default function MyLibraryPage() {
             onRetry={() => void loadResearch()}
             history={history}
             onOpenSubmissions={openSubmissions}
-            onManageHistory={() => {
-              setSavedView({ kind: "history" });
-              selectTab("saved");
-            }}
+            onManageHistory={() => setHistoryOpen(true)}
             onDeleted={dropDeleted}
           />
         )}
@@ -298,6 +297,8 @@ export default function MyLibraryPage() {
         {tab === "calls" && <SavedCallsSection />}
         {tab === "downloads" && <DownloadRequestsView />}
       </div>
+
+      <HistoryDialog open={historyOpen} onClose={() => setHistoryOpen(false)} />
     </div>
   );
 }

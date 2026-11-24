@@ -53,7 +53,7 @@ vi.mock("@/api/library", () => ({
     save: vi.fn(),
     unsave: vi.fn(),
     history: vi.fn(),
-    clearHistory: vi.fn(),
+    removeHistory: vi.fn(),
     preferences: vi.fn(),
     updatePreferences: vi.fn(),
     // IR-572: folders are read with the saves, and written one call at a time.
@@ -174,8 +174,8 @@ async function openTile(name: string) {
   await userEvent.click(folderTile(name));
 }
 /**
- * History opens from the Overview's Recently opened for an author, or from the
- * folders for a reader with no Overview (IR-1324, ADR-044 amendment 2026-11-24).
+ * History's pop-up opens from the Overview's Recently opened for an author, or
+ * from the folders for a reader with no Overview (IR-1324, IR-1331).
  */
 async function manageHistory() {
   const overview = screen.queryByRole("tab", { name: "Overview" });
@@ -836,7 +836,7 @@ describe("My Library: saves follow the account (IR-566)", () => {
     expect(await screen.findByRole("link", { name: rice.title })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: water.title })).not.toBeInTheDocument();
     await manageHistory();
-    expect(await screen.findByRole("heading", { name: "No reading history yet" })).toBeInTheDocument();
+    expect(await within(await screen.findByRole("dialog", { name: "History" })).findByText(/^No reading history yet/)).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: water.title })).not.toBeInTheDocument();
   });
 
@@ -871,110 +871,137 @@ describe("My Library: reading history follows the account (IR-756)", () => {
   const water = paper(41, "Rainwater Harvesting Survey");
   const rice = paper(42, "Rice Husk Insulation Panels");
 
+  /** History is a pop-up (IR-1331); this opens it and returns it. */
   async function openHistory() {
     renderScreen(<MyLibraryPage />);
     await manageHistory();
-    return screen.findByRole("heading", { name: "History", level: 2 });
+    return screen.findByRole("dialog", { name: "History" });
   }
+  const removed = () => vi.mocked(libraryApi.removeHistory);
+  type Removed = Awaited<ReturnType<typeof libraryApi.removeHistory>>;
 
-  // IR-1324 (ADR-044 amendment 2026-11-24): History left Saved Papers' folders.
-  it("opens History from the Overview's Recently opened, and goes back there", async () => {
+  // IR-1331 replaces IR-1324's History view in Saved Papers with a pop-up, on purpose.
+  it("opens History as a pop-up over the Overview, without changing the tab", async () => {
     history([visitEntry(rice)]);
-    await openHistory();
+    const dialog = await openHistory();
 
-    expect(screen.getByRole("tab", { name: "Saved Papers" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("checkbox", { name: "Keep reading history" })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Back to Overview" }));
     expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
-    expect(await screen.findByRole("region", { name: "Recently opened" })).toBeInTheDocument();
+    expect(await within(dialog).findByRole("link", { name: rice.title })).toBeInTheDocument();
+    expect(within(dialog).queryByRole("checkbox", { name: "Keep reading history" })).not.toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("dialog", { name: "History" })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
   });
 
-  it("gives a reader with no Overview History from the folders, back to All saved", async () => {
+  it("gives a reader with no Overview the same pop-up from the folders", async () => {
     signIn(10, "RDCO");
     history([visitEntry(rice)]);
     renderScreen(<MyLibraryPage />);
 
     await manageHistory();
-    expect(await screen.findByRole("heading", { name: "History", level: 2 })).toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: "Keep reading history" })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "All saved papers" }));
-    expect(await screen.findByRole("region", { name: "Folders" })).toBeInTheDocument();
+    const dialog = await screen.findByRole("dialog", { name: "History" });
+    expect(await within(dialog).findByRole("link", { name: rice.title })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Saved Papers" })).toHaveAttribute("aria-selected", "true");
   });
 
-  it("lists what the reader opened on another device, newest first, and says only they can see it", async () => {
+  it("lists what the reader opened on another device, newest first, in rows whose titles open the paper", async () => {
     history([visitEntry(rice, "2026-11-02T08:00:00Z"), visitEntry(water, "2026-11-01T08:00:00Z")]);
-    await openHistory();
+    const dialog = await openHistory();
 
-    const links = await screen.findAllByRole("link", { name: /Rainwater|Rice Husk/ });
-    expect(links.map((l) => l.textContent)).toEqual([rice.title, water.title]);
+    const list = await within(dialog).findByRole("list", { name: "Papers you opened" });
+    expect(within(list).getAllByRole("link").map((l) => l.textContent)).toEqual([rice.title, water.title]);
+    expect(within(list).getByText("Nov 2, 2026")).toBeInTheDocument();
+    expect(within(dialog).getByText(/follows your account.*only you can see it/i)).toBeInTheDocument();
     expect(recordsApi.list).not.toHaveBeenCalled();
-    expect(screen.getByText(/stored on your account.*only you can see it/i)).toBeInTheDocument();
     expect(localStorage.getItem("iris_reading_history")).toBeNull();
+
+    await userEvent.click(within(list).getByRole("link", { name: water.title }));
+    expect(screen.queryByRole("dialog", { name: "History" })).not.toBeInTheDocument();
   });
 
-  it("shows a paper the reader can no longer read as unavailable and discloses nothing", async () => {
+  it("lists a paper the reader can no longer read without its title or a link, so it can be cleared", async () => {
     history([visitEntry(water), { record_id: 77, available: false }]);
-    await openHistory();
+    const dialog = await openHistory();
 
-    expect(await screen.findByText(/1 paper in your history is no longer available to you/)).toBeInTheDocument();
-    expect(screen.getAllByRole("link", { name: /Rainwater/ })).toHaveLength(1);
+    expect(await within(dialog).findByRole("checkbox", { name: "Select A paper you can no longer open" })).toBeInTheDocument();
+    expect(within(dialog).getAllByRole("link")).toHaveLength(1);
     expect(recordsApi.list).not.toHaveBeenCalled();
   });
 
-  it("clears the history on the account", async () => {
-    history([visitEntry(water)]);
-    vi.mocked(libraryApi.clearHistory).mockResolvedValue({} as Awaited<ReturnType<typeof libraryApi.clearHistory>>);
-    await openHistory();
+  it("clears only the ticked papers, after asking", async () => {
+    history([visitEntry(rice), visitEntry(water, "2026-11-01T08:00:00Z")]);
+    removed().mockResolvedValue({} as Removed);
+    const dialog = await openHistory();
 
-    await userEvent.click(await screen.findByRole("button", { name: "Clear history" }));
+    const clear = await within(dialog).findByRole("button", { name: "Clear history" });
+    expect(clear).toBeDisabled();
+    await userEvent.click(within(dialog).getByRole("checkbox", { name: `Select ${water.title}` }));
+    await userEvent.click(clear);
 
-    expect(libraryApi.clearHistory).toHaveBeenCalledTimes(1);
-    expect(await screen.findByRole("heading", { name: "No reading history yet" })).toBeInTheDocument();
+    const confirm = await screen.findByRole("dialog", { name: "Clear 1 paper from your history?" });
+    await userEvent.click(within(confirm).getByRole("button", { name: "Clear history" }));
+
+    expect(removed()).toHaveBeenCalledWith([water.id]);
+    await waitFor(() => expect(within(dialog).queryByRole("link", { name: water.title })).not.toBeInTheDocument());
+    expect(within(dialog).getByRole("link", { name: rice.title })).toBeInTheDocument();
+  });
+
+  it("Select all ticks every row, including an unavailable one, and Cancel clears nothing", async () => {
+    history([visitEntry(rice), { record_id: 77, available: false }]);
+    removed().mockResolvedValue({} as Removed);
+    const dialog = await openHistory();
+
+    await userEvent.click(await within(dialog).findByRole("checkbox", { name: /^Select all/ }));
+    expect(within(dialog).getByRole("checkbox", { name: `Select ${rice.title}` })).toBeChecked();
+    expect(within(dialog).getByRole("checkbox", { name: "Select A paper you can no longer open" })).toBeChecked();
+
+    await userEvent.click(within(dialog).getByRole("button", { name: "Clear history" }));
+    const confirm = await screen.findByRole("dialog", { name: "Clear all your history?" });
+    await userEvent.click(within(confirm).getByRole("button", { name: "Cancel" }));
+    expect(removed()).not.toHaveBeenCalled();
+    expect(within(dialog).getByRole("link", { name: rice.title })).toBeInTheDocument();
+
+    await userEvent.click(within(dialog).getByRole("button", { name: "Clear history" }));
+    await userEvent.click(within(await screen.findByRole("dialog", { name: "Clear all your history?" })).getByRole("button", { name: "Clear history" }));
+    expect(removed()).toHaveBeenCalledWith([rice.id, 77]);
+    expect(await within(dialog).findByText(/^No reading history yet/)).toBeInTheDocument();
   });
 
   it("keeps the history and says so when clearing fails", async () => {
-    history([visitEntry(water)]);
-    vi.mocked(libraryApi.clearHistory).mockRejectedValue(new Error("offline"));
-    await openHistory();
+    history([visitEntry(rice), visitEntry(water, "2026-11-01T08:00:00Z")]);
+    removed().mockRejectedValue(new Error("offline"));
+    const dialog = await openHistory();
 
-    await userEvent.click(await screen.findByRole("button", { name: "Clear history" }));
+    await userEvent.click(await within(dialog).findByRole("checkbox", { name: `Select ${water.title}` }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "Clear history" }));
+    await userEvent.click(within(await screen.findByRole("dialog", { name: /^Clear 1 paper/ })).getByRole("button", { name: "Clear history" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(/could not clear your history/i);
-    expect(screen.getByRole("link", { name: water.title })).toBeInTheDocument();
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(/could not clear your history/i);
+    expect(within(dialog).getByRole("link", { name: water.title })).toBeInTheDocument();
   });
 
-  it("pauses history on the account, keeping what is listed", async () => {
-    history([visitEntry(water)]);
-    vi.mocked(libraryApi.updatePreferences).mockImplementation(async (body) => ({ data: body }) as Awaited<ReturnType<typeof libraryApi.updatePreferences>>);
-    await openHistory();
-
-    const keep = await screen.findByRole("checkbox", { name: "Keep reading history" });
-    expect(keep).toBeChecked();
-    await userEvent.click(keep);
-
-    expect(libraryApi.updatePreferences).toHaveBeenCalledWith({ keep_history: false });
-    expect(keep).not.toBeChecked();
-    expect(screen.getByText(/history is paused/i)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: water.title })).toBeInTheDocument();
-  });
-
-  it("opens with history paused when the account says so", async () => {
+  it("has no pause, but a history paused before says so and can be turned back on", async () => {
     history([], false);
-    await openHistory();
+    vi.mocked(libraryApi.updatePreferences).mockImplementation(async (body) => ({ data: body }) as Awaited<ReturnType<typeof libraryApi.updatePreferences>>);
+    const dialog = await openHistory();
 
-    expect(await screen.findByRole("checkbox", { name: "Keep reading history" })).not.toBeChecked();
-    expect(screen.getByRole("heading", { name: "History is paused" })).toBeInTheDocument();
+    expect(await within(dialog).findByText("History is paused, so papers you open are not added.")).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Turn history back on" }));
+
+    expect(libraryApi.updatePreferences).toHaveBeenCalledWith({ keep_history: true });
+    expect(within(dialog).queryByText(/history is paused/i)).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: /pause/i })).not.toBeInTheDocument();
   });
 
   it("says the history is safe when loading it fails, and Try again reads it again", async () => {
     vi.mocked(libraryApi.history).mockRejectedValueOnce(new Error("offline"));
-    await openHistory();
+    const dialog = await openHistory();
 
-    expect(await screen.findByText("Your history is safe in your account; only loading it failed.")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await within(dialog).findByText(/Could not load your history\. It is safe in your account\./)).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Try again" }));
 
     await waitFor(() => expect(libraryApi.history).toHaveBeenCalledTimes(2));
-    expect(await screen.findByRole("heading", { name: "No reading history yet" })).toBeInTheDocument();
+    expect(await within(dialog).findByText(/^No reading history yet/)).toBeInTheDocument();
   });
 
   // IR-1324: Recently opened lists the ten newest, ruled like Waiting on you.
@@ -996,10 +1023,10 @@ describe("My Library: reading history follows the account (IR-756)", () => {
     expect(within(block).getAllByRole("link").map((l) => l.textContent)).toEqual([rice.title, water.title]);
   });
 
-  it("has no blocking accessibility violations in the History view", async () => {
+  it("has no blocking accessibility violations in the History pop-up", async () => {
     history([visitEntry(water)]);
-    await openHistory();
-    await screen.findByRole("link", { name: water.title });
+    const dialog = await openHistory();
+    await within(dialog).findByRole("link", { name: water.title });
 
     await expectNoBlockingA11yViolations(document.body);
   });

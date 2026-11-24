@@ -163,8 +163,12 @@ export const libraryApi = {
    * Record they cannot read. While history is paused it is a 204 that records nothing.
    */
   visit: (recordId: number) => apiClient.put(`/library/history/${recordId}/`, {}),
-  /** Clear history: the server deletes every entry. */
-  clearHistory: () => apiClient.delete("/library/history/"),
+  /**
+   * Remove these papers from the reader's history (IR-1331): the server deletes
+   * those rows of the caller's own history and answers 204 whatever they name.
+   */
+  removeHistory: (recordIds: number[]) =>
+    apiClient.post("/library/history/remove/", { record_ids: recordIds }),
   /** The reader's settings; the defaults when they never changed one. */
   preferences: () => apiClient.get<LibraryPreferences>("/library/preferences/"),
   updatePreferences: (body: LibraryPreferences) =>

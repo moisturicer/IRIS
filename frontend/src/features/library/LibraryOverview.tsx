@@ -40,7 +40,7 @@ interface LibraryOverviewProps {
   /** The account's reading history (IR-756), most recent first. */
   history:     HistoryItem[];
   onOpenSubmissions: (filter: ResearchFilter) => void;
-  /** Open the History view, where history is paused or cleared (ADR-044, amendment 2026-11-24). */
+  /** Open the History pop-up, where papers are cleared from history (IR-1331). */
   onManageHistory: () => void;
   /** A draft was deleted from its row (IR-1256); drop it. */
   onDeleted: (recordId: number) => void;
@@ -78,7 +78,7 @@ export function LibraryOverview({
           title="Recently opened"
           height={SIDE_CARD_HEIGHT}
           footer={
-            <button type="button" onClick={onManageHistory} className={cn(LINK_TEXT, "-mx-2")}>
+            <button type="button" onClick={onManageHistory} aria-haspopup="dialog" className={cn(LINK_TEXT, "-mx-2")}>
               Manage history <i className="fas fa-arrow-right text-label" aria-hidden />
             </button>
           }
