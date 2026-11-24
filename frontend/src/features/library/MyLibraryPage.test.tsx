@@ -540,7 +540,11 @@ describe("My Library: reading", () => {
     // History is back in the picker (IR-756): it now follows the account, and
     // its pause switch lives in the History view, which every reader must reach.
     expect(within(screen.getByRole("combobox", { name: "Folder" })).getByRole("option", { name: "History" })).toBeInTheDocument();
+    // IR-1313: one width, whatever the folders are, and the new-folder field takes the same.
+    expect(screen.getByRole("combobox", { name: "Folder" })).toHaveClass("w-full", "sm:w-72");
+    expect(screen.getByRole("combobox", { name: "Folder" })).toHaveAttribute("title", "All saved papers");
     await userEvent.selectOptions(screen.getByRole("combobox", { name: "Folder" }), "+ New folder…");
+    expect(screen.getByRole("textbox", { name: "New folder name" })).toHaveClass("w-full", "sm:w-72");
     await userEvent.type(screen.getByRole("textbox", { name: "New folder name" }), "Methods{Enter}");
     expect(await screen.findByRole("heading", { name: "Methods" })).toBeInTheDocument();
     expect(libraryApi.createFolder).toHaveBeenCalledWith("Methods");

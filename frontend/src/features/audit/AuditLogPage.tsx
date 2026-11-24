@@ -131,7 +131,12 @@ export default function AuditLogPage() {
       setPage(1);
       setFilters({ event_type: eventType || undefined, record: record ? Number(record) : undefined, user: user ? Number(user) : undefined, from: from || undefined, to: to || undefined });
     }}>
-      <Select label="Event type" value={eventType} onChange={(e) => setEventType(e.target.value)} aria-describedby={typesFailed ? "audit-event-types-note" : undefined}>
+      {/* One width whatever the types are (IR-1313): it grew from "All events" to
+          the longest type when the list arrived. 20rem holds the longest in full
+          ("Review Threads Closed by Decision" needs 291px in Chromium). */}
+      <div className="w-full sm:w-80">
+      <Select label="Event type" value={eventType} onChange={(e) => setEventType(e.target.value)} aria-describedby={typesFailed ? "audit-event-types-note" : undefined}
+        title={eventType ? typeOptions.find((option) => option.type === eventType)?.label ?? eventName(eventType, new Map()) : "All events"}>
         <option value="">All events</option>
         {/* A type the address chose but the server didn't list (or the list failed): still named, so the filter shown is the one applied. */}
         {eventType && !typeOptions.some((option) => option.type === eventType) && (
@@ -139,6 +144,7 @@ export default function AuditLogPage() {
         )}
         {typeGroups.map(({ group, types }) => <optgroup key={group} label={group}>{types.map(({ type, label: text }) => <option key={type} value={type}>{text}</option>)}</optgroup>)}
       </Select>
+      </div>
       <Input label="Record ID" type="number" min="1" step="1" value={record} onChange={(e) => setRecord(e.target.value)} />
       <Input label="Actor ID" type="number" min="1" step="1" value={user} onChange={(e) => setUser(e.target.value)} />
       <Input label="From date" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />

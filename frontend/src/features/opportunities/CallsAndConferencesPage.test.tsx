@@ -318,6 +318,19 @@ describe("filters", () => {
     expect(screen.getByText("Showing 1 of 3 calls.")).toBeInTheDocument();
   });
 
+  // IR-1313: the Area box is one width from `sm` up, so the row does not move
+  // when the board's Areas arrive or change; the chosen Area is named on hover.
+  it("keeps the Area filter one width, and names the chosen Area on hover", async () => {
+    serve([soon(), month(), later()]);
+    await renderBoard();
+
+    const area = screen.getByRole("combobox", { name: "Area" });
+    expect(area).toHaveClass("sm:w-72");
+    expect(area).toHaveAttribute("title", "All Areas");
+    await userEvent.setup().selectOptions(area, "Artificial Intelligence");
+    expect(area).toHaveAttribute("title", "Artificial Intelligence");
+  });
+
   it("offers to clear the filters when nothing matches", async () => {
     serve([soon(), month()]);
     await renderBoard();

@@ -103,7 +103,10 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       <div className="flex flex-col gap-1">
         <div className={inline ? "flex items-center gap-2" : "flex flex-col gap-1"}>
           {label && <FieldLabel htmlFor={selectId} label={label} optional={optional} />}
-          <div className="relative">
+          {/* Inline, the control takes the rest of its row, so a caller that
+              sizes the row sizes the box: it then keeps that width whatever its
+              options are (IR-1313). Not inline, it already fills its column. */}
+          <div className={inline ? "relative min-w-0 flex-1" : "relative"}>
             <select
               ref={ref}
               id={selectId}
