@@ -51,7 +51,7 @@ def test_research_12_is_research_11_plus_one_rule_about_selections():
     # research-13 is built on research-12 and keeps the rule (IR-1278).
     assert {pin for pin, text in PROMPTS.items() if added in text} == {
         ("agent-research-12", "research-12"), ("agent-research-13", "research-13"),
-        ("agent-research-14", "research-13")}
+        ("agent-research-14", "research-13"), ("agent-research-15", "research-14")}
     rule = SELECTION_INSTRUCTIONS[SELECTION_INSTRUCTIONS.index("Selections."):
                                   SELECTION_INSTRUCTIONS.index("Searching. search")]
     assert SELECTION_INSTRUCTIONS.replace(rule, "", 1) == DELIMITED_INSTRUCTIONS

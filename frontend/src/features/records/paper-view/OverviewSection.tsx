@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_PRIMARY } from "@/components/ui/pillStyles";
 import { ActionRequiredPanel } from "@/features/document-requests/ActionRequiredPanel";
 import type { Capability } from "@/features/records/capabilities";
@@ -9,11 +10,9 @@ import { WAITING_TARGET } from "../waitingOnYou";
 import { CommentsSection } from "./CommentsSection";
 import { SectionHeading } from "./headings";
 import { IpTagger } from "./IpTagger";
-import { NewVersionDialog, newVersionSummary } from "./NewVersionDialog";
 import { PaperAiOverview } from "./PaperAiOverview";
 import { RelatedPublishedResearch } from "./RelatedPublishedResearch";
 import { RelatedWorks } from "./RelatedWorks";
-import { RevisionManuscriptUpload } from "./RevisionManuscriptUpload";
 
 interface OverviewSectionProps {
   record: RecordDetail;
@@ -24,15 +23,8 @@ interface OverviewSectionProps {
   viewerName: string | null;
   /** View, Save, Cite and Share, under the abstract. */
   actions: ReactNode;
-  /** *Submit new version* (IR-273): whether its dialog is open, and what the last one announced. */
-  newVersionOpen: boolean;
-  newVersionDone: string | null;
-  onOpenNewVersion: () => void;
-  onCloseNewVersion: () => void;
-  onNewVersionDone: (outcome: string) => void;
-  onNewVersionRefreshed: (fresh: RecordDetail) => void;
-  /** A document or request changed. */
-  onDocumentsChanged: () => Promise<void> | void;
+  /** Opens Review's Documents tab, where the owner uploads and submits (IR-1318). */
+  onOpenDocuments: () => void;
   /** A save returned the Record. */
   onRecordReplaced: (updated: RecordDetail) => void;
 }
@@ -49,13 +41,7 @@ export function OverviewSection({
   viewerId,
   viewerName,
   actions,
-  newVersionOpen,
-  newVersionDone,
-  onOpenNewVersion,
-  onCloseNewVersion,
-  onNewVersionDone,
-  onNewVersionRefreshed,
-  onDocumentsChanged,
+  onOpenDocuments,
   onRecordReplaced,
 }: OverviewSectionProps) {
   return (
@@ -64,7 +50,7 @@ export function OverviewSection({
           owner comes first. The revision banner and the document
           requests below are that, whole; a separate "Your
           submission" summary repeated them and the rail (IR-1264). */}
-      {/* Revision requests are answered through Submit new version. */}
+      {/* Revision requests are answered through Submit new version, in Documents. */}
       {userIsOwner && record.revision.open.length > 0 && (
         <section
           id={WAITING_TARGET.revision}
@@ -98,63 +84,24 @@ export function OverviewSection({
               </li>
             ))}
           </ul>
-          {can.has("create_version") && record.revision.new_version && (
-            <div className="mt-4 border-t border-stone-300 pt-3">
-              <p className="text-sm text-stone-700 leading-relaxed">
-                Upload your revised manuscript here, add any requested document below, or edit
-                the details, then submit. {newVersionSummary(record.revision.new_version)}
-              </p>
-              {can.has("replace_manuscript") && (
-                <div className="mt-3">
-                  <RevisionManuscriptUpload
-                    recordId={record.id}
-                    staged={record.manuscript_unsubmitted}
-                    onUploaded={onDocumentsChanged}
-                  />
-                </div>
-              )}
-              {record.revision.new_version.blocked && (
-                <p id="new-version-blocked" className="text-sm text-brand mt-2">
-                  {record.revision.new_version.blocked}
-                </p>
-              )}
-              <button
-                type="button"
-                onClick={onOpenNewVersion}
-                aria-describedby={record.revision.new_version.blocked ? "new-version-blocked" : undefined}
-                className={cn(PILL_PRIMARY, "mt-3")}
-              >
-                <i className="fas fa-paper-plane text-2xs" aria-hidden />
-                Submit new version
-              </button>
-            </div>
-          )}
+          {/* Answered in the Documents tab, where the owner uploads and
+              submits (IR-1318); here only why, and the way there. */}
+          <div className="mt-4 border-t border-stone-300 pt-3">
+            <p className="text-sm text-stone-700 leading-relaxed">
+              Upload your changes and submit them in Documents.
+            </p>
+            <button type="button" onClick={onOpenDocuments} className={cn(PILL_PRIMARY, "mt-3", FOCUS_RING)}>
+              <i className="fas fa-folder-open text-2xs" aria-hidden />
+              Go to Documents
+            </button>
+          </div>
         </section>
       )}
-      {/* Rendered while a version can be submitted, so the
-          announcement lands when it fills; nowhere else, so the page
-          keeps one status region (Share's) otherwise. */}
-      {(record.revision.new_version != null || newVersionDone) && (
-        <p role="status" aria-live="polite" className="sr-only">
-          {newVersionDone ?? ""}
-        </p>
-      )}
-      {newVersionOpen && record.revision.new_version && (
-        <NewVersionDialog
-          recordId={record.id}
-          hint={record.revision.new_version}
-          newManuscript={record.manuscript_unsubmitted}
-          onClose={onCloseNewVersion}
-          onDone={onNewVersionDone}
-          onRefreshed={onNewVersionRefreshed}
-        />
-      )}
-
       {userIsOwner && (
         <ActionRequiredPanel
           id={WAITING_TARGET.document}
           recordId={record.id}
-          onChanged={onDocumentsChanged}
+          onOpenDocuments={onOpenDocuments}
         />
       )}
 

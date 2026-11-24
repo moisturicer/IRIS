@@ -15,6 +15,7 @@ REPO = Path(__file__).resolve().parents[4]
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
+from ai.research import recency  # noqa: E402
 from ai.research.tools import PaperDetails  # noqa: E402
 
 from apps.records.models import Author, Classification, PSCEDClassification, Record, RecordType  # noqa: E402
@@ -80,6 +81,8 @@ def test_a_reader_gets_everything_the_publish_form_recorded(research):
         abstract="We predicted 87 floods from 12 gauges.", origin="institutional",
         is_ip=False, ip_type=None, for_commercialization=True, community_extension=False,
         requires_ethics_review=False, requested_offices=("KTTO",),
+        # The campus day it was added (IR-1316).
+        date_added=flood.created_at.astimezone(recency.MANILA).date(),
     ),)
     # A name, never the account behind it.
     assert adviser.email not in repr(found)

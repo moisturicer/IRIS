@@ -52,6 +52,7 @@ import { useRecordLoader } from "./useRecordLoader";
 import { useSidePanel } from "./useSidePanel";
 import { PaperReader } from "./PaperReader";
 import { OverviewSection } from "./OverviewSection";
+import { NewVersionDialog } from "./NewVersionDialog";
 import { ReviewSection } from "./ReviewSection";
 import { RecordDetailsRail } from "./RecordDetailsRail";
 import { EditorialHeader, LineageLinks, type PrimaryAction } from "./EditorialHeader";
@@ -593,24 +594,7 @@ export default function PaperViewPage() {
                 viewerId={user?.id ?? null}
                 viewerName={user ? `${user.first_name} ${user.last_name}`.trim() : null}
                 actions={<>{viewAction}{saveCiteShare}</>}
-                newVersionOpen={newVersionOpen}
-                newVersionDone={newVersionDone}
-                onOpenNewVersion={() => setNewVersionOpen(true)}
-                onCloseNewVersion={() => setNewVersionOpen(false)}
-                onNewVersionDone={(outcome) => {
-                  setNewVersionOpen(false);
-                  setNewVersionDone(outcome);
-                  addToast({ type: "success", message: outcome });
-                  setTrackerVersion((n) => n + 1);
-                  // A failed reload leaves the page as it was, unless the
-                  // Record can no longer be read (IR-906, IR-1273).
-                  void reloadRecord();
-                }}
-                onNewVersionRefreshed={(fresh) => {
-                  replaceRecord(fresh);
-                  setTrackerVersion((n) => n + 1);
-                }}
-                onDocumentsChanged={handleDocumentRequestChanged}
+                onOpenDocuments={() => setViewParams({ section: "review", documents: "open" })}
                 onRecordReplaced={replaceRecord}
               />
             )}
@@ -633,6 +617,38 @@ export default function PaperViewPage() {
                 onChanged={handleDocumentRequestChanged}
                 showDocuments={documentsWanted}
                 onDocumentsShown={() => setViewParams({ documents: null, section: "review" })}
+                onSubmitNewVersion={userIsOwner && can.has("create_version") ? () => setNewVersionOpen(true) : undefined}
+              />
+            )}
+            {/* Submit new version (IR-273), opened from the Documents tab
+                (IR-1318). Its status region is rendered while a version can
+                be submitted, so the announcement lands when it fills;
+                nowhere else, so the page keeps one status region (Share's)
+                otherwise. */}
+            {(record.revision.new_version != null || newVersionDone) && (
+              <p role="status" aria-live="polite" className="sr-only">
+                {newVersionDone ?? ""}
+              </p>
+            )}
+            {newVersionOpen && record.revision.new_version && (
+              <NewVersionDialog
+                recordId={record.id}
+                hint={record.revision.new_version}
+                newManuscript={record.manuscript_unsubmitted}
+                onClose={() => setNewVersionOpen(false)}
+                onDone={(outcome) => {
+                  setNewVersionOpen(false);
+                  setNewVersionDone(outcome);
+                  addToast({ type: "success", message: outcome });
+                  setTrackerVersion((n) => n + 1);
+                  // A failed reload leaves the page as it was, unless the
+                  // Record can no longer be read (IR-906, IR-1273).
+                  void reloadRecord();
+                }}
+                onRefreshed={(fresh) => {
+                  replaceRecord(fresh);
+                  setTrackerVersion((n) => n + 1);
+                }}
               />
             )}
             </div>

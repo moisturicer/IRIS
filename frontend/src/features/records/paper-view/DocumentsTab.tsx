@@ -17,6 +17,13 @@
  *   awaiting review → Accepted, or Replacement needed with the reviewer's
  *   reason (`document-requests/itemStatus`).
  *
+ * - **One place to answer a request** (IR-1318). The owner uploads what
+ *   reviewers ask for here, not on the Overview. While a revision is asked
+ *   for, the top of the tab names who asked and what is not sent yet, with
+ *   *Submit new version* (`SubmitNewVersionBar`), and every file no version
+ *   carries yet is marked *not yet submitted*. A document request alone is
+ *   answered by the upload, and the top of the tab says so.
+ *
  * The page decides who is looking: `owner`, `editable` (the `edit_details`
  * capability, so a draft or a record awaiting revision), `reviewing`, and
  * `attach` (the `attach_file` capability: an office filing a supplementary
@@ -51,6 +58,7 @@ import { useReviewPane } from "./reviewPane";
 import { extensionOf, opensInReader, readerFormat, slotUploadDocument, type ReaderDocument } from "./readerDocument";
 import { SectionHeading } from "./headings";
 import { useRowUploads } from "./rowUploads";
+import { DocumentsAskedNote, SubmitNewVersionBar } from "./SubmitNewVersionBar";
 
 /** What an office may attach (IR-1220, ADR-032 §10 as amended 2026-11-18). */
 const SUPPLEMENTARY_TYPES = ".pdf,.docx,.png,.jpg,.jpeg";
@@ -60,7 +68,7 @@ interface DocumentsTabProps {
     RecordDetail,
     "id" | "abstract_file" | "can_request_document" | "current_holders" | "manuscript_unsubmitted"
     | "record_type_name" | "versions"
-  >;
+  > & Partial<Pick<RecordDetail, "revision">>;
   /** The viewer owns the record: they upload what is asked for. */
   owner:     boolean;
   /** The owner may add or replace any document, not only a requested one. */
@@ -86,6 +94,22 @@ interface DocumentsTabProps {
    * where there is no reader; only PDFs offer it.
    */
   onOpen?: (document: ReaderDocument, opener: HTMLElement) => void;
+  /**
+   * Opens *Submit new version* (IR-1318), given only to an owner with the
+   * `create_version` capability. With a revision open, the tab's top bar
+   * offers it.
+   */
+  onSubmitNewVersion?: () => void;
+}
+
+/** The mark on a file no version carries yet (IR-1318). */
+function NotYetSubmitted({ children }: { children: ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 font-semibold text-brand-dark">
+      <i className="fas fa-file-pen text-2xs" aria-hidden />
+      {children}
+    </span>
+  );
 }
 
 /** A requested item, with who asked and whether that request is still open. */
@@ -135,6 +159,7 @@ export function DocumentsTab({
   replaceManuscript = false,
   onChanged,
   onOpen,
+  onSubmitNewVersion,
 }: DocumentsTabProps) {
   const pane = useReviewPane();
   const guideRead = useRequirementGuide();
@@ -217,6 +242,12 @@ export function DocumentsTab({
 
   const { bySlot, other } = askedFor(requests);
   const shownSlots = slots.filter((s) => editable || s.uploads.length > 0 || bySlot.has(s.id));
+  // What the top of the tab says to the owner (IR-1318): a revision's bar,
+  // else what reviewers still need uploaded.
+  const revision = record.revision;
+  const hint = owner && onSubmitNewVersion && revision && revision.open.length > 0 ? revision.new_version : null;
+  const unsentUploads = new Set((hint?.unsent?.uploads ?? []).map((u) => u.id));
+  const waiting = owner ? [...bySlot.values(), ...other].filter(needsUpload) : [];
   const download = (fetch: () => Promise<{ data: unknown }>, filename: string) =>
     saveBlob(fetch, filename).catch(() => setNotice(`Could not download ${filename}. Please try again.`));
   const manuscript = record.versions?.[record.versions.length - 1] ?? null;
@@ -238,6 +269,11 @@ export function DocumentsTab({
 
   return (
     <div className="space-y-section">
+      {hint && onSubmitNewVersion ? (
+        <SubmitNewVersionBar requests={revision?.open ?? []} hint={hint} onSubmit={onSubmitNewVersion} />
+      ) : waiting.length > 0 && (
+        <DocumentsAskedNote askers={[...new Set(waiting.map((a) => a.asker))]} count={waiting.length} />
+      )}
       {reviewing && (
         <ReviewerDocumentRequests record={record} reviewing onChanged={() => void changed()} />
       )}
@@ -251,12 +287,7 @@ export function DocumentsTab({
           latest={record.abstract_file
             ? manuscript ? byline(manuscript.number, manuscript.created_by_name, manuscript.created_at) : "Uploaded"
             : null}
-          note={record.manuscript_unsubmitted && (
-            <span className="inline-flex items-center gap-1.5 font-semibold text-brand-dark">
-              <i className="fas fa-file-pen text-2xs" aria-hidden />
-              Revised, not yet submitted
-            </span>
-          )}
+          note={record.manuscript_unsubmitted && <NotYetSubmitted>Revised, not yet submitted</NotYetSubmitted>}
           actions={(record.abstract_file || replaceManuscript) && (
             <>
               {record.abstract_file && (
@@ -288,7 +319,11 @@ export function DocumentsTab({
               template={<RequirementTemplate requirement={requirement} />}
               latest={latest ? byline(latest.version, latest.uploaded_by_name, latest.created_at) : null}
               status={asked && <ItemStatusChip item={asked.item} />}
-              note={asked && <AskedNote asked={asked} />}
+              // A requested document's chip says where it stands; any other
+              // upload since the latest version waits for the new one.
+              note={asked
+                ? <AskedNote asked={asked} />
+                : latest && unsentUploads.has(latest.id) && <NotYetSubmitted>Uploaded, not yet submitted</NotYetSubmitted>}
               actions={(latest || canUpload) && (
                 <>
                   {latest && openVersion(slot.name, latest, true)}

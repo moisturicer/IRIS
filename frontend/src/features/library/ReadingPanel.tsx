@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { Select } from "@/components/ui/Select";
+import { cn } from "@/lib/utils";
 import type { ReadingStatus } from "@/api/library";
 import { MAX_FOLDER_NAME, atFolderLimit, type LibraryFolder } from "@/store/library.store";
 
@@ -44,6 +45,15 @@ const NEW_FOLDER = "__new__";
 const HISTORY = "__history__";
 
 /**
+ * The picker's width (IR-1313). A select with no width is as wide as its
+ * longest option, so the toolbar moved when the folders arrived or a new one
+ * was made. It is 18rem from `sm` and fills the row below it. A reader's own
+ * folder name runs to 60 characters, so a long one is clipped closed and read
+ * in full in the open list or on hover. The new-folder field takes the same width.
+ */
+const FOLDER_BOX = "w-full sm:w-72";
+
+/**
  * The reader's own folders as one picker in the Saved papers toolbar,
  * beside Sort, rather than a second panel to navigate. They are the account's
  * (IR-572), read from the server with the saves. "New folder…" swaps the
@@ -70,6 +80,7 @@ export function FolderPicker({ folders, limit, view, onViewChange, onCreate }: F
 
   if (creating) {
     return (
+      <div className="w-full sm:w-auto">
       <input
         ref={input}
         value={name}
@@ -85,15 +96,19 @@ export function FolderPicker({ folders, limit, view, onViewChange, onCreate }: F
         aria-label="New folder name"
         placeholder="Folder name, then Enter"
         maxLength={MAX_FOLDER_NAME}
-        className="min-h-9 w-48 rounded-control border border-field bg-white px-3 text-small placeholder:text-stone-600 focus:border-brand focus:outline-none"
+        className={cn("min-h-9 rounded-control border border-field bg-white px-3 text-small placeholder:text-stone-600 focus:border-brand focus:outline-none", FOLDER_BOX)}
       />
+      </div>
     );
   }
 
   const value = view.kind === "folder" ? `folder:${view.id}` : view.kind === "history" ? HISTORY : "";
   const full = atFolderLimit(folders, limit);
+  const chosen = view.kind === "folder" ? folders.find((f) => f.id === view.id)?.name
+    : view.kind === "history" ? "History" : "All saved papers";
 
   return (
+    <div className="w-full sm:w-auto">
     <Select
       label="Folder"
       size="sm"
@@ -106,7 +121,8 @@ export function FolderPicker({ folders, limit, view, onViewChange, onCreate }: F
         else if (next.startsWith("folder:")) onViewChange({ kind: "folder", id: Number(next.slice("folder:".length)) });
         else onViewChange({ kind: "saved" });
       }}
-      className="max-w-full"
+      title={chosen}
+      className={FOLDER_BOX}
     >
       <option value="">All saved papers</option>
       <option value={HISTORY}>History</option>
@@ -119,5 +135,6 @@ export function FolderPicker({ folders, limit, view, onViewChange, onCreate }: F
         ? <option value={NEW_FOLDER} disabled>{`No room for a new folder (${limit} is the most)`}</option>
         : <option value={NEW_FOLDER}>+ New folder…</option>}
     </Select>
+    </div>
   );
 }
