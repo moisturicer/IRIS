@@ -41,8 +41,11 @@ interface FolderShelfProps {
   folders:      LibraryFolder[];
   /** How many folders the account may hold, when the server has said. */
   limit:        number | null;
-  /** How many papers the reading history lists. */
-  historyCount: number;
+  /**
+   * A reader with no Overview reaches History from here (IR-1324); an author
+   * reaches it from the Overview's Recently opened.
+   */
+  onManageHistory?: () => void;
   onOpen:       (view: LibraryView) => void;
   onCreate:     (name: string) => void;
   onRename:     (id: number, name: string) => void;
@@ -126,12 +129,14 @@ function FolderNameDialog({ open, title, initial = "", submitLabel, onClose, onS
 /**
  * Saved Papers' folders as tiles (IR-1324), replacing the Folder picker
  * (IR-1313): each of the reader's own folders (IR-572) with its name and how
- * many papers it holds, then History (IR-756). **+ Folder** names a new
+ * many papers it holds. History (IR-756) is not a folder: it opens from the
+ * Overview's Recently opened, or from here for a reader with no Overview
+ * (ADR-044 amendment 2026-11-24). **+ Folder** names a new
  * folder in a dialog and is greyed once the account has no room for another.
  * Each folder's "⋯" menu renames it (in a dialog) or deletes it; deleting a
  * folder never unsaves its papers.
  */
-export function FolderShelf({ folders, limit, historyCount, onOpen, onCreate, onRename, onDelete }: FolderShelfProps) {
+export function FolderShelf({ folders, limit, onManageHistory, onOpen, onCreate, onRename, onDelete }: FolderShelfProps) {
   const [creating, setCreating] = useState(false);
   const [renaming, setRenaming] = useState<LibraryFolder | null>(null);
   const full = atFolderLimit(folders, limit);
@@ -141,7 +146,17 @@ export function FolderShelf({ folders, limit, historyCount, onOpen, onCreate, on
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 id="saved-folders" className="font-display text-title font-semibold text-stone-900">Folders</h2>
-          <p className="text-small text-stone-600">Saves and folders follow your account.</p>
+          <p className="text-small text-stone-600">
+            Saves and folders follow your account.
+            {onManageHistory && (
+              <>
+                {" "}
+                <button type="button" onClick={onManageHistory} className={cn("rounded-control font-semibold text-brand underline-offset-2 hover:underline", FOCUS_RING)}>
+                  Manage reading history
+                </button>
+              </>
+            )}
+          </p>
         </div>
         <button
           type="button"
@@ -188,15 +203,6 @@ export function FolderShelf({ folders, limit, historyCount, onOpen, onCreate, on
             </div>
           </li>
         ))}
-        <li>
-          <button type="button" onClick={() => onOpen({ kind: "history" })} aria-label={`History, ${papers(historyCount)}`} className={TILE}>
-            <span className="grid h-10 w-12 place-items-center rounded-control bg-stone-100 text-stone-500 ring-1 ring-stone-200" aria-hidden>
-              <i className="fas fa-clock-rotate-left" />
-            </span>
-            <span className="text-small font-semibold text-stone-900">History</span>
-            <span className="mt-auto text-label text-stone-600">{papers(historyCount)}</span>
-          </button>
-        </li>
       </ul>
 
       <FolderNameDialog

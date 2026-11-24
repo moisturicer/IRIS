@@ -138,6 +138,15 @@ IR-553 asks for a per-Record reading position, keyed by owner, Record and Manusc
 6. **Saving is bounded and never in the way.** The paper view saves 1.5 s after the reader stops, at most 10 s apart while they keep going, and at once when the tab is hidden or they leave the paper. Nothing is saved until the reader moves or a citation, highlight or `?page=` lands them somewhere, so a failed read never overwrites a place with page 1; following a citation counts as reading there. A save the server refuses because the paper was replaced (409) or is no longer readable (404) stops saving for that visit. A save started in one session is never sent in the next, and a failed one leaves the reader as it was.
 7. **Never a discovery signal.** As for history (point 6 of the 2026-11-01 amendment): not in Django admin, no `AuditEvent`, no staff endpoint, and a guard test keeps every other app, `core` and the AI runtime from naming it. Draft and review reading keeps a place like any other, and nothing else can see it.
 
+## Amendment — 2026-11-24 (IR-1324): History opens from Recently opened, not from the folders
+
+**Status of this amendment: Proposed** — accepted when IR-1324's PR merges after review. Decided by Hermoine Zozobrado on 2026-11-24, while building IR-1324: History was to be removed from Saved Papers, and this keeps point 7's controls reachable.
+
+1. **This replaces point 3 of the IR-756 amendment.** IR-1324 replaces Saved Papers' Folder picker with folder tiles, and History is not a folder.
+   - **An author** opens the History view from **Manage history** under the Overview's *Recently opened*, which already shows the top of that list. Its back link returns to the Overview.
+   - **A reader with no Overview** opens it from **Manage reading history**, beside *Saves and folders follow your account* on Saved Papers.
+2. **Nothing else changes.** Point 5 (Clear history deletes the rows) and point 7 (the reader can pause history, with the notice) still apply. Their controls stay in the History view, and every reader, author or not, can still reach it.
+
 ## Alternatives Considered
 
 - **Keep `localStorage`, but key it by user id.** This stops the next person on a shared PC from seeing your saves. It still does not follow the reader to another device, which is User Story 1, and anything kept in a browser is still readable by anyone with access to that browser profile.

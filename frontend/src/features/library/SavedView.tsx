@@ -53,6 +53,10 @@ interface SavedViewProps {
   /** Open a folder, History, or All saved again. */
   onOpenView?:    (view: Exclude<LibraryView, { kind: "research" }>) => void;
   onCreateFolder?: (name: string) => void;
+  /** Shown on the folders for a reader with no Overview, which is where History opens otherwise. */
+  onManageHistory?: () => void;
+  /** Where History's back link goes, when not to All saved (an author came from the Overview). */
+  historyBack?: { label: string; onClick: () => void };
 }
 
 /**
@@ -68,7 +72,7 @@ interface SavedViewProps {
  */
 export function SavedView({
   view, folders, library, libraryLoad, libraryInterrupted = false, onRetryLibrary, onRemove, onRename, onDelete, filters,
-  folderLimit = null, onOpenView, onCreateFolder,
+  folderLimit = null, onOpenView, onCreateFolder, onManageHistory, historyBack,
 }: SavedViewProps) {
   const historyView = view.kind === "history";
   const historyStore = useHistoryStore();
@@ -200,7 +204,7 @@ export function SavedView({
         <FolderShelf
           folders={folders}
           limit={folderLimit}
-          historyCount={historyStore.items.length}
+          onManageHistory={onManageHistory}
           onOpen={(next) => { if (next.kind !== "research") onOpenView(next); }}
           onCreate={onCreateFolder}
           onRename={onRename}
@@ -209,9 +213,13 @@ export function SavedView({
       )}
 
       {!topLevel && onOpenView && (
-        <button type="button" onClick={() => onOpenView({ kind: "saved" })} className={cn(textButton, "-mx-3 mb-1 inline-flex items-center gap-2 text-brand")}>
+        <button
+          type="button"
+          onClick={historyView && historyBack ? historyBack.onClick : () => onOpenView({ kind: "saved" })}
+          className={cn(textButton, "-mx-3 mb-1 inline-flex items-center gap-2 text-brand")}
+        >
           <i className="fas fa-arrow-left text-label" aria-hidden />
-          All saved papers
+          {historyView && historyBack ? historyBack.label : "All saved papers"}
         </button>
       )}
       <div className={cn("flex flex-wrap items-center justify-between gap-3", topLevel && filters ? "mb-2" : "mb-4")}>

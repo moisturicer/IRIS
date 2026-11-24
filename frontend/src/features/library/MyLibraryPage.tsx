@@ -197,6 +197,10 @@ export default function MyLibraryPage() {
           folderLimit={folderLimit}
           onOpenView={setSavedView}
           onCreateFolder={(name) => void createFolder(name)}
+          // History opens from the Overview's Recently opened; a reader with
+          // no Overview gets the link on the folders (ADR-044 amendment 2026-11-24).
+          onManageHistory={mayAuthor ? undefined : () => setSavedView({ kind: "history" })}
+          historyBack={mayAuthor ? { label: "Back to Overview", onClick: () => { setSavedView(ALL_SAVED); selectTab("overview"); } } : undefined}
           filters={
             <UnderlineFilters
               label="Reading status"
@@ -268,6 +272,10 @@ export default function MyLibraryPage() {
             onRetry={() => void loadResearch()}
             history={history}
             onOpenSubmissions={openSubmissions}
+            onManageHistory={() => {
+              setSavedView({ kind: "history" });
+              selectTab("saved");
+            }}
             onDeleted={dropDeleted}
           />
         )}

@@ -38,6 +38,8 @@ interface LibraryOverviewProps {
   /** The account's reading history (IR-756), most recent first. */
   history:     HistoryItem[];
   onOpenSubmissions: (filter: ResearchFilter) => void;
+  /** Open the History view, where history is paused or cleared (ADR-044, amendment 2026-11-24). */
+  onManageHistory: () => void;
   /** A draft was deleted from its row (IR-1256); drop it. */
   onDeleted: (recordId: number) => void;
 }
@@ -50,7 +52,7 @@ interface LibraryOverviewProps {
  * left in IR-1324). On a phone the cards come first, *Waiting on you* on top.
  */
 export function LibraryOverview({
-  research, loading, failed, interrupted = false, onRetry, history, onOpenSubmissions, onDeleted,
+  research, loading, failed, interrupted = false, onRetry, history, onOpenSubmissions, onManageHistory, onDeleted,
 }: LibraryOverviewProps) {
   const publishHref = usePublishHref();
   const waiting = useMemo(() => research.filter(isWaiting), [research]);
@@ -69,7 +71,16 @@ export function LibraryOverview({
       <div className="min-w-0 space-y-section lg:col-start-2 lg:row-start-1">
         <WaitingOnYou waiting={waiting} loading={loading} failed={failed} />
 
-        <SideCard id="overview-opened" title="Recently opened" height="h-80">
+        <SideCard
+          id="overview-opened"
+          title="Recently opened"
+          height="h-80"
+          footer={
+            <button type="button" onClick={onManageHistory} className={cn(LINK_TEXT, "-mx-2")}>
+              Manage history <i className="fas fa-arrow-right text-label" aria-hidden />
+            </button>
+          }
+        >
           {recentlyOpened.length === 0 ? (
             <p className="text-small text-stone-600">Papers you open appear here.</p>
           ) : (

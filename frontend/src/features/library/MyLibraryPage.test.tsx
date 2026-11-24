@@ -173,6 +173,19 @@ async function openTile(name: string) {
   if (!screen.queryByRole("region", { name: "Folders" })) await userEvent.click(screen.getByRole("button", { name: "All saved papers" }));
   await userEvent.click(folderTile(name));
 }
+/**
+ * History opens from the Overview's Recently opened for an author, or from the
+ * folders for a reader with no Overview (IR-1324, ADR-044 amendment 2026-11-24).
+ */
+async function manageHistory() {
+  const overview = screen.queryByRole("tab", { name: "Overview" });
+  if (overview) {
+    await userEvent.click(overview);
+    await userEvent.click(await screen.findByRole("button", { name: /^Manage history/ }));
+  } else {
+    await userEvent.click(await screen.findByRole("button", { name: "Manage reading history" }));
+  }
+}
 /** + Folder names the folder in a dialog (IR-1324). */
 async function newFolder(name: string) {
   await userEvent.click(within(folderShelf()).getByRole("button", { name: "Folder" }));
@@ -668,7 +681,9 @@ describe("My Library: reading", () => {
     expect(screen.getByText("Saves and folders follow your account.")).toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "Folder" })).not.toBeInTheDocument();
     expect(screen.getByRole("searchbox", { name: "Search saved papers" })).toBeInTheDocument();
-    expect(folderTile("History")).toBeInTheDocument();
+    // History is not a folder (IR-1324): an author opens it from the Overview.
+    expect(queryFolderTile("History")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Manage reading history" })).not.toBeInTheDocument();
     expect(within(folderShelf()).getByText(/No folders yet/)).toBeInTheDocument();
     await newFolder("Methods");
     expect(await within(folderShelf()).findByRole("button", { name: "Methods, 0 papers" })).toBeInTheDocument();
@@ -816,7 +831,7 @@ describe("My Library: saves follow the account (IR-566)", () => {
 
     expect(await screen.findByRole("link", { name: rice.title })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: water.title })).not.toBeInTheDocument();
-    await openTile("History");
+    await manageHistory();
     expect(await screen.findByRole("heading", { name: "No reading history yet" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: water.title })).not.toBeInTheDocument();
   });
@@ -853,11 +868,34 @@ describe("My Library: reading history follows the account (IR-756)", () => {
   const rice = paper(42, "Rice Husk Insulation Panels");
 
   async function openHistory() {
-    renderScreen(<MyLibraryPage />, { route: "/records/mine?section=saved" });
-    await screen.findByRole("region", { name: "Folders" });
-    await openTile("History");
+    renderScreen(<MyLibraryPage />);
+    await manageHistory();
     return screen.findByRole("heading", { name: "History", level: 2 });
   }
+
+  // IR-1324 (ADR-044 amendment 2026-11-24): History left Saved Papers' folders.
+  it("opens History from the Overview's Recently opened, and goes back there", async () => {
+    history([visitEntry(rice)]);
+    await openHistory();
+
+    expect(screen.getByRole("tab", { name: "Saved Papers" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("checkbox", { name: "Keep reading history" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Back to Overview" }));
+    expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
+    expect(await screen.findByRole("region", { name: "Recently opened" })).toBeInTheDocument();
+  });
+
+  it("gives a reader with no Overview History from the folders, back to All saved", async () => {
+    signIn(10, "RDCO");
+    history([visitEntry(rice)]);
+    renderScreen(<MyLibraryPage />);
+
+    await manageHistory();
+    expect(await screen.findByRole("heading", { name: "History", level: 2 })).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Keep reading history" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "All saved papers" }));
+    expect(await screen.findByRole("region", { name: "Folders" })).toBeInTheDocument();
+  });
 
   it("lists what the reader opened on another device, newest first, and says only they can see it", async () => {
     history([visitEntry(rice, "2026-11-02T08:00:00Z"), visitEntry(water, "2026-11-01T08:00:00Z")]);
