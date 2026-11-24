@@ -18,6 +18,8 @@ EXPECTED = {
     "db": ["private"],
     "redis": ["private"],
     "migrate": ["private"],
+    # One-shot iris_ai migrator (IR-1320): the database only, never the internet.
+    "ai-migrate": ["private"],
     "frontend": ["private"],
     "celery-beat": ["private"],
     "backend": ["private", "egress"],
