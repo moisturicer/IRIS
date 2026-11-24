@@ -86,9 +86,9 @@ export function LibraryOverview({
           {recentlyOpened.length === 0 ? (
             <p className="text-small text-stone-600">Papers you open appear here.</p>
           ) : (
-            <ul className="divide-y divide-stone-200 border-t border-stone-200">
+            <ul className="divide-y divide-stone-200">
               {recentlyOpened.map(({ record, viewedAt }) => (
-                <li key={record.id} className="py-3 last:pb-0">
+                <li key={record.id} className="py-3 first:pt-0 last:pb-0">
                   <Link
                     to={`/records/${record.id}`}
                     className={cn("block break-words rounded-control text-small font-semibold text-stone-800 hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}
@@ -149,7 +149,8 @@ export function LibraryOverview({
 /**
  * One of the Overview's side cards (IR-1323): a fixed rectangle whose heading
  * and footer stay put while its list scrolls inside it, so a long list never
- * pushes the next card down.
+ * pushes the next card down. The line under the heading belongs to the card,
+ * not the list, so an empty, loading or failed card keeps it (IR-1328).
  */
 function SideCard({ id, title, height, accent = false, badge, footer, children }: {
   id: string;
@@ -171,13 +172,13 @@ function SideCard({ id, title, height, accent = false, badge, footer, children }
         accent ? "border-brand/40 bg-surface" : "border-stone-200 bg-white",
       )}
     >
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="flex shrink-0 items-center gap-2 border-b border-stone-200 pb-3">
         <h2 id={id} className={cn("font-display text-title font-semibold", accent ? "text-brand" : "text-stone-900")}>
           {title}
         </h2>
         {badge}
       </div>
-      <div className="mt-3 min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1 scrollbar-thin">
+      <div className="min-h-0 flex-1 overflow-y-auto pt-3 overscroll-contain pr-1 scrollbar-thin">
         {children}
       </div>
       {footer && <div className="mt-2 shrink-0">{footer}</div>}
@@ -215,14 +216,11 @@ function WaitingOnYou({ waiting, loading, failed }: {
       ) : failed ? (
         <p className="text-small text-stone-600">Couldn’t check what is waiting on you. Your research list says why.</p>
       ) : !any ? (
-        <p className="flex items-start gap-2 text-small text-stone-600">
-          <i className="fas fa-circle-check mt-0.5 text-stone-500" aria-hidden />
-          <span>Nothing needs your action. When a reviewer asks you for changes, it appears here.</span>
-        </p>
+        <p className="text-small text-stone-600">Nothing needs your action. When a reviewer asks you for changes, it appears here.</p>
       ) : (
-        <ul className="divide-y divide-stone-200 border-t border-stone-200">
+        <ul className="divide-y divide-stone-200">
           {waiting.map((item) => (
-            <li key={item.id} className="py-3 last:pb-0">
+            <li key={item.id} className="py-3 first:pt-0 last:pb-0">
               <Link
                 to={`/records/${item.id}`}
                 className={cn("break-words rounded-control font-display text-heading font-semibold leading-snug text-stone-900 hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}

@@ -371,7 +371,7 @@ describe("My Library: an author's research", () => {
     const { container } = renderScreen(<MyLibraryPage />, { route: "/records/mine" });
 
     const waiting = await screen.findByRole("region", { name: "Waiting on you" });
-    expect(await within(waiting).findByText(/^Nothing needs your action\./)).toBeInTheDocument();
+    expect(await within(waiting).findByText("Nothing needs your action. When a reviewer asks you for changes, it appears here.")).toBeInTheDocument();
     expect(within(waiting).queryByText(/^\d+$/)).not.toBeInTheDocument();
     await expectNoBlockingA11yViolations(container);
   });
