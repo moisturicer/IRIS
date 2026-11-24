@@ -343,7 +343,7 @@ Flat. Depth comes from tonal layering: Endpaper ground, stone bars, white pages.
 
 ## Shapes
 
-Gently rounded and consistent. Controls and fields take one radius (0.75 rem); page actions, chips and the Ask IRIS icon are full pills; cards that hold a record are 1.25 rem. A concentric inner shape, such as the section thumb inside its track, is one step smaller (0.375 rem), and that is the only use of the smaller radius. A thick accent border never sits on a rounded shape.
+Gently rounded and consistent. Controls and fields take one radius (0.75 rem), and so do section tabs such as My Library's, like the sidebar's highlighted item (IR-1329); page actions, chips and the Ask IRIS icon are full pills; cards that hold a record are 1.25 rem. A concentric inner shape, such as the section thumb inside its track, is one step smaller (0.375 rem), and that is the only use of the smaller radius. A thick accent border never sits on a rounded shape.
 
 ## Components
 

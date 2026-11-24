@@ -245,8 +245,9 @@ export default function MyLibraryPage() {
               onClick={() => selectTab(t.value)}
               onKeyDown={onTabKey}
               className={cn(
-                // The current tab is a filled pill (IR-1324, the owner's choice B).
-                "min-h-10 shrink-0 whitespace-nowrap rounded-full px-4 text-small font-semibold",
+                // The current tab is filled maroon (IR-1324, the owner's choice B), with
+                // the sidebar highlight's and search field's corner (IR-1329).
+                "min-h-10 shrink-0 whitespace-nowrap rounded-control px-4 text-small font-semibold",
                 COLOUR_TRANSITION,
                 FOCUS_RING,
                 current ? "bg-brand text-white" : "text-stone-600 hover:bg-stone-100 hover:text-stone-900",

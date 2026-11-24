@@ -49,6 +49,8 @@ Change a row here only when the requirement's status changes. To see every note 
 | FR-M2-04 | Bulk import from a template | [details](traceability/FR-M2-04.md) | **IMPLEMENTED** |
 | FR-M3-01 | PDF text extraction | [details](traceability/FR-M3-01.md) | **IMPLEMENTED** |
 | **IR-1330** | Documents tab: each version of a document is downloaded from its row in the versions list only, with no second Download under the document's name — no FR- id | [details](traceability/IR-1330.md) | **IMPLEMENTED** |
+| **IR-1329** | My Library's tabs take the sidebar highlight's corner (`rounded-control`), not full pills — no FR- id | [details](traceability/IR-1329.md) | **IMPLEMENTED** |
+| **IR-1327** | The sign-in error and Account locked pop-ups close with an X in their corner, not a Close button — no FR- id | [details](traceability/IR-1327.md) | **IMPLEMENTED** |
 | **IR-1184** | A keyboard user can skip the sidebar to the page's content: a "Skip to content" link is the first tab stop and moves focus into `main` — WCAG 2.4.1; no FR- id | [details](traceability/IR-1184.md) | **IMPLEMENTED** |
 | **IR-1214** | A paper's version menu shows whenever it has a version, listing v1 alone when that is all there is, so every paper's header looks alike — bug; no FR- id | [details](traceability/IR-1214.md) | **IMPLEMENTED** |
 | **IR-1212** | The review page's Conversation tab opens with who submitted and when ("Ana Cruz submitted on Sep 1, 2026"), without repeating the abstract the Overview shows — no FR- id | [details](traceability/IR-1212.md) | **IMPLEMENTED** |
@@ -444,6 +446,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-1323** | My Library's Overview stacks Waiting on you, Continue reading and Recently opened as fixed-size cards in the right column, each list scrolling inside its card; Recent submissions alone on the left; no FR- id | [details](traceability/IR-1323.md) | **IMPLEMENTED** |
 | **IR-1324** | My Library's tabs: Title Case names, open search and underlined filters, plain group headings on My Submissions, folder tiles with + Folder on Saved Papers, search on Saved Calls, and the Overview without Continue reading; no FR- id | [details](traceability/IR-1324.md) | **IMPLEMENTED** |
 | **IR-1325** | My Library layout tweaks, plus document requests as drafts that *Finish review* sends, *Upload* only on what was asked, and smaller Download/Upload with no Open button — ADR-022 Amendment 9; no FR- id | [details](traceability/IR-1325.md) | **IMPLEMENTED** |
+| **IR-1328** | My Library's Overview: the rule under *Waiting on you* and *Recently opened* stays when a card is empty, and the empty text sits under it, with no icon; no FR- id | [details](traceability/IR-1328.md) | **IMPLEMENTED** |
 | NFR-U3 | Responsive at 360 px, no horizontal scroll | [details](traceability/NFR-U3.md) | **PARTIAL** |
 | NFR-A1 | WCAG 2.1 AA on interactive controls | [details](traceability/NFR-A1.md) | **PARTIAL** |
 
