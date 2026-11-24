@@ -442,7 +442,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-1322** | *Request changes*: one reviewer act asks for a new version, documents or both; an owner's uploads to a submitted paper are held, theirs alone with a trash can, until *Submit new version* or *Submit added documents* sends them — ADR-022 Amendment 8; no FR- id | [details](traceability/IR-1322.md) | **IMPLEMENTED** |
 | **IR-1323** | My Library's Overview stacks Waiting on you, Continue reading and Recently opened as fixed-size cards in the right column, each list scrolling inside its card; Recent submissions alone on the left; no FR- id | [details](traceability/IR-1323.md) | **IMPLEMENTED** |
 | **IR-1324** | My Library's tabs: Title Case names, open search and underlined filters, plain group headings on My Submissions, folder tiles with + Folder on Saved Papers, search on Saved Calls, and the Overview without Continue reading; no FR- id | [details](traceability/IR-1324.md) | **IMPLEMENTED** |
-| **IR-1325** | My Library's Overview: Waiting on you and Recently opened are the same height (24 rem); no FR- id | [details](traceability/IR-1325.md) | **IMPLEMENTED** |
+| **IR-1325** | My Library: the Overview's side cards are one height (24 rem), a rule under the tabs, narrower folder tiles, and a framed *No folders yet* empty state; no FR- id | [details](traceability/IR-1325.md) | **IMPLEMENTED** |
 | NFR-U3 | Responsive at 360 px, no horizontal scroll | [details](traceability/NFR-U3.md) | **PARTIAL** |
 | NFR-A1 | WCAG 2.1 AA on interactive controls | [details](traceability/NFR-A1.md) | **PARTIAL** |
 

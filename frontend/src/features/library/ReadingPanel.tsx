@@ -1,5 +1,6 @@
 import { useEffect, useId, useState } from "react";
 
+import { EmptyState } from "@/components/shared/EmptyState";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
@@ -170,15 +171,18 @@ export function FolderShelf({ folders, limit, onManageHistory, onOpen, onCreate,
       </div>
       {full && <p className="-mt-1 mb-3 text-small text-stone-600">You have {limit} folders, the most an account can hold.</p>}
 
-      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
-        {folders.length === 0 && (
-          <li className="col-span-2 flex items-center gap-3 rounded-card border border-dashed border-stone-300 p-3">
-            <FolderGlyph />
-            <p className="text-small text-stone-600">
-              No folders yet. <span className="font-semibold text-stone-800">+ Folder</span> makes one; file papers into it from their Save menu.
-            </p>
-          </li>
-        )}
+      {folders.length === 0 ? (
+        // The same empty state as Saved Papers' own, about folders (IR-1325).
+        <EmptyState
+          framed
+          icon="fa-folder"
+          title="No folders yet"
+          message="Make a folder, then file papers into it from their Save menu."
+          action={full ? undefined : <Button type="button" variant="outline" onClick={() => setCreating(true)}>New folder</Button>}
+        />
+      ) : (
+      // Narrower tiles than IR-1324's (IR-1325): one more to a row from sm.
+      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
         {folders.map((folder) => (
           <li key={folder.id} className="relative">
             <button
@@ -204,6 +208,7 @@ export function FolderShelf({ folders, limit, onManageHistory, onOpen, onCreate,
           </li>
         ))}
       </ul>
+      )}
 
       <FolderNameDialog
         open={creating}
