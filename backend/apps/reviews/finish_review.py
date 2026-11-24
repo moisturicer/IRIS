@@ -19,13 +19,13 @@ and that service's own checks and refusals stand:
 **Comment only** is a recorded review round with no outcome: it writes a
 `ReviewRound` and no `Review`, changes no Clearance and leaves the Seat open.
 
-**Request changes** (`request_revision`, ADR-022 Amendment 8, IR-1322) may
-carry `documents`, the §2 picklist items a document request takes, and
-`new_version` (default true). With `new_version` it opens the revision and,
-for any documents, a document request from the same party, in this same
-transaction, so a refusal of either makes neither. Without it, it opens the
-document request alone: the round is then *Comment only* plus that request,
-since no revision was asked for. Neither, with no documents, is refused.
+**Document requests go with it** (ADR-022 Amendment 9, IR-1325, which
+replaces Amendment 8's documents inside *Request changes*). A reviewer asks
+for documents in the Documents tab, where each request waits as the
+caller's draft, like a draft thread. *Request changes* and *Comment only*
+send the caller's drafts for this Seat's party with the round, in this same
+transaction; every other verdict is refused while any wait, so a reviewer
+removes them first. *Request changes* always asks for a new version.
 
 **In one transaction**, after the record lock: the caller's drafts are sent,
 the verdict is taken, and a `ReviewRound` records the round, naming the
@@ -34,7 +34,9 @@ anything is written, it refuses -- who before what:
 
 - a caller with no open Seat here (403; 404 to one who may not read the review);
 - a record not in review, an unknown verdict, an unopened Seat (400);
-- *Comment only* with neither a summary nor a draft (400);
+- *Comment only* with neither a summary, a draft nor a draft document request (400);
+- any verdict but *Request changes* or *Comment only* while the caller has
+  draft document requests for this party (400, Amendment 9);
 - an approval -- *Accept & send to RDCO*, *Clear*, *Accept* -- that would send
   one of the caller's own *Must fix* drafts: it would be refused by that very
   thread as soon as it was sent (400).
@@ -64,6 +66,9 @@ from core.text_limits import too_long, too_long_message
 
 from . import decisions, mentions, office_review, revisions, routing, seats
 from .models import ReviewComment, ReviewerSeat, ReviewRound
+
+#: Verdicts that send the caller's draft document requests (ADR-022 Amendment 9).
+SENDS_DOCUMENT_REQUESTS = (ReviewVerdict.REQUEST_REVISION, ReviewVerdict.COMMENT_ONLY)
 
 #: Verdicts that approve, so a *Must fix* sent with one would refuse it.
 APPROVALS = (ReviewVerdict.SEND_TO_RDCO, ReviewVerdict.CLEARED, ReviewVerdict.ACCEPT)
@@ -121,12 +126,9 @@ def _take_verdict(record, actor, verdict, summary, *, to, suggested_offices, tok
 
 @transaction.atomic
 def finish_review(record, actor, *, verdict, summary="", to=None, suggested_offices=None,
-                  token=None, documents=None, new_version=True) -> ReviewRound:
-    """
-    Finish the caller's review of `record` (module note). Returns the round.
-    `documents` is a list of `requests.ItemSpec`, already checked against the
-    picklist; only *Request changes* takes it.
-    """
+                  token=None) -> ReviewRound:
+    """Finish the caller's review of `record` (module note). Returns the round."""
+    from apps.documents import requests
     record = routing._locked(record)
     if not may_read_review(actor, record):
         raise FinishNotFound
@@ -149,17 +151,14 @@ def finish_review(record, actor, *, verdict, summary="", to=None, suggested_offi
                 kind=ReviewCommentKind.THREAD)
         .order_by("created_at", "pk")
     )
-    documents = list(documents or [])
-    if documents and verdict != ReviewVerdict.REQUEST_REVISION:
-        raise FinishError("Only Request changes can ask for documents.")
-    if verdict == ReviewVerdict.REQUEST_REVISION and not new_version:
-        if not documents:
-            raise FinishError(
-                "Choose the documents you need, or say the paper itself needs changes."
-            )
-        # Documents alone: no revision is asked for, so the round has no outcome.
-        verdict = ReviewVerdict.COMMENT_ONLY
-    if verdict == ReviewVerdict.COMMENT_ONLY and not summary and not drafts and not documents:
+    party = str(seat.assignment.party)
+    waiting = requests.drafts_of(record, actor, party).count()
+    if waiting and verdict not in SENDS_DOCUMENT_REQUESTS:
+        raise FinishError(
+            f"You have {waiting} document request{'s' if waiting != 1 else ''} waiting. "
+            "Remove them in the Documents tab, or choose Request changes or Comment only."
+        )
+    if verdict == ReviewVerdict.COMMENT_ONLY and not summary and not drafts and not waiting:
         raise FinishError("Write a summary or a comment first.")
     must_fix = sum(1 for d in drafts if d.severity == ThreadSeverity.MUST_FIX)
     if verdict in APPROVALS and must_fix:
@@ -174,7 +173,6 @@ def finish_review(record, actor, *, verdict, summary="", to=None, suggested_offi
             "Suggestion, or request a revision."
         )
 
-    party = str(seat.assignment.party)
     version = latest_version(record)
     now = timezone.now()
     # Sent before the verdict, so a Decision closes them with the rest. A sent
@@ -190,8 +188,11 @@ def finish_review(record, actor, *, verdict, summary="", to=None, suggested_offi
             record, actor, verdict, summary,
             to=to, suggested_offices=suggested_offices, token=token, threads=len(drafts),
         )
-    if documents:
-        _request_documents(record, actor, party, summary, documents)
+    if waiting:
+        try:
+            requests.send_drafts(record, actor, party)
+        except requests.NotAHolder as exc:
+            raise FinishRefused(str(exc))
     round_ = ReviewRound.objects.create(
         record=record, actor=actor, party=party, version=version,
         verdict=verdict, summary=summary, review=review,
@@ -207,25 +208,6 @@ def finish_review(record, actor, *, verdict, summary="", to=None, suggested_offi
         # so the comments it sent are told on their own.
         _notify_unannounced(record, actor, round_, len(drafts), comment_only=False)
     return round_
-
-
-#: A document request needs a message (ADR-022 §1); a review sent with no
-#: summary still says where the request came from.
-DOCUMENTS_MESSAGE = "Asked for with this review."
-
-
-def _request_documents(record, actor, party, summary, documents) -> None:
-    """Open the document request *Request changes* carries, as the seat's party."""
-    from apps.documents import requests
-
-    try:
-        requests.create_request(
-            record, actor, party=party, message=summary or DOCUMENTS_MESSAGE, specs=documents,
-        )
-    except requests.NotAHolder as exc:
-        raise FinishRefused(str(exc))
-    except requests.DocumentRequestError as exc:
-        raise FinishError(str(exc))
 
 
 def _notify_unannounced(record, actor, round_, threads, *, comment_only):

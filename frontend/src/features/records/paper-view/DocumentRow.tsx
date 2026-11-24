@@ -42,10 +42,12 @@ export interface DocumentRowProps {
   actions?: ReactNode;
   /** Every version, newest first, behind the row's toggle, and how many there are. */
   versions?: { count: number; list: ReactNode };
+  /** Opens the document in the reader by its name (IR-1325), for one with no versions list. */
+  onOpenName?: (opener: HTMLElement) => void;
 }
 
 export function DocumentRow({
-  name, required, template, latest, status, note, actions, versions,
+  name, required, template, latest, status, note, actions, versions, onOpenName,
 }: DocumentRowProps) {
   const ids = useId();
   const [open, setOpen] = useState(false);
@@ -58,7 +60,14 @@ export function DocumentRow({
           <div className="min-w-0">
             {/* min-w-0: a long unbroken name wraps in its line instead of pushing past the row (IR-1218). */}
             <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-              <h3 id={`${ids}-name`} className="min-w-0 max-w-full break-words text-body font-semibold text-stone-900">{name}</h3>
+              <h3 id={`${ids}-name`} className="min-w-0 max-w-full break-words text-body font-semibold text-stone-900">
+                {onOpenName ? (
+                  <button type="button" onClick={(e) => onOpenName(e.currentTarget)} aria-label={`Open ${name}`}
+                    className={cn("rounded-control text-left text-brand underline-offset-2 hover:underline", FOCUS_RING)}>
+                    {name}
+                  </button>
+                ) : name}
+              </h3>
               {required != null && <RequirementLabel required={required} />}
             </div>
             <p className="text-small text-stone-600">{latest ?? "Not uploaded yet"}</p>

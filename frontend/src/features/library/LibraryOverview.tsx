@@ -19,6 +19,8 @@ import { SubmissionPanel, SubmissionRow } from "./SubmissionRow";
 const RECENT_SHOWN = 4;
 /** Recently opened lists the ten newest (IR-1324); it scrolls inside its card. */
 const RECENTLY_OPENED_SHOWN = 10;
+/** Both side cards are one height (IR-1325), shorter than Waiting on you's 28 rem before. */
+const SIDE_CARD_HEIGHT = "h-96";
 
 const LINK_TEXT = cn(
   "inline-flex min-h-9 items-center gap-2 rounded-control px-2 text-small font-semibold text-brand hover:bg-stone-100",
@@ -74,7 +76,7 @@ export function LibraryOverview({
         <SideCard
           id="overview-opened"
           title="Recently opened"
-          height="h-80"
+          height={SIDE_CARD_HEIGHT}
           footer={
             <button type="button" onClick={onManageHistory} className={cn(LINK_TEXT, "-mx-2")}>
               Manage history <i className="fas fa-arrow-right text-label" aria-hidden />
@@ -200,7 +202,7 @@ function WaitingOnYou({ waiting, loading, failed }: {
     <SideCard
       id="overview-waiting"
       title="Waiting on you"
-      height="h-[28rem]"
+      height={SIDE_CARD_HEIGHT}
       badge={any && (
         <span className="rounded-full border border-brand px-2 text-label font-semibold tabular-nums text-brand">
           {waiting.length}

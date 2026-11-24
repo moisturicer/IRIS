@@ -72,7 +72,7 @@ describe("RequestDocumentDialog", () => {
       screen.getByRole("textbox", { name: /message to the owner/i }),
       "The signed consent forms are missing.",
     );
-    await user.click(screen.getByRole("button", { name: "Send request" }));
+    await user.click(screen.getByRole("button", { name: "Add to review" }));
 
     await waitFor(() => expect(onCreated).toHaveBeenCalled());
     expect(createDocumentRequest).toHaveBeenCalledWith(RECORD_ID, {
@@ -87,7 +87,7 @@ describe("RequestDocumentDialog", () => {
 
     await screen.findByRole("checkbox", { name: "Ethics Clearance" });
     await user.type(screen.getByRole("textbox", { name: /message to the owner/i }), "Why");
-    await user.click(screen.getByRole("button", { name: "Send request" }));
+    await user.click(screen.getByRole("button", { name: "Add to review" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/choose at least one document/i);
     expect(createDocumentRequest).not.toHaveBeenCalled();
@@ -98,7 +98,7 @@ describe("RequestDocumentDialog", () => {
     open();
 
     await user.click(await screen.findByRole("checkbox", { name: "Patent Draft" }));
-    await user.click(screen.getByRole("button", { name: "Send request" }));
+    await user.click(screen.getByRole("button", { name: "Add to review" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/tell the owner why/i);
     expect(createDocumentRequest).not.toHaveBeenCalled();
@@ -113,7 +113,7 @@ describe("RequestDocumentDialog", () => {
 
     await user.click(await screen.findByRole("checkbox", { name: "Patent Draft" }));
     await user.type(screen.getByRole("textbox", { name: /message to the owner/i }), "Why");
-    await user.click(screen.getByRole("button", { name: "Send request" }));
+    await user.click(screen.getByRole("button", { name: "Add to review" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("You do not hold this record.");
   });
@@ -126,7 +126,7 @@ describe("RequestDocumentDialog", () => {
     await user.selectOptions(asParty, "RDCO Final");
     await user.click(await screen.findByRole("checkbox", { name: "Patent Draft" }));
     await user.type(screen.getByRole("textbox", { name: /message to the owner/i }), "Why");
-    await user.click(screen.getByRole("button", { name: "Send request" }));
+    await user.click(screen.getByRole("button", { name: "Add to review" }));
 
     await waitFor(() =>
       expect(createDocumentRequest).toHaveBeenCalledWith(RECORD_ID, {
@@ -186,7 +186,7 @@ describe("RequestDocumentDialog", () => {
         renderScreen(<Opener />);
         await user.click(screen.getByRole("button", { name: "Open the dialog" }));
         const first = await screen.findByRole("checkbox", { name: "Ethics Clearance" });
-        const last = screen.getByRole("button", { name: "Send request" });
+        const last = screen.getByRole("button", { name: "Add to review" });
         const dialog = screen.getByRole("dialog", { name: "Request documents" });
 
         // Ethics Clearance, Patent Draft, Other, message, Cancel, Send request.

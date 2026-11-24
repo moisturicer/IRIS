@@ -140,7 +140,7 @@ IR-553 asks for a per-Record reading position, keyed by owner, Record and Manusc
 
 ## Amendment — 2026-11-24 (IR-1324): History opens from Recently opened, not from the folders
 
-**Status of this amendment: Proposed** — accepted when IR-1324's PR merges after review. Decided by Hermoine Zozobrado on 2026-11-24, while building IR-1324: History was to be removed from Saved Papers, and this keeps point 7's controls reachable.
+**Status of this amendment: Accepted** — 2026-11-24, when IR-1324's PR (#1009) merged after Ashlee Sean's review, as relayed by Hermoine Zozobrado. Decided by Hermoine Zozobrado on 2026-11-24, while building IR-1324: History was to be removed from Saved Papers, and this keeps point 7's controls reachable.
 
 1. **This replaces point 3 of the IR-756 amendment.** IR-1324 replaces Saved Papers' Folder picker with folder tiles, and History is not a folder.
    - **An author** opens the History view from **Manage history** under the Overview's *Recently opened*, which already shows the top of that list. Its back link returns to the Overview.

@@ -842,7 +842,7 @@ def tracker_payload(record, user) -> dict[str, Any]:
         "published_later": _published_from_unlisted_entry(record, readable=readable),
         "reassignments": _reassignments(record, staff=staff, readable=readable),
         "document_requests": (
-            serialize_requests(record, user, requests_for(record)) if disclose_requests else None
+            serialize_requests(record, user, requests_for(record, user)) if disclose_requests else None
         ),
         "clearances": [
             clearance_payload(

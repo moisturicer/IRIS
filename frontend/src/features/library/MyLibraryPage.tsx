@@ -227,7 +227,9 @@ export default function MyLibraryPage() {
         )}
       />
 
-      <div role="tablist" aria-label="My Library" className="mb-section-lg -mx-1 flex gap-1 overflow-x-auto overflow-y-hidden p-1 scrollbar-none">
+      {/* A faint rule under the tabs keeps them apart from the page (IR-1325), like the cards' heading rules. */}
+      <div className="mb-section-lg border-b border-stone-200 pb-2">
+      <div role="tablist" aria-label="My Library" className="-mx-1 flex gap-1 overflow-x-auto overflow-y-hidden p-1 scrollbar-none">
         {tabs.map((t) => {
           const current = t.value === tab;
           return (
@@ -254,6 +256,7 @@ export default function MyLibraryPage() {
             </button>
           );
         })}
+      </div>
       </div>
 
       <div

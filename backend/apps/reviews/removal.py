@@ -103,12 +103,20 @@ def leaving(record, user, party) -> dict:
 
 def discard_drafts(record, user, party) -> int:
     """
-    Delete `user`'s unsent drafts written as `party` on `record`. Called
-    inside each removal's transaction, after the seat is withdrawn. Returns
-    how many went.
+    Delete `user`'s unsent drafts written as `party` on `record`: draft
+    comments, and draft document requests (ADR-022 Amendment 9, IR-1325),
+    which only their *Finish review* could have sent. Called inside each
+    removal's transaction, after the seat is withdrawn. Returns how many
+    comments went.
     """
+    from apps.documents.models import DocumentRequest
+    from core.enums import DocumentRequestState
+
     if user is None:
         return 0
+    DocumentRequest.objects.filter(
+        record=record, requested_by=user, party=str(party), state=DocumentRequestState.DRAFT,
+    ).delete()
     deleted, _ = ReviewComment.objects.filter(
         record=record, author=user, party=str(party), is_draft=True,
     ).delete()

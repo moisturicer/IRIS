@@ -684,7 +684,11 @@ describe("My Library: reading", () => {
     // History is not a folder (IR-1324): an author opens it from the Overview.
     expect(queryFolderTile("History")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Manage reading history" })).not.toBeInTheDocument();
-    expect(within(folderShelf()).getByText(/No folders yet/)).toBeInTheDocument();
+    // No folders reads like Saved Papers' own empty state, with a way to make one (IR-1325).
+    expect(within(folderShelf()).getByRole("heading", { name: "No folders yet" })).toBeInTheDocument();
+    await userEvent.click(within(folderShelf()).getByRole("button", { name: "New folder" }));
+    expect(screen.getByRole("dialog", { name: "New folder" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
     await newFolder("Methods");
     expect(await within(folderShelf()).findByRole("button", { name: "Methods 0 papers" })).toBeInTheDocument();
     expect(libraryApi.createFolder).toHaveBeenCalledWith("Methods");

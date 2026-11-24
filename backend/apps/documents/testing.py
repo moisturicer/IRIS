@@ -20,3 +20,17 @@ def real_pdf_bytes(content: bytes = b"") -> bytes:
 
 def pdf_upload(name: str = "paper.pdf", content: bytes = b"") -> SimpleUploadedFile:
     return SimpleUploadedFile(name, real_pdf_bytes(content), content_type="application/pdf")
+
+
+def send_drafted_requests(test, record, user, party):
+    """
+    Send `user`'s draft document requests as `party`, as their *Finish review*
+    does (ADR-022 Amendment 9, IR-1325), for a test that needs a request out
+    and is not about finishing a review. Notices run as on commit.
+    """
+    from django.db import transaction
+
+    from .requests import send_drafts
+
+    with test.captureOnCommitCallbacks(execute=True), transaction.atomic():
+        send_drafts(record, user, str(party))

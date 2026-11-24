@@ -1,4 +1,4 @@
-import { useCallback, useId, useState, type FormEvent } from "react";
+import { useEffect, useId, useState, type FormEvent } from "react";
 
 import { recordsApi } from "@/api/records";
 import { Button, Modal } from "@/components/ui";
@@ -6,10 +6,9 @@ import { fieldClasses } from "@/components/ui/fieldClasses";
 import type { Capability } from "@/features/records/capabilities";
 import { errorDetail } from "@/lib/errorDetail";
 import { cn } from "@/lib/utils";
-import type { DecisionFlags, RecordDetail, ReviewComment, ReviewVerdict } from "@/types/records";
+import type { DecisionFlags, DocumentRequest, RecordDetail, ReviewComment, ReviewVerdict } from "@/types/records";
 
 import { closingLines } from "../DecisionDialog";
-import { RequestChangesFields, asksNothing, type ChangesAsked } from "./RequestChangesFields";
 import { plural, verdictOptions, type Thread } from "./threadModel";
 
 export interface FinishReviewDialogProps {
@@ -43,6 +42,9 @@ const SUBMIT_WORDS: Record<ReviewVerdict, string> = {
   reject: "Reject",
 };
 
+/** The verdicts that send the reviewer's drafted document requests (ADR-022 Amendment 9, IR-1325). */
+const SENDS_DOCUMENT_REQUESTS: readonly ReviewVerdict[] = ["request_revision", "comment_only"];
+
 const DONE_WORDS: Record<Exclude<ReviewVerdict, "send_to_rdco">, string> = {
   comment_only: "Review sent. The authors and the other reviewers have been told.",
   request_revision: "Changes requested. The authors have been notified.",
@@ -57,7 +59,10 @@ const DONE_WORDS: Record<Exclude<ReviewVerdict, "send_to_rdco">, string> = {
 
 /**
  * *Finish review* (ADR-032 §7, 2026-11-04; IR-875): the summary, then a
- * verdict, sent with the viewer's drafts in one act. The verdicts are
+ * verdict, sent with the viewer's drafts in one act -- their draft comments
+ * and the document requests they drafted in the Documents tab (ADR-022
+ * Amendment 9, IR-1325). Only *Request changes* and *Comment only* send
+ * document requests; every other verdict waits until they are removed. The verdicts are
  * `verdictOptions`' -- *Comment only* and what the capabilities grant -- and
  * one that is held says why. A Decision lists what it closes, the open
  * threads among them, and needs the summary as its reason while a *Must fix*
@@ -67,24 +72,38 @@ const DONE_WORDS: Record<Exclude<ReviewVerdict, "send_to_rdco">, string> = {
 export function FinishReviewDialog({ record, can, drafts, sent = [], initialVerdict, onClose, onDone, onSendToRdco }: FinishReviewDialogProps) {
   const ids = useId();
   const [decision, setDecision] = useState<DecisionFlags>(record.decision);
-  const options = verdictOptions(can, { ...record, decision }, drafts);
+  // The document requests this reviewer drafted, which go with the review (Amendment 9).
+  const [asked, setAsked] = useState<DocumentRequest[]>([]);
+  useEffect(() => {
+    if (record.can_request_document.length === 0) return;
+    let cancelled = false;
+    recordsApi.documentRequests(record.id)
+      .then(({ data }) => { if (!cancelled) setAsked(data.filter((r) => r.state === "draft")); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [record.id, record.can_request_document.length]);
+  const askedNames = asked.flatMap((r) => r.items.map((i) => i.label));
+  const waiting = asked.length > 0
+    ? `You have ${plural(askedNames.length, "document request", "document requests")} waiting. Remove ${askedNames.length === 1 ? "it" : "them"} in the Documents tab first, or choose Request changes or Comment only.`
+    : null;
+  const options = verdictOptions(can, { ...record, decision }, drafts).map((o) =>
+    waiting && o.unavailable === null && !SENDS_DOCUMENT_REQUESTS.includes(o.verdict) ? { ...o, unavailable: waiting } : o);
   // A footer button opens it on its own verdict, when that one is on offer and not held (IR-1139).
   const [verdict, setVerdict] = useState<ReviewVerdict>(() =>
     options.find((o) => o.verdict === initialVerdict && o.unavailable === null)?.verdict ?? "comment_only");
   const [summary, setSummary] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
-  // *Request changes*' own fields (ADR-022 Amendment 8, IR-1322).
-  const [changes, setChanges] = useState<ChangesAsked>({ newVersion: true, documents: [] });
-  const onChanges = useCallback((asked: ChangesAsked) => setChanges(asked), []);
   const chosen = options.find((o) => o.verdict === verdict) ?? options[0];
-  const requestingChanges = chosen.verdict === "request_revision";
+  // A verdict the drafted requests hold back falls back to Comment only, which sends them.
+  useEffect(() => {
+    if (chosen.unavailable !== null && chosen.verdict !== "comment_only") setVerdict("comment_only");
+  }, [chosen.unavailable, chosen.verdict]);
   const mustFix = drafts.filter((d) => d.severity === "must_fix").length;
 
   const missingReason = chosen.reasonRequired && summary.trim() === "";
-  const empty = chosen.verdict === "comment_only" && summary.trim() === "" && drafts.length === 0;
-  const asksNone = requestingChanges && asksNothing(changes);
-  const ready = chosen.unavailable === null && !missingReason && !empty && !asksNone;
+  const empty = chosen.verdict === "comment_only" && summary.trim() === "" && drafts.length === 0 && asked.length === 0;
+  const ready = chosen.unavailable === null && !missingReason && !empty;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -100,7 +119,6 @@ export function FinishReviewDialog({ record, can, drafts, sent = [], initialVerd
         verdict: chosen.verdict,
         summary: summary.trim(),
         ...(chosen.decision ? { token: decision.token ?? "" } : {}),
-        ...(requestingChanges ? { new_version: changes.newVersion, documents: changes.documents } : {}),
       });
       onDone(DONE_WORDS[chosen.verdict as Exclude<ReviewVerdict, "send_to_rdco">]);
     } catch (err) {
@@ -160,14 +178,6 @@ export function FinishReviewDialog({ record, can, drafts, sent = [], initialVerd
           })}
         </fieldset>
 
-        {requestingChanges && (
-          <RequestChangesFields recordId={record.id} offerDocuments={record.can_request_document.length > 0} onChange={onChanges} />
-        )}
-        {asksNone && (
-          <p className="text-small text-brand">
-            Choose a document, or say the paper itself needs changes. To send comments alone, choose Comment only.
-          </p>
-        )}
 
         <div>
           <label htmlFor={summaryId} className="mb-1.5 block text-small font-semibold text-stone-900">
@@ -184,6 +194,11 @@ export function FinishReviewDialog({ record, can, drafts, sent = [], initialVerd
               ? `${plural(drafts.length, "draft comment", "draft comments")}${mustFix ? `, ${mustFix} Must fix,` : ""} will be sent with it.`
               : "No draft comments. You can still send a summary."}
           </p>
+          {askedNames.length > 0 && (
+            <p className="mt-1 text-2xs text-stone-600">
+              {plural(askedNames.length, "document request", "document requests")} will be sent with it: {askedNames.join(", ")}.
+            </p>
+          )}
         </div>
 
         {(closing.length > 0 || closingThreads.length > 0) && (

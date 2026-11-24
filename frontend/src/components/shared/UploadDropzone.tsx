@@ -27,7 +27,7 @@ import { forwardRef, useEffect, useRef, useState, type DragEvent, type KeyboardE
 
 import { ProgressBar, toPercent } from "@/components/shared/ProgressBar";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
-import { PILL_SECONDARY } from "@/components/ui/pillStyles";
+import { PILL_SECONDARY, SMALL_ACTION_PILL, SMALL_ACTION_TARGET } from "@/components/ui/pillStyles";
 import { cn, formatBytes } from "@/lib/utils";
 
 /** The upload the parent has in hand, if any. */
@@ -213,7 +213,8 @@ export function UploadDropzone({
           title={compact ? shownHint : undefined}
           className={cn(
             compact
-              ? cn(PILL_SECONDARY, "px-3 reading-split:min-h-9 select-none", dragging && "ring-brand bg-stone-100")
+              // A small pill in a full-size target (IR-1325), like the row's Download.
+              ? cn(SMALL_ACTION_TARGET, "select-none")
               : cn(
                 "flex flex-col items-center justify-center gap-2 rounded-card border-2 border-dashed px-6 py-10 select-none",
                 dragging ? "border-brand bg-stone-100" : "border-stone-300 bg-stone-50",
@@ -225,11 +226,11 @@ export function UploadDropzone({
           )}
         >
           {compact ? (
-            <>
+            <span className={cn(SMALL_ACTION_PILL, dragging && "bg-stone-100 ring-brand")}>
               <i className="fas fa-upload text-2xs" aria-hidden="true" />
               {/* "Upload" is drawn, so the name starts with it (WCAG 2.5.3, IR-908). */}
               {label ? <><span aria-hidden="true">Upload</span><span className="sr-only">{label}</span></> : "Upload"}
-            </>
+            </span>
           ) : (
             <>
               <i className="fas fa-cloud-arrow-up text-3xl text-stone-500" aria-hidden="true" />
