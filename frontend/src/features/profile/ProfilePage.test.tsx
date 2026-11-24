@@ -1,7 +1,8 @@
 /**
- * Your own Profile page (IR-933): what other signed-in people see of you, with
- * the way to edit it. Asserted through the accessible tree. The page reads the
- * signed-in user; another person's profile is IR-700.
+ * Your own Profile page (IR-933): what other signed-in people see of you.
+ * Editing it is in Settings (IR-1304), so the page has no edit control.
+ * Asserted through the accessible tree. The page reads the signed-in user;
+ * another person's profile is IR-700.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -220,26 +221,23 @@ describe("the profile", () => {
   });
 });
 
-describe("editing", () => {
-  it("offers Edit profile, which opens the edit page", () => {
+// IR-1304: editing is in Settings, so this page is only the preview.
+describe("the preview", () => {
+  it("has no way to edit: no Edit profile link or button, and no link to the old edit page", () => {
     renderScreen(<ProfilePage />, { route: "/profile" });
 
-    expect(screen.getByRole("link", { name: "Edit profile" })).toHaveAttribute("href", "/profile/edit");
+    expect(screen.queryByRole("link", { name: /edit/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /edit/i })).not.toBeInTheDocument();
+    for (const link of screen.queryAllByRole("link")) {
+      expect(link.getAttribute("href")).not.toContain("/profile/edit");
+    }
   });
 
-  it("says this is how others see you", () => {
+  it("says this is how others see you, and that it is changed in Settings", () => {
     renderScreen(<ProfilePage />, { route: "/profile" });
 
     expect(screen.getByRole("note")).toHaveTextContent(/this is how other IRIS accounts see your profile/i);
-  });
-
-  it("confirms a save it was sent back from, and otherwise says nothing", () => {
-    const { unmount } = renderScreen(<ProfilePage />, { route: "/profile" });
-    expect(screen.queryByText("Profile saved.")).not.toBeInTheDocument();
-    unmount();
-
-    renderScreen(<ProfilePage />, { route: "/profile", state: { saved: true } });
-    expect(screen.getByText("Profile saved.")).toHaveAttribute("role", "status");
+    expect(screen.getByRole("note")).toHaveTextContent(/change it in Settings/i);
   });
 
   it("has no blocking accessibility violations", async () => {

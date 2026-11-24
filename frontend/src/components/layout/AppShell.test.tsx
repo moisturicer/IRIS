@@ -2,8 +2,8 @@
  * The app shell has no top bar (IR-519, IR-523).
  *
  * The fixed 58px header cost vertical space on every screen and carried a
- * search box with no handler. It is gone: on a desktop the bell sits at the
- * top of the sidebar; below `md`, where the sidebar is a drawer, a slim bar
+ * search box with no handler. It is gone: on a desktop Notifications is a
+ * link in the sidebar; below `md`, where the sidebar is a drawer, a slim bar
  * that scrolls with the page holds only the menu button and the bell.
  * Reverses spec §4.2's "one app header on every screen" (amended here).
  *
@@ -111,16 +111,28 @@ describe("the app shell", () => {
     expect(screen.queryByRole("banner")).not.toBeInTheDocument();
   });
 
-  it("keeps the bell in the sidebar, and a menu button and bell for phones", async () => {
+  it("lists Notifications in the sidebar, and keeps a menu button and bell for phones", async () => {
     renderAt("/records/mine");
 
     await screen.findByRole("heading", { name: "My Library" });
     const sidebar = screen.getByRole("complementary", { name: "Sidebar" });
-    expect(within(sidebar).getByRole("button", { name: /^Notifications/ })).toBeInTheDocument();
+    // A link, not a bell: the sidebar's header holds no bell any more.
+    expect(within(sidebar).getByRole("link", { name: /^Notifications/ })).toHaveAttribute("href", "/notifications");
+    expect(within(sidebar).queryByRole("button", { name: /^Notifications/ })).not.toBeInTheDocument();
 
     const phoneBar = screen.getByRole("navigation", { name: "Menu" });
     expect(within(phoneBar).getByRole("button", { name: "Open menu" })).toBeInTheDocument();
     expect(within(phoneBar).getByRole("button", { name: /^Notifications/ })).toBeInTheDocument();
+  });
+
+  it("gives the sidebar's Notifications link the same unread count as the bell", async () => {
+    vi.mocked(notificationsApi.list).mockResolvedValue({ data: { count: 3, results: [] } } as never);
+    renderAt("/records/mine");
+
+    const nav = await screen.findByRole("navigation", { name: "Main" });
+    expect(await within(nav).findByRole("link", { name: "Notifications, 3 unread" })).toBeInTheDocument();
+    const phoneBar = screen.getByRole("navigation", { name: "Menu" });
+    expect(within(phoneBar).getByRole("button", { name: "Notifications, 3 unread" })).toBeInTheDocument();
   });
 
   it("puts the IRIS mark in the phone bar, linking to Discover (audit RES-04)", async () => {
@@ -131,14 +143,12 @@ describe("the app shell", () => {
     expect(within(phoneBar).getByRole("link", { name: "IRIS, go to Discover" })).toHaveAttribute("href", "/");
   });
 
-  it("lists neither Notifications nor Settings among the sidebar's links", async () => {
-    // The bell is the notification entry (IR-519); Settings is in the account
-    // menu (IR-413).
+  it("does not list Settings among the sidebar's links", async () => {
+    // Settings is in the account menu (IR-413).
     renderAt("/records/mine");
 
     await screen.findByRole("heading", { name: "My Library" });
     const nav = screen.getByRole("navigation", { name: "Main" });
-    expect(within(nav).queryByRole("link", { name: /Notifications/ })).not.toBeInTheDocument();
     expect(within(nav).queryByRole("link", { name: /Settings/ })).not.toBeInTheDocument();
   });
 
@@ -160,8 +170,8 @@ describe("the app shell", () => {
     renderAt("/with-bell");
 
     await screen.findByRole("heading", { name: "Page with a bell" });
-    // The sidebar's bell, the phone bar's and the page's own.
-    expect(screen.getAllByRole("button", { name: /^Notifications/ })).toHaveLength(3);
+    // The phone bar's bell and the page's own, plus the sidebar's count.
+    expect(screen.getAllByRole("button", { name: /^Notifications/ })).toHaveLength(2);
     expect(notificationsApi.list).toHaveBeenCalledTimes(1);
     expect(notificationsApi.list).toHaveBeenCalledWith(true);
   });

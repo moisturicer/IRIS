@@ -12,8 +12,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { RequestTimeoutError } from "@/api/requestPolicy";
+import { emitLiveHint } from "@/lib/live";
 import { expectNoBlockingA11yViolations } from "@/test/axe";
-import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
+import { act, renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
 import type { RecordTracker, TrackerPartyRow } from "@/types/records";
 
 import { ReviewRoutingTracker } from "./ReviewRoutingTracker";
@@ -459,5 +460,32 @@ describe("ReviewRoutingTracker", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("The review tracker took too long to load.");
     await userEvent.click(screen.getByRole("button", { name: "Retry" }));
     await waitFor(() => expect(tracker).toHaveBeenCalledTimes(2));
+  });
+});
+
+describe("ReviewRoutingTracker, live (ADR-073, IR-1287)", () => {
+  it("reads the tracker again on a hint for its record, keeping the rail on screen", async () => {
+    tracker.mockResolvedValueOnce({ data: thesisAtIntake }).mockResolvedValue({ data: afterResubmission });
+    renderTracker();
+    await screen.findByRole("table", { name: /parties/i });
+
+    act(() => { emitLiveHint([`record:${RECORD_ID + 1}`]); });
+    act(() => { emitLiveHint([`record:${RECORD_ID}`]); });
+
+    await waitFor(() => expect(tracker).toHaveBeenCalledTimes(2));
+    expect(screen.queryByText("Loading the review tracker…")).not.toBeInTheDocument();
+    expect(await screen.findByRole("row", { name: /IERC/ })).toBeInTheDocument();
+  });
+
+  it("keeps what it shows when the live read fails", async () => {
+    tracker.mockResolvedValueOnce({ data: thesisAtIntake }).mockRejectedValue(new Error("offline"));
+    renderTracker();
+    await screen.findByRole("table", { name: /parties/i });
+
+    act(() => { emitLiveHint([`record:${RECORD_ID}`]); });
+
+    await waitFor(() => expect(tracker).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole("table", { name: /parties/i })).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });

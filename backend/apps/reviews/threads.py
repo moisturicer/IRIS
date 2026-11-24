@@ -397,6 +397,8 @@ def close_by_decision(record, actor, decision, *, reason) -> list[int]:
         state=ThreadState.CLOSED, closed_by_decision=decision, closed_reason=reason,
         is_draft=False,
     )
+    from apps.live.signals import review_changed
+    review_changed(record.pk)  # an update() sends no signal (IR-1284)
     ReviewThreadEvent.objects.bulk_create([
         ReviewThreadEvent(thread=t, actor=actor, kind=ThreadEventKind.CLOSED_BY_DECISION, created_at=now)
         for t in rows

@@ -1,5 +1,6 @@
 import hashlib
 import json
+import logging
 
 import openai
 
@@ -15,8 +16,12 @@ from ai.infrastructure import agent_config
 from ai.infrastructure.settings import settings
 from ai.runs import stream
 
+log = logging.getLogger(__name__)
+
 #: Statuses another attempt may not meet; any other non-2xx is a refusal.
 TRANSIENT_STATUSES = frozenset({408, 409, 429})
+#: Longest vendor error message kept in a log line.
+LOGGED_MESSAGE_CHARS = 200
 
 class OpenAILLMProvider(LLMProvider):
     def __init__(self):
@@ -124,12 +129,15 @@ class OpenAICompatibleAgentProvider(LLMProvider):
         calls: dict[int, dict] = {}
         finish, usage, extra = None, None, {}
 
+        status = None
+
         async def read(client):
-            nonlocal finish, usage
+            nonlocal finish, usage, status
             async with client.stream("POST", url, json=body, headers=headers) as response:
                 status = response.status_code
                 if status in TRANSIENT_STATUSES or status >= 500:
-                    raise TransientProviderError(f"status {status}")
+                    await response.aread()
+                    raise self._transient(f"status {status}", status=status, body=_json(response))
                 if not 200 <= status < 300:
                     raise ProviderRejected(f"status {status}")
                 async for line in response.aiter_lines():
@@ -142,8 +150,10 @@ class OpenAICompatibleAgentProvider(LLMProvider):
                         chunk = json.loads(data)
                     except ValueError:
                         continue
-                    if chunk.get("error"):
-                        raise TransientProviderError("stream error")
+                    # OpenRouter keeps 200 and reports a failed route in the body (IR-1286).
+                    if chunk.get("error") or any(
+                            c.get("finish_reason") == "error" for c in chunk.get("choices") or []):
+                        raise self._transient("stream error", status=status, body=chunk)
                     usage = chunk.get("usage") or usage
                     for choice in chunk.get("choices") or []:
                         delta = choice.get("delta") or {}
@@ -168,14 +178,20 @@ class OpenAICompatibleAgentProvider(LLMProvider):
                         if choice.get("finish_reason"):
                             finish = choice["finish_reason"]
 
+        mark = sink.mark()
         try:
-            if self._http_client is not None:
-                await read(self._http_client)
-            else:
-                async with httpx.AsyncClient(timeout=None) as client:
-                    await read(client)
-        except httpx.HTTPError as failed:
-            raise TransientProviderError(type(failed).__name__) from None
+            try:
+                if self._http_client is not None:
+                    await read(self._http_client)
+                else:
+                    async with httpx.AsyncClient(timeout=None) as client:
+                        await read(client)
+            except httpx.HTTPError as failed:
+                raise self._transient(type(failed).__name__, status=status, exception=failed) from None
+        except TransientProviderError as failed:
+            # Text the reader already saw cannot be taken back, so that attempt is not resent.
+            failed.replayable = sink.rewind(mark)
+            raise
         if finish is None:
             return None
         if calls:
@@ -195,13 +211,38 @@ class OpenAICompatibleAgentProvider(LLMProvider):
                 async with httpx.AsyncClient(timeout=None) as client:
                     response = await client.post(url, json=payload, headers=headers)
         except httpx.HTTPError as failed:
-            raise TransientProviderError(type(failed).__name__) from None
+            raise self._transient(type(failed).__name__, exception=failed) from None
         status = response.status_code
         if status in TRANSIENT_STATUSES or status >= 500:
-            raise TransientProviderError(f"status {status}")
+            raise self._transient(f"status {status}", status=status, body=_json(response))
         if not 200 <= status < 300:
             raise ProviderRejected(f"status {status}")
         return response
+
+    def _transient(self, reason: str, *, status=None, body=None, exception=None) -> TransientProviderError:
+        """Logs what the vendor said about a failed attempt: never the request, a passage or the key."""
+        error = body.get("error") if isinstance(body, dict) else None
+        if not isinstance(error, dict):
+            error = {"message": error} if isinstance(error, str) else {}
+        message = str(error.get("message") or "")
+        if self.config.api_key:
+            message = message.replace(self.config.api_key, "[key]")
+        known = body if isinstance(body, dict) else {}
+        metadata = error.get("metadata") if isinstance(error.get("metadata"), dict) else {}
+        log.warning(
+            "agent provider attempt failed: reason=%s status=%s code=%s error_type=%s message=%r"
+            " generation=%s provider=%s exception=%s",
+            reason, status, error.get("code"), metadata.get("error_type"), message[:LOGGED_MESSAGE_CHARS],
+            known.get("id"), known.get("provider"), type(exception).__name__ if exception is not None else None,
+        )
+        return TransientProviderError(reason)
+
+
+def _json(response: httpx.Response):
+    try:
+        return response.json()
+    except ValueError:
+        return None
 
 
 class OpenAIEmbeddingProvider(EmbeddingProvider):

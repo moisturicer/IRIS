@@ -138,15 +138,14 @@ describe("answer markdown typography", () => {
     expect(effective(rules, "h1 + *, h2 + *, h3 + *, h4 + *", "margin-top")).toBe("0");
   });
 
-  it("sets every heading inside the AI Overview at 17 px, under its own 22 px one (IR-1089)", async () => {
-    // The chat's ladder (24 / 20 / 16 em) put a section heading above the
-    // 20 px "AI Overview" it sits under (audit VIS-06). The Overview has one
-    // ladder: 22 px for its own heading (`text-section`), 17 px for any
-    // heading the model writes, whatever level it chose.
+  it("keeps every heading inside the AI Overview above body text and under its own 22 px one (IR-1306)", async () => {
+    // IR-1089 set them all at 17 px, which read smaller than the 16 px body in
+    // Garamond. IR-1306 gives them a ladder from 21 px down to 17 px (in em, on
+    // 16 px text), still under the 22 px "AI Overview" (`text-section`).
     const rules = await rulesFor(OVERVIEW_MARKDOWN);
-    for (const heading of ["h1", "h2", "h3", "h4"]) {
-      expect(effective(rules, heading, "font-size"), `<${heading}> inside the Overview`).toBe("17px");
-    }
+    const sizes = ["h1", "h2", "h3", "h4"].map(h => Number(/([\d.]+)em/.exec(effective(rules, h, "font-size") ?? "")?.[1]) * 16);
+    expect(sizes).toEqual([21, 19, 18, 17]);
+    expect(Math.max(...sizes)).toBeLessThan(22);
   });
 
   it("sizes the chat column by the viewport, never a fixed width", () => {

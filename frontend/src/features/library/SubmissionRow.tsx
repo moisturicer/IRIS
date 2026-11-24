@@ -8,8 +8,7 @@ import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { ContinueProposal } from "@/features/records/ContinueProposal";
 import { waitingHref } from "@/features/records/waitingOnYou";
 import { usePublishHref } from "@/features/publish/publishLink";
-import { DeleteDraft } from "./DeleteDraft";
-import { waitingOn } from "./waitingOn";
+import { DeleteRecord, type DeleteKind } from "./DeleteRecord";
 import { cn, formatDate } from "@/lib/utils";
 import type { MyResearchItem } from "@/types/records";
 
@@ -50,11 +49,23 @@ function rowActions(item: MyResearchItem, brief: boolean): ReactNode {
   );
 }
 
+/**
+ * Which trash can a row carries, if any: a draft's, or withdrawing a paper in
+ * review, which the server names `withdraw_submission` (IR-1282). Accepted
+ * work (`request_deletion`, a request RDCO decides) and rejected records get
+ * none here.
+ */
+function deleteKindOf(item: MyResearchItem): DeleteKind | null {
+  if (item.pipeline_status === "draft") return "draft";
+  if (item.delete_act === "withdraw_submission") return "withdraw";
+  return null;
+}
+
 interface SubmissionRowProps {
   item: MyResearchItem;
   /** The Overview's short list: no clearance strip, one action (and a draft's Delete). */
   brief?: boolean;
-  /** Offered on a draft: the row is gone once the server deleted it. */
+  /** Offered on a draft or a paper in review: the row is gone once the server deleted it. */
   onDeleted?: (id: number) => void;
 }
 
@@ -62,17 +73,14 @@ interface SubmissionRowProps {
  * One of the owner's records as a row in a ruled list (IR-410). The title is
  * the row's one link, stretched over the row, so a click anywhere opens it
  * (`rowHref`); only the actions and a draft's trash can sit above it. The
- * status words are the server's (`submitter_status.line`); the sentence under
- * the title says what the record waits on (`waitingOn`, IR-1084).
+ * status words are the server's (`submitter_status.line`). IR-1306 dropped the
+ * sentence under the title: the status, the clearance strip and the action say it.
  */
 export function SubmissionRow({ item, brief = false, onDeleted }: SubmissionRowProps) {
   const publishHref = usePublishHref();
-  const people = [
-    item.authors.map((author) => author.name).join(", "),
-    item.adviser_name && `Adviser: ${item.adviser_name}`,
-  ].filter(Boolean).join(" · ");
+  const authors = item.authors.map((author) => author.name).join(", ");
   const actions = rowActions(item, brief);
-  const deletable = item.pipeline_status === "draft" && onDeleted;
+  const deleteKind = onDeleted ? deleteKindOf(item) : null;
 
   return (
     <li className={cn("group relative flex gap-4 px-4 py-4 hover:bg-stone-50 sm:px-5", COLOUR_TRANSITION)}>
@@ -100,8 +108,14 @@ export function SubmissionRow({ item, brief = false, onDeleted }: SubmissionRowP
                 {item.title}
               </Link>
             </h3>
-            {people && <p className="mt-0.5 break-words text-small text-stone-600">{people}</p>}
-            <p className="mt-1 text-small text-stone-800">{waitingOn(item)}</p>
+            {/* Who, without a sentence about it (IR-1306): authors, then the Adviser marked by an icon. */}
+            {(authors || item.adviser_name) && <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 break-words text-small text-stone-600">
+              {authors && <span>{authors}</span>}
+              {item.adviser_name && <span className="inline-flex items-center gap-1.5">
+                <i aria-hidden className="fas fa-user-tie text-label text-stone-400" />
+                <span className="sr-only">Adviser: </span>{item.adviser_name}
+              </span>}
+            </p>}
           </div>
 
           <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 md:flex-col md:items-end">
@@ -111,9 +125,9 @@ export function SubmissionRow({ item, brief = false, onDeleted }: SubmissionRowP
                 people line (IR-1279); the row itself continues the draft. Above
                 the row's link, so a press deletes rather than opens. The
                 negative margin lines its icon up with the date's right edge. */}
-            {deletable && (
+            {deleteKind && onDeleted && (
               <div className="relative z-10 -mr-2 ml-auto md:ml-0">
-                <DeleteDraft recordId={item.id} title={item.title} onDeleted={onDeleted} />
+                <DeleteRecord kind={deleteKind} recordId={item.id} title={item.title} onDeleted={onDeleted} />
               </div>
             )}
           </div>

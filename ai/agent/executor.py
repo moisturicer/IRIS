@@ -35,7 +35,9 @@ from ai.agent.protocol import (
 )
 from ai.agent.prompts import (  # noqa: F401 -- re-exported: callers and pinned tests name them here
     CHAT_INSTRUCTIONS, CHAT_PROMPT_VERSION, CHAT_TOOL_VERSION, CITED_INSTRUCTIONS, CITED_NOTE, CITED_PROMPT_VERSION,
-    CITED_TOOL_VERSION, COHERENT_INSTRUCTIONS, DELIMITED_INSTRUCTIONS, DELIMITED_PROMPT_VERSION,
+    CITED_TOOL_VERSION, COHERENT_INSTRUCTIONS, DATED_INSTRUCTIONS, DATED_PROMPT_VERSION,
+    DATED_TOOL_VERSION, DETAILS_INSTRUCTIONS, DETAILS_PROMPT_VERSION, DETAILS_TOOL_VERSION,
+    DELIMITED_INSTRUCTIONS, DELIMITED_PROMPT_VERSION,
     DELIMITED_TOOL_VERSION, COHERENT_PROMPT_VERSION,
     COHERENT_TOOL_VERSION, COMPACT_REQUEST, EARLIER_TURN, EVIDENCE_INSTRUCTIONS,
     EVIDENCE_PROMPT_VERSION, EVIDENCE_TOOL_VERSION, FINAL_NOTE, HYBRID_INSTRUCTIONS, HYBRID_PROMPT_VERSION,
@@ -44,12 +46,13 @@ from ai.agent.prompts import (  # noqa: F401 -- re-exported: callers and pinned 
     METADATA_PROMPT_VERSION, METADATA_TOOL_VERSION, PAPER_CHAT_PREFIX, PROMPT_VERSION, PROMPTS,
     RECOVERY_INSTRUCTIONS, RECOVERY_PROMPT_VERSION, RECOVERY_TOOL_VERSION, RESEARCH_INSTRUCTIONS,
     RESEARCH_PROMPT_VERSION, RESEARCH_TOOL_VERSION, SELECTION_INSTRUCTIONS, SELECTION_PREFIX,
-    SELECTION_PROMPT_VERSION, SELECTION_TOOL_VERSION, SELECTION_WITHDRAWN, TOOL_VERSION, quoted, unquoted,
+    SELECTION_PROMPT_VERSION, SELECTION_TOOL_VERSION, SELECTION_WITHDRAWN, TODAY_PREFIX, TOOL_VERSION, quoted, unquoted,
 )
 from ai.agent.tools import (
     ASK_CLARIFICATION, ENDS_RUN, OUTAGES, READ_MANUSCRIPT, TOOL_UNAVAILABLE, Investigation, RunEnded,
 )
 from ai.domain.ports import LLMProvider, ProviderRejected, TransientProviderError, UnsupportedCapability
+from ai.research import recency
 from ai.research.tools import EARLIER_COMMITTED, OK
 from ai.runs import config as runs_config
 from ai.runs.executor import Compacted, Result, RunContext, Unavailable
@@ -64,16 +67,22 @@ NOTHING_TO_COMPACT = "nothing_to_compact"
 RESEARCH_TOOL_VERSIONS = (RESEARCH_TOOL_VERSION, METADATA_TOOL_VERSION, MANUSCRIPT_TOOL_VERSION,
                           RECOVERY_TOOL_VERSION, HYBRID_TOOL_VERSION, LISTING_TOOL_VERSION,
                           CHAT_TOOL_VERSION, EVIDENCE_TOOL_VERSION, COHERENT_TOOL_VERSION, CITED_TOOL_VERSION,
-                          DELIMITED_TOOL_VERSION, SELECTION_TOOL_VERSION)
+                          DELIMITED_TOOL_VERSION, SELECTION_TOOL_VERSION, DETAILS_TOOL_VERSION, DATED_TOOL_VERSION)
 #: Pins that offer research-7's tools and never mention an unseen draft in a repair (IR-1004, IR-1166, IR-1168).
 EVIDENCE_TOOL_VERSIONS = (EVIDENCE_TOOL_VERSION, COHERENT_TOOL_VERSION, CITED_TOOL_VERSION,
-                          DELIMITED_TOOL_VERSION, SELECTION_TOOL_VERSION)
+                          DELIMITED_TOOL_VERSION, SELECTION_TOOL_VERSION, DETAILS_TOOL_VERSION, DATED_TOOL_VERSION)
 #: Versions that number earlier Turns and list what they cited (IR-1168).
-CITED_TOOL_VERSIONS = (CITED_TOOL_VERSION, DELIMITED_TOOL_VERSION, SELECTION_TOOL_VERSION)
+CITED_TOOL_VERSIONS = (CITED_TOOL_VERSION, DELIMITED_TOOL_VERSION, SELECTION_TOOL_VERSION, DETAILS_TOOL_VERSION,
+                       DATED_TOOL_VERSION)
 #: Versions that quote paper text wherever it reaches the model (IR-1196).
-DELIMITED_TOOL_VERSIONS = (DELIMITED_TOOL_VERSION, SELECTION_TOOL_VERSION)
+DELIMITED_TOOL_VERSIONS = (DELIMITED_TOOL_VERSION, SELECTION_TOOL_VERSION, DETAILS_TOOL_VERSION,
+                           DATED_TOOL_VERSION)
 #: Versions that may be sent a passage the reader selected (IR-581).
-SELECTION_TOOL_VERSIONS = (SELECTION_TOOL_VERSION,)
+SELECTION_TOOL_VERSIONS = (SELECTION_TOOL_VERSION, DETAILS_TOOL_VERSION, DATED_TOOL_VERSION)
+#: Versions that offer paper_details (IR-1278).
+DETAILS_TOOL_VERSIONS = (DETAILS_TOOL_VERSION, DATED_TOOL_VERSION)
+#: Versions told today's date, whose tools read the three dates (IR-1316).
+DATED_TOOL_VERSIONS = (DATED_TOOL_VERSION,)
 #: Of the bytes a read may fill, the share kept for JSON escaping of its text.
 ESCAPE_SHARE = 0.9
 #: Over-capacity codes that close research rather than end the run; the final answer must still fit.
@@ -342,7 +351,10 @@ class _Run:
             recovery=tool_set in (RECOVERY_TOOL_VERSION, HYBRID_TOOL_VERSION, LISTING_TOOL_VERSION,
                                 CHAT_TOOL_VERSION),
             hybrid=tool_set in (HYBRID_TOOL_VERSION, LISTING_TOOL_VERSION, CHAT_TOOL_VERSION),
-            listing=tool_set in (LISTING_TOOL_VERSION, CHAT_TOOL_VERSION))
+            listing=tool_set in (LISTING_TOOL_VERSION, CHAT_TOOL_VERSION),
+            # By version, not tool_set: research-13 shares research-7's tool set and adds this one.
+            details=version in DETAILS_TOOL_VERSIONS,
+            today=(context.today or recency.today()) if version in DATED_TOOL_VERSIONS else None)
         #: research-7 names a Paper Chat's paper and repairs a failing answer twice (IR-995).
         self.chat = tool_set == CHAT_TOOL_VERSION
         self.repairs = 2
@@ -545,7 +557,7 @@ class _Run:
                 and self.compactions < rule.max_attempts and status.occupancy_tokens >= rule.threshold_tokens)
 
     def _closing(self, shown: dict, scope) -> list:
-        """The state message, the Paper Chat note and the reader's question, in that order."""
+        """The state message, the Paper Chat note, today's date and the reader's question, in that order."""
         history: list = []
         if shown:
             if self.delimit:
@@ -559,6 +571,8 @@ class _Run:
                         self.investigation.recalled_sources)
             history.append(note)
         history += self._selection(scope)
+        if self.investigation.today is not None:
+            history.append(User(TODAY_PREFIX + json.dumps(recency.window(self.investigation.today))))
         # The reader's words, unchanged unless they would pass for derived context.
         history.append(User(compacting.reader(self.question)))
         return history

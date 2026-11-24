@@ -23,6 +23,11 @@ interface RowMenuProps {
    * still 44px on a touch screen.
    */
   small?: boolean;
+  /**
+   * A full-width outlined button reading "More actions", for a phone card's one
+   * action (IR-1291). The name stays `label`, which starts with those words.
+   */
+  wide?: boolean;
 }
 
 /**
@@ -35,7 +40,7 @@ interface RowMenuProps {
  * in a portal at the trigger's edge, because the table clips what overflows it.
  * Renders nothing when there is nothing to offer.
  */
-export function RowMenu({ label, items, compact = false, small = false }: RowMenuProps) {
+export function RowMenu({ label, items, compact = false, small = false, wide = false }: RowMenuProps) {
   const [open, setOpen] = useState(false);
   const [anchor, setAnchor] = useState<{ top: number; right: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -112,17 +117,21 @@ export function RowMenu({ label, items, compact = false, small = false }: RowMen
         aria-label={label}
         onClick={() => setOpen((value) => !value)}
         className={cn(
-          "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-stone-600 transition-colors duration-150 hover:bg-stone-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand aria-expanded:bg-stone-100 motion-reduce:transition-none",
+          wide
+            ? "inline-flex min-h-11 w-full items-center justify-center rounded-full border border-stone-300 px-4 text-control font-medium text-stone-700 transition-colors duration-150 hover:bg-stone-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand aria-expanded:bg-stone-50 motion-reduce:transition-none"
+            : "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-stone-600 transition-colors duration-150 hover:bg-stone-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand aria-expanded:bg-stone-100 motion-reduce:transition-none",
           // 36px in the split layout, as the review pane's other controls (`reading-split:min-h-9`).
           compact && "-my-2 -mr-2 reading-split:h-9 reading-split:w-9",
           small && "h-8 w-8 touch:h-11 touch:w-11",
         )}
       >
-        <svg viewBox="0 0 24 24" fill="currentColor" className={compact || small ? "h-4 w-4" : "h-5 w-5"} aria-hidden="true">
-          <circle cx="5" cy="12" r="1.8" />
-          <circle cx="12" cy="12" r="1.8" />
-          <circle cx="19" cy="12" r="1.8" />
-        </svg>
+        {wide ? "More actions" : (
+          <svg viewBox="0 0 24 24" fill="currentColor" className={compact || small ? "h-4 w-4" : "h-5 w-5"} aria-hidden="true">
+            <circle cx="5" cy="12" r="1.8" />
+            <circle cx="12" cy="12" r="1.8" />
+            <circle cx="19" cy="12" r="1.8" />
+          </svg>
+        )}
       </button>
       {open && anchor && createPortal(
         <div

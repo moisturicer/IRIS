@@ -40,21 +40,26 @@ describe("the quiet tone and the secondary pill", () => {
     expect(PILL_SECONDARY).toContain("ring-stone-300");
   });
 
+  // IR-1290: five tones, each told apart by its text and outline colour.
   it("stay told apart from the other tones by text and outline once quiet loses its fill", () => {
-    expect(new Set(Object.values(TONES)).size).toBe(4);
+    expect(new Set(Object.values(TONES)).size).toBe(5);
     expect(TONES.quiet).toContain("text-stone-700");
-    expect(TONES.active).toContain("text-brand");
-    expect(TONES.active).toContain("ring-stone-300");
-    expect(TONES.attention).toMatch(/\bbg-brand\b/);
+    expect(TONES.active).toContain("text-review");
+    expect(TONES.active).toContain("ring-review-line");
+    expect(TONES.cleared).toContain("text-cleared");
+    expect(TONES.cleared).toContain("ring-cleared-line");
+    expect(TONES.attention).toContain("text-brand");
+    expect(TONES.attention).toMatch(/\bring-brand\b/);
     expect(TONES.settled).toContain("ring-stone-900");
   });
 
-  // IR-1097, D6: a status is a white chip with its tone in the text and the
-  // outline. Only Attention is filled, so a status never reads as a selection
-  // (an ink outline on white) or a here (a stone fill) by its fill alone.
-  it("fill only Attention", () => {
+  // IR-1290 replaces IR-1097's "only Attention is filled": a status is always
+  // a white chip with its tone in the text and the outline. A solid maroon fill
+  // is the one action to take next, so no status may wear it, Attention
+  // included, and a status never reads as a button, a selection or a here by
+  // its fill alone.
+  it("fill no tone", () => {
     for (const [tone, classes] of Object.entries(TONES)) {
-      if (tone === "attention") continue;
       expect(classes, tone).not.toMatch(/(?<![:\w-])bg-(?!transparent|surface\b|white\b)/);
     }
   });
@@ -67,6 +72,13 @@ describe("the highlight tokens (IR-1097, D6)", () => {
 
   it("define the reviewer's pen: underline, fill and the open thread's passage", () => {
     expect(colors.pen).toEqual({ DEFAULT: "#B4474B", wash: "#FBEAEA", now: "#F5D5D6" });
+  });
+
+  // IR-1290: the two status hues, with the values the contrast figures in
+  // DESIGN.md were computed from.
+  it("define the cleared green and the review amber: text, outline and wash", () => {
+    expect(colors.cleared).toEqual({ DEFAULT: "#1E6B3F", line: "#3F8A5A", wash: "#EAF3EC" });
+    expect(colors.review).toEqual({ DEFAULT: "#8A5300", line: "#B07A1E", wash: "#FBF0DA" });
   });
 
   it("define the pressed filled button as brand-press, and drop gold and cream", () => {

@@ -123,12 +123,8 @@ export interface FilterGroup {
   items: MyResearchItem[];
 }
 
-const GROUP_NOTES: Record<FilterGroup["id"], string> = {
-  waiting:  "A reviewer needs something from you before review can go on.",
-  review:   "With your Adviser, the offices or RDCO. An office that has cleared stays cleared if another asks for revisions.",
-  drafts:   "Not yet submitted.",
-  finished: "Accepted, published, kept unlisted, or closed.",
-};
+// The headings say it; a line under each repeated them (IR-1306). Kept empty, so a group's shape stays.
+const GROUP_NOTES: Record<FilterGroup["id"], string> = { waiting: "", review: "", drafts: "", finished: "" };
 
 /**
  * The owner's records filed under the filters, in filter order. The

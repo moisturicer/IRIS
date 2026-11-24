@@ -390,7 +390,9 @@ describe("My Library: an author's research", () => {
   });
 });
 
-describe("My Library: what each paper waits on (IR-1084)", () => {
+// IR-1306 removed the sentence under each title (IR-1084's "… Nothing to do yet."): the status label,
+// the clearance strip and the one action carry it.
+describe("My Library: what each paper waits on (IR-1084, IR-1306)", () => {
   const inReview = (overrides: Partial<MyResearchItem> = {}) => ownRecord({
     id: 13, title: "Still with the offices", pipeline_status: "in_review", workflow_state: "in_review",
     workflow_state_label: "In review", holders: [{ party: "ierc", label: "IERC" }],
@@ -399,20 +401,20 @@ describe("My Library: what each paper waits on (IR-1084)", () => {
     ...overrides,
   });
 
-  it("says on each Overview row what the paper waits on, and offers one action", async () => {
+  it("shows each Overview row's status without a sentence about it, and offers one action", async () => {
     mine([ownRecord({}), inReview()]);
     renderScreen(<MyLibraryPage />);
 
     const recent = await screen.findByRole("region", { name: "Recent submissions" });
     const review = within(recent).getByRole("link", { name: "Still with the offices" }).closest("li") as HTMLElement;
-    expect(within(review).getByText("IERC is reviewing your version 2. Nothing to do yet.")).toBeInTheDocument();
+    expect(within(review).queryByText(/Nothing to do yet/)).not.toBeInTheDocument();
     // The row itself opens the review; there is no "Open review" button to add.
     expect(within(recent).getByRole("link", { name: "Still with the offices" })).toHaveAttribute("href", "/records/13");
     expect(within(review).queryByRole("link", { name: /^Open review/ })).not.toBeInTheDocument();
     expect(within(review).queryByRole("button")).not.toBeInTheDocument();
 
     const draft = within(recent).getByRole("link", { name: "Community Water Monitoring" }).closest("li") as HTMLElement;
-    expect(within(draft).getByText("Not submitted yet. It waits on you to finish and send it.")).toBeInTheDocument();
+    expect(within(draft).queryByText(/waits on you/)).not.toBeInTheDocument();
     // The row reopens Publish; the trash can is its one button.
     expect(within(recent).getByRole("link", { name: "Community Water Monitoring" })).toHaveAttribute("href", "/?publish=12");
     expect(within(draft).queryByRole("link", { name: /^Continue draft/ })).not.toBeInTheDocument();
@@ -435,7 +437,7 @@ describe("My Library: what each paper waits on (IR-1084)", () => {
     expect(recordsApi.delete).toHaveBeenCalledWith(12);
   });
 
-  it("names every office still reviewing, and the Adviser or RDCO when they hold it", async () => {
+  it("labels each row by the server's status alone, with no sentence about who holds it", async () => {
     mine([
       inReview({ id: 21, title: "Two offices", holders: [{ party: "ierc", label: "IERC" }, { party: "ktto", label: "KTTO" }],
         clearance_strip: [{ ...RESET }, { ...RESET, party: "ktto", label: "KTTO" }] }),
@@ -446,20 +448,19 @@ describe("My Library: what each paper waits on (IR-1084)", () => {
     renderScreen(<MyLibraryPage />, SUBMISSIONS);
 
     await screen.findByRole("link", { name: "Two offices" });
-    expect(screen.getByText("IERC and KTTO are reviewing your version 2. Nothing to do yet.")).toBeInTheDocument();
-    expect(screen.getByText("Your Adviser is reviewing this. Nothing to do yet.")).toBeInTheDocument();
-    expect(screen.getByText("RDCO is making the final decision. Nothing to do yet.")).toBeInTheDocument();
-    expect(screen.getByText("Nothing is waiting on this paper.")).toBeInTheDocument();
+    expect(screen.getAllByText("In specialist review: IERC").length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Nothing to do yet|Nothing is waiting/)).not.toBeInTheDocument();
   });
 
-  it("says what the author owes, in the server's words, where a request is open", async () => {
+  it("offers what the author owes as its one action, in the server's words, where a request is open", async () => {
     const revision = { kind: "revision", party: "ierc", label: "Revision requested by IERC", action_label: "Submit a new version" } as const;
     mine([inReview({ id: 14, title: "Asked to revise", workflow_state: "awaiting_resubmission",
       submitter_status: { line: "Revision requested by IERC: action needed", waiting_on_you: [revision] } })]);
     renderScreen(<MyLibraryPage />, SUBMISSIONS);
 
     await screen.findByRole("link", { name: "Asked to revise" });
-    expect(screen.getByText("Waiting on you: Revision requested by IERC.")).toBeInTheDocument();
+    expect(screen.getByText("Revision requested by IERC: action needed")).toBeInTheDocument();
+    expect(screen.queryByText(/^Waiting on you:/)).not.toBeInTheDocument();
     // Its own act stays the one action; "Open review" is not added beside it.
     expect(screen.getByRole("link", { name: "Submit a new version (Revision requested by IERC)" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /^Open review/ })).not.toBeInTheDocument();
@@ -488,6 +489,67 @@ describe("My Library: what each paper waits on (IR-1084)", () => {
     const dialog = screen.getByRole("dialog", { name: "Delete this draft?" });
     expect(dialog).toHaveTextContent("“Community Water Monitoring” and its files will be removed.");
     expect(recordsApi.delete).not.toHaveBeenCalled();
+  });
+});
+
+describe("My Library: withdrawing a paper in review (IR-1282)", () => {
+  const inReview = (overrides: Partial<MyResearchItem> = {}) => ownRecord({
+    id: 13, title: "Still with the offices", pipeline_status: "in_review", workflow_state: "in_review",
+    workflow_state_label: "In review", holders: [{ party: "ierc", label: "IERC" }],
+    submitter_status: { line: "In specialist review: IERC", waiting_on_you: [] },
+    delete_act: "withdraw_submission",
+    ...overrides,
+  });
+
+  it("puts the same red trash can on a paper in review, asks once in withdrawal's words, then drops the row", async () => {
+    mine([inReview()]);
+    vi.mocked(recordsApi.delete).mockResolvedValue({} as Awaited<ReturnType<typeof recordsApi.delete>>);
+    const user = userEvent.setup();
+    renderScreen(<MyLibraryPage />, SUBMISSIONS);
+
+    const row = (await screen.findByRole("link", { name: "Still with the offices" })).closest("li") as HTMLElement;
+    const remove = within(row).getByRole("button", { name: "Withdraw and delete “Still with the offices”" });
+    expect(within(row).getByText(/^Updated /).parentElement?.contains(remove)).toBe(true);
+    expect(remove).toHaveClass("text-brand");
+
+    await user.click(remove);
+    const dialog = screen.getByRole("dialog", { name: "Withdraw and delete this paper?" });
+    expect(dialog).toHaveTextContent("“Still with the offices” leaves review and is removed with its files.");
+    expect(dialog).toHaveTextContent("Your Adviser and any office reviewing it stop, and are told.");
+    expect(within(dialog).getByRole("button", { name: "Cancel" })).toHaveFocus();
+    expect(recordsApi.delete).not.toHaveBeenCalled();
+
+    await user.click(within(dialog).getByRole("button", { name: "Withdraw and delete" }));
+    await waitFor(() => expect(screen.queryByRole("link", { name: "Still with the offices" })).not.toBeInTheDocument());
+    expect(recordsApi.delete).toHaveBeenCalledWith(13);
+  });
+
+  it("keeps the paper and says why when the withdrawal fails", async () => {
+    mine([inReview()]);
+    vi.mocked(recordsApi.delete).mockRejectedValue({ response: { status: 403, data: { detail: "Only an owner can delete this record." } } });
+    const user = userEvent.setup();
+    renderScreen(<MyLibraryPage />, SUBMISSIONS);
+
+    await user.click(await screen.findByRole("button", { name: "Withdraw and delete “Still with the offices”" }));
+    await user.click(screen.getByRole("button", { name: "Withdraw and delete" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Only an owner can delete this record.");
+    expect(screen.getByRole("dialog", { name: "Withdraw and delete this paper?" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Still with the offices" })).toBeInTheDocument();
+  });
+
+  it("offers no trash can on accepted work, a rejected paper, or one awaiting RDCO's delete decision", async () => {
+    mine([
+      inReview({ id: 31, title: "Published work", pipeline_status: "published", workflow_state: "published", holders: [], delete_act: "request_deletion" }),
+      inReview({ id: 32, title: "Rejected work", pipeline_status: "rejected", workflow_state: "rejected", holders: [], delete_act: "delete_record" }),
+      inReview({ id: 33, title: "Awaiting RDCO", pipeline_status: "pending_delete", workflow_state: "pending_delete", holders: [], delete_act: null }),
+    ]);
+    renderScreen(<MyLibraryPage />, SUBMISSIONS);
+
+    for (const title of ["Published work", "Rejected work", "Awaiting RDCO"]) {
+      const row = (await screen.findByRole("link", { name: title })).closest("li") as HTMLElement;
+      expect(within(row).queryByRole("button", { name: /^(Withdraw and delete|Delete draft)/ })).not.toBeInTheDocument();
+    }
   });
 });
 

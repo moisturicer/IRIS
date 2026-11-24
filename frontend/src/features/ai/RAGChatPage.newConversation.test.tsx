@@ -97,7 +97,7 @@ describe("on a page wider than a phone", () => {
     const user = userEvent.setup();
     renderAsk(CONVERSATION);
     await flood();
-    await user.click(screen.getByRole("button", { name: "Hide conversations" }));
+    await user.click(screen.getByRole("button", { name: "Hide history" }));
     expect(controls()).toHaveLength(1);
   });
 
@@ -124,7 +124,7 @@ describe("on a page wider than a phone", () => {
   it("says conversation, never chat, in the pane", async () => {
     const { container } = renderAsk();
     await flood();
-    expect(screen.getByRole("complementary", { name: "Conversations" })).toBeInTheDocument();
+    expect(screen.getByRole("complementary", { name: "History" })).toBeInTheDocument();
     expect(container.textContent).not.toMatch(/\bchat\b/i);
   });
 });
@@ -134,20 +134,20 @@ describe("on a phone", () => {
 
   it("has the header icon while a conversation is open, and none on the empty page", async () => {
     const empty = renderAsk();
-    await screen.findByRole("button", { name: "Show conversations" });
+    await screen.findByRole("button", { name: "Show history" });
     expect(controls()).toHaveLength(0);
     empty.unmount();
 
     renderAsk(CONVERSATION);
-    await screen.findByRole("button", { name: "Show conversations" });
+    await screen.findByRole("button", { name: "Show history" });
     expect(controls()).toHaveLength(1);
   });
 
   it("has only the drawer's button while the drawer is open", async () => {
     const user = userEvent.setup();
     renderAsk(CONVERSATION);
-    await user.click(await screen.findByRole("button", { name: "Show conversations" }));
-    const dialog = await screen.findByRole("dialog", { name: "Conversations" });
+    await user.click(await screen.findByRole("button", { name: "Show history" }));
+    const dialog = await screen.findByRole("dialog", { name: "History" });
     expect(controls()).toHaveLength(1);
     expect(within(dialog).getByRole("button", { name: "New conversation" })).toBeInTheDocument();
   });
@@ -155,7 +155,7 @@ describe("on a phone", () => {
   it("starts a conversation from the header icon, with focus in the question box", async () => {
     const user = userEvent.setup();
     renderAsk(CONVERSATION);
-    await screen.findByRole("button", { name: "Show conversations" });
+    await screen.findByRole("button", { name: "Show history" });
     await user.click(controls()[0]);
     expect(address).toBe("/ai");
     await waitFor(() => expect(screen.getByRole("textbox", { name: /question|ask/i })).toHaveFocus());

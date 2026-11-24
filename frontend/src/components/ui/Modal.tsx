@@ -34,6 +34,10 @@ interface ModalProps {
   footer?:  ReactNode;
   /** The title in the display face, as a content title (01-design-system §0). */
   displayTitle?: boolean;
+  /** "alertdialog" for a question that interrupts the task (Leave this submission?). Defaults to "dialog". */
+  role?: "dialog" | "alertdialog";
+  /** The id of the element in the body that describes the dialog. */
+  describedBy?: string;
 }
 
 export function Modal({
@@ -45,6 +49,8 @@ export function Modal({
   sheet = false,
   footer,
   displayTitle = false,
+  role = "dialog",
+  describedBy,
 }: ModalProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   // `useId` rather than a literal "modal-title": two dialogs mounted at once
@@ -74,9 +80,10 @@ export function Modal({
             ? `relative bg-overlay shadow-xl w-full h-full md:h-auto md:rounded-dialog ${SIZE_CLASS[size].sheet} md:max-h-[90vh] flex flex-col outline-none`
             : `relative bg-overlay rounded-dialog shadow-xl w-full ${SIZE_CLASS[size].dialog} max-h-[90vh] flex flex-col outline-none`
         }
-        role="dialog"
+        role={role}
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}
+        aria-describedby={describedBy}
       >
         {title && (
           <div className="flex items-center justify-between px-5 py-4 border-b border-stone-200">

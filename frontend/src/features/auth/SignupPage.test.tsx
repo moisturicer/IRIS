@@ -133,6 +133,11 @@ async function submit(user: User, role: "Student" | "Adviser" = "Student") {
   await finish(user);
 }
 
+/** Closes the dialog a refused registration opens, as a person would before going on (IR-1303). */
+async function closeDialog(user: User) {
+  await user.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Close" }));
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
 });
@@ -674,7 +679,9 @@ describe("Security & agreement", { timeout: 30_000 }, () => {
     await submit(user);
 
     await waitFor(() => expect(register).toHaveBeenCalledTimes(1));
-    expect(await screen.findByRole("alert")).toHaveTextContent(/newer notice was published/);
+    expect(await screen.findByRole("alertdialog", { name: "The data notice changed" }))
+      .toHaveAccessibleDescription(/newer notice was published/);
+    await closeDialog(user);
     const region = screen.getByRole("region", { name: "Read the data notice" });
     expect(within(region).getByText("IRIS data notice, revised")).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: CONSENT })).not.toBeChecked();
@@ -853,7 +860,7 @@ describe("the register screen's finish", { timeout: 30_000 }, () => {
     await submit(user);
 
     await waitFor(() => expect(register).toHaveBeenCalledTimes(1));
-    const alert = await screen.findByRole("alert");
+    const alert = await screen.findByRole("alertdialog", { name: "Registration failed" });
     expect(alert).toHaveTextContent("Too many requests — try again in about 42 seconds.");
     // The form stays, with what was typed, so Register can be pressed again.
     expect(screen.getByRole("button", { name: "Register" })).toBeInTheDocument();
@@ -868,7 +875,7 @@ describe("the register screen's finish", { timeout: 30_000 }, () => {
     renderSignup();
     await submit(user);
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Too many requests — try again in about 9 seconds.");
+    expect(await screen.findByRole("alertdialog")).toHaveTextContent("Too many requests — try again in about 9 seconds.");
   });
 
   it("shows no password anywhere on the confirmation (IR-709)", async () => {
@@ -901,7 +908,7 @@ describe("a refused registration", { timeout: 30_000 }, () => {
     renderSignup();
     await submit(user);
 
-    const alert = await screen.findByRole("alert");
+    const alert = await screen.findByRole("alertdialog");
     expect(alert).toHaveTextContent("about 30 minutes");
     expect(alert).not.toHaveTextContent("throttled");
     expect(screen.getByLabelText("Password")).toBeInTheDocument();
@@ -931,7 +938,8 @@ describe("a refused registration", { timeout: 30_000 }, () => {
     await submit(user);
 
     await waitFor(() => expect(stepHeading()).toHaveTextContent("Step 1 of 3 · Identity"));
-    expect(email()).toHaveFocus();
+    await closeDialog(user);
+    await waitFor(() => expect(email()).toHaveFocus());
     expect(email()).toHaveAccessibleDescription(message);
     expect(email()).toHaveAttribute("aria-invalid", "true");
   });
@@ -943,10 +951,13 @@ describe("a refused registration", { timeout: 30_000 }, () => {
     await submit(user);
 
     await waitFor(() => expect(stepHeading()).toHaveTextContent("Step 1 of 3 · Identity"));
-    expect(email()).toHaveFocus();
-    const alert = screen.getByRole("alert");
-    expect(alert).toHaveTextContent(/We brought you back/);
-    expect(alert).toHaveTextContent(/everything else you entered is kept/i);
+    const dialog = screen.getByRole("alertdialog", { name: "We brought you back to Identity" });
+    expect(dialog).toHaveAccessibleDescription(/everything else you entered is kept/i);
+    // Nothing was added inside the form, so the step did not move (IR-1303).
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    await closeDialog(user);
+    // Closing it starts them on the field that was refused.
+    await waitFor(() => expect(email()).toHaveFocus());
     expect(email()).toHaveAccessibleDescription("This email address is already registered.");
     expect(email()).toHaveAttribute("aria-invalid", "true");
     expect(email()).toHaveValue("juan@cit.edu");
@@ -981,6 +992,7 @@ describe("a refused registration", { timeout: 30_000 }, () => {
     renderSignup();
     await submit(user);
     await waitFor(() => expect(stepHeading()).toHaveTextContent("Step 1 of 3 · Identity"));
+    await closeDialog(user);
 
     await user.click(screen.getByRole("button", { name: "Continue to affiliation" }));
     expect(stepHeading()).toHaveTextContent("Step 1 of 3 · Identity");
@@ -994,7 +1006,10 @@ describe("a refused registration", { timeout: 30_000 }, () => {
     await submit(user);
 
     await waitFor(() => expect(stepHeading()).toHaveTextContent("Step 1 of 3 · Identity"));
-    expect(screen.getByRole("alert")).toHaveTextContent(/We brought you back/);
+    expect(screen.getByRole("alertdialog", { name: "We brought you back to Identity" })).toBeInTheDocument();
+    await closeDialog(user);
+    // The role has no invalid state of its own, so focus goes to the chosen one.
+    await waitFor(() => expect(screen.getByRole("radio", { name: "Student" })).toHaveFocus());
     const roles = screen.getByRole("radiogroup", { name: "I am registering as" });
     expect(roles).toHaveAccessibleDescription("This role is not open for registration.");
     await expectNoBlockingA11yViolations(container);
@@ -1010,7 +1025,9 @@ describe("a refused registration", { timeout: 30_000 }, () => {
     await submit(user);
 
     await waitFor(() => expect(stepHeading()).toHaveTextContent("Step 2 of 3 · Affiliation"));
-    expect(screen.getByRole("alert")).toHaveTextContent(/We brought you back/);
+    expect(screen.getByRole("alertdialog", { name: "We brought you back to Affiliation" })).toBeInTheDocument();
+    await closeDialog(user);
+    await waitFor(() => expect(program()).toHaveFocus());
     expect(program()).toHaveAccessibleDescription("This program is not open for registration.");
     expect(program()).toHaveDisplayValue("BS Computer Science");
     await expectNoBlockingA11yViolations(container);
@@ -1040,7 +1057,8 @@ describe("a refused registration", { timeout: 30_000 }, () => {
 
     await waitFor(() => expect(stepHeading()).toHaveTextContent("Step 1 of 3 · Identity"));
     expect(firstName()).toHaveAccessibleDescription("Enter your name as CIT-U records it.");
-    expect(firstName()).toHaveFocus();
+    await closeDialog(user);
+    await waitFor(() => expect(firstName()).toHaveFocus());
     await user.clear(firstName());
     await user.type(firstName(), "Juana");
     await user.click(screen.getByRole("button", { name: "Continue to affiliation" }));
@@ -1059,16 +1077,17 @@ describe("a refused registration", { timeout: 30_000 }, () => {
     );
   });
 
-  it("shows an error that belongs to no field as an alert above Register", async () => {
+  it("shows an error that belongs to no field in a dialog, then returns to Register (IR-1303)", async () => {
     const user = userEvent.setup();
     refuse({ non_field_errors: ["Registration is closed for now."] });
     renderSignup();
     await submit(user);
 
-    const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("Registration is closed for now.");
-    const register = screen.getByRole("button", { name: "Register" });
-    expect(alert.compareDocumentPosition(register) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const dialog = await screen.findByRole("alertdialog", { name: "Registration failed" });
+    expect(dialog).toHaveAccessibleDescription("Registration is closed for now.");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    await closeDialog(user);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Register" })).toHaveFocus());
   });
 
   it("says IRIS could not be reached when no reply came, and blames no field", async () => {
@@ -1077,8 +1096,8 @@ describe("a refused registration", { timeout: 30_000 }, () => {
     renderSignup();
     await submit(user);
 
-    const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent(/IRIS can't be reached right now/);
+    const alert = await screen.findByRole("alertdialog", { name: "IRIS can't be reached right now" });
+    expect(alert).toHaveTextContent(/not a problem with what you typed/);
     expect(screen.getByLabelText("Password")).not.toHaveAttribute("aria-invalid");
     expect(stepHeading()).toHaveTextContent("Step 3 of 3 · Security & agreement");
     expect(screen.getByLabelText("Password")).toHaveValue("IrisDemo123!");
@@ -1090,8 +1109,8 @@ describe("a refused registration", { timeout: 30_000 }, () => {
     const { container } = renderSignup();
     await submit(user);
 
-    const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent(/IRIS can't be reached right now/);
+    const alert = await screen.findByRole("alertdialog", { name: "IRIS can't be reached right now" });
+    expect(alert).toHaveTextContent(/not a problem with what you typed/);
     expect(stepHeading()).toHaveTextContent("Step 3 of 3 · Security & agreement");
     expect(screen.getByLabelText("Password")).toHaveValue("IrisDemo123!");
     expect(screen.getByLabelText("Confirm password")).toHaveValue("IrisDemo123!");

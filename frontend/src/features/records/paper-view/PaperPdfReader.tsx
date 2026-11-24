@@ -352,6 +352,9 @@ export interface PaperPdfReaderProps {
  * the bearer token in memory can reach it. Saving a copy is not this blob:
  * it goes through the download route, which marks it (`downloadControl`).
  */
+/** No outline: the reader clicked elsewhere on the paper (IR-1306). */
+const NO_REGIONS: Region[] = [];
+
 export function PaperPdfReader(props: PaperPdfReaderProps) {
   const epoch = useAuthStore((state) => state.sessionEpoch);
   const shows = props.document ? readerDocumentKey(props.document) : props.version ?? "current";
@@ -408,7 +411,13 @@ function PaperPdfReaderSource({
     [annotations?.marks, shownVersion],
   );
   // Drawn and landed on only on its own Version: a removed passage is in v1, an added one in v2.
-  const threadLanding = annotations?.landing?.version === shownVersion ? annotations.landing : null;
+  const landedThread = annotations?.landing?.version === shownVersion ? annotations.landing : null;
+  // A click elsewhere on the paper puts a citation's outline away (IR-1306); a new citation draws it again.
+  const citationKey = landingLook === "citation"
+    ? highlightRegions.map((r) => `${r.page}:${r.left}:${r.top}:${r.right}:${r.bottom}`).join("|") : "";
+  const [putAway, setPutAway] = useState<{ citation: string; thread: string | null }>({ citation: "", thread: null });
+  const shownRegions = citationKey && putAway.citation === citationKey ? NO_REGIONS : highlightRegions;
+  const threadLanding = landedThread && putAway.thread === String(landedThread.key) ? null : landedThread;
   const landingFocus = useRef<HTMLElement | null>(null);
   const landingFocusRef = useCallback((el: HTMLElement | null) => { landingFocus.current = el; }, []);
   const [commentable, setCommentable] = useState(false);
@@ -746,6 +755,7 @@ function PaperPdfReaderSource({
     if (!(window.getSelection()?.isCollapsed ?? true)) return;
     if (menuOpen) closeMenu();
     if (highlightsShown && highlights.length > 0) onHighlightsShownChange?.(false);
+    if (citationKey || landedThread) setPutAway({ citation: citationKey, thread: landedThread ? String(landedThread.key) : null });
   };
   const drawn = useMemo(() => {
     const shown = highlightsShown ? highlights : NO_HIGHLIGHTS;
@@ -965,7 +975,7 @@ function PaperPdfReaderSource({
               onPaint={onPaint}
               pageNumber={index + 1}
               scale={scale}
-              regions={highlightRegions}
+              regions={shownRegions}
               landingLook={landingLook}
               marks={marks}
               landing={threadLanding}

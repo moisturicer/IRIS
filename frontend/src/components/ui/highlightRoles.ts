@@ -15,7 +15,7 @@
  * | Reference | Maroon text on white, Rule Stone hairline               | `REFERENCE`               |
  * | Match     | Yellow highlighter `hl`; the current Find match `hl-now`| `MATCH`; `index.css` for the PDF |
  * | Pen       | Rose fill `pen-wash`, 2 px `pen` underline, numbered pin; the open thread `pen-now` | `index.css`, `readerAnnotations.tsx` |
- * | Status    | White chip, tone in text and outline; only Attention is filled | `statusTones.ts`   |
+ * | Status    | White chip, tone in text and outline; none is filled (IR-1290) | `statusTones.ts`   |
  *
  * Yellow is for matches only and rose for a reviewer's marks only. A message
  * that needs reading (a warning, an error) is white with a Rule Stone outline

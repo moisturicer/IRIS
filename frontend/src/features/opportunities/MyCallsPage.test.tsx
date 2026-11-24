@@ -5,9 +5,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ToastContainer } from "@/components/ui/Toast";
+import { emitLiveHint } from "@/lib/live";
 import { useUIStore } from "@/store/ui.store";
 import { expectNoBlockingA11yViolations } from "@/test/axe";
-import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
+import { act, renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
 import type { Opportunity } from "@/types/opportunities";
 
 import { callFixture } from "./callFixture";
@@ -121,5 +122,29 @@ describe("My Calls", () => {
 
     await user.click(screen.getByRole("button", { name: "Delete Waiting call" }));
     await expectNoBlockingA11yViolations(await screen.findByRole("dialog", { name: "Delete this call?" }));
+  });
+});
+
+describe("My Calls, live (ADR-073, IR-1289)", () => {
+  it("shows RDCO's decision once a calls hint arrives, keeping the list meanwhile", async () => {
+    await open([waiting()]);
+    expect(within(screen.getByRole("article", { name: "Waiting call" })).getByText("Waiting for RDCO")).toBeInTheDocument();
+
+    mine.mockResolvedValue([callFixture({
+      id: 1, title: "Waiting call", status: "confirmed", status_label: "Confirmed", can_edit: true, can_delete: true,
+    })]);
+    act(() => { emitLiveHint(["calls"]); });
+
+    expect(await within(screen.getByRole("article", { name: "Waiting call" })).findByText("Confirmed")).toBeInTheDocument();
+    expect(mine).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps the list when the live read fails", async () => {
+    await open([waiting()]);
+    mine.mockRejectedValue(new Error("offline"));
+    act(() => { emitLiveHint(["calls"]); });
+
+    await waitFor(() => expect(mine).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole("article", { name: "Waiting call" })).toBeInTheDocument();
   });
 });

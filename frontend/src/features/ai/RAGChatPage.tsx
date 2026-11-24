@@ -20,7 +20,7 @@ import { EarlierConversation } from "./components/EarlierConversations";
 import { ChatToolbar } from "./components/ChatToolbar";
 import { ChatDrawer } from "./components/ChatDrawer";
 import {
-  ConversationHistoryList, ConversationSidebar, NewConversationButton, SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN,
+  ConversationHistoryList, ConversationSidebar, SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN,
   type RenameConversation,
 } from "./components/ConversationSidebar";
 import { ASK_PHONE_MAX_PX } from "./components/answerLayout";
@@ -176,6 +176,7 @@ function RuntimeAskPage() {
 
   return <div ref={observePage} className="relative flex h-full min-h-0 flex-col overflow-hidden bg-canvas">
     <div className="relative flex min-h-0 min-w-0 flex-1" {...(dialogOpen ? { inert: "" } : {})}>
+      {/* History on the left, beside the answer it opens. */}
       {!phone && <ConversationSidebar id={paneId} conversations={conversations} activeId={conversationId ?? null}
         open={paneOpen} search={historySearch} searchRef={searchRef} onNewConversation={newConversation} onSearch={openSearch}
         onToggle={() => setPane(!paneOpen)}
@@ -200,13 +201,10 @@ function RuntimeAskPage() {
       </div>
     </div>
 
-    {phone && dialogOpen && <ChatDrawer title="Conversations" side="start" closeLabel="Close conversations"
+    {phone && dialogOpen && <ChatDrawer title="History" side="start" closeLabel="Close history"
       onClose={() => setDialogOpen(false)} returnTo={dialogOpener.current}>
-      <div className="flex shrink-0 px-3 pt-3">
-        <NewConversationButton onClick={() => { setDialogOpen(false); newConversation(); }} />
-      </div>
       <ConversationHistoryList conversations={conversations} activeId={conversationId ?? null} search={historySearch}
-        searchRef={searchRef}
+        searchRef={searchRef} onNewConversation={() => { setDialogOpen(false); newConversation(); }}
         onRename={rename} onDelete={id => { setDialogOpen(false); setDeleteTarget(conversations.find(c => c.id === id) ?? null); }} />
     </ChatDrawer>}
     <ConfirmDialog open={deleteTarget !== null} title="Delete conversation?"

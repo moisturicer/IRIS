@@ -109,6 +109,11 @@ export interface MyResearchItem {
   submitter_status:     SubmitterStatus;
   created_at:           string;
   updated_at:           string;
+  /**
+   * What the owner's `DELETE /records/<id>/` would do, as Record detail names
+   * it (IR-508), or null while RDCO decides a delete request (IR-1282).
+   */
+  delete_act?:          "delete_record" | "withdraw_submission" | "request_deletion" | null;
 }
 
 /**
@@ -153,7 +158,7 @@ export interface WaitingItem {
  * `awaiting_document`. Carries no reviewer's name or words.
  */
 export interface SubmitterStatus {
-  /** "With your Adviser", "In specialist review: ITSO, IERC", … */
+  /** "Adviser review", "Office review · ITSO, IERC", "Revision requested · IERC", … (IR-1306) */
   line:           string;
   waiting_on_you: WaitingItem[];
 }

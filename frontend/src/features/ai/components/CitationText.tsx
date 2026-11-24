@@ -9,8 +9,8 @@ import "katex/dist/katex.min.css";
 import type { ChatCitation } from "@/types/ai";
 import { hasCitationQuote, openCitationLabel, useCitationLink } from "@/lib/citedPage";
 import { remarkLimitMath } from "./mathLimit";
+import { nestLists } from "./listIndent";
 import { breakLongRuns } from "./runLimit";
-import { REFERENCE } from "@/components/ui/highlightRoles";
 
 /**
  * An answer's text with citation markers rendered as inline chips (IR-329).
@@ -76,6 +76,17 @@ function CitationPlaceholder() {
  * number, so it reads as one -- "p8", at the size of the type around it -- the
  * way a reader would cite a page, instead of an 8px digit in a dot.
  */
+/**
+ * One citation mark for chat and the AI Overview alike (IR-1306): a small
+ * superscript in Binding Maroon, like a reference in a printed paper, with no
+ * fill. Pointer or focus underlines it on a faint maroon wash. "p12" in the
+ * Overview, a number in chat.
+ */
+const CITATION_CHIP =
+  "relative mx-px rounded-control px-0.5 align-super text-[0.68em] font-semibold leading-none tabular-nums " +
+  "text-brand no-underline decoration-brand/50 underline-offset-2 " +
+  "transition-colors duration-150 hover:bg-brand/[0.07] hover:underline focus-visible:underline motion-reduce:transition-none";
+
 function CitationChip({ citation, page = false }: { citation: ChatCitation; page?: boolean }) {
   const { to, state, pageContext } = useCitationLink(citation);
   // The Overview cites a page as a whole, and says so (IR-578).
@@ -93,14 +104,7 @@ function CitationChip({ citation, page = false }: { citation: ChatCitation; page
       state={state}
       title={label}
       aria-label={label}
-      className={
-        page
-          ? "inline-flex items-center px-1 mx-0.5 rounded-control text-2xs font-semibold tabular-nums " +
-            "text-brand leading-5 align-baseline no-underline hover:bg-stone-100 hover:underline transition-colors duration-150"
-          : // min-w: a marker can run to three digits.
-            "inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 mx-0.5 rounded-control " +
-            `${REFERENCE} text-2xs font-semibold tabular-nums align-text-bottom leading-none no-underline`
-      }
+      className={CITATION_CHIP}
     >
       {page ? `p${citation.marker}` : citation.marker}
     </Link>
@@ -184,7 +188,7 @@ export function CitationText({ text, citations, streaming = false, pageMarkers =
         }}
         urlTransform={urlTransform}
       >
-        {toMarkdownLinks(linkPapers(breakLongRuns(text), streaming ? [] : papers), streaming)}
+        {toMarkdownLinks(linkPapers(nestLists(breakLongRuns(text)), streaming ? [] : papers), streaming)}
       </ReactMarkdown>
     </div>
   );

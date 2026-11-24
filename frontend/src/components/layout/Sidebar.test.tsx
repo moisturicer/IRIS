@@ -136,7 +136,7 @@ describe("the sidebar's list", () => {
     renderAt("/records/mine");
 
     await screen.findByRole("heading", { name: "My Library" });
-    expect(mainLinks()).toEqual(["Discover", "Ask IRIS", "My Library", "Calls & Conferences", "Guidelines"]);
+    expect(mainLinks()).toEqual(["Discover", "Ask IRIS", "My Library", "Notifications", "Calls & Conferences", "Guidelines"]);
     expect(screen.queryByText("Research Exploration")).not.toBeInTheDocument();
     expect(screen.queryByText("Tools")).not.toBeInTheDocument();
   });
@@ -277,7 +277,7 @@ describe("the sidebar's list", () => {
     // IR-693 adds Reported comments, after Account Deletions; IR-972 moves the Notice onto RDCO's Setup.
     // IR-974: no Guidelines link for the System Admin (ADR-063 amendment 2026-11-19).
     expect(within(nav).getAllByRole("link").map((link) => link.textContent?.trim()))
-      .toEqual(["Discover", "Users", "Audit Log", "Account Deletions", "Reported Comments", "Retention"]);
+      .toEqual(["Discover", "Notifications", "Users", "Audit Log", "Account Deletions", "Reported Comments", "Retention"]);
     const admin = within(nav).getByRole("list", { name: "Administration" });
     expect(within(admin).getByRole("link", { name: "Users" })).toHaveAttribute("href", "/admin/users");
     expect(within(admin).getByRole("link", { name: "Audit Log" })).toHaveAttribute("href", "/admin/audit");
@@ -299,7 +299,7 @@ describe("the sidebar's list", () => {
     renderAt("/records/mine");
 
     await screen.findByRole("heading", { name: "My Library" });
-    expect(mainLinks()).toEqual(["Discover", "Ask IRIS", "My Library", "Calls & Conferences", "Guidelines"]);
+    expect(mainLinks()).toEqual(["Discover", "Ask IRIS", "My Library", "Notifications", "Calls & Conferences", "Guidelines"]);
     // jsdom applies no CSS, so the names above would be there whether the
     // labels were `md:sr-only` or `md:hidden`. The class is what keeps them
     // in the accessibility tree on the rail, so it is what is checked.
@@ -502,17 +502,26 @@ describe("the My Reviews count (IR-1208)", () => {
   });
 });
 
-describe("the My Library dot (IR-534, B2)", () => {
-  it("appears when a record waits on you, and says so to a screen reader", async () => {
+describe("the My Library count (IR-1310; a dot until then, IR-534 B2)", () => {
+  it("shows how many records wait on you, and says so to a screen reader", async () => {
     waitingOnYou(2);
     signIn(ROLES.STUDENT);
     renderAt("/");
 
     await screen.findByRole("heading", { name: "Discover" });
     const nav = screen.getByRole("navigation", { name: "Main" });
-    expect(
-      await within(nav).findByRole("link", { name: "My Library, something needs your action" }),
-    ).toBeInTheDocument();
+    const link = await within(nav).findByRole("link", { name: "My Library, 2 waiting on you" });
+    expect(within(link).getByText("2")).toBeInTheDocument();
+  });
+
+  it("caps the number shown at 9+, while the screen reader hears the real count", async () => {
+    waitingOnYou(14);
+    signIn(ROLES.STUDENT);
+    renderAt("/");
+
+    const nav = screen.getByRole("navigation", { name: "Main" });
+    const link = await within(nav).findByRole("link", { name: "My Library, 14 waiting on you" });
+    expect(within(link).getByText("9+")).toBeInTheDocument();
   });
 
   it("is absent when nothing waits on you", async () => {
@@ -526,7 +535,18 @@ describe("the My Library dot (IR-534, B2)", () => {
     expect(within(nav).getByRole("link", { name: "My Library" })).toBeInTheDocument();
   });
 
-  it("stays named on the collapsed rail", async () => {
+  it("shows no count, not a stale one, when the read fails", async () => {
+    vi.mocked(apiClient.get).mockRejectedValue(new Error("down"));
+    signIn(ROLES.STUDENT);
+    renderAt("/");
+
+    await screen.findByRole("heading", { name: "Discover" });
+    await vi.waitFor(() => expect(apiClient.get).toHaveBeenCalledWith("/dashboard/stats/"));
+    const nav = screen.getByRole("navigation", { name: "Main" });
+    expect(within(nav).getByRole("link", { name: "My Library" })).toBeInTheDocument();
+  });
+
+  it("stays named with the count on the collapsed rail", async () => {
     useUIStore.setState({ sidebarCollapsed: true });
     waitingOnYou(1);
     signIn(ROLES.STUDENT);
@@ -535,7 +555,7 @@ describe("the My Library dot (IR-534, B2)", () => {
     await screen.findByRole("heading", { name: "Discover" });
     const nav = screen.getByRole("navigation", { name: "Main" });
     expect(
-      await within(nav).findByRole("link", { name: "My Library, something needs your action" }),
+      await within(nav).findByRole("link", { name: "My Library, 1 waiting on you" }),
     ).toBeInTheDocument();
   });
 });
@@ -678,9 +698,9 @@ describe("the account menu", () => {
     expect(screen.queryByRole("link", { name: "Settings & Profile" })).not.toBeInTheDocument();
     // Help is in Settings since IR-1217: not in this menu, nor anywhere in the sidebar.
     const menu = document.getElementById(trigger.getAttribute("aria-controls")!)!;
-    // IR-1137: Notifications is reachable from the account menu too.
-    expect(within(menu).getAllByRole("link").map((l) => l.textContent)).toEqual(["Profile", "Settings", "Notifications"]);
-    expect(within(menu).getByRole("link", { name: "Notifications" })).toHaveAttribute("href", "/notifications");
+    // Notifications left this menu for the sidebar's list (IR-1288; it was
+    // added here by IR-1137), so it is not reachable twice.
+    expect(within(menu).getAllByRole("link").map((l) => l.textContent)).toEqual(["Profile", "Settings"]);
     expect(within(menu).queryByRole("link", { name: "Help" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Help" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
@@ -810,12 +830,14 @@ describe("touch targets in the phone drawer (IR-1092)", () => {
   it("makes the account menu's Profile, Settings and Sign out at least 44px tall", async () => {
     const { user, sidebar } = await openDrawer();
 
-    await user.click(within(sidebar).getByRole("button", { name: /account menu/ }));
+    const trigger = within(sidebar).getByRole("button", { name: /account menu/ });
+    await user.click(trigger);
+    // The account menu's own links, not the nav's.
+    const menu = within(document.getElementById(trigger.getAttribute("aria-controls")!)!);
 
     for (const item of [
-      screen.getByRole("link", { name: "Profile" }),
-      screen.getByRole("link", { name: "Settings" }),
-      screen.getByRole("link", { name: "Notifications" }),
+      menu.getByRole("link", { name: "Profile" }),
+      menu.getByRole("link", { name: "Settings" }),
       screen.getByRole("button", { name: "Sign out" }),
     ]) {
       expect(item).toHaveClass("min-h-11", "md:min-h-0", "touch:min-h-11");
@@ -893,7 +915,9 @@ describe.each([768, 1023])("the tablet icon rail at %i px (IR-1086)", (width) =>
       expect(label).toHaveClass("md:sr-only");
     }
     expect(within(sidebar).getByRole("button", { name: "Expand sidebar" })).toBeInTheDocument();
-    expect(within(sidebar).getByRole("button", { name: /^Notifications/ })).toBeInTheDocument();
+    // Notifications is a link in the list above, not a bell in the header.
+    expect(within(nav).getByRole("link", { name: /^Notifications/ })).toBeInTheDocument();
+    expect(within(sidebar).queryByRole("button", { name: /^Notifications/ })).not.toBeInTheDocument();
     expect(within(sidebar).getByRole("button", { name: /account menu/ })).toBeInTheDocument();
     expect(sidebar).toHaveClass("md:w-rail");
     expect(sidebar).not.toHaveAttribute("inert");
@@ -928,7 +952,7 @@ describe.each([768, 1023])("the tablet icon rail at %i px (IR-1086)", (width) =>
     await user.unhover(nav.getByRole("link", { name: "Ask IRIS" }));
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
 
-    // Tab past the mark and the bell to the first link.
+    // Tab past the mark to the first link.
     while (!navElement.contains(document.activeElement)) await user.tab();
     const focused = document.activeElement as HTMLElement;
     expect(focused).toHaveAccessibleName("Discover");
@@ -937,7 +961,7 @@ describe.each([768, 1023])("the tablet icon rail at %i px (IR-1086)", (width) =>
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   });
 
-  it("gives the IRIS mark (the expand button), the bell and the account button a tooltip too", async () => {
+  it("gives the IRIS mark (the expand button) and the account button a tooltip too", async () => {
     const user = userEvent.setup();
     atWidth(width);
     signIn(ROLES.STUDENT);
@@ -946,8 +970,6 @@ describe.each([768, 1023])("the tablet icon rail at %i px (IR-1086)", (width) =>
     const sidebar = within(await screen.findByRole("complementary", { name: "Sidebar" }));
     await user.hover(sidebar.getByRole("button", { name: "Expand sidebar" }));
     expect(await screen.findByRole("tooltip")).toHaveTextContent("Expand sidebar");
-    await user.hover(sidebar.getByRole("button", { name: /^Notifications/ }));
-    expect(await screen.findByRole("tooltip")).toHaveTextContent("Notifications");
     await user.hover(sidebar.getByRole("button", { name: /account menu/ }));
     expect(await screen.findByRole("tooltip")).toHaveTextContent("Ana Adviser");
   });

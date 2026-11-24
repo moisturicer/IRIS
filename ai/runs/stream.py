@@ -50,6 +50,8 @@ class DraftSink:
         #: "live" publishes as it arrives, "hold" keeps it for `settle`, "off" drops it.
         self.mode = "off"
         self.kept: list[str] = []
+        #: Text events published; a retry is safe only while this has not moved (IR-1286).
+        self.published = 0
 
     async def _add(self, event: dict) -> None:
         try:
@@ -83,7 +85,21 @@ class DraftSink:
         self.held = partial.group(0) if partial else ""
         visible = HANDLE.sub(self._number, text[: len(text) - len(self.held)])
         if visible:
+            self.published += 1
             await self._add({"t": "text", "d": visible})
+
+    def mark(self) -> tuple:
+        """Where one send began, for `rewind`."""
+        return self.published, len(self.kept), self.held, dict(self.numbering)
+
+    def rewind(self, mark: tuple) -> bool:
+        """Forget a failed send's text; False once any of it reached the reader."""
+        published, kept, held, numbering = mark
+        if self.published != published:
+            return False
+        del self.kept[kept:]
+        self.held, self.numbering = held, numbering
+        return True
 
     async def settle(self, answer: bool) -> None:
         """The attempt ended. A held research turn that was the answer is published now; otherwise it is dropped."""

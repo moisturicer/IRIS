@@ -1,6 +1,7 @@
 import { useId, useState } from "react";
 
 import { opportunitiesApi } from "@/api/opportunities";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -39,7 +40,9 @@ const readMine = () => opportunitiesApi.mine();
 
 export function MyCallsPage() {
   const addToast = useUIStore((s) => s.addToast);
-  const { items, setItems, loading, failed, load } = useCallList(readMine);
+  const { items, setItems, loading, failed, load, refresh } = useCallList(readMine);
+  // RDCO confirming, rejecting or removing one of these says `calls` (IR-1289).
+  useLiveRefresh(["calls"], refresh);
   const report = useReportCallFailure(load);
   const deletion = useDeleteCall((gone) => setItems((current) => current.filter((o) => o.id !== gone.id)), report);
   const [editing, setEditing] = useState<Opportunity | null>(null);
