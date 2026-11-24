@@ -8,7 +8,6 @@ import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { Select } from "@/components/ui/Select";
 import { PaperCiteModal } from "@/features/discover/PaperCiteModal";
-import { useHistoryStore } from "@/store/history.store";
 import { readingStatusLabel, sortedItems, type LibraryFolder, type LibraryItem } from "@/store/library.store";
 import { cn } from "@/lib/utils";
 import type { RecordListItem } from "@/types/records";
@@ -26,7 +25,7 @@ const SORT_LABELS: Record<SortKey, string> = {
   year:  "Year published",
 };
 
-/** What a saved paper and a history entry share: an unavailable one has no record. */
+/** A saved paper: an unavailable one has no record. */
 interface AccountEntry {
   recordId:  number;
   available: boolean;
@@ -50,21 +49,19 @@ interface SavedViewProps {
   filters?:       ReactNode;
   /** How many folders the account may hold, when the server has said. */
   folderLimit?:   number | null;
-  /** Open a folder, History, or All saved again. */
+  /** Open a folder, or All saved again. */
   onOpenView?:    (view: Exclude<LibraryView, { kind: "research" }>) => void;
   onCreateFolder?: (name: string) => void;
-  /** Shown on the folders for a reader with no Overview, which is where History opens otherwise. */
+  /** Opens the History pop-up (IR-1331), shown on the folders for a reader with no Overview. */
   onManageHistory?: () => void;
-  /** Where History's back link goes, when not to All saved (an author came from the Overview). */
-  historyBack?: { label: string; onClick: () => void };
 }
 
 /**
  * One view of the reader's saved reading.
  *
- * Every view reads the account. All saved, a Reading status and one of the
- * reader's own folders read the library store; History reads the history store
- * (IR-756). Both server responses already went through `visible_to()`: an
+ * Every view reads the account's library store: All saved, a Reading status
+ * and one of the reader's own folders. History is a pop-up of its own
+ * (`HistoryDialog`, IR-1331). The server's answer already went through `visible_to()`: an
  * unavailable entry arrives as its id and nothing else (ADR-044 §4), and is
  * reported as no longer available rather than silently hidden. A folder holds
  * saves, so its papers are the saves it lists, in the order they were filed
@@ -72,10 +69,8 @@ interface SavedViewProps {
  */
 export function SavedView({
   view, folders, library, libraryLoad, libraryInterrupted = false, onRetryLibrary, onRemove, onRename, onDelete, filters,
-  folderLimit = null, onOpenView, onCreateFolder, onManageHistory, historyBack,
+  folderLimit = null, onOpenView, onCreateFolder, onManageHistory,
 }: SavedViewProps) {
-  const historyView = view.kind === "history";
-  const historyStore = useHistoryStore();
   const [layout, setLayout] = useState<LibraryLayout>("grid");
   const [sort, setSort] = useState<SortKey>("added");
   const [query, setQuery] = useState("");
@@ -90,17 +85,16 @@ export function SavedView({
     ? "All saved"
     : view.kind === "status"
       ? readingStatusLabel(view.status)
-      : historyView ? "History" : folder?.name ?? "Folder";
+      : folder?.name ?? "Folder";
 
-  /* The entries this view shows: History's most recent first, a folder's in
-     filing order, newest first, and every other view's newest saved first. */
+  /* The entries this view shows: a folder's in filing order, newest first,
+     and every other view's newest saved first. */
   const accountItems = useMemo<AccountEntry[]>(() => {
-    if (historyView) return historyStore.items;
     if (view.kind === "folder") {
       return (folder?.recordIds ?? []).flatMap((id) => (library[id] ? [library[id]] : []));
     }
     return sortedItems(library).filter((i) => statusFilter === null || i.readingStatus === statusFilter);
-  }, [historyView, historyStore.items, view.kind, folder, library, statusFilter]);
+  }, [view.kind, folder, library, statusFilter]);
 
   /* The ids this view shows, in its order. */
   const viewIds = useMemo(() => accountItems.map((i) => i.recordId), [accountItems]);
@@ -114,13 +108,9 @@ export function SavedView({
     () => accountItems.flatMap((i) => (i.available && i.record ? [i.record] : [])),
     [accountItems],
   );
-  // History has no per-paper removal, only Clear history, so it offers none here.
-  const unavailableIds = historyView ? [] : accountItems.filter((i) => !i.available).map((i) => i.recordId);
-  const load = historyView ? historyStore.load : libraryLoad;
-  const isLoading = load === "idle" || load === "loading";
-  const isFailed = load === "error";
-  const interrupted = historyView ? historyStore.interrupted : libraryInterrupted;
-  const retry = historyView ? () => void historyStore.refresh() : onRetryLibrary;
+  const unavailableIds = accountItems.filter((i) => !i.available).map((i) => i.recordId);
+  const isLoading = libraryLoad === "idle" || libraryLoad === "loading";
+  const isFailed = libraryLoad === "error";
 
   const visible = useMemo(() => {
     const order = new Map(viewIds.map((id, i) => [id, i]));
@@ -141,10 +131,6 @@ export function SavedView({
     () => Object.fromEntries(Object.values(library).map((i) => [i.recordId, i.readingStatus])),
     [library],
   );
-  const viewedAt = useMemo(
-    () => Object.fromEntries(historyStore.items.flatMap((v) => (v.viewedAt ? [[v.recordId, v.viewedAt]] : []))),
-    [historyStore.items],
-  );
   const unavailable = viewIds.length - shownRecords.length;
 
   const remove = (ids: number[]) => {
@@ -152,11 +138,7 @@ export function SavedView({
     setSelected(new Set());
   };
 
-  const empty = historyView
-    ? historyStore.keepHistory === false
-      ? { title: "History is paused", message: "Papers you open are not added while history is paused." }
-      : { title: "No reading history yet", message: "Papers you open are listed here, newest first, on every device you sign in on." }
-    : view.kind === "saved"
+  const empty = view.kind === "saved"
       ? { title: "No saved papers yet", message: "Save a paper from Discover or a paper's page and it follows your account." }
       : view.kind === "folder"
         ? { title: `Nothing in ${title} yet`, message: "File a paper here from its Save menu on Discover or its page." }
@@ -169,7 +151,7 @@ export function SavedView({
     <div>
       <div className="mb-section flex flex-wrap items-center gap-2">
         <LibrarySearch
-          label={historyView ? "Search your history" : folder ? "Search this folder" : "Search saved papers"}
+          label={folder ? "Search this folder" : "Search saved papers"}
           value={query}
           onChange={setQuery}
           className="basis-full sm:basis-0"
@@ -215,55 +197,18 @@ export function SavedView({
       {!topLevel && onOpenView && (
         <button
           type="button"
-          onClick={historyView && historyBack ? historyBack.onClick : () => onOpenView({ kind: "saved" })}
+          onClick={() => onOpenView({ kind: "saved" })}
           className={cn(textButton, "-mx-3 mb-1 inline-flex items-center gap-2 text-brand")}
         >
           <i className="fas fa-arrow-left text-label" aria-hidden />
-          {historyView && historyBack ? historyBack.label : "All saved papers"}
+          All saved papers
         </button>
       )}
-      <div className={cn("flex flex-wrap items-center justify-between gap-3", topLevel && filters ? "mb-2" : "mb-4")}>
-        <h2 className="font-display text-title font-semibold text-stone-900">{topLevel ? "Papers" : title}</h2>
-        <div className="flex items-center gap-1">
-          {historyView && historyStore.items.length > 0 && (
-            <button type="button" onClick={() => void historyStore.clear()} className={textButton}>Clear history</button>
-          )}
-        </div>
-      </div>
+      <h2 className={cn("font-display text-title font-semibold text-stone-900", topLevel && filters ? "mb-2" : "mb-4")}>{topLevel ? "Papers" : title}</h2>
 
       {topLevel && filters && <div className="mb-4">{filters}</div>}
 
-      {historyView && (
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-card border border-stone-200 bg-white px-3 py-2">
-          <p className="text-small text-stone-700">
-            {historyStore.keepHistory === false
-              ? "History is paused: papers you open are not added. What is listed stays until you clear it."
-              : "Your reading history is stored on your account, so it follows you to any device. Only you can see it."}
-          </p>
-          <label className="flex min-h-10 items-center gap-2 text-small font-semibold text-stone-800">
-            <input
-              type="checkbox"
-              checked={historyStore.keepHistory !== false}
-              disabled={historyStore.keepHistory === null}
-              onChange={(e) => void historyStore.setKeepHistory(e.target.checked)}
-              className={cn("accent-brand", FOCUS_RING)}
-            />
-            Keep reading history
-          </label>
-        </div>
-      )}
-
-      {historyView && historyStore.failure && (
-        <p role="alert" className="mb-3 flex flex-wrap items-center gap-x-2 rounded-card border border-stone-300 bg-surface px-3 py-2 text-small text-brand">
-          {historyStore.failure}
-          <button type="button" onClick={historyStore.dismissFailure} className={cn("ml-auto rounded-control px-2 py-1 font-semibold hover:bg-stone-100", FOCUS_RING)}>
-            Dismiss
-          </button>
-        </p>
-      )}
-
-
-      {selected.size > 0 && !historyView && (
+      {selected.size > 0 && (
         <div className="mb-3 flex flex-wrap items-center gap-2 rounded-card border border-stone-300 bg-surface px-3 py-2">
           <span className="text-small font-semibold text-brand">Selected papers</span>
           <button type="button" onClick={() => remove([...selected])} className={cn(PILL_SECONDARY, "ml-auto min-h-9 px-3")}>
@@ -277,9 +222,7 @@ export function SavedView({
         <p className="mb-3 flex flex-wrap items-center gap-x-2 rounded-card border border-stone-200 bg-white px-3 py-2 text-small text-stone-700">
           <span>
             <i className="fas fa-eye-slash mr-1.5 text-stone-500" aria-hidden />
-            {historyView
-              ? unavailable === 1 ? "1 paper in your history is" : `${unavailable} papers in your history are`
-              : unavailable === 1 ? "1 saved paper is" : `${unavailable} saved papers are`} no longer available to you. They may have been unpublished or withdrawn.
+            {unavailable === 1 ? "1 saved paper is" : `${unavailable} saved papers are`} no longer available to you. They may have been unpublished or withdrawn.
           </span>
           {unavailableIds.length > 0 && (
             <button type="button" onClick={() => onRemove(unavailableIds)} className={cn(textButton, "min-h-8 px-2")}>
@@ -290,18 +233,16 @@ export function SavedView({
       )}
 
       {isLoading ? (
-        <LoadingRegion label="Loading saved papers…" onRetry={retry} className="space-y-2">
+        <LoadingRegion label="Loading saved papers…" onRetry={onRetryLibrary} className="space-y-2">
           {[0, 1, 2].map((i) => <div key={i} className="h-16 rounded-card border border-stone-200 bg-white motion-safe:animate-pulse" />)}
         </LoadingRegion>
       ) : isFailed ? (
         <ReadFailedState
-          interrupted={interrupted}
-          what={historyView ? "reading history" : "saved papers"}
+          interrupted={libraryInterrupted}
+          what="saved papers"
           title="Could not load these papers"
-          message={historyView
-            ? "Your history is safe in your account; only loading it failed."
-            : "Your saved papers and folders are safe in your account; only loading them failed."}
-          onRetry={retry}
+          message="Your saved papers and folders are safe in your account; only loading them failed."
+          onRetry={onRetryLibrary}
         />
       ) : visible.length === 0 ? (
         <EmptyState
@@ -310,7 +251,7 @@ export function SavedView({
           title={query ? (folder ? "No matches in this folder" : "No matches") : empty.title}
           message={query ? "Search looks at titles and author names." : empty.message}
           // The next useful step (audit LAY-06): papers are saved from Discover.
-          action={query || historyView ? undefined : <ButtonLink to="/" variant="outline">Browse Discover</ButtonLink>}
+          action={query ? undefined : <ButtonLink to="/" variant="outline">Browse Discover</ButtonLink>}
         />
       ) : (
         <LibraryRecordTable
@@ -326,9 +267,8 @@ export function SavedView({
           })}
           onToggleAll={() => setSelected((prev) => prev.size === visible.length ? new Set() : new Set(visible.map((r) => r.id)))}
           onCite={setCiting}
-          onRemove={historyView ? undefined : (id) => remove([id])}
+          onRemove={(id) => remove([id])}
           removeLabel={removeLabel}
-          viewedAt={historyView ? viewedAt : undefined}
           readingStatusOf={readingStatusOf}
         />
       )}

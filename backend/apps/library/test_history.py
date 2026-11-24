@@ -10,6 +10,8 @@ What this pins:
 * revisiting moves a Record to the top, and only the 50 most recent are kept;
 * a Record that becomes unreadable is listed as unavailable with only its id;
 * clearing deletes the rows, and pausing records nothing while keeping them;
+* removing chosen papers deletes only those rows of the caller's own history,
+  and refuses anything but a short list of ids (IR-1331);
 * two devices of one account share one history, and two accounts on one
   client never see each other's;
 * nothing outside the library reads the model.
@@ -213,6 +215,72 @@ class HistoryOwnershipTests(HistoryTestCase):
         self.assertEqual(self.listed(), [])
         self.assertFalse(ReadingVisit.objects.filter(owner=self.reader).exists())
         self.assertEqual(self.listed_ids(client=other), [first.id])
+
+
+REMOVE = f"{HISTORY}remove/"
+
+
+class RemoveChosenTests(HistoryTestCase):
+    """IR-1331: the History pop-up clears only the papers the reader ticked."""
+
+    def test_removes_only_the_chosen_papers(self):
+        first, second, third = self.record("First"), self.record("Second"), self.record("Third")
+        for record in (first, second, third):
+            self.visit(record)
+
+        response = self.client.post(REMOVE, {"record_ids": [first.id, third.id]}, format="json")
+
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(self.listed_ids(), [second.id])
+
+    def test_never_touches_another_readers_history(self):
+        record = self.record()
+        self.visit(record)
+        other = APIClient()
+        other.force_authenticate(self.other)
+        self.visit(record, client=other)
+
+        response = other.post(REMOVE, {"record_ids": [record.id]}, format="json")
+
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(self.listed_ids(), [record.id])
+        self.assertEqual(self.listed_ids(client=other), [])
+
+    def test_removes_a_paper_the_reader_can_no_longer_read(self):
+        record = self.record()
+        self.visit(record)
+        Record.objects.filter(pk=record.pk).update(pipeline_status=PipelineStatus.DRAFT)
+
+        response = self.client.post(REMOVE, {"record_ids": [record.id]}, format="json")
+
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(ReadingVisit.objects.filter(owner=self.reader).exists())
+
+    def test_an_id_not_in_the_history_is_the_same_204(self):
+        kept = self.record()
+        self.visit(kept)
+
+        response = self.client.post(REMOVE, {"record_ids": [kept.id + 1000]}, format="json")
+
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(self.listed_ids(), [kept.id])
+
+    def test_refuses_anything_but_a_short_list_of_ids_and_removes_nothing(self):
+        record = self.record()
+        self.visit(record)
+        for body in (
+            {}, {"record_ids": []}, {"record_ids": record.id}, {"record_ids": [str(record.id)]},
+            {"record_ids": [True]}, {"record_ids": list(range(1, MAX_HISTORY_ENTRIES + 2))},
+        ):
+            with self.subTest(body=body):
+                response = self.client.post(REMOVE, body, format="json")
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("record_ids", response.data)
+        self.assertEqual(self.listed_ids(), [record.id])
+
+    def test_signed_out_is_refused(self):
+        self.client.force_authenticate(None)
+        self.assertEqual(self.client.post(REMOVE, {"record_ids": [1]}, format="json").status_code, 401)
 
 
 PREFERENCES = "/api/v1/library/preferences/"
