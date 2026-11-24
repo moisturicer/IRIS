@@ -176,6 +176,12 @@ function RuntimeAskPage() {
 
   return <div ref={observePage} className="relative flex h-full min-h-0 flex-col overflow-hidden bg-canvas">
     <div className="relative flex min-h-0 min-w-0 flex-1" {...(dialogOpen ? { inert: "" } : {})}>
+      {/* History on the left, beside the answer it opens. */}
+      {!phone && <ConversationSidebar id={paneId} conversations={conversations} activeId={conversationId ?? null}
+        open={paneOpen} search={historySearch} searchRef={searchRef} onNewConversation={newConversation} onSearch={openSearch}
+        onToggle={() => setPane(!paneOpen)}
+        onRename={rename} width={sidebarWidth} onResize={resizeSidebar}
+        onDelete={id => setDeleteTarget(conversations.find(c => c.id === id) ?? null)} />}
       <div className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-surface">
         <ChatToolbar sessionTitle={title} eyebrow={conversationId !== undefined}
           phoneHistory={phone ? { open: dialogOpen, onOpen: openDialog } : undefined}
@@ -193,15 +199,9 @@ function RuntimeAskPage() {
             }} />
         </div>
       </div>
-      {/* History on the right (IR-1306), beside the answer it opens. */}
-      {!phone && <ConversationSidebar id={paneId} conversations={conversations} activeId={conversationId ?? null}
-        open={paneOpen} search={historySearch} searchRef={searchRef} onNewConversation={newConversation} onSearch={openSearch}
-        onToggle={() => setPane(!paneOpen)}
-        onRename={rename} width={sidebarWidth} onResize={resizeSidebar}
-        onDelete={id => setDeleteTarget(conversations.find(c => c.id === id) ?? null)} />}
     </div>
 
-    {phone && dialogOpen && <ChatDrawer title="Conversations" side="end" closeLabel="Close conversations"
+    {phone && dialogOpen && <ChatDrawer title="History" side="start" closeLabel="Close history"
       onClose={() => setDialogOpen(false)} returnTo={dialogOpener.current}>
       <ConversationHistoryList conversations={conversations} activeId={conversationId ?? null} search={historySearch}
         searchRef={searchRef} onNewConversation={() => { setDialogOpen(false); newConversation(); }}
