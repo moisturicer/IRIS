@@ -43,6 +43,18 @@ describe("the entry error dialog", () => {
     expect(within(dialog).getByRole("button", { name: "Close" })).toHaveFocus();
   });
 
+  // IR-1327: an X in the corner closes it, not a "Close" button. Its name is
+  // still "Close", for a screen reader, but the word is not shown.
+  it("closes with an X rather than a Close button", async () => {
+    renderScreen(<Failing />);
+    await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
+
+    const dialog = screen.getByRole("alertdialog");
+    const close = within(dialog).getByRole("button", { name: "Close" });
+    expect(close).toHaveTextContent(/^$/);
+    expect(within(dialog).queryByText("Close")).not.toBeInTheDocument();
+  });
+
   it("closes on Close and returns focus where the page asked", async () => {
     const user = userEvent.setup();
     renderScreen(<Failing />);
