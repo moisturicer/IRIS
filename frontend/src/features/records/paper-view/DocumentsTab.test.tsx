@@ -79,10 +79,10 @@ function hold(slotId: number, id: number) {
 }
 
 /** A version already sent (not held), as the server lists it. */
-function sentUpload(slotId: number, id: number): RecordUpload {
+function sentUpload(slotId: number, id: number, version = 1): RecordUpload {
   return {
     id, record: RECORD_ID, slot: slotId, slot_name: "Patent Draft", file: `/media/uploads/9/${id}.pdf`,
-    version: 1, status: null, status_name: null, uploaded_by: 50,
+    version, status: null, status_name: null, uploaded_by: 50,
     uploaded_by_name: "Sam Student", created_at: "2026-10-09T02:00:00Z", reviews: [],
     delete_refused: null, held: false,
   } as RecordUpload;
@@ -266,8 +266,25 @@ describe("the Documents tab, for the owner of a record in review", () => {
     renderFiles();
 
     const patent = await screen.findByRole("group", { name: "Patent Draft" });
+    // Its Download is in its versions list (IR-1330).
+    fireEvent.click(within(patent).getByRole("button", { name: "1 version of Patent Draft" }));
     expect(within(patent).getByRole("button", { name: "Download Patent Draft version 1" })).toBeInTheDocument();
     expect(within(patent).queryByRole("button", { name: /^Upload/ })).not.toBeInTheDocument();
+  });
+
+  // IR-1330: the newest version had a Download under the document's name and
+  // another on its row in the list. Only the row's remains.
+  it("downloads each version from its row in the list, and nowhere else", async () => {
+    slots = slots.map((s) => s.id === PATENT ? { ...s, uploads: [sentUpload(PATENT, 612, 2), sentUpload(PATENT, 611, 1)] } : s);
+    renderFiles();
+
+    const patent = await screen.findByRole("group", { name: "Patent Draft" });
+    expect(within(patent).queryByRole("button", { name: /^Download/ })).not.toBeInTheDocument();
+
+    fireEvent.click(within(patent).getByRole("button", { name: "2 versions of Patent Draft" }));
+    expect(within(patent).getAllByRole("button", { name: /^Download/ })).toHaveLength(2);
+    expect(within(patent).getByRole("button", { name: "Download Patent Draft version 2" })).toBeInTheDocument();
+    expect(within(patent).getByRole("button", { name: "Download Patent Draft version 1" })).toBeInTheDocument();
   });
 
   it("lists no unrequested slot, and offers no upload, when nothing is asked for", async () => {
@@ -793,7 +810,9 @@ describe("downloading a document version", () => {
     }] }];
     renderFiles({ owner: false, reviewing: true, onOpen: vi.fn() });
 
-    fireEvent.click(await screen.findByRole("button", { name: "Download Ethics Clearance version 2" }));
+    // Downloaded from its row in the versions list (IR-1330).
+    fireEvent.click(await screen.findByRole("button", { name: "1 version of Ethics Clearance" }));
+    fireEvent.click(screen.getByRole("button", { name: "Download Ethics Clearance version 2" }));
     await waitFor(() => expect(downloadBlob).toHaveBeenCalledWith(expect.any(Blob), "Ethics Clearance v2.png"));
     // A slot's upload is served as a PDF (IR-1203's image half covers attachments only), so no image Open.
     expect(screen.queryByRole("button", { name: "Open Ethics Clearance version 2" })).not.toBeInTheDocument();
@@ -808,7 +827,9 @@ describe("downloading a document version", () => {
     }] }];
     renderFiles({ owner: false, reviewing: true });
 
-    fireEvent.click(await screen.findByRole("button", { name: "Download Ethics Clearance version 1" }));
+    // Downloaded from its row in the versions list (IR-1330).
+    fireEvent.click(await screen.findByRole("button", { name: "1 version of Ethics Clearance" }));
+    fireEvent.click(screen.getByRole("button", { name: "Download Ethics Clearance version 1" }));
     await waitFor(() => expect(downloadBlob).toHaveBeenCalledWith(expect.any(Blob), "Ethics Clearance v1.pdf"));
   });
 });
