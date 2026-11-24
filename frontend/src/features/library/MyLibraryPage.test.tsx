@@ -163,6 +163,21 @@ const myDownloads = (rows: ReaderDownloadRequest[]) =>
 const section = (name: string) =>
   screen.getByRole("heading", { name, level: 2 }).closest("section, details") as HTMLElement;
 
+/* Saved Papers' folder tiles (IR-1324), named "<folder>, <n> papers". */
+const folderShelf = () => screen.getByRole("region", { name: "Folders" });
+const tileName = (name: string) => new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}, \\d+ papers?$`);
+const folderTile = (name: string) => within(folderShelf()).getByRole("button", { name: tileName(name) });
+const queryFolderTile = (name: string) => within(folderShelf()).queryByRole("button", { name: tileName(name) });
+/** Open a tile, going back to All saved first when inside a folder. */
+async function openTile(name: string) {
+  if (!screen.queryByRole("region", { name: "Folders" })) await userEvent.click(screen.getByRole("button", { name: "All saved papers" }));
+  await userEvent.click(folderTile(name));
+}
+async function newFolder(name: string) {
+  await userEvent.click(within(folderShelf()).getByRole("button", { name: "Folder" }));
+  await userEvent.type(screen.getByRole("textbox", { name: "New folder name" }), `${name}{Enter}`);
+}
+
 beforeEach(() => {
   localStorage.clear();
   sessionStorage.clear();
@@ -293,20 +308,28 @@ describe("My Library: an author's research", () => {
     }
   });
 
-  it("folds every group, keeps Finished folded until asked for, and opens a group picked as a filter", async () => {
+  // IR-1324 replaces "folds every group": nothing folds, and every filter always shows.
+  it("shows every group under a plain heading, offers all five filters, and says when a picked one is empty", async () => {
     mine([
       ownRecord({ id: 22, title: "Rejected paper", pipeline_status: "rejected", workflow_state: "rejected", workflow_state_label: "Archived" }),
       ownRecord({ id: 23, title: "Draft paper" }),
     ]);
-    renderScreen(<MyLibraryPage />, SUBMISSIONS);
+    const { container } = renderScreen(<MyLibraryPage />, SUBMISSIONS);
 
     await screen.findByRole("heading", { name: "Drafts", level: 2 });
-    expect((section("Drafts") as HTMLDetailsElement).open).toBe(true);
-    expect((section("Finished") as HTMLDetailsElement).open).toBe(false);
+    expect(within(section("Finished")).getByRole("link", { name: "Rejected paper" })).toBeVisible();
+    expect(container.querySelector("details")).toBeNull();
+    const filters = screen.getByRole("group", { name: "Show" });
+    expect(within(filters).getAllByRole("button").map((b) => b.textContent))
+      .toEqual(["All", "Needs your action", "In review", "Drafts", "Finished"]);
 
-    await userEvent.click(within(screen.getByRole("group", { name: "Show" })).getByRole("button", { name: "Finished" }));
-    expect((section("Finished") as HTMLDetailsElement).open).toBe(true);
+    await userEvent.click(within(filters).getByRole("button", { name: "Finished" }));
+    expect(screen.getByRole("link", { name: "Rejected paper" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Drafts", level: 2 })).not.toBeInTheDocument();
+
+    await userEvent.click(within(filters).getByRole("button", { name: "In review" }));
+    expect(screen.getByRole("heading", { name: "Nothing in review" })).toBeInTheDocument();
+    await expectNoBlockingA11yViolations(container);
   });
 
   it("searches titles and authors, and says when nothing matches", async () => {
@@ -361,24 +384,26 @@ describe("My Library: an author's research", () => {
     expect(await screen.findByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
     const waiting = screen.getByRole("region", { name: "Waiting on you" });
     expect(within(waiting).getByText("1")).toBeInTheDocument();
-    expect(within(waiting).getByRole("link", { name: /^Upload the documents/ }))
+    // One short link per paper (IR-1324); the request's words stay for a screen reader.
+    expect(within(waiting).getByRole("link", { name: /^Submit documents/ }))
       .toHaveAttribute("href", "/records/15?section=review&documents=open");
+    expect(within(waiting).getByRole("link", { name: /^Submit documents/ })).toHaveAccessibleName(/Changes requested by Adviser.*Asked for a form/);
     // The draft's title opens Publish over My Library (IR-1258).
     expect(within(screen.getByRole("region", { name: "Recent submissions" })).getByRole("link", { name: "Community Water Monitoring" }))
       .toHaveAttribute("href", "/records/mine?publish=12");
-    // The Reading shelf is gone (IR-1321); its reading stays, its folders do not.
+    // The Reading shelf is gone (IR-1321), and Continue reading with it (IR-1324).
     expect(screen.queryByRole("region", { name: "Reading shelf" })).not.toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Continue reading" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Continue reading" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Your folders" })).not.toBeInTheDocument();
-    // The side cards in order, first on a phone, then the author's records (IR-1323).
-    expect(screen.getAllByRole("heading", { level: 2 }).slice(0, 4).map((h) => h.textContent))
-      .toEqual(["Waiting on you", "Continue reading", "Recently opened", "Recent submissions"]);
+    // The side cards in order, first on a phone, then the author's records (IR-1323, IR-1324).
+    expect(screen.getAllByRole("heading", { level: 2 }).slice(0, 3).map((h) => h.textContent))
+      .toEqual(["Waiting on you", "Recently opened", "Recent submissions"]);
     // A brief row carries no per-request button either.
-    expect(within(screen.getByRole("region", { name: "Recent submissions" })).queryByRole("link", { name: /^Upload the documents/ })).not.toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "Recent submissions" })).queryByRole("link", { name: /^Submit documents/ })).not.toBeInTheDocument();
     await expectNoBlockingA11yViolations(container);
 
-    await userEvent.click(screen.getByRole("tab", { name: "My submissions" }));
-    expect(screen.getByRole("tab", { name: "My submissions" })).toHaveAttribute("aria-selected", "true");
+    await userEvent.click(screen.getByRole("tab", { name: "My Submissions" }));
+    expect(screen.getByRole("tab", { name: "My Submissions" })).toHaveAttribute("aria-selected", "true");
     expect(within(section("Drafts")).getByRole("link", { name: "Community Water Monitoring" })).toBeInTheDocument();
   });
 
@@ -416,7 +441,7 @@ describe("My Library: an author's research", () => {
 
     await waitFor(() => expect(recordsApi.mine).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(screen.queryByRole("link", { name: "Community Water Monitoring" })).not.toBeInTheDocument());
-    expect(screen.getByRole("tab", { name: "My submissions" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "My Submissions" })).toHaveAttribute("aria-selected", "true");
   });
 
   it("offers a retry when the research list fails to load", async () => {
@@ -624,34 +649,28 @@ describe("My Library: interrupted reads (IR-906)", () => {
 });
 
 describe("My Library: reading", () => {
-  // IR-572 changes this test on purpose: folders follow the account, so the
-  // toolbar no longer says they stay in this browser, and "New folder" asks
-  // the server for the folder rather than writing it to localStorage.
-  it("keeps search, sort, Folder and Reading status in one toolbar, and says saves and folders follow the account", async () => {
+  // IR-1324 replaces the Folder picker (IR-1313) with folder tiles: History
+  // is a tile, + Folder makes a folder in place and the new tile appears.
+  it("keeps search and sort on one line, folders as tiles with + Folder, and says saves and folders follow the account", async () => {
     mine([ownRecord({})]);
     vi.mocked(libraryApi.createFolder).mockResolvedValue({ data: folderEntry(3, "Methods") } as Awaited<ReturnType<typeof libraryApi.createFolder>>);
-    renderScreen(<MyLibraryPage />);
+    const { container } = renderScreen(<MyLibraryPage />);
 
-    await userEvent.click(await screen.findByRole("tab", { name: "Saved papers" }));
+    await userEvent.click(await screen.findByRole("tab", { name: "Saved Papers" }));
     expect(screen.getByText("Saves and folders follow your account.")).toBeInTheDocument();
-    expect(screen.queryByRole("region", { name: "Folders" })).not.toBeInTheDocument();
-
-    // History is back in the picker (IR-756): it now follows the account, and
-    // its pause switch lives in the History view, which every reader must reach.
-    expect(within(screen.getByRole("combobox", { name: "Folder" })).getByRole("option", { name: "History" })).toBeInTheDocument();
-    // IR-1313: one width, whatever the folders are, and the new-folder field takes the same.
-    expect(screen.getByRole("combobox", { name: "Folder" })).toHaveClass("w-full", "sm:w-72");
-    expect(screen.getByRole("combobox", { name: "Folder" })).toHaveAttribute("title", "All saved papers");
-    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Folder" }), "+ New folder…");
-    expect(screen.getByRole("textbox", { name: "New folder name" })).toHaveClass("w-full", "sm:w-72");
-    await userEvent.type(screen.getByRole("textbox", { name: "New folder name" }), "Methods{Enter}");
-    expect(await screen.findByRole("heading", { name: "Methods" })).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Folder" })).not.toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: "Search saved papers" })).toBeInTheDocument();
+    expect(folderTile("History")).toBeInTheDocument();
+    expect(within(folderShelf()).getByText(/No folders yet/)).toBeInTheDocument();
+    await newFolder("Methods");
+    expect(await within(folderShelf()).findByRole("button", { name: "Methods, 0 papers" })).toBeInTheDocument();
     expect(libraryApi.createFolder).toHaveBeenCalledWith("Methods");
     expect(screen.queryByRole("button", { name: /liked/i })).not.toBeInTheDocument();
 
     await userEvent.click(within(screen.getByRole("group", { name: "Reading status" })).getByRole("button", { name: "Want to read" }));
     expect(await screen.findByRole("heading", { name: "Nothing in Want to read yet" })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("tab", { name: "My submissions" }));
+    await expectNoBlockingA11yViolations(container);
+    await userEvent.click(screen.getByRole("tab", { name: "My Submissions" }));
     expect(screen.getByRole("link", { name: "Community Water Monitoring" })).toBeInTheDocument();
   });
 
@@ -662,8 +681,8 @@ describe("My Library: reading", () => {
     const { container } = renderScreen(<MyLibraryPage />);
 
     expect(await screen.findByRole("heading", { name: "No saved papers yet" })).toBeInTheDocument();
-    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Saved papers", "Saved calls", "Download requests"]);
-    expect(screen.getByRole("tab", { name: "Saved papers" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Saved Papers", "Saved Calls", "Download Requests"]);
+    expect(screen.getByRole("tab", { name: "Saved Papers" })).toHaveAttribute("aria-selected", "true");
     expect(screen.queryByRole("link", { name: "Publish" })).not.toBeInTheDocument();
     await waitFor(() => expect(recordsApi.mine).not.toHaveBeenCalled());
     await expectNoBlockingA11yViolations(container);
@@ -789,7 +808,7 @@ describe("My Library: saves follow the account (IR-566)", () => {
 
     expect(await screen.findByRole("link", { name: rice.title })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: water.title })).not.toBeInTheDocument();
-    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Folder" }), "History");
+    await openTile("History");
     expect(await screen.findByRole("heading", { name: "No reading history yet" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: water.title })).not.toBeInTheDocument();
   });
@@ -811,7 +830,7 @@ describe("My Library: saves follow the account (IR-566)", () => {
     await userEvent.click(within(screen.getByRole("group", { name: "Reading status" })).getByRole("button", { name: "Want to read" }));
 
     expect(await screen.findByRole("heading", { name: "Nothing in Want to read yet" })).toBeInTheDocument();
-    expect(within(screen.getByRole("combobox", { name: "Folder" })).queryByRole("option", { name: "Old browser folder" })).not.toBeInTheDocument();
+    expect(queryFolderTile("Old browser folder")).not.toBeInTheDocument();
     expect(libraryApi.save).not.toHaveBeenCalled();
     expect(libraryApi.createFolder).not.toHaveBeenCalled();
 
@@ -827,7 +846,8 @@ describe("My Library: reading history follows the account (IR-756)", () => {
 
   async function openHistory() {
     renderScreen(<MyLibraryPage />, { route: "/records/mine?section=saved" });
-    await userEvent.selectOptions(await screen.findByRole("combobox", { name: "Folder" }), "History");
+    await screen.findByRole("region", { name: "Folders" });
+    await openTile("History");
     return screen.findByRole("heading", { name: "History", level: 2 });
   }
 
@@ -928,7 +948,9 @@ describe("My Library: folders follow the account (IR-572)", () => {
   const water = paper(41, "Rainwater Harvesting Survey");
   const rice = paper(42, "Rice Husk Insulation Panels");
   const SAVED = { route: "/records/mine?section=saved" };
-  const pick = (name: string) => userEvent.selectOptions(screen.getByRole("combobox", { name: "Folder" }), name);
+  const pick = (name: string) => name === "All saved papers"
+    ? userEvent.click(screen.getByRole("button", { name: "All saved papers" }))
+    : openTile(name);
   const failed = () => Promise.reject(new Error("offline"));
 
   it("reads the account's folders from the server and shows a folder's saves in filing order", async () => {
@@ -949,7 +971,8 @@ describe("My Library: folders follow the account (IR-572)", () => {
     expect(await screen.findByRole("heading", { name: "Nothing in Results yet" })).toBeInTheDocument();
   });
 
-  it("creates a folder on the server and opens it; a refusal says why and adds nothing", async () => {
+  // IR-1324: a new folder appears as a tile rather than opening.
+  it("creates a folder on the server and shows its tile; a refusal says why and adds nothing", async () => {
     folders([folderEntry(3, "Methods")]);
     vi.mocked(libraryApi.createFolder)
       .mockResolvedValueOnce({ data: folderEntry(5, "Field work") } as Awaited<ReturnType<typeof libraryApi.createFolder>>)
@@ -957,14 +980,12 @@ describe("My Library: folders follow the account (IR-572)", () => {
     renderScreen(<MyLibraryPage />, SAVED);
     await screen.findByRole("heading", { name: "No saved papers yet" });
 
-    await pick("+ New folder…");
-    await userEvent.type(screen.getByRole("textbox", { name: "New folder name" }), "Field work{Enter}");
-    expect(await screen.findByRole("heading", { name: "Field work" })).toBeInTheDocument();
+    await newFolder("Field work");
+    expect(await within(folderShelf()).findByRole("button", { name: "Field work, 0 papers" })).toBeInTheDocument();
 
-    await pick("+ New folder…");
-    await userEvent.type(screen.getByRole("textbox", { name: "New folder name" }), "One more{Enter}");
+    await newFolder("One more");
     expect(await screen.findByRole("alert")).toHaveTextContent("You have 10 folders. Delete one to make another.");
-    expect(within(screen.getByRole("combobox", { name: "Folder" })).queryByRole("option", { name: "One more" })).not.toBeInTheDocument();
+    expect(queryFolderTile("One more")).not.toBeInTheDocument();
   });
 
   it("does not offer a new folder once the account holds the most it may", async () => {
@@ -972,9 +993,8 @@ describe("My Library: folders follow the account (IR-572)", () => {
     renderScreen(<MyLibraryPage />, SAVED);
     await screen.findByRole("heading", { name: "No saved papers yet" });
 
-    const folderPicker = screen.getByRole("combobox", { name: "Folder" });
-    expect(within(folderPicker).queryByRole("option", { name: "+ New folder…" })).not.toBeInTheDocument();
-    expect(within(folderPicker).getByRole("option", { name: "No room for a new folder (2 is the most)" })).toBeDisabled();
+    expect(within(folderShelf()).getByRole("button", { name: "Folder" })).toBeDisabled();
+    expect(within(folderShelf()).getByText("You have 2 folders, the most an account can hold.")).toBeInTheDocument();
   });
 
   it("takes a paper out of a folder without unsaving it", async () => {
@@ -1026,7 +1046,7 @@ describe("My Library: folders follow the account (IR-572)", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Delete folder" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(/could not delete this folder/i);
-    expect(within(screen.getByRole("combobox", { name: "Folder" })).getByRole("option", { name: "Method papers" })).toBeInTheDocument();
+    expect(await within(folderShelf()).findByRole("button", { name: "Method papers, 1 paper" })).toBeInTheDocument();
     // The paper was never at risk: deleting a folder never deletes a save.
     expect(screen.getByRole("link", { name: water.title })).toBeInTheDocument();
     expect(libraryApi.unsave).not.toHaveBeenCalled();
@@ -1037,7 +1057,7 @@ describe("My Library: folders follow the account (IR-572)", () => {
     folders([folderEntry(3, "First reader's folder", [water.id])]);
     const first = renderScreen(<MyLibraryPage />, SAVED);
     await screen.findByRole("link", { name: water.title });
-    expect(within(screen.getByRole("combobox", { name: "Folder" })).getByRole("option", { name: "First reader's folder" })).toBeInTheDocument();
+    expect(folderTile("First reader's folder")).toBeInTheDocument();
     first.unmount();
 
     useAuthStore.getState().logout();
@@ -1049,9 +1069,8 @@ describe("My Library: folders follow the account (IR-572)", () => {
     renderScreen(<MyLibraryPage />, SAVED);
 
     await screen.findByRole("link", { name: rice.title });
-    const picker = screen.getByRole("combobox", { name: "Folder" });
-    expect(within(picker).getByRole("option", { name: "Second reader's folder" })).toBeInTheDocument();
-    expect(within(picker).queryByRole("option", { name: "First reader's folder" })).not.toBeInTheDocument();
+    expect(folderTile("Second reader's folder")).toBeInTheDocument();
+    expect(queryFolderTile("First reader's folder")).not.toBeInTheDocument();
     expect(localStorage.getItem("iris_record_collections")).toBeNull();
   });
 });
@@ -1070,7 +1089,7 @@ describe("My Library: download requests (IR-743)", () => {
     const { container } = renderScreen(<MyLibraryPage />, DOWNLOADS);
 
     expect(await screen.findByRole("link", { name: "Pending paper" })).toHaveAttribute("href", "/records/45");
-    expect(screen.getByRole("tab", { name: "Download requests" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "Download Requests" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getAllByRole("listitem").map((li) => within(li).getByRole("link").textContent))
       .toEqual(["Pending paper", "Granted paper", "Declined paper", "Revoked paper", "Expired paper"]);
 
@@ -1106,7 +1125,7 @@ describe("My Library: download requests (IR-743)", () => {
 
     expect(await screen.findByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
     expect(recordsApi.myDownloadRequests).not.toHaveBeenCalled();
-    await userEvent.click(screen.getByRole("tab", { name: "Download requests" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Download Requests" }));
     expect(await screen.findByRole("heading", { name: "No download requests yet" })).toBeInTheDocument();
     expect(recordsApi.myDownloadRequests).toHaveBeenCalledOnce();
   });
@@ -1168,7 +1187,7 @@ describe("My Library follows the server's can_author (IR-1096)", () => {
     renderScreen(<MyLibraryPage />);
 
     expect(await screen.findByRole("heading", { name: "No saved papers yet" })).toBeInTheDocument();
-    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Saved papers", "Saved calls", "Download requests"]);
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Saved Papers", "Saved Calls", "Download Requests"]);
     expect(screen.queryByRole("link", { name: "Publish" })).not.toBeInTheDocument();
     await waitFor(() => expect(recordsApi.mine).not.toHaveBeenCalled());
   });
@@ -1177,7 +1196,7 @@ describe("My Library follows the server's can_author (IR-1096)", () => {
     signIn(13, "RDCO", true);
     renderScreen(<MyLibraryPage />);
 
-    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Overview", "My submissions", "Saved papers", "Saved calls", "Download requests"]);
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Overview", "My Submissions", "Saved Papers", "Saved Calls", "Download Requests"]);
     expect(screen.getByRole("link", { name: "Publish" })).toBeInTheDocument();
   });
 });
@@ -1200,7 +1219,7 @@ describe("Saved calls (IR-766)", () => {
     renderScreen(<MyLibraryPage />, { route: "/records/mine?section=calls" });
 
     expect(await screen.findByRole("article", { name: "Energy Letters special issue" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Saved calls" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "Saved Calls" })).toHaveAttribute("aria-selected", "true");
     expect(screen.queryByRole("heading", { name: "No saved papers yet" })).toBeNull();
   });
 });

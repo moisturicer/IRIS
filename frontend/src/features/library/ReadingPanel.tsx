@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
-import { Select } from "@/components/ui/Select";
+import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
+import { PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { cn } from "@/lib/utils";
 import type { ReadingStatus } from "@/api/library";
 import { MAX_FOLDER_NAME, atFolderLimit, type LibraryFolder } from "@/store/library.store";
@@ -32,37 +33,42 @@ export function viewKey(view: LibraryView): string {
   return view.kind;
 }
 
-interface FolderPickerProps {
+interface FolderShelfProps {
   folders:      LibraryFolder[];
   /** How many folders the account may hold, when the server has said. */
   limit:        number | null;
-  view:         LibraryView;
-  onViewChange: (view: LibraryView) => void;
+  /** How many papers the reading history lists. */
+  historyCount: number;
+  onOpen:       (view: LibraryView) => void;
   onCreate:     (name: string) => void;
 }
 
-const NEW_FOLDER = "__new__";
-const HISTORY = "__history__";
+/** A closed folder, drawn in greys like a desktop folder (IR-1324). */
+function FolderGlyph() {
+  return (
+    <svg viewBox="0 0 48 40" className="h-10 w-12" aria-hidden>
+      <path d="M2 6a4 4 0 0 1 4-4h11.5l5 5H42a4 4 0 0 1 4 4v3H2z" className="fill-stone-300" />
+      <path d="M2 12h44v22a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4z" className={cn("fill-stone-400 group-hover:fill-stone-500", COLOUR_TRANSITION)} />
+    </svg>
+  );
+}
+
+const papers = (n: number) => `${n} ${n === 1 ? "paper" : "papers"}`;
+
+const TILE = cn(
+  "group flex h-full w-full flex-col items-start gap-2 rounded-card border border-stone-200 bg-white p-3 text-left hover:border-stone-300 hover:bg-stone-50",
+  COLOUR_TRANSITION,
+  FOCUS_RING,
+);
 
 /**
- * The picker's width (IR-1313). A select with no width is as wide as its
- * longest option, so the toolbar moved when the folders arrived or a new one
- * was made. It is 18rem from `sm` and fills the row below it. A reader's own
- * folder name runs to 60 characters, so a long one is clipped closed and read
- * in full in the open list or on hover. The new-folder field takes the same width.
+ * Saved Papers' folders as tiles (IR-1324), replacing the Folder picker
+ * (IR-1313): each of the reader's own folders (IR-572) with its name and how
+ * many papers it holds, then History (IR-756). **+ Folder** turns into a name
+ * field in place and is greyed once the account has no room for another.
+ * Renaming and deleting a folder happen in the folder's own view.
  */
-const FOLDER_BOX = "w-full sm:w-72";
-
-/**
- * The reader's own folders as one picker in the Saved papers toolbar,
- * beside Sort, rather than a second panel to navigate. They are the account's
- * (IR-572), read from the server with the saves. "New folder…" swaps the
- * picker for a name field in place, and is offered only while the account
- * has room for another. Renaming and deleting a folder happen in the
- * folder's own view. History (IR-756) is here too, because its pause switch
- * lives in its view and every reader, author or not, has this toolbar.
- */
-export function FolderPicker({ folders, limit, view, onViewChange, onCreate }: FolderPickerProps) {
+export function FolderShelf({ folders, limit, historyCount, onOpen, onCreate }: FolderShelfProps) {
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
   const input = useRef<HTMLInputElement>(null);
@@ -77,64 +83,75 @@ export function FolderPicker({ folders, limit, view, onViewChange, onCreate }: F
     setName("");
     setCreating(false);
   };
-
-  if (creating) {
-    return (
-      <div className="w-full sm:w-auto">
-      <input
-        ref={input}
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        onBlur={submit}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") submit();
-          if (e.key === "Escape") {
-            setName("");
-            setCreating(false);
-          }
-        }}
-        aria-label="New folder name"
-        placeholder="Folder name, then Enter"
-        maxLength={MAX_FOLDER_NAME}
-        className={cn("min-h-9 rounded-control border border-field bg-white px-3 text-small placeholder:text-stone-600 focus:border-brand focus:outline-none", FOLDER_BOX)}
-      />
-      </div>
-    );
-  }
-
-  const value = view.kind === "folder" ? `folder:${view.id}` : view.kind === "history" ? HISTORY : "";
   const full = atFolderLimit(folders, limit);
-  const chosen = view.kind === "folder" ? folders.find((f) => f.id === view.id)?.name
-    : view.kind === "history" ? "History" : "All saved papers";
 
   return (
-    <div className="w-full sm:w-auto">
-    <Select
-      label="Folder"
-      size="sm"
-      inline
-      value={value}
-      onChange={(e) => {
-        const next = e.target.value;
-        if (next === NEW_FOLDER) setCreating(true);
-        else if (next === HISTORY) onViewChange({ kind: "history" });
-        else if (next.startsWith("folder:")) onViewChange({ kind: "folder", id: Number(next.slice("folder:".length)) });
-        else onViewChange({ kind: "saved" });
-      }}
-      title={chosen}
-      className={FOLDER_BOX}
-    >
-      <option value="">All saved papers</option>
-      <option value={HISTORY}>History</option>
-      {folders.length > 0 && (
-        <optgroup label="Your folders">
-          {folders.map((f) => <option key={f.id} value={`folder:${f.id}`}>{f.name}</option>)}
-        </optgroup>
-      )}
-      {full
-        ? <option value={NEW_FOLDER} disabled>{`No room for a new folder (${limit} is the most)`}</option>
-        : <option value={NEW_FOLDER}>+ New folder…</option>}
-    </Select>
-    </div>
+    <section aria-labelledby="saved-folders" className="mb-section-lg">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 id="saved-folders" className="font-display text-title font-semibold text-stone-900">Folders</h2>
+          <p className="text-small text-stone-600">Saves and folders follow your account.</p>
+        </div>
+        {creating ? (
+          <input
+            ref={input}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onBlur={submit}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") submit();
+              if (e.key === "Escape") {
+                setName("");
+                setCreating(false);
+              }
+            }}
+            aria-label="New folder name"
+            placeholder="Folder name, then Enter"
+            maxLength={MAX_FOLDER_NAME}
+            className="min-h-9 w-full rounded-control border border-field bg-white px-3 text-small placeholder:text-stone-600 focus:border-brand focus:outline-none sm:w-72"
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setCreating(true)}
+            disabled={full}
+            className={cn(PILL_SECONDARY, "min-h-9 px-4 disabled:cursor-not-allowed disabled:opacity-60", FOCUS_RING)}
+          >
+            <i className="fas fa-plus text-label" aria-hidden />
+            Folder
+          </button>
+        )}
+      </div>
+      {full && <p className="-mt-1 mb-3 text-small text-stone-600">You have {limit} folders, the most an account can hold.</p>}
+
+      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+        {folders.length === 0 && (
+          <li className="col-span-2 flex items-center gap-3 rounded-card border border-dashed border-stone-300 p-3 sm:col-span-2">
+            <FolderGlyph />
+            <p className="text-small text-stone-600">
+              No folders yet. <span className="font-semibold text-stone-800">+ Folder</span> makes one; file papers into it from their Save menu.
+            </p>
+          </li>
+        )}
+        {folders.map((folder) => (
+          <li key={folder.id}>
+            <button type="button" onClick={() => onOpen({ kind: "folder", id: folder.id })} aria-label={`${folder.name}, ${papers(folder.recordIds.length)}`} className={TILE}>
+              <FolderGlyph />
+              <span className="break-words text-small font-semibold text-stone-900">{folder.name}</span>
+              <span className="mt-auto text-label text-stone-600">{papers(folder.recordIds.length)}</span>
+            </button>
+          </li>
+        ))}
+        <li>
+          <button type="button" onClick={() => onOpen({ kind: "history" })} aria-label={`History, ${papers(historyCount)}`} className={TILE}>
+            <span className="grid h-10 w-12 place-items-center rounded-control bg-stone-100 text-stone-500 ring-1 ring-stone-200" aria-hidden>
+              <i className="fas fa-clock-rotate-left" />
+            </span>
+            <span className="text-small font-semibold text-stone-900">History</span>
+            <span className="mt-auto text-label text-stone-600">{papers(historyCount)}</span>
+          </button>
+        </li>
+      </ul>
+    </section>
   );
 }
