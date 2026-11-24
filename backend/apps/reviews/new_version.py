@@ -181,6 +181,30 @@ def _kept_offices(record, reset) -> list[str]:
     )
 
 
+def unsent(record) -> dict:
+    """
+    What the owner has changed that no version carries yet (IR-1318), so the
+    Documents tab can mark it *not yet submitted*: a revised manuscript, edited
+    details, and every document uploaded since the latest version. The same
+    uploads the next version will list as added during this one
+    (`documents_added_during`). Read from upload times, never stored.
+    """
+    from apps.documents.models import RecordUpload
+
+    latest = latest_version(record)
+    if latest is None:
+        return {"manuscript": False, "details": False, "uploads": []}
+    uploads = (
+        RecordUpload.objects.filter(record=record, created_at__gt=latest.created_at)
+        .select_related("slot").order_by("created_at", "pk")
+    )
+    return {
+        "manuscript": stored_manuscript_unsubmitted(record),
+        "details": record.details_edited_at is not None and record.details_edited_at > latest.created_at,
+        "uploads": [{"id": u.pk, "label": u.slot.name} for u in uploads],
+    }
+
+
 def new_version_hint(record, user) -> Optional[dict]:
     """
     What record detail tells an owner about the version they would submit
@@ -193,7 +217,8 @@ def new_version_hint(record, user) -> Optional[dict]:
       `RESTART_ALL` the completed offices it reopens;
     - `kept`: the offices whose `cleared` clearance it keeps;
     - `blocked`: why it cannot be submitted yet;
-    - `letter`: the response to reviewers it would carry (IR-876).
+    - `letter`: the response to reviewers it would carry (IR-876);
+    - `unsent`: what it would carry that no version does yet (IR-1318).
     """
     if not routing.is_in_review(record) or not is_record_owner(user, record):
         return None
@@ -211,6 +236,7 @@ def new_version_hint(record, user) -> Optional[dict]:
         "kept": [_label(o) for o in kept],
         "blocked": unchanged_reason(record, requests) or new_version_blocked_reason(record, requests),
         "letter": response_letter.assemble(record, requests),
+        "unsent": unsent(record),
     }
 
 

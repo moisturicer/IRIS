@@ -28,6 +28,8 @@ interface ReviewSectionProps {
   /** Review's Documents tab is asked for by the address. */
   showDocuments: boolean;
   onDocumentsShown: () => void;
+  /** Opens *Submit new version*, for an owner who may submit one (IR-1318). */
+  onSubmitNewVersion?: () => void;
 }
 
 /**
@@ -53,6 +55,7 @@ export function ReviewSection({
   onChanged,
   showDocuments,
   onDocumentsShown,
+  onSubmitNewVersion,
 }: ReviewSectionProps) {
   const paper = hasPaper(record);
   return (
@@ -86,6 +89,7 @@ export function ReviewSection({
           replaceManuscript={can.has("replace_manuscript")}
           onChanged={onChanged}
           onOpen={paper ? onOpenDocument : undefined}
+          onSubmitNewVersion={onSubmitNewVersion}
         />
       }
     />

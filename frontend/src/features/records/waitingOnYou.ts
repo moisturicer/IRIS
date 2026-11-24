@@ -5,11 +5,16 @@
  */
 import type { WaitingItem } from "@/types/records";
 
-/** The Overview's element that answers each kind, as a fragment id. */
+/** The Overview's element that explains each kind, as a fragment id. */
 export const WAITING_TARGET: Record<WaitingItem["kind"], string> = {
   revision: "revision-requested",
   document: "documents-requested",
 };
 
-export const waitingHref = (recordId: number, item: Pick<WaitingItem, "kind">) =>
-  `/records/${recordId}?section=overview#${WAITING_TARGET[item.kind]}`;
+/**
+ * Both kinds are answered in Review's Documents tab (IR-1318): a document by
+ * uploading it, a revision by uploading changes and *Submit new version*.
+ * `kind` stays in the signature so a later kind can land elsewhere.
+ */
+export const waitingHref = (recordId: number, _item: Pick<WaitingItem, "kind">) =>
+  `/records/${recordId}?section=review&documents=open`;

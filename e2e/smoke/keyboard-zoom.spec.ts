@@ -159,6 +159,8 @@ function mockReadyDraft(api: MockApi, initialDraft = draftDetail()) {
     reviews: [], versions: [], review_comments: [], resubmissions: [], document_requests: [], clearances: [],
   } }));
   api.on("GET", "/records/42/document-requests/", []);
+  // The author submits the new version from Review's Documents tab (IR-1318), which lists attachments.
+  api.on("GET", "/documents/files/", []);
   api.on("GET", "/records/42/review-comments/", []);
   api.on("GET", "/records/42/response-letters/", []);
   api.on("GET", "/library/highlights/42/", { results: [] });
@@ -320,7 +322,8 @@ test("an author submits, a reviewer requests revisions, and the author resubmits
 
   workflow.setActor("Student");
   await page.reload();
-  await page.goto("/records/42");
+  // Submit new version is in Review's Documents tab (IR-1318).
+  await page.goto("/records/42?section=review&documents=open");
   const newVersion = page.getByRole("button", { name: "Submit new version" });
   await tabTo(page, newVersion);
   await expectVisibleFocus(newVersion);

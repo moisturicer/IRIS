@@ -462,7 +462,10 @@ export const DIALOGS: DialogCase[] = [
     open: press(button), dialog: anyDialog,
   })),
   {
-    id: "submit a new version", screen: "paper-view", sources: ["features/records/paper-view/NewVersionDialog.tsx"],
+    id: "submit a new version", screen: "paper-view",
+    sources: ["features/records/paper-view/NewVersionDialog.tsx", "features/records/paper-view/SubmitNewVersionBar.tsx"],
+    // Submitted from Review's Documents tab, where the owner uploads (IR-1318).
+    path: `/records/${PAPER.id}?section=review&documents=open`,
     override: (api) => {
       api.on("GET", `/records/${PAPER.id}/tracker/`, { ...TRACKER, workflow_state: "revision_requested", workflow_state_label: "Revision requested" });
       api.on("GET", `/records/${PAPER.id}/document-requests/`, []);
