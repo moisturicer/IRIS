@@ -2895,9 +2895,10 @@ describe("the Review section (IR-412)", () => {
       const consent = await within(panel).findByRole("group", { name: "Consent Paper" });
       expect(consent).toHaveTextContent(`v2 · Rhea Owner · ${formatDate("2026-11-03T08:00:00Z")}`);
       expect(within(panel).getByRole("group", { name: "Manuscript" })).toBeInTheDocument();
-      // A reviewer downloads; only an owner uploads.
-      expect(within(consent).getByRole("button", { name: "Download Consent Paper version 2" })).toBeInTheDocument();
+      // A reviewer downloads, from the versions list (IR-1330); only an owner uploads.
       expect(within(consent).queryByRole("button", { name: /^Upload/ })).not.toBeInTheDocument();
+      await userEvent.click(within(consent).getByRole("button", { name: "2 versions of Consent Paper" }));
+      expect(within(consent).getByRole("button", { name: "Download Consent Paper version 2" })).toBeInTheDocument();
       expect(screen.queryByRole("dialog", { name: "All documents" })).not.toBeInTheDocument();
     });
 
