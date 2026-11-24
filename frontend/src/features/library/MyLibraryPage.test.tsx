@@ -163,9 +163,9 @@ const myDownloads = (rows: ReaderDownloadRequest[]) =>
 const section = (name: string) =>
   screen.getByRole("heading", { name, level: 2 }).closest("section, details") as HTMLElement;
 
-/* Saved Papers' folder tiles (IR-1324), named "<folder>, <n> papers". */
+/* Saved Papers' folder tiles (IR-1324), named by what they show: "<folder> <n> papers". */
 const folderShelf = () => screen.getByRole("region", { name: "Folders" });
-const tileName = (name: string) => new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}, \\d+ papers?$`);
+const tileName = (name: string) => new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} \\d+ papers?$`);
 const folderTile = (name: string) => within(folderShelf()).getByRole("button", { name: tileName(name) });
 const queryFolderTile = (name: string) => within(folderShelf()).queryByRole("button", { name: tileName(name) });
 /** Open a tile, going back to All saved first when inside a folder. */
@@ -686,7 +686,7 @@ describe("My Library: reading", () => {
     expect(screen.queryByRole("button", { name: "Manage reading history" })).not.toBeInTheDocument();
     expect(within(folderShelf()).getByText(/No folders yet/)).toBeInTheDocument();
     await newFolder("Methods");
-    expect(await within(folderShelf()).findByRole("button", { name: "Methods, 0 papers" })).toBeInTheDocument();
+    expect(await within(folderShelf()).findByRole("button", { name: "Methods 0 papers" })).toBeInTheDocument();
     expect(libraryApi.createFolder).toHaveBeenCalledWith("Methods");
     expect(screen.queryByRole("button", { name: /liked/i })).not.toBeInTheDocument();
 
@@ -1038,7 +1038,7 @@ describe("My Library: folders follow the account (IR-572)", () => {
     await screen.findByRole("heading", { name: "No saved papers yet" });
 
     await newFolder("Field work");
-    expect(await within(folderShelf()).findByRole("button", { name: "Field work, 0 papers" })).toBeInTheDocument();
+    expect(await within(folderShelf()).findByRole("button", { name: "Field work 0 papers" })).toBeInTheDocument();
 
     await newFolder("One more");
     expect(await screen.findByRole("alert")).toHaveTextContent("You have 10 folders. Delete one to make another.");
@@ -1102,12 +1102,12 @@ describe("My Library: folders follow the account (IR-572)", () => {
     await userEvent.type(field, "Method papers");
     await expectNoBlockingA11yViolations(container);
     await userEvent.click(within(dialog).getByRole("button", { name: "Rename" }));
-    expect(await within(folderShelf()).findByRole("button", { name: "Method papers, 1 paper" })).toBeInTheDocument();
+    expect(await within(folderShelf()).findByRole("button", { name: "Method papers 1 paper" })).toBeInTheDocument();
     expect(libraryApi.renameFolder).toHaveBeenCalledWith(3, "Method papers");
 
     await folderAction("Method papers", "Delete folder");
     expect(await screen.findByRole("alert")).toHaveTextContent(/could not delete this folder/i);
-    expect(await within(folderShelf()).findByRole("button", { name: "Method papers, 1 paper" })).toBeInTheDocument();
+    expect(await within(folderShelf()).findByRole("button", { name: "Method papers 1 paper" })).toBeInTheDocument();
     // The paper was never at risk: deleting a folder never deletes a save.
     expect(screen.getByRole("link", { name: water.title })).toBeInTheDocument();
     expect(libraryApi.unsave).not.toHaveBeenCalled();

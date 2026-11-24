@@ -184,11 +184,11 @@ export function FolderShelf({ folders, limit, onManageHistory, onOpen, onCreate,
             <button
               type="button"
               onClick={() => onOpen({ kind: "folder", id: folder.id })}
-              aria-label={`${folder.name}, ${papers(folder.recordIds.length)}`}
               className={cn(TILE, "pr-11")}
             >
               <FolderGlyph />
-              <span className="break-words text-small font-semibold text-stone-900">{folder.name}</span>
+              {/* The name comes from what the tile shows (axe label-content-name-mismatch): "Thesis 3 papers". */}
+              <span className="break-words text-small font-semibold text-stone-900">{folder.name}</span>{" "}
               <span className="mt-auto text-label text-stone-600">{papers(folder.recordIds.length)}</span>
             </button>
             <div className="absolute right-1.5 top-1.5">

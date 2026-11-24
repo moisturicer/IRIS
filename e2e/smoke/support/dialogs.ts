@@ -393,6 +393,22 @@ export const DIALOGS: DialogCase[] = [
     open: async () => {},
     dialog: (page) => page.getByRole("dialog", { name: "Session Expired" }),
   },
+  // IR-1324: Saved Papers names a new folder, and renames one, in a dialog.
+  {
+    id: "name a new folder", screen: "my-library", path: "/records/mine?section=saved",
+    sources: ["features/library/ReadingPanel.tsx"],
+    open: press("Folder"),
+    dialog: (page) => page.getByRole("dialog", { name: "New folder" }),
+  },
+  {
+    id: "rename a folder", screen: "my-library", path: "/records/mine?section=saved",
+    sources: ["features/library/ReadingPanel.tsx"],
+    override: (api) => api.on("GET", "/library/folders/", { limit: 10, results: [
+      { id: 1, name: "Thesis", record_ids: [], created_at: "2026-11-01T08:00:00+08:00", updated_at: "2026-11-01T08:00:00+08:00" },
+    ] }),
+    open: fromRowMenu("Rename"),
+    dialog: (page) => page.getByRole("dialog", { name: "Rename folder" }),
+  },
   {
     id: "ask again for a download", screen: "my-library", path: "/records/mine?section=downloads",
     sources: ["components/records/DownloadRequestModal.tsx"],
