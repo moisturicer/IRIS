@@ -43,7 +43,20 @@ const SHOTS = [
     await p.getByRole('button', { name: 'Publish' }).first().click();
     await p.waitForTimeout(1500);
   }],
+  ['S-2.1b-publish-leave', 'student', '/', async (p) => {
+    await p.getByRole('button', { name: 'Publish' }).first().click();
+    await p.waitForTimeout(1500);
+    await p.getByRole('radio', { name: /Thesis \/ Research/ }).first().check();
+    await p.waitForTimeout(500);
+    await p.getByRole('button', { name: 'Close' }).filter({ visible: true }).first().click();
+    await p.waitForTimeout(1200);
+  }],
+  ['S-2.8b-discover-people', 'student', '/', async (p) => {
+    await p.getByRole('button', { name: 'People', exact: true }).filter({ visible: true }).first().click();
+    await p.waitForTimeout(2000);
+  }],
   ['S-6.1-my-library', 'student', '/records/mine'],
+  ['S-6.1b-my-library-empty', 'adviser', '/records/mine'],
   ['S-2.4-paper-view', 'student', '/records/1'],
   ['S-2.5a-download-request', 'student', '/records/2'],
   ['S-5.4-ask-iris', 'student', '/ai'],
@@ -52,12 +65,36 @@ const SHOTS = [
   ['S-1.7-settings-privacy', 'student', '/settings?tab=privacy'],
   ['S-7.3-settings-help', 'student', '/settings?tab=help'],
   ['S-2.2b-guidelines', 'student', '/guidelines'],
-  ['S-3.4-owner-revision', 'student', '/records/33?section=review'],
-  ['S-3.1a-my-reviews', 'adviser', '/review?tab=done'],
-  ['S-3.1b-adviser-review', 'adviser', '/records/33?section=review'],
-  ['S-3.5-document-request', 'student', '/records/mine'],
-  ['S-3.2a-rdco-decide', 'rdco', '/records/20?section=review'],
-  ['S-3.2b-rdco-offices-reviewing', 'rdco', '/records/22?section=review'],
+  // seed_demo record ids on a freshly seeded database (local build at the pinned commit).
+  ['S-3.4-owner-revision', 'student', '/records/13?section=review', async (p) => {
+    await p.getByRole('tab', { name: 'Documents' }).filter({ visible: true }).first().click();
+    await p.waitForTimeout(1500);
+  }],
+  ['S-3.1a-my-reviews', 'adviser', '/review'],
+  ['S-3.1b-adviser-review', 'adviser', '/records/15?section=review'],
+  ['S-3.1c-request-changes', 'adviser', '/records/15?section=review', async (p) => {
+    // Opening the review first is what a reviewer does; it changes only this throwaway database.
+    const open = p.getByRole('button', { name: 'Open review' }).filter({ visible: true });
+    if (await open.count()) { await open.first().click(); await p.waitForTimeout(2000); }
+    await p.getByRole('button', { name: /^Finish review/ }).filter({ visible: true }).first().click();
+    await p.waitForTimeout(1000);
+    await p.getByRole('radio', { name: /Request changes/ }).first().check();
+    await p.waitForTimeout(1000);
+  }],
+  ['S-3.5-document-request', 'student', '/records/16?section=review', async (p) => {
+    await p.getByRole('tab', { name: 'Documents' }).filter({ visible: true }).first().click();
+    await p.waitForTimeout(1500);
+    // A held upload (ADR-022 Amendment 8): a placeholder PDF named by IRIS_SCREENSHOT_UPLOAD,
+    // uploaded and not sent, so the shot shows "Added, not sent yet" and Submit added documents.
+    if (process.env.IRIS_SCREENSHOT_UPLOAD) {
+      const chooser = p.waitForEvent('filechooser', { timeout: 10000 });
+      await p.getByRole('button', { name: /^Upload/ }).filter({ visible: true }).first().click();
+      await (await chooser).setFiles(process.env.IRIS_SCREENSHOT_UPLOAD);
+      await p.waitForTimeout(4000);
+    }
+  }],
+  ['S-3.2a-rdco-decide', 'rdco', '/records/17?section=review'],
+  ['S-3.2b-rdco-offices-reviewing', 'rdco', '/records/19?section=review'],
   ['S-3.4b-preserved-clearances', 'rdco', '/records/14?section=review', async (p) => {
     await p.getByRole('tab', { name: 'Details' }).filter({ visible: true }).first().click();
     await p.waitForTimeout(1500);
@@ -67,6 +104,10 @@ const SHOTS = [
   ['S-2.5b-download-requests', 'rdco', '/rdco/download-requests'],
   ['S-2.6-delete-requests', 'rdco', '/rdco/delete-requests'],
   ['S-2.2a-setup', 'rdco', '/rdco/setup'],
+  ['S-2.2c-add-requirement', 'rdco', '/rdco/setup', async (p) => {
+    await p.getByRole('button', { name: 'Add a requirement' }).first().click();
+    await p.waitForTimeout(1200);
+  }],
   ['S-3.7-analytics', 'rdco', '/rdco/analytics'],
   ['S-6.4b-call-requests', 'rdco', '/rdco/call-requests'],
   ['S-3.3-office-console', 'ierc.coordinator', '/review/office'],
