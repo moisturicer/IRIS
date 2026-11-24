@@ -135,15 +135,15 @@ describe("the frame sign in opens in", () => {
     expect(within(header).queryByRole("heading")).not.toBeInTheDocument();
   });
 
-  it("offers one Create an account link under the form and Help in the masthead", () => {
+  it("offers one Create an account link under the form and nothing in the masthead (IR-1281)", () => {
     renderScreen(<LoginPage />, { route: "/login" });
 
     const links = screen.getAllByRole("link", { name: "Create an account" });
     expect(links).toHaveLength(1);
     links.forEach((link) => expect(link).toHaveAttribute("href", "/signup"));
     const header = screen.getByRole("banner");
-    expect(within(header).getAllByRole("link")).toHaveLength(1);
-    expect(within(header).getByRole("link", { name: "Help" })).toHaveAttribute("aria-haspopup", "dialog");
+    expect(within(header).queryAllByRole("link")).toHaveLength(0);
+    expect(screen.queryByRole("link", { name: "Help" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /sign up/i })).not.toBeInTheDocument();
   });
 

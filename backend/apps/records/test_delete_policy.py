@@ -164,6 +164,20 @@ class TheOfferNamesTheActTests(DeletePolicyTestBase):
             with self.subTest(state=state):
                 self.assertEqual(self.offered(getattr(self, state)(), self.owner), expected)
 
+    def test_my_library_names_the_same_act_as_record_detail(self):
+        """`/records/mine/`'s `delete_act` is what Record detail offers (IR-1282)."""
+        records = {state: getattr(self, state)() for state in ("make_record", "rejected", "at_adviser", "published")}
+        pending = self.published()
+        self.delete(pending, self.owner)
+
+        self.client.force_authenticate(self.owner)
+        listed = {row["id"]: row["delete_act"] for row in self.client.get(reverse("record-mine")).data}
+
+        for state, record in records.items():
+            with self.subTest(state=state):
+                self.assertEqual({listed[record.pk]}, self.offered(record, self.owner))
+        self.assertIsNone(listed[pending.pk])
+
     def test_nothing_is_offered_while_a_decision_is_pending(self):
         record = self.published()
         self.delete(record, self.owner)

@@ -14,7 +14,7 @@ interface EntryLede {
 }
 
 interface EntryFrameProps {
-  /** Account help on sign in and register, without leaving the form. */
+  /** Account help on register, without leaving the form (sign in has none since IR-1281). */
   help?: boolean;
   /** Headline and plain sentence, on sign in and register only (IR-704). */
   lede?: EntryLede;

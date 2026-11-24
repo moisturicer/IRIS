@@ -28,6 +28,18 @@ _Avoid_: Institutional by default
 The recorded year a work was published, distinct from its completion year and the date it was added to IRIS.
 _Avoid_: Completion year, added year
 
+**Completion year**:
+The one year a work was finished: what its submitter recorded, or else what an import recorded.
+_Avoid_: Publication year, added date
+
+**Date added**:
+The day a Record was created in IRIS, in campus time; what a reader means by uploaded.
+_Avoid_: Publication date
+
+**Recent**:
+In Ask IRIS, a completion or publication year from this year or the four before it, or a date added in the last 90 days.
+_Avoid_: Trending (about views)
+
 **Author**:
 A person or organization explicitly credited with creating the work.
 _Avoid_: Submitting owner, import actor

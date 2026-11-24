@@ -404,7 +404,7 @@ export const DIALOGS: DialogCase[] = [
   },
   {
     id: "delete a draft", screen: "my-library", path: "/records/mine?section=research",
-    sources: ["features/library/DeleteDraft.tsx"],
+    sources: ["features/library/DeleteRecord.tsx"],
     override: (api) => api.on("GET", "/records/mine/", [{
       id: 12, title: "Community Water Monitoring", authors: [{ id: 1, name: "Lee Cruz", role: null }],
       adviser_name: "Dr Santos", record_type_name: "Thesis / Research", pipeline_status: "draft",
@@ -462,7 +462,10 @@ export const DIALOGS: DialogCase[] = [
     open: press(button), dialog: anyDialog,
   })),
   {
-    id: "submit a new version", screen: "paper-view", sources: ["features/records/paper-view/NewVersionDialog.tsx"],
+    id: "submit a new version", screen: "paper-view",
+    sources: ["features/records/paper-view/NewVersionDialog.tsx"],
+    // Submitted from Review's Documents tab, where the owner uploads (IR-1318).
+    path: `/records/${PAPER.id}?section=review&documents=open`,
     override: (api) => {
       api.on("GET", `/records/${PAPER.id}/tracker/`, { ...TRACKER, workflow_state: "revision_requested", workflow_state_label: "Revision requested" });
       api.on("GET", `/records/${PAPER.id}/document-requests/`, []);
@@ -482,8 +485,8 @@ export const DIALOGS: DialogCase[] = [
   {
     id: "ask iris chat history on a narrow screen", screen: "ask-iris-conversation", sources: ["features/ai/components/ChatDrawer.tsx", "features/ai/RAGChatPage.tsx"],
     viewport: { width: 640, height: 900 },
-    // IR-1233: the one pane toggle, "Show conversations", opens this dialog at 640px and below.
-    open: press("Show conversations"), dialog: (page) => page.getByRole("dialog", { name: "Conversations" }),
+    // IR-1233: the one pane toggle, "Show history", opens this dialog at 640px and below.
+    open: press("Show history"), dialog: (page) => page.getByRole("dialog", { name: "History" }),
   },
   consoleAction("assign a reviewer", "Assign", "pool", "features/review/AssignReviewerDialog.tsx"),
   consoleAction("reassign a reviewer", "Reassign", "seat", "features/review/ReassignDialog.tsx"),

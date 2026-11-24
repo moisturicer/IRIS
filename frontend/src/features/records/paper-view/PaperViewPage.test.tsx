@@ -741,43 +741,49 @@ describe("the new-version control follows revision requests", () => {
     capabilities: ["cite", "create_version", "replace_manuscript", "edit_details"],
   });
 
-  it("on the adviser-first model, offers the owner a new version that names who reviews it (IR-273)", async () => {
+  // Changed deliberately by IR-1318: the Overview's card keeps why and who,
+  // and sends the owner to Documents, where they upload and submit. It used
+  // to carry the manuscript upload (IR-1046) and Submit new version (IR-273).
+  it("keeps upload and submit off the Overview, and goes to Documents for them (IR-1318)", async () => {
+    const revising = asked(null);
+    shownRecord = {
+      ...revising,
+      manuscript_unsubmitted: true,
+      revision: {
+        ...revising.revision,
+        new_version: { ...revising.revision.new_version!, unsent: { manuscript: true, details: false, uploads: [] } },
+      },
+    };
+    signInAs(OWNER_ID, "Student");
+    renderPaperView();
+
+    const banner = await screen.findByRole("region", { name: "Revision requested" });
+    expect(screen.queryByRole("button", RESUBMIT)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Submit new version" })).not.toBeInTheDocument();
+    expect(within(banner).queryByLabelText(/revised manuscript/i)).not.toBeInTheDocument();
+
+    await userEvent.click(within(banner).getByRole("button", { name: "Go to Documents" }));
+
+    const bar = await screen.findByRole("region", { name: "Revision requested by IERC" });
+    expect(bar).toHaveTextContent("1 change not sent yet: revised manuscript.");
+    expect(bar).toHaveTextContent("IERC will review v3. ITSO's clearance is kept.");
+  });
+
+  it("offers the owner a new version from the Documents tab that names who reviews it (IR-273, IR-1318)", async () => {
     shownRecord = asked(null);
     signInAs(OWNER_ID, "Student");
-    renderPaperView();
+    renderPaper(`/records/${RECORD_ID}?section=review&documents=open`);
 
-    const banner = await screen.findByRole("region", { name: "Revision requested" });
-    expect(banner).toHaveTextContent("IERC will review v3. ITSO's clearance is kept.");
-    expect(screen.queryByRole("button", RESUBMIT)).not.toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole("button", { name: "Submit new version" }));
+    const bar = await screen.findByRole("region", { name: "Revision requested by IERC" });
+    await userEvent.click(within(bar).getByRole("button", { name: "Submit new version" }));
 
     expect(await screen.findByRole("dialog", { name: "Submit new version" })).toBeInTheDocument();
-  });
-
-  it("lets the owner upload the revised manuscript from the card, and says when one is waiting (IR-1046)", async () => {
-    shownRecord = { ...asked(null), manuscript_unsubmitted: true };
-    signInAs(OWNER_ID, "Student");
-    renderPaperView();
-
-    const banner = await screen.findByRole("region", { name: "Revision requested" });
-    expect(within(banner).getByLabelText("Replace revised manuscript")).toBeInTheDocument();
-    expect(banner).toHaveTextContent("Revised manuscript ready, not yet submitted");
-  });
-
-  it("offers no manuscript upload in the card without the replace_manuscript capability (IR-1046)", async () => {
-    shownRecord = { ...asked(null), capabilities: ["cite", "create_version"] };
-    signInAs(OWNER_ID, "Student");
-    renderPaperView();
-
-    const banner = await screen.findByRole("region", { name: "Revision requested" });
-    expect(within(banner).queryByLabelText(/revised manuscript/i)).not.toBeInTheDocument();
   });
 
   it("holds the new version, saying why, until something has changed (IR-273)", async () => {
     shownRecord = asked("Nothing has changed since IERC asked for a revision.");
     signInAs(OWNER_ID, "Student");
-    renderPaperView();
+    renderPaper(`/records/${RECORD_ID}?section=review&documents=open`);
 
     const open = await screen.findByRole("button", { name: "Submit new version" });
     expect(open).toHaveAccessibleDescription("Nothing has changed since IERC asked for a revision.");
@@ -3493,7 +3499,7 @@ describe("a record the viewer cannot read (IR-411)", () => {
       capabilities: ["cite", "create_version", "replace_manuscript", "edit_details"],
     };
     signInAs(OWNER_ID, "Student");
-    renderPaperView();
+    renderPaper(`/records/${RECORD_ID}?section=review&documents=open`);
 
     await userEvent.click(await screen.findByRole("button", { name: "Submit new version" }));
     const dialog = await screen.findByRole("dialog", { name: "Submit new version" });
@@ -3774,6 +3780,14 @@ describe("the Overview's header (IR-569)", () => {
     // Neither the publication year nor the view count is a second date or a stat in the header.
     expect(within(header).queryByText(/Published \d{4}/)).not.toBeInTheDocument();
     expect(within(header).queryByText(/\d+ views?$/)).not.toBeInTheDocument();
+  });
+
+  it("shows an import's completion year when the form recorded none (IR-1316)", async () => {
+    shownRecord = { ...record, year_accomplished: null, year_completed: 2019 };
+    renderPaperView();
+    await waitForRecord(record.title);
+    const details = screen.getByRole("complementary", { name: "Record details" });
+    expect(within(details).getByText("Year Accomplished").parentElement).toHaveTextContent("2019");
   });
 
   it("lists no documents in Record details: they are Review's to show (IR-1244)", async () => {

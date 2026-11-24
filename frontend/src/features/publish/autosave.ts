@@ -54,28 +54,46 @@ export function useAutosave({ enabled, payload, complete, save }: AutosaveInput)
     saved.current = map;
   }, []);
 
-  const saveNow = useCallback(async (): Promise<void> => {
+  /**
+   * Save what can be saved now. True when it reached the server, or nothing
+   * was waiting; false when the save failed or met a newer draft (IR-1312).
+   */
+  const saveNow = useCallback(async (): Promise<boolean> => {
     while (inFlight.current) await inFlight.current;
+    if (conflicted.current) return false;
     const body = latest.current;
-    if (conflicted.current || !saved.current || !differs(body, saved.current)) return;
+    if (!saved.current || !differs(body, saved.current)) return true;
     setStatus("saving");
     const attempt = (async () => {
       try {
         await saveRef.current(body);
         markSaved(body);
         setStatus("saved");
+        return true;
       } catch (err) {
         if (isStaleEdit(err)) conflicted.current = true;
         setStatus(isStaleEdit(err) ? "conflict" : "failed");
+        return false;
       }
     })();
-    inFlight.current = attempt;
+    inFlight.current = attempt.then(() => undefined);
     try {
-      await attempt;
+      return await attempt;
     } finally {
       inFlight.current = null;
     }
   }, [markSaved]);
+
+  /** The fields of `complete` the server does not hold yet, such as one waiting for Continue. */
+  const latestComplete = useRef(complete);
+  latestComplete.current = complete;
+  const unsavedFields = useCallback((): string[] => {
+    const map = saved.current;
+    if (map == null) return [];
+    return Object.entries(latestComplete.current)
+      .filter(([key, value]) => map.get(key) !== JSON.stringify(value ?? null))
+      .map(([key]) => key);
+  }, []);
 
   const text = JSON.stringify(payload);
   useEffect(() => {
@@ -116,5 +134,6 @@ export function useAutosave({ enabled, payload, complete, save }: AutosaveInput)
 
   const unsaved = saved.current != null && differs(complete, saved.current);
   const shown: SaveStatus = (status === "saved" || status === "idle") && unsaved ? "unsaved" : status;
-  return { status: shown, markSaved, saveNow, exclusive, conflict, reset };
+  const isConflicted = useCallback(() => conflicted.current, []);
+  return { status: shown, markSaved, saveNow, unsavedFields, isConflicted, exclusive, conflict, reset };
 }

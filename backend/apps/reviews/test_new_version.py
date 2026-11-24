@@ -442,6 +442,37 @@ class NothingChangedTests(NewVersionTestBase):
         self.assertIsNone(self.detail(record, self.ierc)["revision"]["new_version"])
 
 
+class UnsentTests(NewVersionTestBase):
+    """What the Documents tab marks *not yet submitted* (IR-1318)."""
+
+    def unsent(self, record):
+        return self.detail(record, self.owner)["revision"]["new_version"]["unsent"]
+
+    def test_nothing_is_unsent_before_the_owner_changes_anything(self):
+        record = self.itso_cleared_and_ierc_asked()
+
+        self.assertEqual(self.unsent(record), {"manuscript": False, "details": False, "uploads": []})
+
+    def test_each_change_since_the_latest_version_is_named_until_it_is_submitted(self):
+        record = self.itso_cleared_and_ierc_asked()
+        slot = UploadSlot.objects.create(name="Consent form", record_type=record.record_type)
+        upload = RecordUpload.objects.create(
+            record=record, slot=slot, file=_pdf(b"%PDF-1.7 consent"), uploaded_by=self.owner,
+        )
+        self.upload_manuscript(record)
+        self.edit_title(record)
+
+        self.assertEqual(self.unsent(record), {
+            "manuscript": True, "details": True,
+            "uploads": [{"id": upload.pk, "label": "Consent form"}],
+        })
+
+        self.submitted(record)
+        # The version carries them; asked again, nothing is unsent.
+        self.asked(record, self.ierc)
+        self.assertEqual(self.unsent(record), {"manuscript": False, "details": False, "uploads": []})
+
+
 # --- AC: two requests --------------------------------------------------------------------
 
 class TwoRequestsTests(NewVersionTestBase):

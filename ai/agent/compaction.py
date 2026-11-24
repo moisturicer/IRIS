@@ -22,7 +22,7 @@ from typing import Optional
 
 from ai.agent.context import Capacity, Reserves
 from ai.agent.prompts import (
-    DERIVED, HANDOFF_PREFIX as PREFIX, READER_MARK, STATE_PREFIX, SUMMARY_REQUEST as NOTE, quoted,
+    DERIVED, HANDOFF_PREFIX as PREFIX, READER_MARK, STATE_PREFIX, SUMMARY_REQUEST as NOTE, TODAY_PREFIX, quoted,
 )
 from ai.agent.protocol import ModelTurn, ToolResult, User
 from ai.research.tools import Source
@@ -115,12 +115,12 @@ def is_handoff(entry) -> bool:
 
 
 def is_state(entry) -> bool:
-    return isinstance(entry, User) and entry.text.startswith(STATE_PREFIX)
+    return isinstance(entry, User) and entry.text.startswith((STATE_PREFIX, TODAY_PREFIX))
 
 
 def reader(text: str) -> str:
-    """Reader text, marked when it starts like a handoff or the state message so it never passes for one."""
-    return READER_MARK + text if text.startswith((PREFIX, STATE_PREFIX)) else text
+    """Reader text, marked when it starts like a message IRIS writes, so it never passes for one."""
+    return READER_MARK + text if text.startswith((PREFIX, STATE_PREFIX, TODAY_PREFIX)) else text
 
 
 def split(history, keep: int) -> Optional[Split]:
