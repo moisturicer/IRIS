@@ -12,7 +12,7 @@ COLLEGE OF COMPUTER STUDIES
 
 **Version 2.0 (MVP as built)**
 
-> **How to read this version.** This document is derived from the Architecture Decision Records in `docs/adr/` and from the code at commit `a46d7fc4` on `main`. **Where they differ from this document, they win.** It is a thesis deliverable that describes the Minimum Viable Product (MVP) as built. It is not an engineering authority: the ADRs are. Requirement status lines are copied from `docs/testing/TRACEABILITY.md` at the same commit, and nothing here is called VERIFIED unless that file says so.
+> **How to read this version.** This document is derived from the Architecture Decision Records in `docs/adr/` and from the code at commit `c01f0ef1` on `main`. **Where they differ from this document, they win.** It is a thesis deliverable that describes the Minimum Viable Product (MVP) as built. It is not an engineering authority: the ADRs are. Requirement status lines are copied from `docs/testing/TRACEABILITY.md` at the same commit, and nothing here is called VERIFIED unless that file says so.
 
 **Change History**
 
@@ -127,14 +127,14 @@ The intended audience of this SRS includes:
 
 IPAMS v2.0 had three limitations that made incremental repair unfeasible: (1) it degraded badly when more than about ten people used it at once; (2) its AI module was a stateless language-model wrapper with no institutional context, so its answers could not be checked; and (3) it had no structured approval workflow matching CIT-U's governance, and no technical controls for the Data Privacy Act of 2012 (RA 10173).
 
-IRIS is a web-based platform for submitting, reviewing, publishing and searching the research and intellectual-property (IP) outputs of CIT-U's students, faculty and research offices. Its MVP covers:
+IRIS is a web-based platform for submitting, reviewing, publishing and searching the research and intellectual-property (IP) outputs of CIT-U's students, faculty and research offices. Its MVP, what is built on `main` at commit `c01f0ef1`, covers:
 
 **Type-differentiated submission and review (the research contribution).** IRIS accepts three record types, each reviewed differently ([ADR-032](adr/032-adviser-first-review-and-office-reviewer-pools.md), [ADR-047](adr/047-rdco-routes-and-decides-at-any-time.md)):
 
-* **Proposal:** an early-stage research idea. Its **Adviser alone** decides it (accept, request revision or reject). It is never routed to an office and never published.
+* **Proposal:** an early-stage research idea. Its **Adviser alone** decides it (accept, request changes or reject). It is never routed to an office and never published.
 * **Thesis / Research** and **Project:** completed work. The Adviser reviews it first and, on accepting it, **sends it to RDCO**. RDCO may request parallel reviews from ITSO, IERC and KTTO, and those offices may request each other. **Only RDCO publishes**, and RDCO may decide at any time.
 
-When one reviewer asks for revisions, the owner submits a new **Version**. Under **clearance-aware resubmission**, only the clearance of the party that asked is reset; every other office's completed clearance is kept ([ADR-003](adr/003-clearance-aware-resubmission.md)). This is the thesis's primary research contribution. It is measured against a "restart-all" comparison policy ([ADR-004](adr/004-restart-all-comparison-mode.md)).
+When one reviewer asks for changes to the paper itself (*Request changes*), the owner submits a new **Version**. Under **clearance-aware resubmission**, only the clearance of the party that asked is reset; every other office's completed clearance is kept ([ADR-003](adr/003-clearance-aware-resubmission.md)). This is the thesis's primary research contribution. It is measured against a "restart-all" comparison policy ([ADR-004](adr/004-restart-all-comparison-mode.md)).
 
 **Indexing and AI (thesis-critical since 2026-09-04, [ADR-013](adr/013-chunk-level-rag-pipeline.md)).** A submitted manuscript is extracted, split into passages ("chunks"), and embedded for search by meaning. **Ask IRIS** answers questions about the library with citations to passages the reader may read. **Paper Chat** does the same for one paper, and each paper has a cited **AI Overview**. Nothing reaches an AI vendor until the paper is **published**, a person has released its embargo, and its owner has consented to AI use (the **disclosure gate**).
 
@@ -161,7 +161,7 @@ Table 1: Definitions, Acronyms and Abbreviations
 | :---: | ----- |
 | **IPAMS** | Intellectual Property Asset Management System, the legacy CIT-U platform IRIS replaces. |
 | **IRIS** | Intelligent Research & IP System, the reimplemented platform. |
-| **MVP** | Minimum Viable Product. In this document: what is built on `main` and used by the pilot (Section 3.2). Work accepted but not built is in Section 3.4. |
+| **MVP** | Minimum Viable Product. In this document: what is built on `main` at commit `c01f0ef1` (Section 3.2). Work accepted but not built is in Section 3.4. The commit the deployed server runs is not recorded here: the iris-demo server has been off since 2026-11-15 to save cost, and the screens in this document are local builds. |
 | **ADR** | Architecture Decision Record, a short document in `docs/adr/` that records one design decision, its alternatives and its consequences. The ADRs are IRIS's requirements authority. |
 | **Record** | One research or IP output in IRIS (a Proposal, Thesis / Research or Project), with its metadata, owners, Adviser and files. |
 | **Version** | One submitted state of a Record. Every resubmission creates a new Version that keeps its own manuscript, text and documents ([ADR-058](adr/058-each-version-keeps-its-text-and-its-files.md)). |
@@ -170,7 +170,8 @@ Table 1: Definitions, Acronyms and Abbreviations
 | **Assignment** | "This party has the Record": an open review task for one party. |
 | **Seat** | "This person is reviewing it for that party": a named reviewer on an Assignment. An office's unclaimed Assignment sits in its **Pool**. |
 | **Clearance** | One specialist office's recorded outcome for a Record (pending, cleared, declined, not cleared). Each office's clearance is stored separately. |
-| **Revision request** | A reviewer's request that the owner change the submission and send a new Version. Distinct from a **document request**, which asks only for a missing file. |
+| **Revision request** | The part of a reviewer's *Request changes* that asks the owner for a new Version (`ResubmissionRequest`). *Request changes* may also ask for documents in the same act, or for documents alone: that is a **document request**, which asks only for files ([ADR-022](adr/022-explicit-document-requests.md) Amendment 8). |
+| **Held upload** | An owner's upload to a submitted Record that is not sent yet. Only the owners see it, until *Submit new version* or *Submit added documents* sends it. |
 | **Decision** | The act that ends a Record's review: accept (Proposal), publish, keep unlisted or reject. |
 | **Clearance-aware resubmission** | On a new Version, only the clearances of the parties that asked for revisions are reset; every other clearance is preserved. |
 | **Embargo** | A hold on a paper's release, for example under a sponsor agreement. A person ends it; a date never does ([ADR-052](adr/052-each-paper-states-its-embargo-and-a-person-ends-it.md)). |
@@ -252,9 +253,9 @@ Zhang, Y., et al. (2025). Adaptive load balancing in microservices-based institu
 
 Django Software Foundation. (2025). *Django documentation* (Version 5.2). https://docs.djangoproject.com/en/5.2/
 
-IRIS Architecture Decision Records, `docs/adr/001`–`074`, at commit `a46d7fc4`. The ADR cited for a requirement is its authority.
+IRIS Architecture Decision Records, `docs/adr/001`–`074`, at commit `c01f0ef1`. The ADR cited for a requirement is its authority.
 
-IRIS Requirements Traceability, `docs/testing/TRACEABILITY.md`, at commit `a46d7fc4`.
+IRIS Requirements Traceability, `docs/testing/TRACEABILITY.md`, at commit `c01f0ef1`.
 
 pgvector. (n.d.). *Open-source vector similarity search for Postgres*. https://github.com/pgvector/pgvector
 
@@ -294,8 +295,8 @@ Table 2: User Characteristics
 
 | User Class | Technical Level | Primary Interaction & System Role |
 | :---: | :---: | ----- |
-| **Students / Researchers** | Low–Medium | Sign up, publish records, answer revision and document requests, search and read the library, ask Ask IRIS, keep a private reading library. |
-| **Advisers (faculty)** | Medium | Review their advisees' records first: decide Proposals; accept a Thesis / Research or Project and send it to RDCO, or request revision or reject. May also submit their own work, naming a different Adviser. Post Calls & Conferences for RDCO to confirm. |
+| **Students / Researchers** | Low–Medium | Sign up, publish records, answer reviewers' requested changes (a new Version, documents or both), search and read the library, ask Ask IRIS, keep a private reading library. |
+| **Advisers (faculty)** | Medium | Review their advisees' records first: decide Proposals; accept a Thesis / Research or Project and send it to RDCO, or request changes or reject. May also submit their own work, naming a different Adviser. Post Calls & Conferences for RDCO to confirm. |
 | **IERC members** | Medium | Ethics review of records RDCO or another office routes to them; record a clearance or a finding. |
 | **ITSO officers** | Medium–High | Technical and patentability review of routed records. |
 | **KTTO officers** | Medium | IP and commercialization review of routed records; release an IP mark so a paper may reach AI. |
@@ -383,7 +384,8 @@ Table 4: Docker Compose Service Map
 | `db` | pgvector/pgvector:pg16 | private | PostgreSQL 16 + pgvector: Django tables and the iris_ai schema |
 | `redis` | redis:7-alpine | private | Celery broker, cache, live-hint channels, AI run wake-ups |
 | `clamav` | clamav/clamav:stable | private, egress | Malware scanning of uploads; signature updates |
-| `migrate` | backend image | private | Runs migrations once before the application services |
+| `migrate` | backend image | private | Runs Django's migrations once before the application services |
+| `ai-migrate` | ai image | private | Migrates the `iris_ai` schema once, after `migrate`; the AI services wait for it (IR-1320) |
 | `backend` | backend image | private, egress | Django on ASGI (Gunicorn + Uvicorn workers) |
 | `ai-gateway` | ai image | private, egress | FastAPI AI runtime; no public port |
 | `ai-runs-worker` | ai image | private, egress | Claims and runs Ask IRIS runs |
@@ -726,7 +728,7 @@ Table 32: External Cloud Services
 
 ## 3.2 Functional Requirements
 
-Table X lists every MVP functional requirement. Each subsection then gives its use-case diagram, use cases, activity diagrams and screens, as v1 did. Each entry's **Status** is copied from `docs/testing/TRACEABILITY.md` at commit `a46d7fc4`, using its vocabulary: VERIFIED (tested, evidence recorded), IMPLEMENTED (code exists, no recorded test evidence), PARTIAL (some of the requirement is met). Where a requirement has no `FR-` label in the matrix, its status is the matrix's row for the ticket that built it.
+Table 33 lists every MVP functional requirement. Each subsection then gives its use-case diagram, use cases, activity diagrams and screens, as v1 did. Each entry's **Status** is copied from `docs/testing/TRACEABILITY.md` at commit `c01f0ef1`, using its vocabulary: VERIFIED (tested, evidence recorded), IMPLEMENTED (code exists, no recorded test evidence), PARTIAL (some of the requirement is met). Where a requirement has no `FR-` label in the matrix, its status is the matrix's row for the ticket that built it.
 
 Table 33: Functional Requirements
 
@@ -741,7 +743,7 @@ Table 33: Functional Requirements
 | **FR-1.7** | Personal Data Rights: Export and Account Deletion | The system shall let a person **download their personal data** (`GET /api/v1/users/me/data/`) and **request deletion of their account** in Settings. |
 | **FR-2.1** | Publish a Record | The system shall provide a multi-step **Publish** form for Students and Advisers to create a record of one of three types: **Proposal**, **Thesis / Research** or **Project**. It collects the title, abstract, year, authors, co-owners (verified accounts only), a named **Adviser** (who **must not be an owner**: nobody reviews their own submission), the declared research origin and publication metadata, PSCED and classification, keywords, the manuscript PDF and the type's documents. |
 | **FR-2.2** | Required Documents and Templates | The system shall let **RDCO** add, edit, reorder and remove each record type's **requirements** (upload slots), labelled Required or Optional, each with a description and at most one current **Template**, in Setup. |
-| **FR-2.3** | Upload Checks | Every uploaded file shall be checked before it is stored:. |
+| **FR-2.3** | Upload Checks | Every uploaded file shall be checked before it is stored. |
 | **FR-2.4** | Versions | Every submission and resubmission shall create a new **Version** of the same record. |
 | **FR-2.5** | Download Requests and Watermarked Copies | Reading a paper in the browser shall stay open to everyone the visibility rule admits. |
 | **FR-2.6** | Delete Requests | The system shall let a record's owner ask for its deletion. |
@@ -750,8 +752,8 @@ Table 33: Functional Requirements
 | **FR-3.1** | Adviser-First Review | Every record shall enter review with its Adviser. |
 | **FR-3.2** | RDCO Routes and Decides at Any Time | From the Adviser's send onward, RDCO holds the record. |
 | **FR-3.3** | Parallel Office Clearance | Each routed office shall review in parallel, through its own **reviewer pool**. An office's assignment lands in its Pool; a member **claims** it, or a coordinator **assigns** or reassigns it, as a **Seat**. A reviewer may **add a colleague** from their own office. |
-| **FR-3.4** | Clearance-Aware Resubmission | **This is IRIS's primary research contribution.** When a reviewer requests revision, the owners answer every open revision request with one new Version. |
-| **FR-3.5** | Explicit Document Requests | A reviewer who only needs a file shall create a **document request**, distinct from a revision request. |
+| **FR-3.4** | Clearance-Aware Resubmission | **This is IRIS's primary research contribution.** When a reviewer requests changes to the paper itself, the owners answer every open revision request with one new Version. |
+| **FR-3.5** | Explicit Document Requests | A reviewer who needs only files shall ask for them in a **document request**, distinct from a revision request: from the Documents tab, or with *Request changes* and no new Version. |
 | **FR-3.6** | Review Threads and Comments | Reviewers shall discuss a Version in **threads** that may be anchored to a passage of the manuscript. |
 | **FR-3.7** | Turnaround, Reminders and Escalation | Each party's assignment shall carry a **due date** computed from that party's turnaround in **working days**, minus an administrator-kept holiday table, in Manila time. |
 | **FR-3.8** | IP Type on Published Records | Office staff shall be able to tag a record with an IP type: **Patent**, **Copyright**, **Trade Secret** or **Utility Model** (`IPType`). |
@@ -759,7 +761,7 @@ Table 33: Functional Requirements
 | **FR-4.2** | Live Updates | Pages shall update themselves. |
 | **FR-5.1** | Extraction | When a record is **published** (or a published record's embargo is released again), the system shall queue its manuscript's extraction on the `extraction` queue. |
 | **FR-5.2** | Chunking and Embedding | After extraction, the system shall split the text into **chunks**, the retrievable unit. |
-| **FR-5.3** | Disclosure Gate | **No part of a paper shall reach any AI vendor or model** (Unstructured's read, Voyage's vectors and reranking, the AI Overview, paper briefs, figure and formula reading, and Ask IRIS and Paper Chat, including their counts, lists and title lookups) unless all of the following hold:. |
+| **FR-5.3** | Disclosure Gate | **No part of a paper shall reach any AI vendor or model** (Unstructured's read, Voyage's vectors and reranking, the AI Overview, paper briefs, figure and formula reading, and Ask IRIS and Paper Chat, including their counts, lists and title lookups) unless all of the following hold. |
 | **FR-5.4** | Ask IRIS | The system shall let a signed-in person ask questions about the library in a conversation (`/ai`). |
 | **FR-5.5** | Paper Chat | From a paper's page, a reader shall be able to ask questions about **that paper only**. This is Ask IRIS with its reader grant scoped to one record. |
 | **FR-5.6** | AI Overview | Each published paper the gate admits shall have a **stored, cited summary** (`RecordOverview`), generated once on the `embedding` queue after its passages are embedded, and regenerated when the manuscript changes. |
@@ -946,7 +948,7 @@ Use Case M1-3.1: Lock Out Repeated Sign-in Failures
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
 ![Figure 13](diagrams/srs-sdd-v2/screens/S-1.2c-sign-in-error.png)
-*Figure 13: Failed sign-in with the attempts left (local build)*
+*Figure 13: Failed sign-in: the attempts left, said in a dialog (local build)*
 
 #### 3.2.1.4 Account Recovery
 
@@ -1135,6 +1137,9 @@ Screens of a production build of this repository on a local machine, with `seed_
 ![Figure 28](diagrams/srs-sdd-v2/screens/S-2.1-publish.png)
 *Figure 28: Publish dialog (local build)*
 
+![Figure 29](diagrams/srs-sdd-v2/screens/S-2.1b-publish-leave.png)
+*Figure 29: Publish asks before closing: "Discard what you've entered?" (local build)*
+
 #### 3.2.2.2 Required Documents and Templates
 
 **FR-ID: FR-2.2** · **Status: IMPLEMENTED** (IR-971) · Source: [ADR-063](adr/063-rdco-sets-requirements-and-templates.md)
@@ -1143,8 +1148,8 @@ The system shall let **RDCO** add, edit, reorder and remove each record type's *
 
 **Use Case Diagram**
 
-![Figure 29](diagrams/srs-sdd-v2/png/U-2.2-requirements.png)
-*Figure 29: Required Documents and Templates Use Case Diagram*
+![Figure 30](diagrams/srs-sdd-v2/png/U-2.2-requirements.png)
+*Figure 30: Required Documents and Templates Use Case Diagram*
 
 **Use Case Description**
 
@@ -1161,18 +1166,21 @@ Use Case M2-2.1: Set a Record Type's Requirements
 
 **Activity Diagram**
 
-![Figure 30](diagrams/srs-sdd-v2/png/A-2.2-requirements.png)
-*Figure 30: Set a record type's requirements Activity Diagram*
+![Figure 31](diagrams/srs-sdd-v2/png/A-2.2-requirements.png)
+*Figure 31: Set a record type's requirements Activity Diagram*
 
 **Wireframes**
 
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
-![Figure 31](diagrams/srs-sdd-v2/screens/S-2.2a-setup.png)
-*Figure 31: Setup: requirements and templates (RDCO) (local build)*
+![Figure 32](diagrams/srs-sdd-v2/screens/S-2.2a-setup.png)
+*Figure 32: Setup: a record type's description, requirements and templates (RDCO) (local build)*
 
-![Figure 32](diagrams/srs-sdd-v2/screens/S-2.2b-guidelines.png)
-*Figure 32: Guidelines (local build)*
+![Figure 33](diagrams/srs-sdd-v2/screens/S-2.2c-add-requirement.png)
+*Figure 33: Setup: the "Add a requirement" popup (RDCO) (local build)*
+
+![Figure 34](diagrams/srs-sdd-v2/screens/S-2.2b-guidelines.png)
+*Figure 34: Guidelines, one record type at a time (local build)*
 
 #### 3.2.2.3 Upload Checks
 
@@ -1187,8 +1195,8 @@ Every uploaded file shall be checked before it is stored:
 
 **Use Case Diagram**
 
-![Figure 33](diagrams/srs-sdd-v2/png/U-2.3-upload-checks.png)
-*Figure 33: Upload Checks Use Case Diagram*
+![Figure 35](diagrams/srs-sdd-v2/png/U-2.3-upload-checks.png)
+*Figure 35: Upload Checks Use Case Diagram*
 
 **Use Case Description**
 
@@ -1205,26 +1213,26 @@ Use Case M2-3.1: Upload a Checked File
 
 **Activity Diagram**
 
-![Figure 34](diagrams/srs-sdd-v2/png/A-2.3-upload.png)
-*Figure 34: Check an upload Activity Diagram*
+![Figure 36](diagrams/srs-sdd-v2/png/A-2.3-upload.png)
+*Figure 36: Check an upload Activity Diagram*
 
 **Wireframes**
 
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
-![Figure 35](diagrams/srs-sdd-v2/screens/S-2.1-publish.png)
-*Figure 35: Publish dialog (local build)*
+![Figure 37](diagrams/srs-sdd-v2/screens/S-2.1-publish.png)
+*Figure 37: Publish dialog (local build)*
 
 #### 3.2.2.4 Versions
 
 **FR-ID: FR-2.4** · **Status: IMPLEMENTED** (IR-871) · Sources: [ADR-058](adr/058-each-version-keeps-its-text-and-its-files.md), [ADR-032](adr/032-adviser-first-review-and-office-reviewer-pools.md) §5–§6
 
-Every submission and resubmission shall create a new **Version** of the same record. A Version keeps its own manuscript, its own documents and its own **review text**: a local read of the PDF with pdfplumber and no AI, made whatever the embargo or consent. Reviewers can compare two Versions section by section (IR-873, VERIFIED). A metadata-only Version names the previous Version's manuscript. An accepted Proposal can be **continued as** a Thesis / Research or Project, a new record linked to it (lineage).
+Every submission and resubmission shall create a new **Version** of the same record. A Version keeps its own manuscript, its own documents and its own **review text**: a local read of the PDF with pdfplumber and no AI, made whatever the embargo or consent. Reviewers can compare two Versions section by section (IR-873, VERIFIED). A metadata-only Version names the previous Version's manuscript. An accepted Proposal can be **continued as** a Thesis / Research or Project, a new record linked to it (lineage). An owner's upload to a submitted record joins a Version only when it is sent; until then it is held and seen only by the owners, and may be deleted by them (ADR-058 as amended for IR-1322).
 
 **Use Case Diagram**
 
-![Figure 36](diagrams/srs-sdd-v2/png/U-2.4-versions.png)
-*Figure 36: Versions Use Case Diagram*
+![Figure 38](diagrams/srs-sdd-v2/png/U-2.4-versions.png)
+*Figure 38: Versions Use Case Diagram*
 
 **Use Case Description**
 
@@ -1241,15 +1249,15 @@ Use Case M2-4.1: Compare Two Versions
 
 **Activity Diagram**
 
-![Figure 37](diagrams/srs-sdd-v2/png/A-2.4-version.png)
-*Figure 37: Read and compare Versions Activity Diagram*
+![Figure 39](diagrams/srs-sdd-v2/png/A-2.4-version.png)
+*Figure 39: Read and compare Versions Activity Diagram*
 
 **Wireframes**
 
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
-![Figure 38](diagrams/srs-sdd-v2/screens/S-2.4-paper-view.png)
-*Figure 38: Paper View with the in-browser reader (local build)*
+![Figure 40](diagrams/srs-sdd-v2/screens/S-2.4-paper-view.png)
+*Figure 40: Paper View: a published paper's Overview; its AI Overview is unavailable because no AI vendor is reached locally (local build)*
 
 #### 3.2.2.5 Download Requests and Watermarked Copies
 
@@ -1259,8 +1267,8 @@ Reading a paper in the browser shall stay open to everyone the visibility rule a
 
 **Use Case Diagram**
 
-![Figure 39](diagrams/srs-sdd-v2/png/U-2.5-downloads.png)
-*Figure 39: Download Requests and Watermarked Copies Use Case Diagram*
+![Figure 41](diagrams/srs-sdd-v2/png/U-2.5-downloads.png)
+*Figure 41: Download Requests and Watermarked Copies Use Case Diagram*
 
 **Use Case Description**
 
@@ -1277,18 +1285,18 @@ Use Case M2-5.1: Request a Download
 
 **Activity Diagram**
 
-![Figure 40](diagrams/srs-sdd-v2/png/A-2.5-download.png)
-*Figure 40: Request and use a download Activity Diagram*
+![Figure 42](diagrams/srs-sdd-v2/png/A-2.5-download.png)
+*Figure 42: Request and use a download Activity Diagram*
 
 **Wireframes**
 
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
-![Figure 41](diagrams/srs-sdd-v2/screens/S-2.5a-download-request.png)
-*Figure 41: Paper View: saving a copy needs a request (local build)*
+![Figure 43](diagrams/srs-sdd-v2/screens/S-2.5a-download-request.png)
+*Figure 43: Paper View: saving a copy needs a request (local build)*
 
-![Figure 42](diagrams/srs-sdd-v2/screens/S-2.5b-download-requests.png)
-*Figure 42: Download requests (RDCO) (local build)*
+![Figure 44](diagrams/srs-sdd-v2/screens/S-2.5b-download-requests.png)
+*Figure 44: Download requests (RDCO) (local build)*
 
 #### 3.2.2.6 Delete Requests
 
@@ -1298,8 +1306,8 @@ The system shall let a record's owner ask for its deletion. The record moves to 
 
 **Use Case Diagram**
 
-![Figure 43](diagrams/srs-sdd-v2/png/U-2.6-delete-requests.png)
-*Figure 43: Delete Requests Use Case Diagram*
+![Figure 45](diagrams/srs-sdd-v2/png/U-2.6-delete-requests.png)
+*Figure 45: Delete Requests Use Case Diagram*
 
 **Use Case Description**
 
@@ -1316,15 +1324,15 @@ Use Case M2-6.1: Request a Record's Deletion
 
 **Activity Diagram**
 
-![Figure 44](diagrams/srs-sdd-v2/png/A-2.6-delete-request.png)
-*Figure 44: Delete a record Activity Diagram*
+![Figure 46](diagrams/srs-sdd-v2/png/A-2.6-delete-request.png)
+*Figure 46: Delete a record Activity Diagram*
 
 **Wireframes**
 
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
-![Figure 45](diagrams/srs-sdd-v2/screens/S-2.6-delete-requests.png)
-*Figure 45: Delete requests (RDCO) (local build)*
+![Figure 47](diagrams/srs-sdd-v2/screens/S-2.6-delete-requests.png)
+*Figure 47: Delete requests (RDCO) (local build)*
 
 #### 3.2.2.7 Bulk Import from Excel
 
@@ -1334,8 +1342,8 @@ Office staff shall be able to download a styled `.xlsx` template (the Import rec
 
 **Use Case Diagram**
 
-![Figure 46](diagrams/srs-sdd-v2/png/U-2.7-excel-import.png)
-*Figure 46: Bulk Import from Excel Use Case Diagram*
+![Figure 48](diagrams/srs-sdd-v2/png/U-2.7-excel-import.png)
+*Figure 48: Bulk Import from Excel Use Case Diagram*
 
 **Use Case Description**
 
@@ -1352,18 +1360,18 @@ Use Case M2-7.1: Import Legacy Records
 
 **Activity Diagram**
 
-![Figure 47](diagrams/srs-sdd-v2/png/A-2.7-import.png)
-*Figure 47: Import records from Excel Activity Diagram*
+![Figure 49](diagrams/srs-sdd-v2/png/A-2.7-import.png)
+*Figure 49: Import records from Excel Activity Diagram*
 
-![Figure 48](diagrams/srs-sdd-v2/v1-kept/SRS-v1-image45-excel-import-activity.png)
-*Figure 48: Bulk import via Excel activity diagram (v1, kept)*
+![Figure 50](diagrams/srs-sdd-v2/v1-kept/SRS-v1-image45-excel-import-activity.png)
+*Figure 50: Bulk import via Excel activity diagram (v1, kept)*
 
 **Wireframes**
 
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
-![Figure 49](diagrams/srs-sdd-v2/screens/S-2.7-import.png)
-*Figure 49: Import records (RDCO) (local build)*
+![Figure 51](diagrams/srs-sdd-v2/screens/S-2.7-import.png)
+*Figure 51: Import records (RDCO) (local build)*
 
 #### 3.2.2.8 Discover: Browse and Search Published Records
 
@@ -1373,8 +1381,8 @@ The system shall let any signed-in person browse published records and search th
 
 **Use Case Diagram**
 
-![Figure 50](diagrams/srs-sdd-v2/png/U-2.8-discover.png)
-*Figure 50: Discover: Browse and Search Published Records Use Case Diagram*
+![Figure 52](diagrams/srs-sdd-v2/png/U-2.8-discover.png)
+*Figure 52: Discover: Browse and Search Published Records Use Case Diagram*
 
 **Use Case Description**
 
@@ -1391,25 +1399,28 @@ Use Case M2-8.1: Search Published Records
 
 **Activity Diagram**
 
-![Figure 51](diagrams/srs-sdd-v2/png/A-2.8-search.png)
-*Figure 51: Search Discover Activity Diagram*
+![Figure 53](diagrams/srs-sdd-v2/png/A-2.8-search.png)
+*Figure 53: Search Discover Activity Diagram*
 
-![Figure 52](diagrams/srs-sdd-v2/v1-kept/SRS-v1-image56-keyword-search-activity.png)
-*Figure 52: Keyword search activity diagram (v1, kept)*
+![Figure 54](diagrams/srs-sdd-v2/v1-kept/SRS-v1-image56-keyword-search-activity.png)
+*Figure 54: Keyword search activity diagram (v1, kept)*
 
 **Wireframes**
 
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
-![Figure 53](diagrams/srs-sdd-v2/screens/S-2.8-discover.png)
-*Figure 53: Discover (local build)*
+![Figure 55](diagrams/srs-sdd-v2/screens/S-2.8-discover.png)
+*Figure 55: Discover (local build)*
+
+![Figure 56](diagrams/srs-sdd-v2/screens/S-2.8b-discover-people.png)
+*Figure 56: Discover: People, with College, Department and Role filters (local build)*
 
 ### Module 3: Review Workflow (Thesis Core)
 
 This module is the thesis's research contribution. v1's fixed route ("RDCO intake → IERC + KTTO → RDCO final") is **superseded** by ADR-021, ADR-032 and ADR-047: there is no intake stage, every record enters with its Adviser, and routing to offices is RDCO's decision.
 
-![Figure 54](diagrams/srs-sdd-v2/png/V-03-record-states.png)
-*Figure 54: Record lifecycle and review states*
+![Figure 57](diagrams/srs-sdd-v2/png/V-03-record-states.png)
+*Figure 57: Record lifecycle and review states*
 
 #### 3.2.3.1 Adviser-First Review
 
@@ -1417,14 +1428,14 @@ This module is the thesis's research contribution. v1's fixed route ("RDCO intak
 
 Every record shall enter review with its Adviser.
 
-* **Proposal:** the Adviser alone decides: **request revision**, **reject** (`rejected`, shown as *Archived*) or **accept** (`approved`, shown as *Accepted*). A Proposal is never routed to an office and never published.
-* **Thesis / Research and Project:** the Adviser may **request revision**, **reject**, or **accept & send to RDCO**, with a required reason. Sending is not a Decision. It may nominate RDCO officers and suggest specialist offices, but the suggestion routes nothing. The Adviser's only Decision on these types is reject.
-* A reject needs a reason, shown to the owners. Neither the Adviser's reject nor the send is allowed while a revision request is open.
+* **Proposal:** the Adviser alone decides: **request changes**, **reject** (`rejected`, shown as *Archived*) or **accept** (`approved`, shown as *Accepted*). A Proposal is never routed to an office and never published.
+* **Thesis / Research and Project:** the Adviser may **request changes**, **reject**, or **accept & send to RDCO**, with a required reason. Sending is not a Decision. It may nominate RDCO officers and suggest specialist offices, but the suggestion routes nothing. The Adviser's only Decision on these types is reject.
+* A reject needs a reason, shown to the owners. Neither the Adviser's reject nor the send is allowed while a revision request is open. *Request changes* is the `request_revision` verdict, shown under that name since IR-1322 ([ADR-032](adr/032-adviser-first-review-and-office-reviewer-pools.md) §7 as amended).
 
 **Use Case Diagram**
 
-![Figure 55](diagrams/srs-sdd-v2/png/U-3.1-adviser-first.png)
-*Figure 55: Adviser-First Review Use Case Diagram*
+![Figure 58](diagrams/srs-sdd-v2/png/U-3.1-adviser-first.png)
+*Figure 58: Adviser-First Review Use Case Diagram*
 
 **Use Case Description**
 
@@ -1436,23 +1447,26 @@ Use Case M3-1.1: Adviser Reviews a Thesis
 | **Description** | The Adviser reviews the submission and decides what happens next. |
 | **Preconditions** | The record is `in_review` and the Adviser holds its review. |
 | **Main Flow** | 1. The Adviser opens the record from My Reviews (To review). 2. The Adviser reads the manuscript and may comment in threads (FR-3.6). 3. The Adviser chooses Accept & send to RDCO, gives a reason, and may nominate RDCO officers and tick suggested offices. 4. The system completes the Adviser's assignment, opens RDCO's assignment, notifies RDCO, and records the act. |
-| **Alternative Flow** | **Request revision:** the owners are asked for a new Version (FR-3.4). **Reject:** with a reason, the record becomes `rejected` (*Archived*). |
+| **Alternative Flow** | **Request changes:** the owners are asked for a new Version, documents, or both (FR-3.4, FR-3.5). **Reject:** with a reason, the record becomes `rejected` (*Archived*). |
 | **Postconditions** | RDCO holds the record, or the owners have been asked to revise, or the record is archived. |
 
 **Activity Diagram**
 
-![Figure 56](diagrams/srs-sdd-v2/png/A-3.1-adviser.png)
-*Figure 56: The Adviser's review Activity Diagram*
+![Figure 59](diagrams/srs-sdd-v2/png/A-3.1-adviser.png)
+*Figure 59: The Adviser's review Activity Diagram*
 
 **Wireframes**
 
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
-![Figure 57](diagrams/srs-sdd-v2/screens/S-3.1a-my-reviews.png)
-*Figure 57: My Reviews (Adviser) (local build)*
+![Figure 60](diagrams/srs-sdd-v2/screens/S-3.1a-my-reviews.png)
+*Figure 60: My Reviews (Adviser) (local build)*
 
-![Figure 58](diagrams/srs-sdd-v2/screens/S-3.1b-adviser-review.png)
-*Figure 58: Review workspace (Adviser) (local build)*
+![Figure 61](diagrams/srs-sdd-v2/screens/S-3.1b-adviser-review.png)
+*Figure 61: Review workspace (Adviser) (local build)*
+
+![Figure 62](diagrams/srs-sdd-v2/screens/S-3.1c-request-changes.png)
+*Figure 62: Finish review: "Request changes", with "The paper itself needs changes" ticked and the documents picklist (Adviser) (local build)*
 
 #### 3.2.3.2 RDCO Routes and Decides at Any Time
 
@@ -1470,8 +1484,8 @@ Every request carries a required reason and names an office (its Pool) or specif
 
 **Use Case Diagram**
 
-![Figure 59](diagrams/srs-sdd-v2/png/U-3.2-rdco.png)
-*Figure 59: RDCO Routes and Decides at Any Time Use Case Diagram*
+![Figure 63](diagrams/srs-sdd-v2/png/U-3.2-rdco.png)
+*Figure 63: RDCO Routes and Decides at Any Time Use Case Diagram*
 
 **Use Case Description**
 
@@ -1499,18 +1513,18 @@ Use Case M3-2.2: RDCO Decides
 
 **Activity Diagram**
 
-![Figure 60](diagrams/srs-sdd-v2/png/A-3.2-rdco.png)
-*Figure 60: RDCO routes and decides Activity Diagram*
+![Figure 64](diagrams/srs-sdd-v2/png/A-3.2-rdco.png)
+*Figure 64: RDCO routes and decides Activity Diagram*
 
 **Wireframes**
 
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
-![Figure 61](diagrams/srs-sdd-v2/screens/S-3.2a-rdco-decide.png)
-*Figure 61: RDCO's view of a record ready to decide, with its embargo card (local build)*
+![Figure 65](diagrams/srs-sdd-v2/screens/S-3.2a-rdco-decide.png)
+*Figure 65: RDCO's view of a record ready to decide, with its embargo card (local build)*
 
-![Figure 62](diagrams/srs-sdd-v2/screens/S-3.2b-rdco-offices-reviewing.png)
-*Figure 62: RDCO's view while IERC and KTTO still review (local build)*
+![Figure 66](diagrams/srs-sdd-v2/screens/S-3.2b-rdco-offices-reviewing.png)
+*Figure 66: RDCO's view while IERC and KTTO still review (local build)*
 
 #### 3.2.3.3 Parallel Office Clearance
 
@@ -1520,8 +1534,8 @@ Each routed office shall review in parallel, through its own **reviewer pool**. 
 
 **Use Case Diagram**
 
-![Figure 63](diagrams/srs-sdd-v2/png/U-3.3-clearance.png)
-*Figure 63: Parallel Office Clearance Use Case Diagram*
+![Figure 67](diagrams/srs-sdd-v2/png/U-3.3-clearance.png)
+*Figure 67: Parallel Office Clearance Use Case Diagram*
 
 **Use Case Description**
 
@@ -1533,38 +1547,39 @@ Use Case M3-3.1: Review for an Office
 | **Description** | A specialist office reviews a record RDCO routed to it. |
 | **Preconditions** | RDCO (or another office) has requested this office. |
 | **Main Flow** | 1. The record lands in the office's Pool. 2. A member claims it, or the coordinator assigns a reviewer. 3. The reviewer reads the paper, may add a colleague or request another office. 4. The reviewer clears it, or records a finding. 5. IRIS records the office's clearance, completes its assignment and tells RDCO. |
-| **Alternative Flow** | **Needs a document:** the reviewer makes a document request (FR-3.5). **Needs changes:** the reviewer requests revision (FR-3.4). **Coordinator reassigns:** the Seat moves to another member. |
+| **Alternative Flow** | **Needs a document:** the reviewer asks for it from the Documents tab, or with *Request changes* (FR-3.5). **Needs changes to the paper:** the reviewer chooses *Request changes* (FR-3.4). **Coordinator reassigns:** the Seat moves to another member. |
 | **Postconditions** | The office's clearance is recorded on its own row. |
 
 **Activity Diagram**
 
-![Figure 64](diagrams/srs-sdd-v2/png/A-3.3-office.png)
-*Figure 64: An office's review Activity Diagram*
+![Figure 68](diagrams/srs-sdd-v2/png/A-3.3-office.png)
+*Figure 68: An office's review Activity Diagram*
 
 **Wireframes**
 
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
-![Figure 65](diagrams/srs-sdd-v2/screens/S-3.3-office-console.png)
-*Figure 65: IERC office console: ITSO and KTTO clearances kept from v1 (local build)*
+![Figure 69](diagrams/srs-sdd-v2/screens/S-3.3-office-console.png)
+*Figure 69: IERC office console: ITSO and KTTO clearances kept from v1 (local build)*
 
 #### 3.2.3.4 Clearance-Aware Resubmission
 
-**FR-ID: FR-3.4** · **Status: VERIFIED** (FR-M5-01) · Sources: [ADR-003](adr/003-clearance-aware-resubmission.md), [ADR-004](adr/004-restart-all-comparison-mode.md)
+**FR-ID: FR-3.4** · **Status: VERIFIED** (FR-M5-01) · Sources: [ADR-003](adr/003-clearance-aware-resubmission.md), [ADR-004](adr/004-restart-all-comparison-mode.md), [ADR-022](adr/022-explicit-document-requests.md) Amendment 8
 
-**This is IRIS's primary research contribution.** When a reviewer requests revision, the owners answer every open revision request with one new Version. On that Version:
+**This is IRIS's primary research contribution.** A reviewer asks for a revision by finishing their review with *Request changes* and *The paper itself needs changes* ticked, which is the default. Documents may be asked for in the same act (FR-3.5); if either request is refused, neither is made. The owners answer every open revision request with one new Version, uploaded and submitted from the Documents tab (IR-1318). An owner's uploads to a submitted record are **held**: only the owners see them until *Submit new version* sends them. On that Version:
 
-1. every open revision request is resolved as `resubmitted`;
-2. **only the clearances of the parties that asked are reset** to `pending`; every other office's `cleared` clearance is **preserved**;
-3. only the asking parties' reviewers return to `in_review`. An office still reviewing keeps its Seats, and if RDCO or the Adviser asked, only RDCO or the Adviser looks again;
-4. nothing is deleted. Every round stays visible as a Version in the timeline.
+1. every held upload is sent, and the Version names it;
+2. every open revision request is resolved as `resubmitted`;
+3. **only the clearances of the parties that asked are reset** to `pending`; every other office's `cleared` clearance is **preserved**;
+4. only the asking parties' reviewers return to `in_review`. An office still reviewing keeps its Seats, and if RDCO or the Adviser asked, only RDCO or the Adviser looks again;
+5. nothing is deleted. Every round stays visible as a Version in the timeline.
 
-A new Version is refused if nothing changed since the newest request, or if a *Must fix* thread from an asking party has no answer (*Addressed* or *Declined*). The sequence is drawn in Figure 68. The comparison policy **restart-all** (ADR-004), which resets every office, is available as a configuration (`WORKFLOW_TABLE`) for the thesis evaluation. The default is clearance-aware.
+A new Version is refused if nothing changed since the newest request (a held upload counts as a change), or if a *Must fix* thread from an asking party has no answer (*Addressed* or *Declined*). The sequence is drawn in Figure 72. The comparison policy **restart-all** (ADR-004), which resets every office, is available as a configuration (`WORKFLOW_TABLE`) for the thesis evaluation. The default is clearance-aware.
 
 **Use Case Diagram**
 
-![Figure 66](diagrams/srs-sdd-v2/png/U-3.4-resubmission.png)
-*Figure 66: Clearance-Aware Resubmission Use Case Diagram*
+![Figure 70](diagrams/srs-sdd-v2/png/U-3.4-resubmission.png)
+*Figure 70: Clearance-Aware Resubmission Use Case Diagram*
 
 **Use Case Description**
 
@@ -1575,38 +1590,43 @@ Use Case M3-4.1: Resubmit After a Revision Request
 | **Actors** | Record owner; requesting reviewers |
 | **Description** | The owner answers revision requests with a new Version, and only the asking parties review again. |
 | **Preconditions** | The record is in review (`awaiting_resubmission`) with at least one open revision request. |
-| **Main Flow** | 1. The owner sees each open request and its *Must fix* threads. 2. The owner answers each *Must fix* thread, and uploads a revised manuscript, documents, or edited details. 3. The owner submits the new Version. 4. The system writes the Version, freezes a response letter, resolves the requests, resets only the asking parties' clearances, reopens only their Seats, records which clearances were preserved, and notifies the asking reviewers. 5. A revised manuscript gets its own review text; it is read for AI only once the record is published (FR-5.1). |
-| **Alternative Flow** | **Nothing changed:** refused with the reason. **Unanswered Must fix thread:** refused, naming it. **Owner discards the revised manuscript:** the record returns to its last submitted manuscript. |
+| **Main Flow** | 1. The owner opens the Documents tab, which names who asked for changes and what is not sent yet. 2. The owner answers each *Must fix* thread, and uploads a revised manuscript or documents (held, seen only by the owners), or edits the details. 3. The owner presses *Submit new version*. 4. The system sends every held upload, writes the Version naming them, freezes a response letter, resolves the requests, resets only the asking parties' clearances, reopens only their Seats, records which clearances were preserved, and notifies the asking reviewers. 5. A revised manuscript gets its own review text; it is read for AI only once the record is published (FR-5.1). |
+| **Alternative Flow** | **Nothing changed:** refused with the reason. **Unanswered Must fix thread:** refused, naming it. **Owner discards the revised manuscript:** the record returns to its last submitted manuscript. **A held file is not wanted:** the owner deletes it with its trash can before sending. |
 | **Postconditions** | A new Version exists; the asking parties review it; every other clearance is unchanged. |
 
 **Activity Diagram**
 
-![Figure 67](diagrams/srs-sdd-v2/png/A-3.4-resubmit.png)
-*Figure 67: Clearance-aware resubmission Activity Diagram*
+![Figure 71](diagrams/srs-sdd-v2/png/A-3.4-resubmit.png)
+*Figure 71: Clearance-aware resubmission Activity Diagram*
 
-![Figure 68](diagrams/srs-sdd-v2/png/V-04-clearance-aware-resubmission.png)
-*Figure 68: Clearance-Aware Resubmission Sequence (the thesis contribution)*
+![Figure 72](diagrams/srs-sdd-v2/png/V-04-clearance-aware-resubmission.png)
+*Figure 72: Clearance-Aware Resubmission Sequence (the thesis contribution)*
 
 **Wireframes**
 
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
-![Figure 69](diagrams/srs-sdd-v2/screens/S-3.4-owner-revision.png)
-*Figure 69: Owner's review pane: who holds the paper and what waits (local build)*
+![Figure 73](diagrams/srs-sdd-v2/screens/S-3.1c-request-changes.png)
+*Figure 73: Finish review: "Request changes", with "The paper itself needs changes" ticked and the documents picklist (Adviser) (local build)*
 
-![Figure 70](diagrams/srs-sdd-v2/screens/S-3.4b-preserved-clearances.png)
-*Figure 70: Review details: clearances kept across Versions (local build)*
+![Figure 74](diagrams/srs-sdd-v2/screens/S-3.4-owner-revision.png)
+*Figure 74: Owner's Documents tab: changes requested by IERC; "Submit new version" waits for a change, and ITSO and KTTO keep their clearances (local build)*
+
+![Figure 75](diagrams/srs-sdd-v2/screens/S-3.4b-preserved-clearances.png)
+*Figure 75: Review details: ITSO and KTTO kept on v2 while IERC reviews again; the demo record has no manuscript file (local build)*
 
 #### 3.2.3.5 Explicit Document Requests
 
-**FR-ID: FR-3.5** · **Status: IMPLEMENTED** (FR-M5-03) · Source: [ADR-022](adr/022-explicit-document-requests.md)
+**FR-ID: FR-3.5** · **Status: IMPLEMENTED** (FR-M5-03; IR-1322) · Source: [ADR-022](adr/022-explicit-document-requests.md), including Amendment 8
 
-A reviewer who only needs a file shall create a **document request**, distinct from a revision request. The record stays in review (`awaiting_document`). No clearance resets, no assignment closes, and the owner does not resubmit. The owner uploads against the requested items, and the reviewer accepts or rejects each one with a reason. The requesting party's turnaround clock pauses while its own request is open (FR-3.7).
+A reviewer who needs only files shall ask for them in a **document request**, distinct from a revision request. The reviewer asks from the Documents tab (*Request documents*), or finishes their review with *Request changes*, chooses the documents and unticks *The paper itself needs changes*. The record stays in review (`awaiting_document`). No clearance resets, no assignment closes, and no new Version is needed.
+
+While any request is open, the owner may upload to every one of the record type's slots. **An owner's upload is held**: only the owners see it, and it answers nothing and notifies nobody until the owner presses *Submit added documents* (`POST /api/v1/records/<id>/documents/send/`). That send answers each requested item from its slot, fulfils each request with nothing left missing, and tells each requesting party once. It is refused while a revision is open (the files then go with *Submit new version*), when nothing is held, and for anyone but an owner. The owner may delete a held file. The reviewer then accepts or rejects each upload with a reason, and a rejection reopens the request. The requesting party's turnaround clock pauses while its own request is open (FR-3.7).
 
 **Use Case Diagram**
 
-![Figure 71](diagrams/srs-sdd-v2/png/U-3.5-document-requests.png)
-*Figure 71: Explicit Document Requests Use Case Diagram*
+![Figure 76](diagrams/srs-sdd-v2/png/U-3.5-document-requests.png)
+*Figure 76: Explicit Document Requests Use Case Diagram*
 
 **Use Case Description**
 
@@ -1617,21 +1637,21 @@ Use Case M3-5.1: Ask for a Missing Document
 | **Actors** | Reviewer; record owner |
 | **Description** | A reviewer asks for a file without sending the paper back for resubmission. |
 | **Preconditions** | The reviewer holds an open review of the record. |
-| **Main Flow** | 1. The reviewer picks the documents needed and writes a message. 2. IRIS opens the request, shows awaiting_document and pauses the reviewer's clock. 3. The owner is notified and uploads each item. 4. The reviewer accepts each item. 5. IRIS fulfils the request and restarts the clock. |
-| **Alternative Flow** | **Reviewer rejects an item (with a reason):** the owner uploads again. **A Decision ends the review:** open requests are withdrawn. |
+| **Main Flow** | 1. The reviewer picks the documents needed, from the Documents tab or with *Request changes* in *Finish review*, and writes a message. 2. IRIS opens the request, shows awaiting_document and pauses the reviewer's clock. 3. The owner is notified and uploads each item; each upload is held, seen only by the owners. 4. The owner presses *Submit added documents*. 5. IRIS sends the held uploads, answers the items, fulfils the request, restarts the clock and notifies the reviewer once. 6. The reviewer accepts each upload. |
+| **Alternative Flow** | **Reviewer rejects an item (with a reason):** the request reopens; the owner uploads and sends again. **A revision is also open:** the owner sends the files with *Submit new version* (FR-3.4). **A Decision ends the review:** open requests are withdrawn. |
 | **Postconditions** | The reviewer has the document; no clearance changed. |
 
 **Activity Diagram**
 
-![Figure 72](diagrams/srs-sdd-v2/png/A-3.5-doc-request.png)
-*Figure 72: A document request Activity Diagram*
+![Figure 77](diagrams/srs-sdd-v2/png/A-3.5-doc-request.png)
+*Figure 77: A document request Activity Diagram*
 
 **Wireframes**
 
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
-![Figure 73](diagrams/srs-sdd-v2/screens/S-3.5-document-request.png)
-*Figure 73: My Library: documents requested of the author (local build)*
+![Figure 78](diagrams/srs-sdd-v2/screens/S-3.5-document-request.png)
+*Figure 78: Owner's Documents tab: an upload held as "Added, not sent yet", and "Submit added documents" (local build)*
 
 #### 3.2.3.6 Review Threads and Comments
 
@@ -1641,8 +1661,8 @@ Reviewers shall discuss a Version in **threads** that may be anchored to a passa
 
 **Use Case Diagram**
 
-![Figure 74](diagrams/srs-sdd-v2/png/U-3.6-threads.png)
-*Figure 74: Review Threads and Comments Use Case Diagram*
+![Figure 79](diagrams/srs-sdd-v2/png/U-3.6-threads.png)
+*Figure 79: Review Threads and Comments Use Case Diagram*
 
 **Use Case Description**
 
@@ -1659,15 +1679,15 @@ Use Case M3-6.1: Discuss a Passage in a Thread
 
 **Activity Diagram**
 
-![Figure 75](diagrams/srs-sdd-v2/png/A-3.6-thread.png)
-*Figure 75: A review thread Activity Diagram*
+![Figure 80](diagrams/srs-sdd-v2/png/A-3.6-thread.png)
+*Figure 80: A review thread Activity Diagram*
 
 **Wireframes**
 
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
-![Figure 76](diagrams/srs-sdd-v2/screens/S-3.4-owner-revision.png)
-*Figure 76: Owner's review pane: who holds the paper and what waits (local build)*
+![Figure 81](diagrams/srs-sdd-v2/screens/S-3.1b-adviser-review.png)
+*Figure 81: Review workspace: the Threads tab beside Documents; the demo data has no threads (local build)*
 
 #### 3.2.3.7 Turnaround, Reminders and Escalation
 
@@ -1677,8 +1697,8 @@ Each party's assignment shall carry a **due date** computed from that party's tu
 
 **Use Case Diagram**
 
-![Figure 77](diagrams/srs-sdd-v2/png/U-3.7-turnaround.png)
-*Figure 77: Turnaround, Reminders and Escalation Use Case Diagram*
+![Figure 82](diagrams/srs-sdd-v2/png/U-3.7-turnaround.png)
+*Figure 82: Turnaround, Reminders and Escalation Use Case Diagram*
 
 **Use Case Description**
 
@@ -1695,15 +1715,15 @@ Use Case M3-7.1: Follow Due Dates
 
 **Activity Diagram**
 
-![Figure 78](diagrams/srs-sdd-v2/png/A-3.7-reminders.png)
-*Figure 78: Reminders and escalation Activity Diagram*
+![Figure 83](diagrams/srs-sdd-v2/png/A-3.7-reminders.png)
+*Figure 83: Reminders and escalation Activity Diagram*
 
 **Wireframes**
 
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
-![Figure 79](diagrams/srs-sdd-v2/screens/S-3.7-analytics.png)
-*Figure 79: Workflow analytics (RDCO) (local build)*
+![Figure 84](diagrams/srs-sdd-v2/screens/S-3.7-analytics.png)
+*Figure 84: Workflow analytics (RDCO) (local build)*
 
 #### 3.2.3.8 IP Type on Published Records
 
@@ -1713,8 +1733,8 @@ Office staff shall be able to tag a record with an IP type: **Patent**, **Copyri
 
 **Use Case Diagram**
 
-![Figure 80](diagrams/srs-sdd-v2/png/U-3.8-ip-type.png)
-*Figure 80: IP Type on Published Records Use Case Diagram*
+![Figure 85](diagrams/srs-sdd-v2/png/U-3.8-ip-type.png)
+*Figure 85: IP Type on Published Records Use Case Diagram*
 
 **Use Case Description**
 
@@ -1731,15 +1751,15 @@ Use Case M3-8.1: Tag and Release IP
 
 **Activity Diagram**
 
-![Figure 81](diagrams/srs-sdd-v2/png/A-3.8-ip.png)
-*Figure 81: Tag and release IP Activity Diagram*
+![Figure 86](diagrams/srs-sdd-v2/png/A-3.8-ip.png)
+*Figure 86: Tag and release IP Activity Diagram*
 
 **Wireframes**
 
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
-![Figure 82](diagrams/srs-sdd-v2/screens/S-3.2a-rdco-decide.png)
-*Figure 82: RDCO's view of a record ready to decide, with its embargo card (local build)*
+![Figure 87](diagrams/srs-sdd-v2/screens/S-3.2a-rdco-decide.png)
+*Figure 87: RDCO's view of a record ready to decide, with its embargo card (local build)*
 
 ### Module 4: Notifications
 
@@ -1751,8 +1771,8 @@ The system shall notify the relevant people in-app at each workflow event, for e
 
 **Use Case Diagram**
 
-![Figure 83](diagrams/srs-sdd-v2/png/U-4.1-notifications.png)
-*Figure 83: In-App and Email Notifications Use Case Diagram*
+![Figure 88](diagrams/srs-sdd-v2/png/U-4.1-notifications.png)
+*Figure 88: In-App and Email Notifications Use Case Diagram*
 
 **Use Case Description**
 
@@ -1769,15 +1789,15 @@ Use Case M4-1.1: Receive and Settle a Notification
 
 **Activity Diagram**
 
-![Figure 84](diagrams/srs-sdd-v2/png/A-4.1-notify.png)
-*Figure 84: Notify and resolve Activity Diagram*
+![Figure 89](diagrams/srs-sdd-v2/png/A-4.1-notify.png)
+*Figure 89: Notify and resolve Activity Diagram*
 
 **Wireframes**
 
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
-![Figure 85](diagrams/srs-sdd-v2/screens/S-4.1-notifications.png)
-*Figure 85: Notifications, with answered requests marked (local build)*
+![Figure 90](diagrams/srs-sdd-v2/screens/S-4.1-notifications.png)
+*Figure 90: Notifications, with answered requests marked (local build)*
 
 #### 3.2.4.2 Live Updates
 
@@ -1787,8 +1807,8 @@ Pages shall update themselves. Each tab holds one stream, `GET /api/v1/live/`. T
 
 **Use Case Diagram**
 
-![Figure 86](diagrams/srs-sdd-v2/png/U-4.2-live.png)
-*Figure 86: Live Updates Use Case Diagram*
+![Figure 91](diagrams/srs-sdd-v2/png/U-4.2-live.png)
+*Figure 91: Live Updates Use Case Diagram*
 
 **Use Case Description**
 
@@ -1805,8 +1825,8 @@ Use Case M4-2.1: See a Page Update Itself
 
 **Activity Diagram**
 
-![Figure 87](diagrams/srs-sdd-v2/png/A-4.2-live.png)
-*Figure 87: A live update Activity Diagram*
+![Figure 92](diagrams/srs-sdd-v2/png/A-4.2-live.png)
+*Figure 92: A live update Activity Diagram*
 
 ### Module 5: Indexing and AI (Thesis-Critical)
 
@@ -1820,8 +1840,8 @@ When a record is **published** (or a published record's embargo is released agai
 
 **Use Case Diagram**
 
-![Figure 88](diagrams/srs-sdd-v2/png/U-5.1-extraction.png)
-*Figure 88: Extraction Use Case Diagram*
+![Figure 93](diagrams/srs-sdd-v2/png/U-5.1-extraction.png)
+*Figure 93: Extraction Use Case Diagram*
 
 **Use Case Description**
 
@@ -1838,8 +1858,8 @@ Use Case M5-1.1: Extract a Published Manuscript
 
 **Activity Diagram**
 
-![Figure 89](diagrams/srs-sdd-v2/png/A-5.1-extract.png)
-*Figure 89: Extract a published manuscript Activity Diagram*
+![Figure 94](diagrams/srs-sdd-v2/png/A-5.1-extract.png)
+*Figure 94: Extract a published manuscript Activity Diagram*
 
 #### 3.2.5.2 Chunking and Embedding
 
@@ -1849,8 +1869,8 @@ After extraction, the system shall split the text into **chunks**, the retrievab
 
 **Use Case Diagram**
 
-![Figure 90](diagrams/srs-sdd-v2/png/U-5.2-indexing.png)
-*Figure 90: Chunking and Embedding Use Case Diagram*
+![Figure 95](diagrams/srs-sdd-v2/png/U-5.2-indexing.png)
+*Figure 95: Chunking and Embedding Use Case Diagram*
 
 **Use Case Description**
 
@@ -1867,8 +1887,8 @@ Use Case M5-2.1: Index a Paper's Passages
 
 **Activity Diagram**
 
-![Figure 91](diagrams/srs-sdd-v2/png/A-5.2-index.png)
-*Figure 91: Chunk and embed Activity Diagram*
+![Figure 96](diagrams/srs-sdd-v2/png/A-5.2-index.png)
+*Figure 96: Chunk and embed Activity Diagram*
 
 #### 3.2.5.3 Disclosure Gate
 
@@ -1885,8 +1905,8 @@ The gate is one module (`apps/ai/policy/disclosure.py`) consulted at every outbo
 
 **Use Case Diagram**
 
-![Figure 92](diagrams/srs-sdd-v2/png/U-5.3-gate.png)
-*Figure 92: Disclosure Gate Use Case Diagram*
+![Figure 97](diagrams/srs-sdd-v2/png/U-5.3-gate.png)
+*Figure 97: Disclosure Gate Use Case Diagram*
 
 **Use Case Description**
 
@@ -1903,26 +1923,28 @@ Use Case M5-3.1: Release an Embargo
 
 **Activity Diagram**
 
-![Figure 93](diagrams/srs-sdd-v2/png/A-5.3-gate.png)
-*Figure 93: The disclosure gate Activity Diagram*
+![Figure 98](diagrams/srs-sdd-v2/png/A-5.3-gate.png)
+*Figure 98: The disclosure gate Activity Diagram*
 
 **Wireframes**
 
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
-![Figure 94](diagrams/srs-sdd-v2/screens/S-3.2a-rdco-decide.png)
-*Figure 94: RDCO's view of a record ready to decide, with its embargo card (local build)*
+![Figure 99](diagrams/srs-sdd-v2/screens/S-3.2a-rdco-decide.png)
+*Figure 99: RDCO's view of a record ready to decide, with its embargo card (local build)*
 
 #### 3.2.5.4 Ask IRIS
 
-**FR-ID: FR-5.4** · **Status: PARTIAL** (FR-M4-01; IR-957) · Sources: [ADR-049](adr/049-dedicated-ai-runtime-and-local-research.md), [ADR-019](adr/019-persisted-unified-conversation-history.md), [ADR-034](adr/034-ungrounded-answers-as-a-distinct-state.md) (proposed)
+**FR-ID: FR-5.4** · **Status: PARTIAL** (FR-M4-01; IR-957, IR-1278, IR-1316) · Sources: [ADR-049](adr/049-dedicated-ai-runtime-and-local-research.md), [ADR-019](adr/019-persisted-unified-conversation-history.md), [ADR-034](adr/034-ungrounded-answers-as-a-distinct-state.md) (proposed)
 
-The system shall let a signed-in person ask questions about the library in a conversation (`/ai`). Each answer cites the passages it rests on, and opens the paper at the cited page. **Citations only ever point at passages the reader may read**: retrieval applies the same visibility rule as the rest of IRIS. The question is answered by the **AI runtime**. Django issues a reader grant, and the run is queued in PostgreSQL (`iris_ai` schema) and claimed by `ai-runs-worker`. A bounded agent loop uses read-only research tools: search that combines keyword, paper-level and passage-level vector search; opening a passage; reading a manuscript in order; resolving a named paper; and exact record counts. Answers **stream**. A reconnecting page resumes from a cursor, and a stopped, expired or failed run can be retried. Conversations are kept per account and can be pinned, renamed and deleted (one ⋯ menu, IR-1253). Django's earlier answer path answers 410 Gone; earlier Django conversations stay readable, read-only.
+The system shall let a signed-in person ask questions about the library in a conversation (`/ai`). Each answer cites the passages it rests on, and opens the paper at the cited page. **Citations only ever point at passages the reader may read**: retrieval applies the same visibility rule as the rest of IRIS. The question is answered by the **AI runtime**. Django issues a reader grant, and the run is queued in PostgreSQL (`iris_ai` schema) and claimed by `ai-runs-worker`. A bounded agent loop uses read-only research tools: search that combines keyword, paper-level and passage-level vector search; opening a passage; reading a manuscript in order; resolving a named paper; exact record counts and lists; a paper's recorded details (`paper_details`: authors, the Adviser by name, the three years, type, Area, PSCED, keywords and abstract; IR-1278, ADR-049 amendment of 2026-11-23, proposed); and filtering and sorting by completion, publication and added dates, with "recent" given a fixed range from today's date (IR-1316, ADR-049 amendment of 2026-11-24, proposed). Answers **stream**. A reconnecting page resumes from a cursor, and a stopped, expired or failed run can be retried. Conversations are kept per account and can be pinned, renamed and deleted (one ⋯ menu, IR-1253). Django's earlier answer path answers 410 Gone; earlier Django conversations stay readable, read-only.
+
+**Quality caveat (why PARTIAL).** Ask IRIS was switched to the AI runtime (IR-957) before IR-955's quality bar was met. In IR-995's agent-only rerun, questions from two readers with different access (family F12) were answered correctly 43.8% of the time, against 62.5% on Django's earlier path; every other family passed ([ADR-049](adr/049-dedicated-ai-runtime-and-local-research.md) §Amendment 2026-11-09). See Appendix C.
 
 **Use Case Diagram**
 
-![Figure 95](diagrams/srs-sdd-v2/png/U-5.4-ask-iris.png)
-*Figure 95: Ask IRIS Use Case Diagram*
+![Figure 100](diagrams/srs-sdd-v2/png/U-5.4-ask-iris.png)
+*Figure 100: Ask IRIS Use Case Diagram*
 
 **Use Case Description**
 
@@ -1939,15 +1961,15 @@ Use Case M5-4.1: Ask a Question
 
 **Activity Diagram**
 
-![Figure 96](diagrams/srs-sdd-v2/png/A-5.4-ask.png)
-*Figure 96: Answer an Ask IRIS question Activity Diagram*
+![Figure 101](diagrams/srs-sdd-v2/png/A-5.4-ask.png)
+*Figure 101: Answer an Ask IRIS question Activity Diagram*
 
 **Wireframes**
 
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
-![Figure 97](diagrams/srs-sdd-v2/screens/S-5.4-ask-iris.png)
-*Figure 97: Ask IRIS (AI runtime not running locally) (local build)*
+![Figure 102](diagrams/srs-sdd-v2/screens/S-5.4-ask-iris.png)
+*Figure 102: Ask IRIS: the conversation history on the left; it cannot load conversations because the AI runtime is not running locally (local build)*
 
 #### 3.2.5.5 Paper Chat
 
@@ -1957,8 +1979,8 @@ From a paper's page, a reader shall be able to ask questions about **that paper 
 
 **Use Case Diagram**
 
-![Figure 98](diagrams/srs-sdd-v2/png/U-5.5-paper-chat.png)
-*Figure 98: Paper Chat Use Case Diagram*
+![Figure 103](diagrams/srs-sdd-v2/png/U-5.5-paper-chat.png)
+*Figure 103: Paper Chat Use Case Diagram*
 
 **Use Case Description**
 
@@ -1975,15 +1997,15 @@ Use Case M5-5.1: Ask About One Paper
 
 **Activity Diagram**
 
-![Figure 99](diagrams/srs-sdd-v2/png/A-5.5-paper-chat.png)
-*Figure 99: Paper Chat Activity Diagram*
+![Figure 104](diagrams/srs-sdd-v2/png/A-5.5-paper-chat.png)
+*Figure 104: Paper Chat Activity Diagram*
 
 **Wireframes**
 
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
-![Figure 100](diagrams/srs-sdd-v2/screens/S-2.4-paper-view.png)
-*Figure 100: Paper View with the in-browser reader (local build)*
+![Figure 105](diagrams/srs-sdd-v2/screens/S-2.4-paper-view.png)
+*Figure 105: Paper View: a published paper's Overview; its AI Overview is unavailable because no AI vendor is reached locally (local build)*
 
 #### 3.2.5.6 AI Overview
 
@@ -1993,8 +2015,8 @@ Each published paper the gate admits shall have a **stored, cited summary** (`Re
 
 **Use Case Diagram**
 
-![Figure 101](diagrams/srs-sdd-v2/png/U-5.6-overview.png)
-*Figure 101: AI Overview Use Case Diagram*
+![Figure 106](diagrams/srs-sdd-v2/png/U-5.6-overview.png)
+*Figure 106: AI Overview Use Case Diagram*
 
 **Use Case Description**
 
@@ -2011,15 +2033,15 @@ Use Case M5-6.1: Read a Paper's AI Overview
 
 **Activity Diagram**
 
-![Figure 102](diagrams/srs-sdd-v2/png/A-5.6-overview.png)
-*Figure 102: The AI Overview Activity Diagram*
+![Figure 107](diagrams/srs-sdd-v2/png/A-5.6-overview.png)
+*Figure 107: The AI Overview Activity Diagram*
 
 **Wireframes**
 
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
-![Figure 103](diagrams/srs-sdd-v2/screens/S-2.4-paper-view.png)
-*Figure 103: Paper View with the in-browser reader (local build)*
+![Figure 108](diagrams/srs-sdd-v2/screens/S-2.4-paper-view.png)
+*Figure 108: Paper View: a published paper's Overview; its AI Overview is unavailable because no AI vendor is reached locally (local build)*
 
 #### 3.2.5.7 Degradation When AI Is Unavailable
 
@@ -2029,8 +2051,8 @@ When an AI vendor or the AI runtime is unavailable, all non-AI features shall ke
 
 **Use Case Diagram**
 
-![Figure 104](diagrams/srs-sdd-v2/png/U-5.7-degradation.png)
-*Figure 104: Degradation When AI Is Unavailable Use Case Diagram*
+![Figure 109](diagrams/srs-sdd-v2/png/U-5.7-degradation.png)
+*Figure 109: Degradation When AI Is Unavailable Use Case Diagram*
 
 **Use Case Description**
 
@@ -2047,15 +2069,15 @@ Use Case M5-7.1: Use IRIS While AI Is Down
 
 **Activity Diagram**
 
-![Figure 105](diagrams/srs-sdd-v2/png/A-5.7-degrade.png)
-*Figure 105: Degrade when AI is unavailable Activity Diagram*
+![Figure 110](diagrams/srs-sdd-v2/png/A-5.7-degrade.png)
+*Figure 110: Degrade when AI is unavailable Activity Diagram*
 
 **Wireframes**
 
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
-![Figure 106](diagrams/srs-sdd-v2/screens/S-2.5a-download-request.png)
-*Figure 106: Paper View: saving a copy needs a request (local build)*
+![Figure 111](diagrams/srs-sdd-v2/screens/S-2.5a-download-request.png)
+*Figure 111: Paper View: saving a copy needs a request (local build)*
 
 #### 3.2.5.8 Index Administration
 
@@ -2065,8 +2087,8 @@ Office staff shall be able to see the index's status, re-embed one record or all
 
 **Use Case Diagram**
 
-![Figure 107](diagrams/srs-sdd-v2/png/U-5.8-index-admin.png)
-*Figure 107: Index Administration Use Case Diagram*
+![Figure 112](diagrams/srs-sdd-v2/png/U-5.8-index-admin.png)
+*Figure 112: Index Administration Use Case Diagram*
 
 **Use Case Description**
 
@@ -2083,8 +2105,8 @@ Use Case M5-8.1: Re-embed Records
 
 **Activity Diagram**
 
-![Figure 108](diagrams/srs-sdd-v2/png/A-5.8-reembed.png)
-*Figure 108: Re-embed records Activity Diagram*
+![Figure 113](diagrams/srs-sdd-v2/png/A-5.8-reembed.png)
+*Figure 113: Re-embed records Activity Diagram*
 
 ### Module 6: Reader Library and Discovery
 
@@ -2098,8 +2120,8 @@ A reader shall be able to save records to **My Library** with a reading status (
 
 **Use Case Diagram**
 
-![Figure 109](diagrams/srs-sdd-v2/png/U-6.1-saved.png)
-*Figure 109: Saved Records and Reading Status Use Case Diagram*
+![Figure 114](diagrams/srs-sdd-v2/png/U-6.1-saved.png)
+*Figure 114: Saved Records and Reading Status Use Case Diagram*
 
 **Use Case Description**
 
@@ -2116,15 +2138,18 @@ Use Case M6-1.1: Save a Paper and Read It Later
 
 **Activity Diagram**
 
-![Figure 110](diagrams/srs-sdd-v2/png/A-6.1-save.png)
-*Figure 110: Save and read Activity Diagram*
+![Figure 115](diagrams/srs-sdd-v2/png/A-6.1-save.png)
+*Figure 115: Save and read Activity Diagram*
 
 **Wireframes**
 
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
-![Figure 111](diagrams/srs-sdd-v2/screens/S-6.1-my-library.png)
-*Figure 111: My Library (local build)*
+![Figure 116](diagrams/srs-sdd-v2/screens/S-6.1-my-library.png)
+*Figure 116: My Library: the count badge, and Waiting on you in the right column (local build)*
+
+![Figure 117](diagrams/srs-sdd-v2/screens/S-6.1b-my-library-empty.png)
+*Figure 117: My Library with nothing submitted yet (Adviser) (local build)*
 
 #### 3.2.6.2 Folders
 
@@ -2134,8 +2159,8 @@ A reader shall be able to group saved records into their own **folders**. Folder
 
 **Use Case Diagram**
 
-![Figure 112](diagrams/srs-sdd-v2/png/U-6.2-folders.png)
-*Figure 112: Folders Use Case Diagram*
+![Figure 118](diagrams/srs-sdd-v2/png/U-6.2-folders.png)
+*Figure 118: Folders Use Case Diagram*
 
 **Use Case Description**
 
@@ -2152,15 +2177,15 @@ Use Case M6-2.1: File Saves in Folders
 
 **Activity Diagram**
 
-![Figure 113](diagrams/srs-sdd-v2/png/A-6.2-folders.png)
-*Figure 113: File a save in a folder Activity Diagram*
+![Figure 119](diagrams/srs-sdd-v2/png/A-6.2-folders.png)
+*Figure 119: File a save in a folder Activity Diagram*
 
 **Wireframes**
 
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
-![Figure 114](diagrams/srs-sdd-v2/screens/S-6.1-my-library.png)
-*Figure 114: My Library (local build)*
+![Figure 120](diagrams/srs-sdd-v2/screens/S-6.1-my-library.png)
+*Figure 120: My Library: the count badge, and Waiting on you in the right column (local build)*
 
 #### 3.2.6.3 Private Notes and Highlights
 
@@ -2170,8 +2195,8 @@ A reader shall be able to keep **private notes** on a record, which autosave. A 
 
 **Use Case Diagram**
 
-![Figure 115](diagrams/srs-sdd-v2/png/U-6.3-notes.png)
-*Figure 115: Private Notes and Highlights Use Case Diagram*
+![Figure 121](diagrams/srs-sdd-v2/png/U-6.3-notes.png)
+*Figure 121: Private Notes and Highlights Use Case Diagram*
 
 **Use Case Description**
 
@@ -2188,8 +2213,8 @@ Use Case M6-3.1: Keep a Private Note
 
 **Activity Diagram**
 
-![Figure 116](diagrams/srs-sdd-v2/png/A-6.3-note.png)
-*Figure 116: A private note Activity Diagram*
+![Figure 122](diagrams/srs-sdd-v2/png/A-6.3-note.png)
+*Figure 122: A private note Activity Diagram*
 
 #### 3.2.6.4 Calls & Conferences
 
@@ -2199,8 +2224,8 @@ The system shall list **calls for papers and conferences**. Each has a type, des
 
 **Use Case Diagram**
 
-![Figure 117](diagrams/srs-sdd-v2/png/U-6.4-calls.png)
-*Figure 117: Calls & Conferences Use Case Diagram*
+![Figure 123](diagrams/srs-sdd-v2/png/U-6.4-calls.png)
+*Figure 123: Calls & Conferences Use Case Diagram*
 
 **Use Case Description**
 
@@ -2217,18 +2242,18 @@ Use Case M6-4.1: Post and Confirm a Call
 
 **Activity Diagram**
 
-![Figure 118](diagrams/srs-sdd-v2/png/A-6.4-call.png)
-*Figure 118: Post a call Activity Diagram*
+![Figure 124](diagrams/srs-sdd-v2/png/A-6.4-call.png)
+*Figure 124: Post a call Activity Diagram*
 
 **Wireframes**
 
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
-![Figure 119](diagrams/srs-sdd-v2/screens/S-6.4-calls.png)
-*Figure 119: Calls & Conferences (local build)*
+![Figure 125](diagrams/srs-sdd-v2/screens/S-6.4-calls.png)
+*Figure 125: Calls & Conferences: the empty board (local build)*
 
-![Figure 120](diagrams/srs-sdd-v2/screens/S-6.4b-call-requests.png)
-*Figure 120: Call requests (RDCO) (local build)*
+![Figure 126](diagrams/srs-sdd-v2/screens/S-6.4b-call-requests.png)
+*Figure 126: Call requests (RDCO) (local build)*
 
 #### 3.2.6.5 Personal Discovery
 
@@ -2238,8 +2263,8 @@ Discover shall offer a **For you** ordering built from a **transparent recipe** 
 
 **Use Case Diagram**
 
-![Figure 121](diagrams/srs-sdd-v2/png/U-6.5-discovery.png)
-*Figure 121: Personal Discovery Use Case Diagram*
+![Figure 127](diagrams/srs-sdd-v2/png/U-6.5-discovery.png)
+*Figure 127: Personal Discovery Use Case Diagram*
 
 **Use Case Description**
 
@@ -2256,15 +2281,15 @@ Use Case M6-5.1: Get Suggestions For You
 
 **Activity Diagram**
 
-![Figure 122](diagrams/srs-sdd-v2/png/A-6.5-for-you.png)
-*Figure 122: Personal discovery Activity Diagram*
+![Figure 128](diagrams/srs-sdd-v2/png/A-6.5-for-you.png)
+*Figure 128: Personal discovery Activity Diagram*
 
 **Wireframes**
 
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
-![Figure 123](diagrams/srs-sdd-v2/screens/S-2.8-discover.png)
-*Figure 123: Discover (local build)*
+![Figure 129](diagrams/srs-sdd-v2/screens/S-2.8-discover.png)
+*Figure 129: Discover (local build)*
 
 ### Module 7: Audit and Administration
 
@@ -2276,8 +2301,8 @@ The system shall write an `AuditEvent` for every security-relevant and workflow 
 
 **Use Case Diagram**
 
-![Figure 124](diagrams/srs-sdd-v2/png/U-7.1-audit.png)
-*Figure 124: Audit Log Use Case Diagram*
+![Figure 130](diagrams/srs-sdd-v2/png/U-7.1-audit.png)
+*Figure 130: Audit Log Use Case Diagram*
 
 **Use Case Description**
 
@@ -2294,15 +2319,15 @@ Use Case M7-1.1: Read the Audit Log
 
 **Activity Diagram**
 
-![Figure 125](diagrams/srs-sdd-v2/png/A-7.1-audit.png)
-*Figure 125: Write and read the audit log Activity Diagram*
+![Figure 131](diagrams/srs-sdd-v2/png/A-7.1-audit.png)
+*Figure 131: Write and read the audit log Activity Diagram*
 
 **Wireframes**
 
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
-![Figure 126](diagrams/srs-sdd-v2/screens/S-7.1-audit-log.png)
-*Figure 126: Audit Log (System Admin) (local build)*
+![Figure 132](diagrams/srs-sdd-v2/screens/S-7.1-audit-log.png)
+*Figure 132: Audit Log (System Admin) (local build)*
 
 #### 3.2.7.2 System Admin and RDCO Consoles
 
@@ -2315,8 +2340,8 @@ Django's own admin site (`/django-admin/`) is closed to outside networks and is 
 
 **Use Case Diagram**
 
-![Figure 127](diagrams/srs-sdd-v2/png/U-7.2-consoles.png)
-*Figure 127: System Admin and RDCO Consoles Use Case Diagram*
+![Figure 133](diagrams/srs-sdd-v2/png/U-7.2-consoles.png)
+*Figure 133: System Admin and RDCO Consoles Use Case Diagram*
 
 **Use Case Description**
 
@@ -2333,21 +2358,21 @@ Use Case M7-2.1: Run IRIS as System Admin
 
 **Activity Diagram**
 
-![Figure 128](diagrams/srs-sdd-v2/png/A-7.2-console.png)
-*Figure 128: The consoles Activity Diagram*
+![Figure 134](diagrams/srs-sdd-v2/png/A-7.2-console.png)
+*Figure 134: The consoles Activity Diagram*
 
 **Wireframes**
 
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
-![Figure 129](diagrams/srs-sdd-v2/screens/S-7.2a-retention.png)
-*Figure 129: Retention (System Admin) (local build)*
+![Figure 135](diagrams/srs-sdd-v2/screens/S-7.2a-retention.png)
+*Figure 135: Retention (System Admin) (local build)*
 
-![Figure 130](diagrams/srs-sdd-v2/screens/S-7.2b-deletion-requests.png)
-*Figure 130: Account deletion requests (System Admin) (local build)*
+![Figure 136](diagrams/srs-sdd-v2/screens/S-7.2b-deletion-requests.png)
+*Figure 136: Account deletion requests (System Admin) (local build)*
 
-![Figure 131](diagrams/srs-sdd-v2/screens/S-1.6-users.png)
-*Figure 131: Users page (RDCO) (local build)*
+![Figure 137](diagrams/srs-sdd-v2/screens/S-1.6-users.png)
+*Figure 137: Users page (RDCO) (local build)*
 
 #### 3.2.7.3 Settings and Help
 
@@ -2357,8 +2382,8 @@ Each person shall have a **Settings** page for their profile, password, AI answe
 
 **Use Case Diagram**
 
-![Figure 132](diagrams/srs-sdd-v2/png/U-7.3-settings.png)
-*Figure 132: Settings and Help Use Case Diagram*
+![Figure 138](diagrams/srs-sdd-v2/png/U-7.3-settings.png)
+*Figure 138: Settings and Help Use Case Diagram*
 
 **Use Case Description**
 
@@ -2375,15 +2400,15 @@ Use Case M7-3.1: Change My Settings
 
 **Activity Diagram**
 
-![Figure 133](diagrams/srs-sdd-v2/png/A-7.3-help.png)
-*Figure 133: Settings and Help Activity Diagram*
+![Figure 139](diagrams/srs-sdd-v2/png/A-7.3-help.png)
+*Figure 139: Settings and Help Activity Diagram*
 
 **Wireframes**
 
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
-![Figure 134](diagrams/srs-sdd-v2/screens/S-7.3-settings-help.png)
-*Figure 134: Settings: Help (local build)*
+![Figure 140](diagrams/srs-sdd-v2/screens/S-7.3-settings-help.png)
+*Figure 140: Settings: Help (local build)*
 
 ## 3.3 Non-functional Requirements
 
@@ -2457,8 +2482,8 @@ A ***first-time user shall*** complete a submission in under 10 minutes; five of
 **NFR-U3 - Responsive Layout**  
 ***Every screen shall*** work at 360 px wide and above with no horizontal scroll. *Validation:* The viewport matrix in the smoke tier (360, 768, 1280, 1745 px). *Status:* PARTIAL
 
-![Figure 135](diagrams/srs-sdd-v2/v1-kept/SRS-v1-image15-responsive-activity.png)
-*Figure 135: Responsive layout activity diagram (v1, kept; v1 FR-M1-03 is now NFR-U3)*
+![Figure 141](diagrams/srs-sdd-v2/v1-kept/SRS-v1-image15-responsive-activity.png)
+*Figure 141: Responsive layout activity diagram (v1, kept; v1 FR-M1-03 is now NFR-U3)*
 
 **NFR-A1 - Accessibility (new)**  
 ***Interactive controls shall*** meet WCAG 2.1 AA. axe-core runs in the frontend tests and fails on serious or critical issues; colour contrast stays a manual check. *Validation:* axe-core in Vitest and in a real browser (smoke tier). *Status:* PARTIAL
@@ -2582,4 +2607,5 @@ Contradictions found while writing this version are recorded here, not silently 
 7. **Section D diagrams predated ADR-067 and ADR-074.** D-1, D-3, D-16 and D-17 named LlamaParse and D-16 had no ClamAV container. Corrected in this change (IR-1275).
 8. **`backend/apps/storage` no longer exists.** The v2 handoff expected an empty leftover app; it has already been removed.
 9. **The Import page is RDCO's, the import API is any office's.** `RecordViewSet.import_excel` admits `IsStaff` (KTTO, RDCO, ITSO, IERC), but the frontend route shows Import records to RDCO only. FR-2.7 describes both.
+10. **Ask IRIS answers two readers with different access worse than the path it replaced.** IR-957 switched Ask IRIS to the AI runtime before IR-955's bar was met; IR-995's agent-only rerun scored 43.8% on F12 against Django's 62.5% ([ADR-049](adr/049-dedicated-ai-runtime-and-local-research.md) §Amendment 2026-11-09). FR-5.4 and FR-5.5 stay PARTIAL.
 
