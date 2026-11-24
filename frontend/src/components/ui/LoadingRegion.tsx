@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { SlowLoadNotice, useLoadStage } from "./slowLoad";
+import { SlowLoadNotice, useLoadStage, usePlaceholderDelay } from "./slowLoad";
 
 interface LoadingRegionProps {
   /** Announced while loading: "Loading your research…". */
@@ -17,13 +17,18 @@ interface LoadingRegionProps {
  * A loading placeholder of a screen's own shape (the library's pulsing cards),
  * with what `Skeleton` gives the generic one: the label as a polite status, a
  * line of text after 2 s and Try again after 10 s.
+ *
+ * The shapes, and the room `className` gives them, appear only after 400 ms
+ * (IR-1314): a fast answer, and above all an empty one, never shows the shape
+ * of content it doesn't have. The label is in the region from the first frame.
  */
 export function LoadingRegion({ label, onRetry, className, children }: LoadingRegionProps) {
   const { stage, restart } = useLoadStage();
+  const showShapes = usePlaceholderDelay();
   return (
     <div role="status">
       <span className="sr-only">{label}</span>
-      <div aria-hidden className={className}>{children}</div>
+      {showShapes ? <div aria-hidden className={className}>{children}</div> : <div aria-hidden />}
       <SlowLoadNotice stage={stage} onRetry={onRetry} onRestart={restart} className="mt-4" />
     </div>
   );
