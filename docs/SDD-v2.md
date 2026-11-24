@@ -21,7 +21,7 @@ COLLEGE OF COMPUTER STUDIES
 
 **Preface**
 
-This Software Design Description (SDD) describes how IRIS is built: its services, data model, components and the main interactions between them. It is derived from the Architecture Decision Records in `docs/adr/` and from the code at commit `a46d7fc4` on `main`. **Where they differ from this document, they win.** It is a thesis deliverable, not an engineering authority. Requirements are those of SRS v2 (`docs/SRS-v2.md`), and its requirement IDs (FR-1.1 … FR-7.3) are used here.
+This Software Design Description (SDD) describes how IRIS is built: its services, data model, components and the main interactions between them. It is derived from the Architecture Decision Records in `docs/adr/` and from the code at commit `c01f0ef1` on `main`. **Where they differ from this document, they win.** It is a thesis deliverable, not an engineering authority. Requirements are those of SRS v2 (`docs/SRS-v2.md`), and its requirement IDs (FR-1.1 … FR-7.3) are used here.
 
 **Table of Contents**
 
@@ -128,7 +128,7 @@ Work planned beyond the MVP (SRS v2 §3.4) has no design here.
 
 * Institute of Electrical and Electronics Engineers. (2009). *IEEE Std 1016-2009: IEEE standard for information technology — Systems design — Software design descriptions*.
 * Abac, A. S. B., Adolfo, L. J. R., Revalde, J. T. I., & Zozobrado, H. J. J. (2026). *Software requirements specification for I.R.I.S. – Intelligent Research & IP System* (Version 2.0). College of Computer Studies, Cebu Institute of Technology – University. (`docs/SRS-v2.md`)
-* IRIS Architecture Decision Records, `docs/adr/`, at commit `a46d7fc4`.
+* IRIS Architecture Decision Records, `docs/adr/`, at commit `c01f0ef1`.
 * Django Software Foundation. *Django 5.2 documentation*. https://docs.djangoproject.com/en/5.2/
 * Encode. *Django REST Framework documentation*. https://www.django-rest-framework.org/
 * The PostgreSQL Global Development Group. *PostgreSQL 16 documentation*. https://www.postgresql.org/docs/16/
@@ -156,7 +156,7 @@ Work planned beyond the MVP (SRS v2 §3.4) has no design here.
 5. **Data:** `db` (PostgreSQL 16 + pgvector: Django's tables plus the AI-owned `iris_ai` schema), `redis` (Celery broker, cache, live-hint channels, run wake-ups) and a `media_files` volume for uploads.
 6. **Workers:** `celery-default` (chunking, notifications, email, reminders), `celery-extraction` (concurrency 2), `celery-embedding` (concurrency 4) and `celery-beat` (schedules, in Manila time).
 7. **`clamav`:** scans every upload during the request (ADR-074).
-8. **`migrate`:** a one-shot service that runs `manage.py migrate` before the application services start (ADR-039).
+8. **`migrate`** and **`ai-migrate`:** one-shot services. `migrate` runs `manage.py migrate` before the application services start (ADR-039); `ai-migrate` then runs `python -m ai.runs.migrate` for the `iris_ai` schema, and the AI services wait for it (IR-1320).
 
 **Networks.** `private` is internal-only: the database and Redis live there and have no outside access. Containers that call a vendor (`backend`, `ai-gateway`, `ai-runs-worker`, the Celery workers, `clamav` for signature updates, `caddy`) also join `egress`. Outbound calls go to Unstructured, Voyage, OpenRouter and SMTP only.
 
@@ -334,7 +334,7 @@ Password guessing must be slow and visible, without hard-coding limits (NFR-S6).
 1. User Interface Design
 
 ![Figure 12](diagrams/srs-sdd-v2/screens/S-1.2c-sign-in-error.png)
-*Figure 12: Failed sign-in with the attempts left (local build)*
+*Figure 12: Failed sign-in: the attempts left, said in a dialog (local build)*
 
 2. ##### Frontend Components
 
@@ -538,6 +538,9 @@ A record must enter review with a named Adviser who is not an owner, starting em
 ![Figure 28](diagrams/srs-sdd-v2/screens/S-2.1-publish.png)
 *Figure 28: Publish dialog (local build)*
 
+![Figure 29](diagrams/srs-sdd-v2/screens/S-2.1b-publish-leave.png)
+*Figure 29: Publish asks before closing: "Discard what you've entered?" (local build)*
+
 2. ##### Frontend Components
 
 | Component Name | Description & Purpose | Component Format |
@@ -558,18 +561,18 @@ A record must enter review with a named Adviser who is not an owner, starting em
 
 4. Class Diagram
 
-![Figure 29](diagrams/srs-sdd-v2/png/C-2.1-records.png)
-*Figure 29: Classes: records and submission*
+![Figure 30](diagrams/srs-sdd-v2/png/C-2.1-records.png)
+*Figure 30: Classes: records and submission*
 
 5. Sequence Diagrams
 
-![Figure 30](diagrams/srs-sdd-v2/png/Q-2.1-publish.png)
-*Figure 30: Sequence Diagram for create and submit a record*
+![Figure 31](diagrams/srs-sdd-v2/png/Q-2.1-publish.png)
+*Figure 31: Sequence Diagram for create and submit a record*
 
 6. Schema
 
-![Figure 31](diagrams/srs-sdd-v2/png/E-2.1-records.png)
-*Figure 31: Database Schema for records and Versions*
+![Figure 32](diagrams/srs-sdd-v2/png/E-2.1-records.png)
+*Figure 32: Database Schema for records and Versions*
 
 #### 3.2.2 Required Documents and Templates (FR-2.2)
 
@@ -577,11 +580,14 @@ RDCO, not a deployment, decides what each record type asks for (ADR-063).
 
 1. User Interface Design
 
-![Figure 32](diagrams/srs-sdd-v2/screens/S-2.2a-setup.png)
-*Figure 32: Setup: requirements and templates (RDCO) (local build)*
+![Figure 33](diagrams/srs-sdd-v2/screens/S-2.2a-setup.png)
+*Figure 33: Setup: a record type's description, requirements and templates (RDCO) (local build)*
 
-![Figure 33](diagrams/srs-sdd-v2/screens/S-2.2b-guidelines.png)
-*Figure 33: Guidelines (local build)*
+![Figure 34](diagrams/srs-sdd-v2/screens/S-2.2c-add-requirement.png)
+*Figure 34: Setup: the "Add a requirement" popup (RDCO) (local build)*
+
+![Figure 35](diagrams/srs-sdd-v2/screens/S-2.2b-guidelines.png)
+*Figure 35: Guidelines, one record type at a time (local build)*
 
 2. ##### Frontend Components
 
@@ -602,18 +608,18 @@ RDCO, not a deployment, decides what each record type asks for (ADR-063).
 
 4. Class Diagram
 
-![Figure 34](diagrams/srs-sdd-v2/png/C-2.2-requirements.png)
-*Figure 34: Classes: requirements and templates*
+![Figure 36](diagrams/srs-sdd-v2/png/C-2.2-requirements.png)
+*Figure 36: Classes: requirements and templates*
 
 5. Sequence Diagrams
 
-![Figure 35](diagrams/srs-sdd-v2/png/Q-2.2-requirements.png)
-*Figure 35: Sequence Diagram for set requirements and templates*
+![Figure 37](diagrams/srs-sdd-v2/png/Q-2.2-requirements.png)
+*Figure 37: Sequence Diagram for set requirements and templates*
 
 6. Schema
 
-![Figure 36](diagrams/srs-sdd-v2/png/E-2.2-documents.png)
-*Figure 36: Database Schema for requirements and uploads*
+![Figure 38](diagrams/srs-sdd-v2/png/E-2.2-documents.png)
+*Figure 38: Database Schema for requirements and uploads*
 
 #### 3.2.3 Upload Checks (FR-2.3)
 
@@ -641,17 +647,17 @@ See Figure 28 (Publish dialog (local build)).
 
 4. Class Diagram
 
-![Figure 37](diagrams/srs-sdd-v2/png/C-2.3-uploads.png)
-*Figure 37: Classes: upload checks*
+![Figure 39](diagrams/srs-sdd-v2/png/C-2.3-uploads.png)
+*Figure 39: Classes: upload checks*
 
 5. Sequence Diagrams
 
-![Figure 38](diagrams/srs-sdd-v2/png/Q-2.3-upload.png)
-*Figure 38: Sequence Diagram for check and store an upload*
+![Figure 40](diagrams/srs-sdd-v2/png/Q-2.3-upload.png)
+*Figure 40: Sequence Diagram for check and store an upload*
 
 6. Schema
 
-See Figure 36 (Database Schema for requirements and uploads).
+See Figure 38 (Database Schema for requirements and uploads).
 
 #### 3.2.4 Versions (FR-2.4)
 
@@ -659,8 +665,8 @@ Each Version keeps its own manuscript, documents and review text, so reviewers c
 
 1. User Interface Design
 
-![Figure 39](diagrams/srs-sdd-v2/screens/S-2.4-paper-view.png)
-*Figure 39: Paper View with the in-browser reader (local build)*
+![Figure 41](diagrams/srs-sdd-v2/screens/S-2.4-paper-view.png)
+*Figure 41: Paper View: a published paper's Overview; its AI Overview is unavailable because no AI vendor is reached locally (local build)*
 
 2. ##### Frontend Components
 
@@ -681,17 +687,17 @@ Each Version keeps its own manuscript, documents and review text, so reviewers c
 
 4. Class Diagram
 
-![Figure 40](diagrams/srs-sdd-v2/png/C-2.4-versions.png)
-*Figure 40: Classes: Versions and review text*
+![Figure 42](diagrams/srs-sdd-v2/png/C-2.4-versions.png)
+*Figure 42: Classes: Versions and review text*
 
 5. Sequence Diagrams
 
-![Figure 41](diagrams/srs-sdd-v2/png/Q-2.4-versions.png)
-*Figure 41: Sequence Diagram for compare two Versions*
+![Figure 43](diagrams/srs-sdd-v2/png/Q-2.4-versions.png)
+*Figure 43: Sequence Diagram for compare two Versions*
 
 6. Schema
 
-See Figure 31 (Database Schema for records and Versions).
+See Figure 32 (Database Schema for records and Versions).
 
 #### 3.2.5 Download Requests and Watermarked Copies (FR-2.5)
 
@@ -699,11 +705,11 @@ Reading stays open, saving a copy needs RDCO's approval, and every copy names wh
 
 1. User Interface Design
 
-![Figure 42](diagrams/srs-sdd-v2/screens/S-2.5a-download-request.png)
-*Figure 42: Paper View: saving a copy needs a request (local build)*
+![Figure 44](diagrams/srs-sdd-v2/screens/S-2.5a-download-request.png)
+*Figure 44: Paper View: saving a copy needs a request (local build)*
 
-![Figure 43](diagrams/srs-sdd-v2/screens/S-2.5b-download-requests.png)
-*Figure 43: Download requests (RDCO) (local build)*
+![Figure 45](diagrams/srs-sdd-v2/screens/S-2.5b-download-requests.png)
+*Figure 45: Download requests (RDCO) (local build)*
 
 2. ##### Frontend Components
 
@@ -726,18 +732,18 @@ Reading stays open, saving a copy needs RDCO's approval, and every copy names wh
 
 4. Class Diagram
 
-![Figure 44](diagrams/srs-sdd-v2/png/C-2.5-downloads.png)
-*Figure 44: Classes: download requests and watermarks*
+![Figure 46](diagrams/srs-sdd-v2/png/C-2.5-downloads.png)
+*Figure 46: Classes: download requests and watermarks*
 
 5. Sequence Diagrams
 
-![Figure 45](diagrams/srs-sdd-v2/png/Q-2.5-download.png)
-*Figure 45: Sequence Diagram for request and download a copy*
+![Figure 47](diagrams/srs-sdd-v2/png/Q-2.5-download.png)
+*Figure 47: Sequence Diagram for request and download a copy*
 
 6. Schema
 
-![Figure 46](diagrams/srs-sdd-v2/png/E-2.5-requests.png)
-*Figure 46: Database Schema for download and delete requests*
+![Figure 48](diagrams/srs-sdd-v2/png/E-2.5-requests.png)
+*Figure 48: Database Schema for download and delete requests*
 
 #### 3.2.6 Delete Requests (FR-2.6)
 
@@ -745,8 +751,8 @@ An owner may ask for removal; RDCO decides, and a decline restores the record.
 
 1. User Interface Design
 
-![Figure 47](diagrams/srs-sdd-v2/screens/S-2.6-delete-requests.png)
-*Figure 47: Delete requests (RDCO) (local build)*
+![Figure 49](diagrams/srs-sdd-v2/screens/S-2.6-delete-requests.png)
+*Figure 49: Delete requests (RDCO) (local build)*
 
 2. ##### Frontend Components
 
@@ -765,17 +771,17 @@ An owner may ask for removal; RDCO decides, and a decline restores the record.
 
 4. Class Diagram
 
-![Figure 48](diagrams/srs-sdd-v2/png/C-2.6-delete-import.png)
-*Figure 48: Classes: delete requests and Excel import*
+![Figure 50](diagrams/srs-sdd-v2/png/C-2.6-delete-import.png)
+*Figure 50: Classes: delete requests and Excel import*
 
 5. Sequence Diagrams
 
-![Figure 49](diagrams/srs-sdd-v2/png/Q-2.6-delete.png)
-*Figure 49: Sequence Diagram for a delete request*
+![Figure 51](diagrams/srs-sdd-v2/png/Q-2.6-delete.png)
+*Figure 51: Sequence Diagram for a delete request*
 
 6. Schema
 
-See Figure 46 (Database Schema for download and delete requests).
+See Figure 48 (Database Schema for download and delete requests).
 
 #### 3.2.7 Bulk Import from Excel (FR-2.7)
 
@@ -783,8 +789,8 @@ Records finished before IRIS come in by spreadsheet, row by row, all-or-nothing 
 
 1. User Interface Design
 
-![Figure 50](diagrams/srs-sdd-v2/screens/S-2.7-import.png)
-*Figure 50: Import records (RDCO) (local build)*
+![Figure 52](diagrams/srs-sdd-v2/screens/S-2.7-import.png)
+*Figure 52: Import records (RDCO) (local build)*
 
 2. ##### Frontend Components
 
@@ -803,22 +809,22 @@ Records finished before IRIS come in by spreadsheet, row by row, all-or-nothing 
 
 4. Class Diagram
 
-See Figure 48 (Classes: delete requests and Excel import).
+See Figure 50 (Classes: delete requests and Excel import).
 
 5. Sequence Diagrams
 
-![Figure 51](diagrams/srs-sdd-v2/png/Q-2.7-import.png)
-*Figure 51: Sequence Diagram for import records from Excel*
+![Figure 53](diagrams/srs-sdd-v2/png/Q-2.7-import.png)
+*Figure 53: Sequence Diagram for import records from Excel*
 
-![Figure 52](diagrams/srs-sdd-v2/v1-kept/SDD-v1-image36-excel-import-sequence.png)
-*Figure 52: Sequence Diagram for bulk record import (v1, kept)*
+![Figure 54](diagrams/srs-sdd-v2/v1-kept/SDD-v1-image36-excel-import-sequence.png)
+*Figure 54: Sequence Diagram for bulk record import (v1, kept)*
 
-![Figure 53](diagrams/srs-sdd-v2/v1-kept/SDD-v1-image94-template-and-import-sequence.png)
-*Figure 53: Sequence Diagram for template download and import (v1, kept)*
+![Figure 55](diagrams/srs-sdd-v2/v1-kept/SDD-v1-image94-template-and-import-sequence.png)
+*Figure 55: Sequence Diagram for template download and import (v1, kept)*
 
 6. Schema
 
-See Figure 31 (Database Schema for records and Versions).
+See Figure 32 (Database Schema for records and Versions).
 
 #### 3.2.8 Discover: Browse and Search (FR-2.8)
 
@@ -826,8 +832,11 @@ Readers find published research by keyword and filters, and a refusal looks like
 
 1. User Interface Design
 
-![Figure 54](diagrams/srs-sdd-v2/screens/S-2.8-discover.png)
-*Figure 54: Discover (local build)*
+![Figure 56](diagrams/srs-sdd-v2/screens/S-2.8-discover.png)
+*Figure 56: Discover (local build)*
+
+![Figure 57](diagrams/srs-sdd-v2/screens/S-2.8b-discover-people.png)
+*Figure 57: Discover: People, with College, Department and Role filters (local build)*
 
 2. ##### Frontend Components
 
@@ -848,27 +857,27 @@ Readers find published research by keyword and filters, and a refusal looks like
 
 4. Class Diagram
 
-![Figure 55](diagrams/srs-sdd-v2/v1-kept/SDD-v1-image46-search-vector-class.png)
-*Figure 55: Class Diagram for Search index class diagram (v1, kept)*
+![Figure 58](diagrams/srs-sdd-v2/v1-kept/SDD-v1-image46-search-vector-class.png)
+*Figure 58: Class Diagram for Search index class diagram (v1, kept)*
 
 5. Sequence Diagrams
 
-![Figure 56](diagrams/srs-sdd-v2/png/Q-2.8-discover.png)
-*Figure 56: Sequence Diagram for search Discover*
+![Figure 59](diagrams/srs-sdd-v2/png/Q-2.8-discover.png)
+*Figure 59: Sequence Diagram for search Discover*
 
-![Figure 57](diagrams/srs-sdd-v2/v1-kept/SDD-v1-image47-search-vector-sequence.png)
-*Figure 57: Sequence Diagram for search index update on save (v1, kept)*
+![Figure 60](diagrams/srs-sdd-v2/v1-kept/SDD-v1-image47-search-vector-sequence.png)
+*Figure 60: Sequence Diagram for search index update on save (v1, kept)*
 
 6. Schema
 
-See Figure 31 (Database Schema for records and Versions).
+See Figure 32 (Database Schema for records and Versions).
 
 ### Module 3: Review Workflow (Thesis Core)
 
-**Why this design.** The thesis claims that per-office clearance state makes resubmission cheaper: only the office that asked looks again (ADR-003). That needs three separate facts that v1 merged into one status column: **who holds the record** (Assignments and Seats), **what each office concluded** (Clearances), and **what is being asked of the owner** (revision and document requests). `pipeline_status` is kept to one value while in review, and the API derives a readable `workflow_state` from those facts (ADR-021 §4). Figure 58 shows the states; the core classes are in each feature's class diagram.
+**Why this design.** The thesis claims that per-office clearance state makes resubmission cheaper: only the office that asked looks again (ADR-003). That needs three separate facts that v1 merged into one status column: **who holds the record** (Assignments and Seats), **what each office concluded** (Clearances), and **what is being asked of the owner** (revision and document requests). `pipeline_status` is kept to one value while in review, and the API derives a readable `workflow_state` from those facts (ADR-021 §4). Figure 61 shows the states; the core classes are in each feature's class diagram.
 
-![Figure 58](diagrams/srs-sdd-v2/png/V-03-record-states.png)
-*Figure 58: Record lifecycle and review states*
+![Figure 61](diagrams/srs-sdd-v2/png/V-03-record-states.png)
+*Figure 61: Record lifecycle and review states*
 
 #### 3.3.1 Adviser-First Review (FR-3.1)
 
@@ -876,11 +885,14 @@ Every record enters with its Adviser, who alone decides a Proposal and sends a T
 
 1. User Interface Design
 
-![Figure 59](diagrams/srs-sdd-v2/screens/S-3.1a-my-reviews.png)
-*Figure 59: My Reviews (Adviser) (local build)*
+![Figure 62](diagrams/srs-sdd-v2/screens/S-3.1a-my-reviews.png)
+*Figure 62: My Reviews (Adviser) (local build)*
 
-![Figure 60](diagrams/srs-sdd-v2/screens/S-3.1b-adviser-review.png)
-*Figure 60: Review workspace (Adviser) (local build)*
+![Figure 63](diagrams/srs-sdd-v2/screens/S-3.1b-adviser-review.png)
+*Figure 63: Review workspace (Adviser) (local build)*
+
+![Figure 64](diagrams/srs-sdd-v2/screens/S-3.1c-request-changes.png)
+*Figure 64: Finish review: "Request changes", with "The paper itself needs changes" ticked and the documents picklist (Adviser) (local build)*
 
 2. ##### Frontend Components
 
@@ -888,6 +900,7 @@ Every record enters with its Adviser, who alone decides a Proposal and sends a T
 | :---: | ----- | ----- |
 | **MyReviewsPage** frontend/src/features/review/MyReviewsPage.tsx | To review, In review, Done; sort; Overdue only. | React page component |
 | **ReviewWorkspaceLayout, ReviewActionBar, DecisionDialog, RouteDialog** frontend/src/features/records/paper-view/ | The review workspace and its acts. | React component |
+| **FinishReviewDialog, RequestChangesFields** frontend/src/features/records/paper-view/threads/ | *Finish review*: summary and verdict; for *Request changes*, the new-version tick and the documents picklist. | React dialog component |
 
 3. ##### Backend Components
 
@@ -895,24 +908,25 @@ Every record enters with its Adviser, who alone decides a Proposal and sends a T
 | :---: | ----- | ----- |
 | **routing.accept_and_route** backend/apps/reviews/routing.py | Complete the Adviser's assignment; open RDCO's. | Service module |
 | **decisions.decide** backend/apps/reviews/decisions.py | Accept (Proposal) or reject. | Service module |
+| **finish_review** backend/apps/reviews/finish_review.py | Sends the reviewer's drafts with the verdict; *Request changes* opens the revision request, the document request, or both, in one transaction. | Service module |
 | **RecordAssignment, ReviewerSeat, Review** backend/apps/reviews/models.py | Who holds the record; the Adviser's Review. | Django model |
 
-**API:** `POST /api/v1/records/<id>/accept-and-route/` · `POST /api/v1/records/<id>/decide/` · `GET /api/v1/reviews/mine/`
+**API:** `POST /api/v1/records/<id>/accept-and-route/` · `POST /api/v1/records/<id>/decide/` · `POST /api/v1/records/<id>/finish-review/` · `GET /api/v1/reviews/mine/`
 
 4. Class Diagram
 
-![Figure 61](diagrams/section-d/png/D-20-class-workflow-core.png)
-*Figure 61: Class Diagram for Workflow core classes (Section D-20)*
+![Figure 65](diagrams/section-d/png/D-20-class-workflow-core.png)
+*Figure 65: Class Diagram for Workflow core classes (Section D-20)*
 
 5. Sequence Diagrams
 
-![Figure 62](diagrams/srs-sdd-v2/png/Q-3.1-adviser.png)
-*Figure 62: Sequence Diagram for the Adviser accepts and sends to RDCO*
+![Figure 66](diagrams/srs-sdd-v2/png/Q-3.1-adviser.png)
+*Figure 66: Sequence Diagram for the Adviser accepts and sends to RDCO*
 
 6. Schema
 
-![Figure 63](diagrams/srs-sdd-v2/png/E-3.1-workflow.png)
-*Figure 63: Database Schema for assignments, Seats, clearances and revision requests*
+![Figure 67](diagrams/srs-sdd-v2/png/E-3.1-workflow.png)
+*Figure 67: Database Schema for assignments, Seats, clearances and revision requests*
 
 #### 3.3.2 RDCO Routes and Decides at Any Time (FR-3.2)
 
@@ -920,11 +934,11 @@ RDCO routes to offices and alone publishes; a Decision closes all open work with
 
 1. User Interface Design
 
-![Figure 64](diagrams/srs-sdd-v2/screens/S-3.2a-rdco-decide.png)
-*Figure 64: RDCO's view of a record ready to decide, with its embargo card (local build)*
+![Figure 68](diagrams/srs-sdd-v2/screens/S-3.2a-rdco-decide.png)
+*Figure 68: RDCO's view of a record ready to decide, with its embargo card (local build)*
 
-![Figure 65](diagrams/srs-sdd-v2/screens/S-3.2b-rdco-offices-reviewing.png)
-*Figure 65: RDCO's view while IERC and KTTO still review (local build)*
+![Figure 69](diagrams/srs-sdd-v2/screens/S-3.2b-rdco-offices-reviewing.png)
+*Figure 69: RDCO's view while IERC and KTTO still review (local build)*
 
 2. ##### Frontend Components
 
@@ -944,16 +958,16 @@ RDCO routes to offices and alone publishes; a Decision closes all open work with
 
 4. Class Diagram
 
-See Figure 61 (Class Diagram for Workflow core classes (Section D-20)).
+See Figure 65 (Class Diagram for Workflow core classes (Section D-20)).
 
 5. Sequence Diagrams
 
-![Figure 66](diagrams/srs-sdd-v2/png/Q-3.2-rdco.png)
-*Figure 66: Sequence Diagram for RDCO routes, then decides*
+![Figure 70](diagrams/srs-sdd-v2/png/Q-3.2-rdco.png)
+*Figure 70: Sequence Diagram for RDCO routes, then decides*
 
 6. Schema
 
-See Figure 63 (Database Schema for assignments, Seats, clearances and revision requests).
+See Figure 67 (Database Schema for assignments, Seats, clearances and revision requests).
 
 #### 3.3.3 Parallel Office Clearance (FR-3.3)
 
@@ -961,8 +975,8 @@ Each office reviews through its own Pool and records its own clearance (ADR-032 
 
 1. User Interface Design
 
-![Figure 67](diagrams/srs-sdd-v2/screens/S-3.3-office-console.png)
-*Figure 67: IERC office console: ITSO and KTTO clearances kept from v1 (local build)*
+![Figure 71](diagrams/srs-sdd-v2/screens/S-3.3-office-console.png)
+*Figure 71: IERC office console: ITSO and KTTO clearances kept from v1 (local build)*
 
 2. ##### Frontend Components
 
@@ -983,63 +997,68 @@ Each office reviews through its own Pool and records its own clearance (ADR-032 
 
 4. Class Diagram
 
-See Figure 61 (Class Diagram for Workflow core classes (Section D-20)).
+See Figure 65 (Class Diagram for Workflow core classes (Section D-20)).
 
 5. Sequence Diagrams
 
-![Figure 68](diagrams/srs-sdd-v2/png/Q-3.3-office.png)
-*Figure 68: Sequence Diagram for an office claims and clears*
+![Figure 72](diagrams/srs-sdd-v2/png/Q-3.3-office.png)
+*Figure 72: Sequence Diagram for an office claims and clears*
 
 6. Schema
 
-See Figure 63 (Database Schema for assignments, Seats, clearances and revision requests).
+See Figure 67 (Database Schema for assignments, Seats, clearances and revision requests).
 
 #### 3.3.4 Clearance-Aware Resubmission (FR-3.4)
 
-The thesis contribution: on a new Version, only the asking parties' clearances reset (ADR-003); restart-all is the comparison arm (ADR-004).
+The thesis contribution: on a new Version, only the asking parties' clearances reset (ADR-003); restart-all is the comparison arm (ADR-004). A reviewer asks with *Request changes*, and the owner uploads and submits from the Documents tab; uploads are held until *Submit new version* sends them (ADR-022 Amendment 8, IR-1318).
 
 1. User Interface Design
 
-![Figure 69](diagrams/srs-sdd-v2/screens/S-3.4-owner-revision.png)
-*Figure 69: Owner's review pane: who holds the paper and what waits (local build)*
+See Figure 64 (Finish review: "Request changes", with "The paper itself needs changes" ticked and the documents picklist (Adviser) (local build)).
 
-![Figure 70](diagrams/srs-sdd-v2/screens/S-3.4b-preserved-clearances.png)
-*Figure 70: Review details: clearances kept across Versions (local build)*
+![Figure 73](diagrams/srs-sdd-v2/screens/S-3.4-owner-revision.png)
+*Figure 73: Owner's Documents tab: changes requested by IERC; "Submit new version" waits for a change, and ITSO and KTTO keep their clearances (local build)*
+
+![Figure 74](diagrams/srs-sdd-v2/screens/S-3.4b-preserved-clearances.png)
+*Figure 74: Review details: ITSO and KTTO kept on v2 while IERC reviews again; the demo record has no manuscript file (local build)*
 
 2. ##### Frontend Components
 
 | Component Name | Description & Purpose | Component Format |
 | :---: | ----- | ----- |
-| **RequestRevisionDialog, NewVersionDialog, RevisionManuscriptUpload** frontend/src/features/records/paper-view/ | Request revision; answer threads and submit a new Version. | React dialog component |
+| **FinishReviewDialog, RequestChangesFields, RequestRevisionDialog** frontend/src/features/records/paper-view/ | *Request changes* (the `request_revision` verdict), from *Finish review* or the footer. | React dialog component |
+| **DocumentsTab, SubmitChangesBar, NewVersionDialog** frontend/src/features/records/paper-view/ | The owner uploads in the Documents tab, sees what is not sent yet, and submits the new Version (IR-1318, IR-1322). | React component |
 
 3. ##### Backend Components
 
 | Component Name | Description & Purpose | Component Format |
 | :---: | ----- | ----- |
+| **finish_review** backend/apps/reviews/finish_review.py | *Request changes* with `new_version` opens the revision request, and any document request, in one transaction. | Service module |
 | **revisions** backend/apps/reviews/revisions.py | Request and withdraw revision requests. | Service module |
+| **requests.send_held_uploads** backend/apps/documents/requests.py | Called inside `submit_new_version`: sends every held upload, so the Version names it. | Service module |
 | **new_version.submit_new_version** backend/apps/reviews/new_version.py | The one transaction: Version, resolve requests, reset only the asking parties, reopen their Seats. | Service module |
 | **lifecycle** backend/apps/records/lifecycle.py | RESUBMISSION_POLICY: CLEARANCE_AWARE (default) or RESTART_ALL (WORKFLOW_TABLE). | Service module |
 | **clearance_state.is_preserved** backend/apps/reviews/clearance_state.py | Tells a kept clearance from a reset one. | Service module |
 
-**API:** `POST /api/v1/records/<id>/request-revision/` · `POST /api/v1/records/<id>/revision-requests/<rid>/withdraw/` · `POST /api/v1/records/<id>/new-version/` · `POST /api/v1/records/<id>/discard-revised-manuscript/` · `GET /api/v1/records/<id>/response-letters/`
+**API:** `POST /api/v1/records/<id>/finish-review/` · `POST /api/v1/records/<id>/request-revision/` · `POST /api/v1/records/<id>/revision-requests/<rid>/withdraw/` · `POST /api/v1/records/<id>/new-version/` · `POST /api/v1/records/<id>/discard-revised-manuscript/` · `GET /api/v1/records/<id>/response-letters/`
 
 4. Class Diagram
 
-See Figure 61 (Class Diagram for Workflow core classes (Section D-20)).
+See Figure 65 (Class Diagram for Workflow core classes (Section D-20)).
 
 5. Sequence Diagrams
 
-![Figure 71](diagrams/srs-sdd-v2/png/Q-3.4-resubmission.png)
-*Figure 71: Sequence Diagram for clearance-aware resubmission*
+![Figure 75](diagrams/srs-sdd-v2/png/Q-3.4-resubmission.png)
+*Figure 75: Sequence Diagram for clearance-aware resubmission*
 
-![Figure 72](diagrams/srs-sdd-v2/png/V-04-clearance-aware-resubmission.png)
-*Figure 72: Sequence Diagram for Clearance-aware resubmission (the thesis contribution)*
+![Figure 76](diagrams/srs-sdd-v2/png/V-04-clearance-aware-resubmission.png)
+*Figure 76: Sequence Diagram for Clearance-aware resubmission (the thesis contribution)*
 
 How `submit_new_version` (`apps/reviews/new_version.py`) works, in one transaction:
 
-- **Step 1: Lock and check.** Lock the record. The actor must be an owner, the record in review, and at least one revision request open. Something must have changed since the newest request: a different manuscript, a document uploaded since, or an edited detail. Every *Must fix* thread from an asking party must be answered. The resubmission policy is read first, so a misconfiguration refuses cleanly.
+- **Step 1: Lock and check.** Lock the record. The actor must be an owner, the record in review, and at least one revision request open. Something must have changed since the newest request: a different manuscript, a document uploaded since, an upload still held, or an edited detail. Every *Must fix* thread from an asking party must be answered. The resubmission policy is read first, so a misconfiguration refuses cleanly.
 - **Step 2: Work out who reviews again.** `_parties` lists the asking parties. `_reset_offices` decides which clearances reset: **under `CLEARANCE_AWARE`, only the asking parties'**; under `RESTART_ALL`, every office's. `_kept_offices` records which `cleared` clearances survive, counted per office for the evaluation (IR-144).
-- **Step 3: Write.** `write_version(…, REVISION)` writes Version n+1. The response letter is frozen from the open threads. The requests are marked `resubmitted`. Earlier action notifications are settled (ADR-069). The record's resubmission count is bumped before the reset, so every reset row is dated after it.
+- **Step 3: Write.** `send_held_uploads` sends every held upload (sets `sent_at`) and answers any requested document it fills. `write_version(…, REVISION)` then writes Version n+1, which names those uploads. The response letter is frozen from the open threads. The requests are marked `resubmitted`. Earlier action notifications are settled (ADR-069). The record's resubmission count is bumped before the reset, so every reset row is dated after it.
 - **Step 4: Reset and reopen.** `RecordClearance.update(...)` resets only the chosen offices to `pending`. The asking parties' completed assignments reopen with the **same Seats**, so the same reviewers look again in parallel. An office still reviewing keeps its Seats under both policies.
 - **Step 5: After commit.** The revised manuscript gets its review text, and is read for AI only once the record is published. Threads are re-placed on the new Version. The asking reviewers are notified, and live hints sent. Each post-commit step is independent: a failing step is logged and the rest still run (IR-1049).
 
@@ -1047,46 +1066,49 @@ How `submit_new_version` (`apps/reviews/new_version.py`) works, in one transacti
 
 6. Schema
 
-See Figure 63 (Database Schema for assignments, Seats, clearances and revision requests).
+See Figure 67 (Database Schema for assignments, Seats, clearances and revision requests).
 
 #### 3.3.5 Explicit Document Requests (FR-3.5)
 
-Asking for a file must not send the paper back for resubmission (ADR-022).
+Asking for a file must not send the paper back for resubmission (ADR-022). Since Amendment 8 an owner's uploads are held until the owner sends them.
 
 1. User Interface Design
 
-![Figure 73](diagrams/srs-sdd-v2/screens/S-3.5-document-request.png)
-*Figure 73: My Library: documents requested of the author (local build)*
+![Figure 77](diagrams/srs-sdd-v2/screens/S-3.5-document-request.png)
+*Figure 77: Owner's Documents tab: an upload held as "Added, not sent yet", and "Submit added documents" (local build)*
 
 2. ##### Frontend Components
 
 | Component Name | Description & Purpose | Component Format |
 | :---: | ----- | ----- |
-| **RequestDocumentDialog, ReviewerDocumentRequests, ActionRequiredPanel** frontend/src/features/document-requests/ | Ask, review items, and the owner's to-do. | React component |
+| **RequestDocumentDialog, ReviewerDocumentRequests, ActionRequiredPanel** frontend/src/features/document-requests/ | Ask from the Documents tab, decide each upload, and the owner's to-do. | React component |
+| **DocumentsTab, SubmitChangesBar** frontend/src/features/records/paper-view/ | Upload on every slot while a request is open; *Added, not sent yet* with a trash can; *Submit added documents*. | React component |
 
 3. ##### Backend Components
 
 | Component Name | Description & Purpose | Component Format |
 | :---: | ----- | ----- |
-| **requests** backend/apps/documents/requests.py | create_request, accept_item, reject_item, withdraw_request. | Service module |
+| **requests** backend/apps/documents/requests.py | create_request, send_held_uploads, accept_item, reject_item, withdraw_request. | Service module |
+| **RecordViewSet.send_documents** backend/apps/records/views.py | *Submit added documents*: 409 while a revision is open, 400 when nothing is held, 403 for anyone but an owner. | DRF ViewSet action |
 | **DocumentRequest, DocumentRequestItem** backend/apps/documents/models.py | The request and its items. | Django model |
+| **RecordUpload.sent_at, RecordUploadQuerySet.visible_to** backend/apps/documents/models.py | Null while held; a held upload is the owners' alone, a 404 to anyone else. Migration `documents.0029` adds it, with existing uploads marked sent. | Django model |
 
-**API:** `POST /api/v1/records/<id>/document-requests/` · `PATCH /api/v1/document-requests/<id>/` · `PATCH /api/v1/document-request-items/<id>/`
+**API:** `POST /api/v1/records/<id>/document-requests/` · `POST /api/v1/records/<id>/documents/send/` · `PATCH /api/v1/document-requests/<id>/` · `PATCH /api/v1/document-request-items/<id>/`
 
 4. Class Diagram
 
-![Figure 74](diagrams/srs-sdd-v2/png/C-3.5-doc-requests.png)
-*Figure 74: Classes: document requests*
+![Figure 78](diagrams/srs-sdd-v2/png/C-3.5-doc-requests.png)
+*Figure 78: Classes: document requests*
 
 5. Sequence Diagrams
 
-![Figure 75](diagrams/srs-sdd-v2/png/Q-3.5-doc-request.png)
-*Figure 75: Sequence Diagram for a document request*
+![Figure 79](diagrams/srs-sdd-v2/png/Q-3.5-doc-request.png)
+*Figure 79: Sequence Diagram for a document request*
 
 6. Schema
 
-![Figure 76](diagrams/srs-sdd-v2/png/E-3.5-doc-requests.png)
-*Figure 76: Database Schema for document requests*
+![Figure 80](diagrams/srs-sdd-v2/png/E-3.5-doc-requests.png)
+*Figure 80: Database Schema for document requests*
 
 #### 3.3.6 Review Threads and Comments (FR-3.6)
 
@@ -1094,7 +1116,7 @@ Reviewers' points and the owner's answers stay with the Version they were made o
 
 1. User Interface Design
 
-See Figure 69 (Owner's review pane: who holds the paper and what waits (local build)).
+See Figure 63 (Review workspace (Adviser) (local build)): its Threads tab. The demo data has no threads.
 
 2. ##### Frontend Components
 
@@ -1115,18 +1137,18 @@ See Figure 69 (Owner's review pane: who holds the paper and what waits (local bu
 
 4. Class Diagram
 
-![Figure 77](diagrams/srs-sdd-v2/png/C-3.6-threads.png)
-*Figure 77: Classes: review threads*
+![Figure 81](diagrams/srs-sdd-v2/png/C-3.6-threads.png)
+*Figure 81: Classes: review threads*
 
 5. Sequence Diagrams
 
-![Figure 78](diagrams/srs-sdd-v2/png/Q-3.6-threads.png)
-*Figure 78: Sequence Diagram for a review thread*
+![Figure 82](diagrams/srs-sdd-v2/png/Q-3.6-threads.png)
+*Figure 82: Sequence Diagram for a review thread*
 
 6. Schema
 
-![Figure 79](diagrams/srs-sdd-v2/png/E-3.6-threads.png)
-*Figure 79: Database Schema for review threads*
+![Figure 83](diagrams/srs-sdd-v2/png/E-3.6-threads.png)
+*Figure 83: Database Schema for review threads*
 
 #### 3.3.7 Turnaround, Reminders and Escalation (FR-3.7)
 
@@ -1134,8 +1156,8 @@ Late reviews must be visible, but a date never decides anything (ADR-043).
 
 1. User Interface Design
 
-![Figure 80](diagrams/srs-sdd-v2/screens/S-3.7-analytics.png)
-*Figure 80: Workflow analytics (RDCO) (local build)*
+![Figure 84](diagrams/srs-sdd-v2/screens/S-3.7-analytics.png)
+*Figure 84: Workflow analytics (RDCO) (local build)*
 
 2. ##### Frontend Components
 
@@ -1157,18 +1179,18 @@ Late reviews must be visible, but a date never decides anything (ADR-043).
 
 4. Class Diagram
 
-![Figure 81](diagrams/srs-sdd-v2/png/C-3.7-deadlines.png)
-*Figure 81: Classes: turnaround and reminders*
+![Figure 85](diagrams/srs-sdd-v2/png/C-3.7-deadlines.png)
+*Figure 85: Classes: turnaround and reminders*
 
 5. Sequence Diagrams
 
-![Figure 82](diagrams/srs-sdd-v2/png/Q-3.7-reminders.png)
-*Figure 82: Sequence Diagram for reminders and escalation*
+![Figure 86](diagrams/srs-sdd-v2/png/Q-3.7-reminders.png)
+*Figure 86: Sequence Diagram for reminders and escalation*
 
 6. Schema
 
-![Figure 83](diagrams/srs-sdd-v2/png/E-3.7-deadlines.png)
-*Figure 83: Database Schema for turnaround*
+![Figure 87](diagrams/srs-sdd-v2/png/E-3.7-deadlines.png)
+*Figure 87: Database Schema for turnaround*
 
 #### 3.3.8 IP Type on Published Records (FR-3.8)
 
@@ -1176,7 +1198,7 @@ The IP type is recorded and filterable; an IP-marked paper waits for KTTO before
 
 1. User Interface Design
 
-See Figure 64 (RDCO's view of a record ready to decide, with its embargo card (local build)).
+See Figure 68 (RDCO's view of a record ready to decide, with its embargo card (local build)).
 
 2. ##### Frontend Components
 
@@ -1195,18 +1217,18 @@ See Figure 64 (RDCO's view of a record ready to decide, with its embargo card (l
 
 4. Class Diagram
 
-![Figure 84](diagrams/srs-sdd-v2/png/C-3.8-ip-embargo.png)
-*Figure 84: Classes: IP and embargo on a record*
+![Figure 88](diagrams/srs-sdd-v2/png/C-3.8-ip-embargo.png)
+*Figure 88: Classes: IP and embargo on a record*
 
 5. Sequence Diagrams
 
-![Figure 85](diagrams/srs-sdd-v2/png/Q-3.8-ip.png)
-*Figure 85: Sequence Diagram for tag and release IP*
+![Figure 89](diagrams/srs-sdd-v2/png/Q-3.8-ip.png)
+*Figure 89: Sequence Diagram for tag and release IP*
 
 6. Schema
 
-![Figure 86](diagrams/srs-sdd-v2/png/E-3.8-embargo.png)
-*Figure 86: Database Schema for IP and embargo*
+![Figure 90](diagrams/srs-sdd-v2/png/E-3.8-embargo.png)
+*Figure 90: Database Schema for IP and embargo*
 
 ### Module 4: Notifications
 
@@ -1216,8 +1238,8 @@ People hear about events that concern them, and an action notice settles when it
 
 1. User Interface Design
 
-![Figure 87](diagrams/srs-sdd-v2/screens/S-4.1-notifications.png)
-*Figure 87: Notifications, with answered requests marked (local build)*
+![Figure 91](diagrams/srs-sdd-v2/screens/S-4.1-notifications.png)
+*Figure 91: Notifications, with answered requests marked (local build)*
 
 2. ##### Frontend Components
 
@@ -1238,18 +1260,18 @@ People hear about events that concern them, and an action notice settles when it
 
 4. Class Diagram
 
-![Figure 88](diagrams/srs-sdd-v2/png/C-4.1-notifications.png)
-*Figure 88: Classes: notifications and live hints*
+![Figure 92](diagrams/srs-sdd-v2/png/C-4.1-notifications.png)
+*Figure 92: Classes: notifications and live hints*
 
 5. Sequence Diagrams
 
-![Figure 89](diagrams/srs-sdd-v2/png/Q-4.1-notify.png)
-*Figure 89: Sequence Diagram for notify and settle*
+![Figure 93](diagrams/srs-sdd-v2/png/Q-4.1-notify.png)
+*Figure 93: Sequence Diagram for notify and settle*
 
 6. Schema
 
-![Figure 90](diagrams/srs-sdd-v2/png/E-4.1-notifications.png)
-*Figure 90: Database Schema for notifications*
+![Figure 94](diagrams/srs-sdd-v2/png/E-4.1-notifications.png)
+*Figure 94: Database Schema for notifications*
 
 #### 3.4.2 Live Updates (FR-4.2)
 
@@ -1276,15 +1298,15 @@ No screen of its own: every wired page refreshes itself.
 
 4. Class Diagram
 
-See Figure 88 (Classes: notifications and live hints).
+See Figure 92 (Classes: notifications and live hints).
 
 5. Sequence Diagrams
 
-![Figure 91](diagrams/srs-sdd-v2/png/Q-4.2-live.png)
-*Figure 91: Sequence Diagram for a live hint*
+![Figure 95](diagrams/srs-sdd-v2/png/Q-4.2-live.png)
+*Figure 95: Sequence Diagram for a live hint*
 
-![Figure 92](diagrams/srs-sdd-v2/png/V-06-live-hints.png)
-*Figure 92: Sequence Diagram for Live updates by server-sent hints*
+![Figure 96](diagrams/srs-sdd-v2/png/V-06-live-hints.png)
+*Figure 96: Sequence Diagram for Live updates by server-sent hints*
 
 6. Schema
 
@@ -1319,18 +1341,18 @@ No screen of its own.
 
 4. Class Diagram
 
-![Figure 93](diagrams/srs-sdd-v2/png/C-5.1-extraction.png)
-*Figure 93: Classes: extraction*
+![Figure 97](diagrams/srs-sdd-v2/png/C-5.1-extraction.png)
+*Figure 97: Classes: extraction*
 
 5. Sequence Diagrams
 
-![Figure 94](diagrams/srs-sdd-v2/png/Q-5.1-extract.png)
-*Figure 94: Sequence Diagram for extract a published manuscript*
+![Figure 98](diagrams/srs-sdd-v2/png/Q-5.1-extract.png)
+*Figure 98: Sequence Diagram for extract a published manuscript*
 
 6. Schema
 
-![Figure 95](diagrams/srs-sdd-v2/png/E-5.1-extraction.png)
-*Figure 95: Database Schema for extraction*
+![Figure 99](diagrams/srs-sdd-v2/png/E-5.1-extraction.png)
+*Figure 99: Database Schema for extraction*
 
 #### 3.5.2 Chunking and Embedding (FR-5.2)
 
@@ -1355,18 +1377,18 @@ None: this feature has no screen.
 
 4. Class Diagram
 
-![Figure 96](diagrams/srs-sdd-v2/png/C-5.2-indexing.png)
-*Figure 96: Classes: chunks and vectors*
+![Figure 100](diagrams/srs-sdd-v2/png/C-5.2-indexing.png)
+*Figure 100: Classes: chunks and vectors*
 
 5. Sequence Diagrams
 
-![Figure 97](diagrams/srs-sdd-v2/png/Q-5.2-index.png)
-*Figure 97: Sequence Diagram for chunk and embed*
+![Figure 101](diagrams/srs-sdd-v2/png/Q-5.2-index.png)
+*Figure 101: Sequence Diagram for chunk and embed*
 
 6. Schema
 
-![Figure 98](diagrams/srs-sdd-v2/png/E-5.2-indexing.png)
-*Figure 98: Database Schema for chunks and vectors*
+![Figure 102](diagrams/srs-sdd-v2/png/E-5.2-indexing.png)
+*Figure 102: Database Schema for chunks and vectors*
 
 #### 3.5.3 Disclosure Gate (FR-5.3)
 
@@ -1374,7 +1396,7 @@ No part of a paper reaches an AI vendor unless it is published, released, IP-rel
 
 1. User Interface Design
 
-See Figure 64 (RDCO's view of a record ready to decide, with its embargo card (local build)).
+See Figure 68 (RDCO's view of a record ready to decide, with its embargo card (local build)).
 
 2. ##### Frontend Components
 
@@ -1394,16 +1416,16 @@ See Figure 64 (RDCO's view of a record ready to decide, with its embargo card (l
 
 4. Class Diagram
 
-See Figure 84 (Classes: IP and embargo on a record).
+See Figure 88 (Classes: IP and embargo on a record).
 
 5. Sequence Diagrams
 
-![Figure 99](diagrams/srs-sdd-v2/png/Q-5.3-gate.png)
-*Figure 99: Sequence Diagram for release an embargo, then publish*
+![Figure 103](diagrams/srs-sdd-v2/png/Q-5.3-gate.png)
+*Figure 103: Sequence Diagram for release an embargo, then publish*
 
 6. Schema
 
-See Figure 86 (Database Schema for IP and embargo).
+See Figure 90 (Database Schema for IP and embargo).
 
 #### 3.5.4 Ask IRIS (FR-5.4)
 
@@ -1411,8 +1433,8 @@ Questions are answered by the AI runtime from passages the reader may read, stre
 
 1. User Interface Design
 
-![Figure 100](diagrams/srs-sdd-v2/screens/S-5.4-ask-iris.png)
-*Figure 100: Ask IRIS (AI runtime not running locally) (local build)*
+![Figure 104](diagrams/srs-sdd-v2/screens/S-5.4-ask-iris.png)
+*Figure 104: Ask IRIS: the conversation history on the left; it cannot load conversations because the AI runtime is not running locally (local build)*
 
 2. ##### Frontend Components
 
@@ -1427,30 +1449,30 @@ Questions are answered by the AI runtime from passages the reader may read, stre
 | :---: | ----- | ----- |
 | **ReaderSessionGrantView, RuntimeEdgeGrantView** backend/apps/ai/views/grants.py | Reader and edge grants. | DRF APIView |
 | **ai/api, ai/runs** ai/ | Runs: submit, status, cancel, retry; worker claim with lease and fence. | FastAPI router / worker |
-| **ai/agent, ai/research** ai/ | Bounded tool loop; read-only research tools. | Runtime module |
+| **ai/agent, ai/research** ai/ | Bounded tool loop; read-only research tools: `search`, `open_passage`, `read_manuscript`, `resolve_papers`, `count_records`, `list_records`, `recover_turn`, and `paper_details` (IR-1278); three dates and a fixed "recent" (IR-1316). Both of the last rest on proposed ADR-049 amendments. | Runtime module |
 | **ask_run, run_event, turn, citation** ai/runs/migrations/*.sql | The iris_ai schema. | SQL table |
 
 **API:** `POST /api/v1/ai/runtime/edge-grant/ (nginx auth_request)` · `/api/v1/ai/runtime/runs, /runs/<id>?after=N, /runs/<id>/cancel, /runs/<id>/retry` · `/api/v1/ai/runtime/conversations/…`
 
 4. Class Diagram
 
-![Figure 101](diagrams/section-d/png/D-21-component-ai-runtime.png)
-*Figure 101: Class Diagram for AI runtime classes: ports and adapters (Section D-21)*
+![Figure 105](diagrams/section-d/png/D-21-component-ai-runtime.png)
+*Figure 105: Class Diagram for AI runtime classes: ports and adapters (Section D-21)*
 
 5. Sequence Diagrams
 
-![Figure 102](diagrams/srs-sdd-v2/png/Q-5.4-ask.png)
-*Figure 102: Sequence Diagram for an Ask IRIS run*
+![Figure 106](diagrams/srs-sdd-v2/png/Q-5.4-ask.png)
+*Figure 106: Sequence Diagram for an Ask IRIS run*
 
-![Figure 103](diagrams/section-d/png/D-18-architecture-ask-iris-flow.png)
-*Figure 103: Sequence Diagram for Ask IRIS request flow (Section D-18)*
+![Figure 107](diagrams/section-d/png/D-18-architecture-ask-iris-flow.png)
+*Figure 107: Sequence Diagram for Ask IRIS request flow (Section D-18)*
 
 **Run lifecycle:** submitted → `queued` → claimed by a worker (leased, fenced) → tool loop within Bounds → final draft checked (repaired once if needed) and sources rechecked → Turn and citations committed under the fence → delivered. A page that closes does not cancel the run, and reconnecting replays the journal from the cursor. A run that ended `cancelled`, `expired` or `failed` can be retried as a new linked run with fresh limits. A source replaced during the run stops it with `source_changed` rather than cite stale text. Django's old answer routes (`/ai/ask/`, `/ai/ask/stream/`, `/ai/search/`) answer **410 Gone**.
 
 6. Schema
 
-![Figure 104](diagrams/section-d/png/D-14-erd-iris-ai.png)
-*Figure 104: Database Schema for AI runtime schema iris_ai (Section D-14)*
+![Figure 108](diagrams/section-d/png/D-14-erd-iris-ai.png)
+*Figure 108: Database Schema for AI runtime schema iris_ai (Section D-14)*
 
 #### 3.5.5 Paper Chat (FR-5.5)
 
@@ -1458,7 +1480,7 @@ Ask IRIS with its grant scoped to one record (ADR-049).
 
 1. User Interface Design
 
-See Figure 39 (Paper View with the in-browser reader (local build)).
+See Figure 41 (Paper View: a published paper's Overview; its AI Overview is unavailable because no AI vendor is reached locally (local build)).
 
 2. ##### Frontend Components
 
@@ -1476,16 +1498,16 @@ See Figure 39 (Paper View with the in-browser reader (local build)).
 
 4. Class Diagram
 
-See Figure 101 (Class Diagram for AI runtime classes: ports and adapters (Section D-21)).
+See Figure 105 (Class Diagram for AI runtime classes: ports and adapters (Section D-21)).
 
 5. Sequence Diagrams
 
-![Figure 105](diagrams/srs-sdd-v2/png/Q-5.5-paper-chat.png)
-*Figure 105: Sequence Diagram for Paper Chat*
+![Figure 109](diagrams/srs-sdd-v2/png/Q-5.5-paper-chat.png)
+*Figure 109: Sequence Diagram for Paper Chat*
 
 6. Schema
 
-See Figure 104 (Database Schema for AI runtime schema iris_ai (Section D-14)).
+See Figure 108 (Database Schema for AI runtime schema iris_ai (Section D-14)).
 
 #### 3.5.6 AI Overview (FR-5.6)
 
@@ -1493,7 +1515,7 @@ Each indexed paper has a stored, cited summary; reviewers get a brief (ADR-020).
 
 1. User Interface Design
 
-See Figure 39 (Paper View with the in-browser reader (local build)).
+See Figure 41 (Paper View: a published paper's Overview; its AI Overview is unavailable because no AI vendor is reached locally (local build)).
 
 2. ##### Frontend Components
 
@@ -1513,18 +1535,18 @@ See Figure 39 (Paper View with the in-browser reader (local build)).
 
 4. Class Diagram
 
-![Figure 106](diagrams/srs-sdd-v2/png/C-5.6-overview.png)
-*Figure 106: Classes: AI Overview, paper brief and index jobs*
+![Figure 110](diagrams/srs-sdd-v2/png/C-5.6-overview.png)
+*Figure 110: Classes: AI Overview, paper brief and index jobs*
 
 5. Sequence Diagrams
 
-![Figure 107](diagrams/srs-sdd-v2/png/Q-5.6-overview.png)
-*Figure 107: Sequence Diagram for the AI Overview*
+![Figure 111](diagrams/srs-sdd-v2/png/Q-5.6-overview.png)
+*Figure 111: Sequence Diagram for the AI Overview*
 
 6. Schema
 
-![Figure 108](diagrams/srs-sdd-v2/png/E-5.6-overview.png)
-*Figure 108: Database Schema for overviews, briefs and index jobs*
+![Figure 112](diagrams/srs-sdd-v2/png/E-5.6-overview.png)
+*Figure 112: Database Schema for overviews, briefs and index jobs*
 
 #### 3.5.7 Degradation When AI Is Unavailable (FR-5.7)
 
@@ -1532,7 +1554,7 @@ Non-AI features keep working and no answer is ever made up (ADR-008).
 
 1. User Interface Design
 
-See Figure 42 (Paper View: saving a copy needs a request (local build)).
+See Figure 44 (Paper View: saving a copy needs a request (local build)).
 
 2. ##### Frontend Components
 
@@ -1550,12 +1572,12 @@ See Figure 42 (Paper View: saving a copy needs a request (local build)).
 
 4. Class Diagram
 
-See Figure 101 (Class Diagram for AI runtime classes: ports and adapters (Section D-21)).
+See Figure 105 (Class Diagram for AI runtime classes: ports and adapters (Section D-21)).
 
 5. Sequence Diagrams
 
-![Figure 109](diagrams/srs-sdd-v2/png/Q-5.7-degrade.png)
-*Figure 109: Sequence Diagram for when AI is unavailable*
+![Figure 113](diagrams/srs-sdd-v2/png/Q-5.7-degrade.png)
+*Figure 113: Sequence Diagram for when AI is unavailable*
 
 6. Schema
 
@@ -1584,16 +1606,16 @@ None: this feature has no screen.
 
 4. Class Diagram
 
-See Figure 106 (Classes: AI Overview, paper brief and index jobs).
+See Figure 110 (Classes: AI Overview, paper brief and index jobs).
 
 5. Sequence Diagrams
 
-![Figure 110](diagrams/srs-sdd-v2/png/Q-5.8-index-admin.png)
-*Figure 110: Sequence Diagram for re-embed records*
+![Figure 114](diagrams/srs-sdd-v2/png/Q-5.8-index-admin.png)
+*Figure 114: Sequence Diagram for re-embed records*
 
 6. Schema
 
-See Figure 108 (Database Schema for overviews, briefs and index jobs).
+See Figure 112 (Database Schema for overviews, briefs and index jobs).
 
 ### Module 6: Reader Library and Discovery
 
@@ -1603,8 +1625,11 @@ A reader's library follows the account (ADR-044).
 
 1. User Interface Design
 
-![Figure 111](diagrams/srs-sdd-v2/screens/S-6.1-my-library.png)
-*Figure 111: My Library (local build)*
+![Figure 115](diagrams/srs-sdd-v2/screens/S-6.1-my-library.png)
+*Figure 115: My Library: the count badge, and Waiting on you in the right column (local build)*
+
+![Figure 116](diagrams/srs-sdd-v2/screens/S-6.1b-my-library-empty.png)
+*Figure 116: My Library with nothing submitted yet (Adviser) (local build)*
 
 2. ##### Frontend Components
 
@@ -1623,18 +1648,18 @@ A reader's library follows the account (ADR-044).
 
 4. Class Diagram
 
-![Figure 112](diagrams/srs-sdd-v2/png/C-6.1-library.png)
-*Figure 112: Classes: the reader's library*
+![Figure 117](diagrams/srs-sdd-v2/png/C-6.1-library.png)
+*Figure 117: Classes: the reader's library*
 
 5. Sequence Diagrams
 
-![Figure 113](diagrams/srs-sdd-v2/png/Q-6.1-library.png)
-*Figure 113: Sequence Diagram for save, file and annotate*
+![Figure 118](diagrams/srs-sdd-v2/png/Q-6.1-library.png)
+*Figure 118: Sequence Diagram for save, file and annotate*
 
 6. Schema
 
-![Figure 114](diagrams/srs-sdd-v2/png/E-6.1-library.png)
-*Figure 114: Database Schema for the reader's library*
+![Figure 119](diagrams/srs-sdd-v2/png/E-6.1-library.png)
+*Figure 119: Database Schema for the reader's library*
 
 #### 3.6.2 Folders (FR-6.2)
 
@@ -1642,7 +1667,7 @@ Folders are the reader's alone and never a discovery signal (ADR-070).
 
 1. User Interface Design
 
-See Figure 111 (My Library (local build)).
+See Figure 115 (My Library: the count badge, and Waiting on you in the right column (local build)).
 
 2. ##### Frontend Components
 
@@ -1661,15 +1686,15 @@ See Figure 111 (My Library (local build)).
 
 4. Class Diagram
 
-See Figure 112 (Classes: the reader's library).
+See Figure 117 (Classes: the reader's library).
 
 5. Sequence Diagrams
 
-See Figure 113 (Sequence Diagram for save, file and annotate).
+See Figure 118 (Sequence Diagram for save, file and annotate).
 
 6. Schema
 
-See Figure 114 (Database Schema for the reader's library).
+See Figure 119 (Database Schema for the reader's library).
 
 #### 3.6.3 Private Notes and Highlights (FR-6.3)
 
@@ -1696,15 +1721,15 @@ No screen of its own.
 
 4. Class Diagram
 
-See Figure 112 (Classes: the reader's library).
+See Figure 117 (Classes: the reader's library).
 
 5. Sequence Diagrams
 
-See Figure 113 (Sequence Diagram for save, file and annotate).
+See Figure 118 (Sequence Diagram for save, file and annotate).
 
 6. Schema
 
-See Figure 114 (Database Schema for the reader's library).
+See Figure 119 (Database Schema for the reader's library).
 
 #### 3.6.4 Calls & Conferences (FR-6.4)
 
@@ -1712,11 +1737,11 @@ Calls are listed after RDCO confirms them (ADR-050).
 
 1. User Interface Design
 
-![Figure 115](diagrams/srs-sdd-v2/screens/S-6.4-calls.png)
-*Figure 115: Calls & Conferences (local build)*
+![Figure 120](diagrams/srs-sdd-v2/screens/S-6.4-calls.png)
+*Figure 120: Calls & Conferences: the empty board (local build)*
 
-![Figure 116](diagrams/srs-sdd-v2/screens/S-6.4b-call-requests.png)
-*Figure 116: Call requests (RDCO) (local build)*
+![Figure 121](diagrams/srs-sdd-v2/screens/S-6.4b-call-requests.png)
+*Figure 121: Call requests (RDCO) (local build)*
 
 2. ##### Frontend Components
 
@@ -1736,18 +1761,18 @@ Calls are listed after RDCO confirms them (ADR-050).
 
 4. Class Diagram
 
-![Figure 117](diagrams/srs-sdd-v2/png/C-6.4-calls.png)
-*Figure 117: Classes: Calls & Conferences*
+![Figure 122](diagrams/srs-sdd-v2/png/C-6.4-calls.png)
+*Figure 122: Classes: Calls & Conferences*
 
 5. Sequence Diagrams
 
-![Figure 118](diagrams/srs-sdd-v2/png/Q-6.4-calls.png)
-*Figure 118: Sequence Diagram for post and confirm a call*
+![Figure 123](diagrams/srs-sdd-v2/png/Q-6.4-calls.png)
+*Figure 123: Sequence Diagram for post and confirm a call*
 
 6. Schema
 
-![Figure 119](diagrams/srs-sdd-v2/png/E-6.4-calls.png)
-*Figure 119: Database Schema for Calls & Conferences*
+![Figure 124](diagrams/srs-sdd-v2/png/E-6.4-calls.png)
+*Figure 124: Database Schema for Calls & Conferences*
 
 #### 3.6.5 Personal Discovery (FR-6.5)
 
@@ -1755,7 +1780,7 @@ Suggestions come from a transparent recipe the reader can see and reset (ADR-062
 
 1. User Interface Design
 
-See Figure 54 (Discover (local build)).
+See Figure 56 (Discover (local build)).
 
 2. ##### Frontend Components
 
@@ -1774,18 +1799,18 @@ See Figure 54 (Discover (local build)).
 
 4. Class Diagram
 
-![Figure 120](diagrams/srs-sdd-v2/png/C-6.5-discovery.png)
-*Figure 120: Classes: personal discovery*
+![Figure 125](diagrams/srs-sdd-v2/png/C-6.5-discovery.png)
+*Figure 125: Classes: personal discovery*
 
 5. Sequence Diagrams
 
-![Figure 121](diagrams/srs-sdd-v2/png/Q-6.5-discovery.png)
-*Figure 121: Sequence Diagram for personal discovery*
+![Figure 126](diagrams/srs-sdd-v2/png/Q-6.5-discovery.png)
+*Figure 126: Sequence Diagram for personal discovery*
 
 6. Schema
 
-![Figure 122](diagrams/srs-sdd-v2/png/E-6.5-discovery.png)
-*Figure 122: Database Schema for personal discovery*
+![Figure 127](diagrams/srs-sdd-v2/png/E-6.5-discovery.png)
+*Figure 127: Database Schema for personal discovery*
 
 ### Module 7: Audit and Administration
 
@@ -1795,8 +1820,8 @@ Every act and its audit row commit together; no role can edit the log (NFR-S5).
 
 1. User Interface Design
 
-![Figure 123](diagrams/srs-sdd-v2/screens/S-7.1-audit-log.png)
-*Figure 123: Audit Log (System Admin) (local build)*
+![Figure 128](diagrams/srs-sdd-v2/screens/S-7.1-audit-log.png)
+*Figure 128: Audit Log (System Admin) (local build)*
 
 2. ##### Frontend Components
 
@@ -1816,18 +1841,18 @@ Every act and its audit row commit together; no role can edit the log (NFR-S5).
 
 4. Class Diagram
 
-![Figure 124](diagrams/srs-sdd-v2/png/C-7.1-audit.png)
-*Figure 124: Classes: audit and administration*
+![Figure 129](diagrams/srs-sdd-v2/png/C-7.1-audit.png)
+*Figure 129: Classes: audit and administration*
 
 5. Sequence Diagrams
 
-![Figure 125](diagrams/srs-sdd-v2/png/Q-7.1-audit.png)
-*Figure 125: Sequence Diagram for write and read audit events*
+![Figure 130](diagrams/srs-sdd-v2/png/Q-7.1-audit.png)
+*Figure 130: Sequence Diagram for write and read audit events*
 
 6. Schema
 
-![Figure 126](diagrams/srs-sdd-v2/png/E-7.1-audit.png)
-*Figure 126: Database Schema for audit and settings*
+![Figure 131](diagrams/srs-sdd-v2/png/E-7.1-audit.png)
+*Figure 131: Database Schema for audit and settings*
 
 #### 3.7.2 System Admin and RDCO Consoles (FR-7.2)
 
@@ -1835,11 +1860,11 @@ The System Admin runs IRIS with no workflow access; RDCO runs the workflow (ADR-
 
 1. User Interface Design
 
-![Figure 127](diagrams/srs-sdd-v2/screens/S-7.2a-retention.png)
-*Figure 127: Retention (System Admin) (local build)*
+![Figure 132](diagrams/srs-sdd-v2/screens/S-7.2a-retention.png)
+*Figure 132: Retention (System Admin) (local build)*
 
-![Figure 128](diagrams/srs-sdd-v2/screens/S-7.2b-deletion-requests.png)
-*Figure 128: Account deletion requests (System Admin) (local build)*
+![Figure 133](diagrams/srs-sdd-v2/screens/S-7.2b-deletion-requests.png)
+*Figure 133: Account deletion requests (System Admin) (local build)*
 
 See Figure 23 (Users page (RDCO) (local build)).
 
@@ -1861,16 +1886,16 @@ See Figure 23 (Users page (RDCO) (local build)).
 
 4. Class Diagram
 
-See Figure 124 (Classes: audit and administration).
+See Figure 129 (Classes: audit and administration).
 
 5. Sequence Diagrams
 
-![Figure 129](diagrams/srs-sdd-v2/png/Q-7.2-consoles.png)
-*Figure 129: Sequence Diagram for a System Admin setting*
+![Figure 134](diagrams/srs-sdd-v2/png/Q-7.2-consoles.png)
+*Figure 134: Sequence Diagram for a System Admin setting*
 
 6. Schema
 
-See Figure 126 (Database Schema for audit and settings).
+See Figure 131 (Database Schema for audit and settings).
 
 #### 3.7.3 Settings and Help (FR-7.3)
 
@@ -1878,8 +1903,8 @@ Each person manages their account in one place, with Help inside it.
 
 1. User Interface Design
 
-![Figure 130](diagrams/srs-sdd-v2/screens/S-7.3-settings-help.png)
-*Figure 130: Settings: Help (local build)*
+![Figure 135](diagrams/srs-sdd-v2/screens/S-7.3-settings-help.png)
+*Figure 135: Settings: Help (local build)*
 
 2. ##### Frontend Components
 
@@ -1901,8 +1926,8 @@ See Figure 26 (Classes: personal data rights).
 
 5. Sequence Diagrams
 
-![Figure 131](diagrams/srs-sdd-v2/png/Q-7.3-settings.png)
-*Figure 131: Sequence Diagram for change the AI answer*
+![Figure 136](diagrams/srs-sdd-v2/png/Q-7.3-settings.png)
+*Figure 136: Sequence Diagram for change the AI answer*
 
 6. Schema
 
