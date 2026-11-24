@@ -332,6 +332,24 @@ describe("My Library: an author's research", () => {
     await expectNoBlockingA11yViolations(container);
   });
 
+  // IR-1323: each side card is a fixed rectangle whose list scrolls, so none is cut short.
+  it("lists every paper waiting on the author in a card that scrolls, and an empty Recently opened says so", async () => {
+    const document = { kind: "document", party: "adviser", label: "Changes requested by Adviser", action_label: "Upload the documents" } as const;
+    mine(Array.from({ length: 7 }, (_, i) => ownRecord({
+      id: 40 + i, title: `Waiting paper ${i + 1}`, pipeline_status: "in_review", workflow_state: "awaiting_document",
+      workflow_state_label: "Awaiting document", holders: [{ party: "adviser", label: "Adviser" }],
+      submitter_status: { line: "Documents requested by Adviser: action needed", waiting_on_you: [document] },
+    })));
+    const { container } = renderScreen(<MyLibraryPage />, { route: "/records/mine" });
+
+    const waiting = await screen.findByRole("region", { name: "Waiting on you" });
+    expect(await within(waiting).findByRole("link", { name: "Waiting paper 7" })).toBeInTheDocument();
+    expect(within(waiting).getAllByRole("link", { name: /^Waiting paper/ })).toHaveLength(7);
+    expect(within(waiting).queryByRole("button", { name: /Show all/ })).not.toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "Recently opened" })).getByText("Papers you open appear here.")).toBeInTheDocument();
+    await expectNoBlockingA11yViolations(container);
+  });
+
   it("opens an author on Overview: what waits on them, counted, in the right column, and a tab to every submission", async () => {
     const document = { kind: "document", party: "adviser", label: "Changes requested by Adviser", action_label: "Upload the documents" } as const;
     mine([
@@ -352,8 +370,9 @@ describe("My Library: an author's research", () => {
     expect(screen.queryByRole("region", { name: "Reading shelf" })).not.toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Continue reading" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Your folders" })).not.toBeInTheDocument();
-    // On a phone, the first thing an author reads.
-    expect(screen.getAllByRole("heading", { level: 2 })[0]).toHaveTextContent("Waiting on you");
+    // The side cards in order, first on a phone, then the author's records (IR-1323).
+    expect(screen.getAllByRole("heading", { level: 2 }).slice(0, 4).map((h) => h.textContent))
+      .toEqual(["Waiting on you", "Continue reading", "Recently opened", "Recent submissions"]);
     // A brief row carries no per-request button either.
     expect(within(screen.getByRole("region", { name: "Recent submissions" })).queryByRole("link", { name: /^Upload the documents/ })).not.toBeInTheDocument();
     await expectNoBlockingA11yViolations(container);
@@ -892,8 +911,7 @@ describe("My Library: reading history follows the account (IR-756)", () => {
     history([visitEntry(rice), { record_id: 77, available: false }, visitEntry(water, "2026-11-01T08:00:00Z")]);
     renderScreen(<MyLibraryPage />);
 
-    const recent = await screen.findByRole("heading", { name: "Recently opened" });
-    const block = recent.parentElement as HTMLElement;
+    const block = await screen.findByRole("region", { name: "Recently opened" });
     expect(within(block).getAllByRole("link").map((l) => l.textContent)).toEqual([rice.title, water.title]);
   });
 
