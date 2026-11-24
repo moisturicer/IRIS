@@ -9,13 +9,13 @@ import { PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { Select } from "@/components/ui/Select";
 import { PaperCiteModal } from "@/features/discover/PaperCiteModal";
 import { useHistoryStore } from "@/store/history.store";
-import { MAX_FOLDER_NAME, readingStatusLabel, sortedItems, type LibraryFolder, type LibraryItem } from "@/store/library.store";
+import { readingStatusLabel, sortedItems, type LibraryFolder, type LibraryItem } from "@/store/library.store";
 import { cn } from "@/lib/utils";
 import type { RecordListItem } from "@/types/records";
 
 import { LibraryRecordTable, type LibraryLayout } from "./LibraryRecordTable";
-import type { LibraryView } from "./ReadingPanel";
-import { SearchGlyph } from "@/components/brand/IrisBrand";
+import { LibrarySearch } from "./LibraryToolbar";
+import { FolderShelf, type LibraryView } from "./ReadingPanel";
 import { SELECTED_SEGMENT } from "@/components/ui/highlightRoles";
 
 type SortKey = "added" | "title" | "year";
@@ -46,10 +46,17 @@ interface SavedViewProps {
   onRemove:    (ids: number[]) => void;
   onRename:    (id: number, name: string) => void;
   onDelete:    (id: number) => void;
-  /** The Reading status filters, set under the search in the toolbar. */
+  /** The Reading status filters, set under the Papers heading. */
   filters?:       ReactNode;
-  /** The Folder picker, set beside Sort in the toolbar. */
-  folderControl?: ReactNode;
+  /** How many folders the account may hold, when the server has said. */
+  folderLimit?:   number | null;
+  /** Open a folder, History, or All saved again. */
+  onOpenView?:    (view: Exclude<LibraryView, { kind: "research" }>) => void;
+  onCreateFolder?: (name: string) => void;
+  /** Shown on the folders for a reader with no Overview, which is where History opens otherwise. */
+  onManageHistory?: () => void;
+  /** Where History's back link goes, when not to All saved (an author came from the Overview). */
+  historyBack?: { label: string; onClick: () => void };
 }
 
 /**
@@ -64,7 +71,8 @@ interface SavedViewProps {
  * (IR-572).
  */
 export function SavedView({
-  view, folders, library, libraryLoad, libraryInterrupted = false, onRetryLibrary, onRemove, onRename, onDelete, filters, folderControl,
+  view, folders, library, libraryLoad, libraryInterrupted = false, onRetryLibrary, onRemove, onRename, onDelete, filters,
+  folderLimit = null, onOpenView, onCreateFolder, onManageHistory, historyBack,
 }: SavedViewProps) {
   const historyView = view.kind === "history";
   const historyStore = useHistoryStore();
@@ -73,9 +81,10 @@ export function SavedView({
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [citing, setCiting] = useState<RecordListItem | null>(null);
-  const [renaming, setRenaming] = useState(false);
 
   const folder = view.kind === "folder" ? folders.find((f) => f.id === view.id) : undefined;
+  /* All saved and a Reading status show the folders above the papers (IR-1324). */
+  const topLevel = view.kind === "saved" || view.kind === "status";
   const statusFilter = view.kind === "status" ? view.status : null;
   const title = view.kind === "saved"
     ? "All saved"
@@ -99,7 +108,6 @@ export function SavedView({
   useEffect(() => {
     setSelected(new Set());
     setQuery("");
-    setRenaming(false);
   }, [view.kind, folder?.id, statusFilter]);
 
   const shownRecords = useMemo(
@@ -159,20 +167,13 @@ export function SavedView({
 
   return (
     <div>
-      <div className="mb-section rounded-card border border-stone-200 bg-white p-card-compact md:p-card">
-      <div className="flex flex-wrap items-center gap-2">
-        <label className="relative min-w-[12rem] flex-1">
-          <span className="sr-only">Search this folder</span>
-          <SearchGlyph className="pointer-events-none absolute left-3.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-stone-500" />
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by title or author"
-            className="w-full rounded-control border border-field bg-white py-2 pl-10 pr-3 text-body placeholder:text-stone-600 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
-          />
-        </label>
-        {folderControl}
+      <div className="mb-section flex flex-wrap items-center gap-2">
+        <LibrarySearch
+          label={historyView ? "Search your history" : folder ? "Search this folder" : "Search saved papers"}
+          value={query}
+          onChange={setQuery}
+          className="basis-full sm:basis-0"
+        />
         <Select
           label="Sort"
           size="sm"
@@ -198,41 +199,39 @@ export function SavedView({
           ))}
         </div>
       </div>
-      {filters && <div className="mt-3 border-t border-stone-200 pt-3">{filters}</div>}
-      </div>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        {renaming && folder ? (
-          <input
-            autoFocus
-            defaultValue={folder.name}
-            maxLength={MAX_FOLDER_NAME}
-            aria-label={`Rename ${folder.name}`}
-            onBlur={(e) => {
-              const name = e.target.value.trim();
-              if (name && name !== folder.name) onRename(folder.id, name);
-              setRenaming(false);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") e.currentTarget.blur();
-              if (e.key === "Escape") setRenaming(false);
-            }}
-            className="rounded-control border border-field px-3 py-1.5 font-display text-title font-semibold focus:border-brand focus:outline-none"
-          />
-        ) : (
-          <h2 className="font-display text-title font-semibold text-stone-900">{title}</h2>
-        )}
+
+      {topLevel && onOpenView && onCreateFolder && (
+        <FolderShelf
+          folders={folders}
+          limit={folderLimit}
+          onManageHistory={onManageHistory}
+          onOpen={(next) => { if (next.kind !== "research") onOpenView(next); }}
+          onCreate={onCreateFolder}
+          onRename={onRename}
+          onDelete={onDelete}
+        />
+      )}
+
+      {!topLevel && onOpenView && (
+        <button
+          type="button"
+          onClick={historyView && historyBack ? historyBack.onClick : () => onOpenView({ kind: "saved" })}
+          className={cn(textButton, "-mx-3 mb-1 inline-flex items-center gap-2 text-brand")}
+        >
+          <i className="fas fa-arrow-left text-label" aria-hidden />
+          {historyView && historyBack ? historyBack.label : "All saved papers"}
+        </button>
+      )}
+      <div className={cn("flex flex-wrap items-center justify-between gap-3", topLevel && filters ? "mb-2" : "mb-4")}>
+        <h2 className="font-display text-title font-semibold text-stone-900">{topLevel ? "Papers" : title}</h2>
         <div className="flex items-center gap-1">
-          {folder && !renaming && (
-            <>
-              <button type="button" onClick={() => setRenaming(true)} className={textButton}>Rename</button>
-              <button type="button" onClick={() => onDelete(folder.id)} className={textButton}>Delete folder</button>
-            </>
-          )}
           {historyView && historyStore.items.length > 0 && (
             <button type="button" onClick={() => void historyStore.clear()} className={textButton}>Clear history</button>
           )}
         </div>
       </div>
+
+      {topLevel && filters && <div className="mb-4">{filters}</div>}
 
       {historyView && (
         <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-card border border-stone-200 bg-white px-3 py-2">
@@ -308,7 +307,7 @@ export function SavedView({
         <EmptyState
           framed
           icon={query ? "fa-magnifying-glass" : "fa-folder-open"}
-          title={query ? "No matches in this folder" : empty.title}
+          title={query ? (folder ? "No matches in this folder" : "No matches") : empty.title}
           message={query ? "Search looks at titles and author names." : empty.message}
           // The next useful step (audit LAY-06): papers are saved from Discover.
           action={query || historyView ? undefined : <ButtonLink to="/" variant="outline">Browse Discover</ButtonLink>}

@@ -5,23 +5,20 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { ReadFailedState } from "@/components/shared/ReadFailedState";
 import { LoadingRegion } from "@/components/ui/LoadingRegion";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
-import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
-import { formatAuthorList, recordYearLabel } from "@/features/discover/discoverUtils";
+import { PILL_PRIMARY } from "@/components/ui/pillStyles";
 import { waitingHref } from "@/features/records/waitingOnYou";
 import { usePublishHref } from "@/features/publish/publishLink";
 import { cn, formatDate } from "@/lib/utils";
 import type { HistoryItem } from "@/store/history.store";
-import { sortedItems, type LibraryItem } from "@/store/library.store";
 import type { MyResearchItem } from "@/types/records";
 
-import type { LibraryView } from "./ReadingPanel";
 import type { ResearchFilter } from "./researchSections";
 import { SubmissionPanel, SubmissionRow } from "./SubmissionRow";
 
 /** How many records Recent submissions shows before pointing at its tab. */
 const RECENT_SHOWN = 4;
-/** The side cards scroll (IR-1323); history is long, so it stops somewhere. */
-const RECENTLY_OPENED_SHOWN = 20;
+/** Recently opened lists the ten newest (IR-1324); it scrolls inside its card. */
+const RECENTLY_OPENED_SHOWN = 10;
 
 const LINK_TEXT = cn(
   "inline-flex min-h-9 items-center gap-2 rounded-control px-2 text-small font-semibold text-brand hover:bg-stone-100",
@@ -38,24 +35,24 @@ interface LibraryOverviewProps {
   /** The read timed out (IR-906): Retry, not a refusal. */
   interrupted?: boolean;
   onRetry:     () => void;
-  library:     Record<number, LibraryItem>;
   /** The account's reading history (IR-756), most recent first. */
   history:     HistoryItem[];
   onOpenSubmissions: (filter: ResearchFilter) => void;
-  onOpenSaved: (view: LibraryView) => void;
+  /** Open the History view, where history is paused or cleared (ADR-044, amendment 2026-11-24). */
+  onManageHistory: () => void;
   /** A draft was deleted from its row (IR-1256); drop it. */
   onDeleted: (recordId: number) => void;
 }
 
 /**
  * My Library's Overview for an author (IR-1321, IR-1323). The left column is
- * their latest records. The right is three fixed-size cards, each scrolling
- * its own list: *Waiting on you*, the one place for what the author must act
- * on and the one counter on the page, then *Continue reading* and *Recently
- * opened*. On a phone the cards come first, *Waiting on you* at the top.
+ * their latest records. The right is two fixed-size cards, each scrolling its
+ * own list: *Waiting on you*, the one place for what the author must act on
+ * and the one counter on the page, then *Recently opened* (*Continue reading*
+ * left in IR-1324). On a phone the cards come first, *Waiting on you* on top.
  */
 export function LibraryOverview({
-  research, loading, failed, interrupted = false, onRetry, library, history, onOpenSubmissions, onOpenSaved, onDeleted,
+  research, loading, failed, interrupted = false, onRetry, history, onOpenSubmissions, onManageHistory, onDeleted,
 }: LibraryOverviewProps) {
   const publishHref = usePublishHref();
   const waiting = useMemo(() => research.filter(isWaiting), [research]);
@@ -68,10 +65,6 @@ export function LibraryOverview({
     () => [...research].sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, RECENT_SHOWN),
     [research],
   );
-  const reading = useMemo(
-    () => sortedItems(library).filter((i) => i.readingStatus === "reading" && i.available && i.record),
-    [library],
-  );
 
   return (
     <div className="grid gap-section-lg lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
@@ -79,50 +72,21 @@ export function LibraryOverview({
         <WaitingOnYou waiting={waiting} loading={loading} failed={failed} />
 
         <SideCard
-          id="overview-reading"
-          title="Continue reading"
-          height="h-64"
+          id="overview-opened"
+          title="Recently opened"
+          height="h-80"
           footer={
-            <button type="button" onClick={() => onOpenSaved({ kind: "saved" })} className={cn(LINK_TEXT, "-mx-2")}>
-              Open saved papers <i className="fas fa-arrow-right text-label" aria-hidden />
+            <button type="button" onClick={onManageHistory} className={cn(LINK_TEXT, "-mx-2")}>
+              Manage history <i className="fas fa-arrow-right text-label" aria-hidden />
             </button>
           }
         >
-          {reading.length === 0 ? (
-            <p className="text-small text-stone-600">
-              Mark a saved paper <span className="font-semibold text-stone-800">Reading</span> and it waits here.
-            </p>
-          ) : (
-            <ul className="space-y-3">
-              {reading.map(({ record }) => record && (
-                <li key={record.id} className="flex gap-3">
-                  <span className="grid h-12 w-10 shrink-0 place-items-center rounded-control bg-stone-100 text-stone-600 ring-1 ring-stone-200" aria-hidden>
-                    <i className="fas fa-book-open text-small" />
-                  </span>
-                  <div className="min-w-0">
-                    <Link
-                      to={`/records/${record.id}`}
-                      className={cn("break-words rounded-control font-display text-body font-semibold leading-snug text-stone-900 hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}
-                    >
-                      {record.title}
-                    </Link>
-                    <p className="break-words text-label text-stone-600">
-                      {formatAuthorList(record.authors, 2)} · {recordYearLabel(record)}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </SideCard>
-
-        <SideCard id="overview-opened" title="Recently opened" height="h-64">
           {recentlyOpened.length === 0 ? (
             <p className="text-small text-stone-600">Papers you open appear here.</p>
           ) : (
-            <ul className="space-y-3">
+            <ul className="divide-y divide-stone-200 border-t border-stone-200">
               {recentlyOpened.map(({ record, viewedAt }) => (
-                <li key={record.id}>
+                <li key={record.id} className="py-3 last:pb-0">
                   <Link
                     to={`/records/${record.id}`}
                     className={cn("block break-words rounded-control text-small font-semibold text-stone-800 hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}
@@ -236,8 +200,7 @@ function WaitingOnYou({ waiting, loading, failed }: {
     <SideCard
       id="overview-waiting"
       title="Waiting on you"
-      height="h-96"
-      accent={any}
+      height="h-[28rem]"
       badge={any && (
         <span className="rounded-full border border-brand px-2 text-label font-semibold tabular-nums text-brand">
           {waiting.length}
@@ -265,19 +228,16 @@ function WaitingOnYou({ waiting, loading, failed }: {
                 {item.title}
               </Link>
               <p className="mt-0.5 text-small text-stone-700">{item.submitter_status.line}</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {item.submitter_status.waiting_on_you.map((request) => (
-                  <Link
-                    key={`${request.kind}-${request.party}`}
-                    to={waitingHref(item.id, request)}
-                    className={cn(PILL_SECONDARY, "min-h-9 bg-white px-4", FOCUS_RING)}
-                  >
-                    {request.action_label}
-                    <span className="sr-only"> ({request.label}, {item.title})</span>
-                    <i className="fas fa-arrow-right text-label" aria-hidden />
-                  </Link>
-                ))}
-              </div>
+              {/* One short link per paper (IR-1324): every request is answered on its
+                  Documents tab, so the parties' requests share it. Their words stay for a screen reader. */}
+              <Link
+                to={waitingHref(item.id, item.submitter_status.waiting_on_you[0])}
+                className={cn("-mx-1 mt-1 inline-flex min-h-8 items-center gap-1.5 rounded-control px-1 text-small font-semibold text-brand underline-offset-2 hover:underline", COLOUR_TRANSITION, FOCUS_RING)}
+              >
+                Submit documents
+                <span className="sr-only"> ({item.submitter_status.waiting_on_you.map((r) => r.label).join("; ")}, {item.title})</span>
+                <i className="fas fa-arrow-right text-label" aria-hidden />
+              </Link>
             </li>
           ))}
         </ul>

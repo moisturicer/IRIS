@@ -1,4 +1,4 @@
-import { useEffect, useId } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 
 import { EmptyState } from "@/components/shared/EmptyState";
 import { InterruptedState } from "@/components/shared/InterruptedState";
@@ -8,6 +8,8 @@ import { LoadingRegion } from "@/components/ui/LoadingRegion";
 import { SkeletonBlock } from "@/components/ui/Skeleton";
 import { cn } from "@/lib/utils";
 import { savedInOrder, useSavedCallsStore, type SavedCall } from "@/store/savedCalls.store";
+
+import { LibrarySearch } from "@/features/library/LibraryToolbar";
 
 import { CallDetails } from "./CallDetails";
 import { CallTags } from "./CallTags";
@@ -33,7 +35,15 @@ export function SavedCallsSection() {
   const ensureLoaded = useSavedCallsStore((s) => s.ensureLoaded);
   const unsave = useSavedCallsStore((s) => s.unsave);
 
+  const [query, setQuery] = useState("");
   useEffect(() => { void ensureLoaded(); }, [ensureLoaded]);
+  const list = useMemo(() => savedInOrder(items, order), [items, order]);
+  /* Search reads what a row shows (IR-1324); an unavailable call shows nothing, so it never matches. */
+  const shown = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return list;
+    return list.filter((item) => item.available && [item.call.title, item.call.location].some((text) => (text ?? "").toLowerCase().includes(needle)));
+  }, [list, query]);
 
   if (load === "idle" || load === "loading") {
     return (
@@ -61,13 +71,12 @@ export function SavedCallsSection() {
     );
   }
 
-  const list = savedInOrder(items, order);
   if (list.length === 0) {
     return (
       <EmptyState
         framed
         icon="fa-bookmark"
-        title="No saved calls"
+        title="No saved calls right now"
         message="Use the bookmark on a call in Calls & Conferences to keep it here."
         action={<ButtonLink to="/opportunities" variant="outline">Go to Calls & Conferences</ButtonLink>}
       />
@@ -75,13 +84,25 @@ export function SavedCallsSection() {
   }
 
   return (
-    <ol aria-label="Saved calls" className="bg-white rounded-card border border-stone-200 divide-y divide-stone-200">
-      {list.map((item) => (
-        <li key={item.callId}>
-          <SavedCallRow item={item} onRemove={(title) => void unsave({ id: item.callId, title })} />
-        </li>
-      ))}
-    </ol>
+    <div>
+      <LibrarySearch label="Search your saved calls" value={query} onChange={setQuery} placeholder="Search by title or place" className="mb-section" />
+      {shown.length === 0 ? (
+        <EmptyState
+          framed
+          icon="fa-magnifying-glass"
+          title={`No saved calls match “${query.trim()}”`}
+          message="Search looks at call titles and places."
+        />
+      ) : (
+        <ol aria-label="Saved calls" className="bg-white rounded-card border border-stone-200 divide-y divide-stone-200">
+          {shown.map((item) => (
+            <li key={item.callId}>
+              <SavedCallRow item={item} onRemove={(title) => void unsave({ id: item.callId, title })} />
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
   );
 }
 

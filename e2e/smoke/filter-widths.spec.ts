@@ -232,32 +232,21 @@ for (const width of [360, 1280]) {
       await noSidewaysScroll(page, width);
     });
 
-    test("My Library Saved papers: Folder and Sort", async ({ page, api }) => {
+    // IR-1324 replaced the Folder picker (IR-1313) with folder tiles, so only
+    // Sort is a filter box here; a long folder name must still wrap in its tile.
+    test("My Library Saved papers: Sort, and a long folder name", async ({ page, api }) => {
       await signedIn(page, api);
       screenMocks("my-library", api);
       api.on("GET", "/library/saves/", { results: [
         { record_id: PAPER.id, available: true, reading_status: null, saved_at: "2026-11-01T08:00:00+08:00", updated_at: "2026-11-01T08:00:00+08:00", record: PAPER },
       ] });
-      const folders = gate();
-      api.on("GET", "/library/folders/", folders.reply({ limit: 10, results: [
+      api.on("GET", "/library/folders/", { limit: 10, results: [
         { id: 1, name: "Thesis", record_ids: [PAPER.id], created_at: "2026-11-01T08:00:00+08:00", updated_at: "2026-11-01T08:00:00+08:00" },
         { id: 2, name: LONG_FOLDER, record_ids: [], created_at: "2026-11-01T08:00:00+08:00", updated_at: "2026-11-01T08:00:00+08:00" },
-      ] }));
+      ] });
       await page.goto("/records/mine?section=saved");
-      const folder = page.getByRole("combobox", { name: "Folder" });
+      await expect(page.getByRole("button", { name: `${LONG_FOLDER} 0 papers` })).toBeVisible();
       const sort = page.getByRole("combobox", { name: "Sort" });
-      await expect(page.getByRole("heading", { name: "My Library" })).toBeVisible();
-      // Saves and folders are read together, so the picker may not be drawn before both arrive.
-      const folderWidths = await folder.isVisible() ? [await widthOf(folder)] : [];
-      folders.release();
-      await expect(folder.locator("option")).toHaveCount(5);
-      folderWidths.push(await widthOf(folder));
-      for (const value of ["__history__", "", "folder:1", "folder:2"]) {
-        await folder.selectOption(value);
-        folderWidths.push(await widthOf(folder));
-      }
-      report("Library Folder", width, folderWidths);
-      await folder.selectOption("");
       report("Library Sort", width, [await widthOf(sort), ...await everyOption(sort)]);
       await holdsLongest("Library Sort", width, sort);
       await noSidewaysScroll(page, width);

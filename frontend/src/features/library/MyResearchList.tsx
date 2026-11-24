@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { SearchGlyph } from "@/components/brand/IrisBrand";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ReadFailedState } from "@/components/shared/ReadFailedState";
 import { LoadingRegion } from "@/components/ui/LoadingRegion";
@@ -11,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { usePublishHref } from "@/features/publish/publishLink";
 import type { MyResearchItem } from "@/types/records";
 
-import { FilterChips } from "./FilterChips";
+import { LibrarySearch, UnderlineFilters } from "./LibraryToolbar";
 import {
   RESEARCH_FILTERS,
   groupByFilter,
@@ -20,32 +19,31 @@ import {
 } from "./researchSections";
 import { SubmissionPanel, SubmissionRow } from "./SubmissionRow";
 
+/** What an empty filter says (IR-1324): every filter shows, so an empty one explains itself. */
+const EMPTY_FILTER: Record<Exclude<ResearchFilter, "all">, { title: string; message: string }> = {
+  waiting:  { title: "Nothing needs your action", message: "When a reviewer asks you for changes, it appears here." },
+  review:   { title: "Nothing in review", message: "A paper you submit is here while your Adviser and the offices review it." },
+  drafts:   { title: "No drafts", message: "A paper you start and haven’t submitted is kept here." },
+  finished: { title: "Nothing finished yet", message: "Accepted, published and archived papers are kept here." },
+};
+
 /**
- * One filter's records, folded like a chapter: a summary line with the
- * group's name and what it means, and the ruled rows under it.
+ * One filter's records under a plain heading (IR-1324), with the ruled rows
+ * under it. Nothing folds.
  */
-function Group({ group, open, onDeleted }: { group: FilterGroup; open: boolean; onDeleted?: (id: number) => void }) {
+function Group({ group, onDeleted }: { group: FilterGroup; onDeleted?: (id: number) => void }) {
   const titleId = `research-${group.id}`;
   const waiting = group.id === "waiting";
   return (
-    <details open={open} className="group/fold">
-      <summary className={cn("grid cursor-pointer list-none grid-cols-[0.75rem_minmax(0,1fr)] items-start gap-x-3 rounded-control py-1 [&::-webkit-details-marker]:hidden", FOCUS_RING)}>
-        <i
-          className="fas fa-chevron-right row-span-2 mt-2 w-3 text-label text-stone-500 transition-transform duration-200 group-open/fold:rotate-90 motion-reduce:transition-none"
-          aria-hidden
-        />
-        <h2 id={titleId} className={cn("inline-flex items-center gap-2 font-display text-title font-semibold", waiting ? "text-brand" : "text-stone-900")}>
-          {waiting && <i className="fas fa-circle-exclamation text-small" aria-hidden />}
-          {group.title}
-        </h2>
-        {group.note && <span className="col-start-2 text-small text-stone-600">{group.note}</span>}
-      </summary>
-      <div className="mt-3">
-        <SubmissionPanel tone={waiting ? "waiting" : "plain"}>
-          {group.items.map((item) => <SubmissionRow key={item.id} item={item} onDeleted={onDeleted} />)}
-        </SubmissionPanel>
-      </div>
-    </details>
+    <section aria-labelledby={titleId}>
+      <h2 id={titleId} className={cn("mb-3 inline-flex items-center gap-2 font-display text-title font-semibold", waiting ? "text-brand" : "text-stone-900")}>
+        {waiting && <i className="fas fa-circle-exclamation text-small" aria-hidden />}
+        {group.title}
+      </h2>
+      <SubmissionPanel tone={waiting ? "waiting" : "plain"}>
+        {group.items.map((item) => <SubmissionRow key={item.id} item={item} onDeleted={onDeleted} />)}
+      </SubmissionPanel>
+    </section>
   );
 }
 
@@ -65,15 +63,15 @@ interface MyResearchListProps {
 /**
  * My submissions (IR-410; spec §4.9 as amended 2026-10-11): the owner's
  * records filed under the filters (Needs your action, In review, Drafts,
- * Finished), what waits on the owner first. Each group folds; Finished
- * starts folded. Picking a filter shows that group alone, open. Who has a
- * record now is on its own row, in the server's words. No counts.
+ * Finished), what waits on the owner first, each under a plain heading
+ * (IR-1324). Every filter always shows, and an empty one says so when picked.
+ * Picking a filter shows that group alone. Who has a record now is on its own
+ * row, in the server's words. No counts.
  */
 export function MyResearchList({ items, loading, failed, interrupted = false, onRetry, filter, onFilterChange, onDeleted }: MyResearchListProps) {
   const publishHref = usePublishHref();
   const [query, setQuery] = useState("");
 
-  const all = useMemo(() => groupByFilter(items), [items]);
   const groups = useMemo(() => {
     const needle = query.trim().toLowerCase();
     const matched = needle
@@ -83,9 +81,6 @@ export function MyResearchList({ items, loading, failed, interrupted = false, on
       : items;
     return groupByFilter(matched).filter((group) => filter === "all" || group.id === filter);
   }, [items, query, filter]);
-
-  // Offer only the filters that would show something, plus All.
-  const filters = RESEARCH_FILTERS.filter((f) => f.value === "all" || f.value === filter || all.some((g) => g.id === f.value));
 
   if (loading) {
     return (
@@ -123,36 +118,21 @@ export function MyResearchList({ items, loading, failed, interrupted = false, on
 
   return (
     <div>
-      <div className="mb-section rounded-card border border-stone-200 bg-white p-card-compact md:p-card">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <label className="relative block lg:w-80">
-            <span className="sr-only">Search your research</span>
-            <SearchGlyph className="pointer-events-none absolute left-3.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-stone-500" />
-            <input
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by title or author"
-              className="w-full rounded-control border border-field bg-white py-2 pl-10 pr-3 text-body placeholder:text-stone-600 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
-            />
-          </label>
-          <FilterChips label="Show" options={filters} value={filter} onChange={onFilterChange} />
-        </div>
+      <div className="mb-section space-y-3">
+        <LibrarySearch label="Search your research" value={query} onChange={setQuery} />
+        <UnderlineFilters label="Show" options={RESEARCH_FILTERS} value={filter} onChange={onFilterChange} />
       </div>
 
       {groups.length === 0 ? (
         <EmptyState
           framed
-          icon="fa-magnifying-glass"
-          title={query.trim() ? `Nothing matches “${query.trim()}”` : "Nothing here right now"}
-          message={query.trim() ? "Search looks at titles and author names." : "Choose All to see every record."}
+          icon={query.trim() ? "fa-magnifying-glass" : "fa-inbox"}
+          title={query.trim() ? `Nothing matches “${query.trim()}”` : filter === "all" ? "Nothing here right now" : EMPTY_FILTER[filter].title}
+          message={query.trim() ? "Search looks at titles and author names." : filter === "all" ? "Choose All to see every record." : EMPTY_FILTER[filter].message}
         />
       ) : (
         <div className="space-y-section-lg">
-          {groups.map((group) => (
-            // Keyed on the filter so a group re-opens when it is picked alone.
-            <Group key={`${filter}-${group.id}`} group={group} open={filter !== "all" || group.id !== "finished"} onDeleted={onDeleted} />
-          ))}
+          {groups.map((group) => <Group key={group.id} group={group} onDeleted={onDeleted} />)}
         </div>
       )}
     </div>

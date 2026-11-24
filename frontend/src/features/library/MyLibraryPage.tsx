@@ -14,10 +14,10 @@ import { READING_STATUSES, useLibraryStore } from "@/store/library.store";
 import type { MyResearchItem } from "@/types/records";
 
 import { DownloadRequestsView } from "./DownloadRequestsView";
-import { FilterChips } from "./FilterChips";
+import { UnderlineFilters } from "./LibraryToolbar";
 import { LibraryOverview } from "./LibraryOverview";
 import { MyResearchList } from "./MyResearchList";
-import { FolderPicker, isSameView, viewKey, type LibraryView } from "./ReadingPanel";
+import { isSameView, viewKey, type LibraryView } from "./ReadingPanel";
 import type { ResearchFilter } from "./researchSections";
 import { isRequestTimeout } from "@/api/requestPolicy";
 import { SavedCallsSection } from "@/features/opportunities/SavedCallsSection";
@@ -32,11 +32,12 @@ type SavedViewKind = Exclude<LibraryView, { kind: "research" }>;
 /** Every tab, in order. `reader`: every reader has it, author or not (IR-743, IR-766). */
 const AUTHOR_TABS: { value: Tab; label: string; reader: boolean }[] = [
   { value: "overview",  label: "Overview",          reader: false },
-  { value: "research",  label: "My submissions",    reader: false },
-  { value: "saved",     label: "Saved papers",      reader: true },
+  // Title Case at the owner's direction (IR-1324), an exception to DESIGN.md's sentence case.
+  { value: "research",  label: "My Submissions",    reader: false },
+  { value: "saved",     label: "Saved Papers",      reader: true },
   // Calls for papers the reader saved, apart from papers (IR-766).
-  { value: "calls",     label: "Saved calls",       reader: true },
-  { value: "downloads", label: "Download requests", reader: true },
+  { value: "calls",     label: "Saved Calls",       reader: true },
+  { value: "downloads", label: "Download Requests", reader: true },
 ];
 const READER_TABS = AUTHOR_TABS.filter((t) => t.reader);
 
@@ -142,11 +143,6 @@ export default function MyLibraryPage() {
     selectTab("research");
   };
 
-  const openSaved = (view: LibraryView) => {
-    if (view.kind !== "research") setSavedView(view);
-    selectTab("saved");
-  };
-
   const removeFromView = (ids: number[]) => {
     if (savedView.kind === "folder") {
       // Out of this folder only: the paper stays saved (IR-572).
@@ -198,31 +194,20 @@ export default function MyLibraryPage() {
             void deleteFolder(id);
             if (isSameView(savedView, { kind: "folder", id })) setSavedView(ALL_SAVED);
           }}
-          folderControl={
-            <FolderPicker
-              folders={folders}
-              limit={folderLimit}
-              view={savedView}
-              onViewChange={(view) => { if (view.kind !== "research") setSavedView(view); }}
-              onCreate={(name) => {
-                void createFolder(name).then((made) => {
-                  if (made) setSavedView({ kind: "folder", id: made.id });
-                });
-              }}
-            />
-          }
+          folderLimit={folderLimit}
+          onOpenView={setSavedView}
+          onCreateFolder={(name) => void createFolder(name)}
+          // History opens from the Overview's Recently opened; a reader with
+          // no Overview gets the link on the folders (ADR-044 amendment 2026-11-24).
+          onManageHistory={mayAuthor ? undefined : () => setSavedView({ kind: "history" })}
+          historyBack={mayAuthor ? { label: "Back to Overview", onClick: () => { setSavedView(ALL_SAVED); selectTab("overview"); } } : undefined}
           filters={
-            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-              <FilterChips
-                label="Reading status"
-                options={STATUS_FILTERS}
-                value={statusFilter}
-                onChange={(value) => setSavedView(value === "all" ? ALL_SAVED : { kind: "status", status: value })}
-              />
-              <p className="text-label text-stone-500">
-                Saves and folders follow your account.
-              </p>
-            </div>
+            <UnderlineFilters
+              label="Reading status"
+              options={STATUS_FILTERS}
+              value={statusFilter}
+              onChange={(value) => setSavedView(value === "all" ? ALL_SAVED : { kind: "status", status: value })}
+            />
           }
         />
       </div>
@@ -242,7 +227,7 @@ export default function MyLibraryPage() {
         )}
       />
 
-      <div role="tablist" aria-label="My Library" className="mb-section-lg flex gap-1 overflow-x-auto overflow-y-hidden border-b border-stone-200">
+      <div role="tablist" aria-label="My Library" className="mb-section-lg -mx-1 flex gap-1 overflow-x-auto overflow-y-hidden p-1 scrollbar-none">
         {tabs.map((t) => {
           const current = t.value === tab;
           return (
@@ -258,11 +243,11 @@ export default function MyLibraryPage() {
               onClick={() => selectTab(t.value)}
               onKeyDown={onTabKey}
               className={cn(
-                "relative min-h-11 shrink-0 whitespace-nowrap rounded-t-control px-3 text-small font-semibold",
-                "after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:rounded-full after:content-['']",
+                // The current tab is a filled pill (IR-1324, the owner's choice B).
+                "min-h-10 shrink-0 whitespace-nowrap rounded-full px-4 text-small font-semibold",
                 COLOUR_TRANSITION,
                 FOCUS_RING,
-                current ? "text-brand after:bg-brand" : "text-stone-600 hover:text-stone-900 after:bg-transparent",
+                current ? "bg-brand text-white" : "text-stone-600 hover:bg-stone-100 hover:text-stone-900",
               )}
             >
               {t.label}
@@ -285,10 +270,12 @@ export default function MyLibraryPage() {
             failed={failed}
             interrupted={interrupted}
             onRetry={() => void loadResearch()}
-            library={library}
             history={history}
             onOpenSubmissions={openSubmissions}
-            onOpenSaved={openSaved}
+            onManageHistory={() => {
+              setSavedView({ kind: "history" });
+              selectTab("saved");
+            }}
             onDeleted={dropDeleted}
           />
         )}
