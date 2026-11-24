@@ -49,6 +49,7 @@ AGENT = dict(
     RUNS_AGENT_MODEL=MODEL,
     RUNS_AGENT_RESERVES=json.dumps(dict(output_tokens=60, reasoning_tokens=40, next_result_tokens=300,
                                         repair_tokens=100)),
+    RUNS_AGENT_PROVIDER_RETRIES="1",
     AGENT_LLM_ENDPOINT=ENDPOINT,
     AGENT_LLM_API_KEY="sk-test-never-sent",
     AGENT_LLM_MODELS=MODEL,
@@ -379,7 +380,7 @@ def test_a_killed_workers_agent_run_is_resumed_by_another_under_the_same_pin_and
     assert accounted(queued["id"]) == ["agent", "agent"]
     # Both attempts were admitted under the run's pin: the dead one's and the resumed one's.
     assert [(r.owner, r.purpose_version, r.model) for r in ProviderReservation.objects.order_by("id")] == [
-        ("ai", "agent-research-12", MODEL)] * 2
+        ("ai", "agent-research-15", MODEL)] * 2
 
 
 def test_two_workers_settle_agent_runs_within_the_deep_and_per_reader_caps(runtime):

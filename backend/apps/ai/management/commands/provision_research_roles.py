@@ -35,6 +35,8 @@ DEFINER_FUNCTIONS = (
     "lock_processing_source()",
     "pending_manuscript_work(integer, uuid)",
     "manuscript_invalidations(integer, uuid)",
+    # A readable paper's Adviser, by name only (IR-1278).
+    "research_advisers(bigint[])",
 )
 HELPER_FUNCTIONS = ("hmac_sha256(bytea, bytea)", "b64url_encode(bytea)", "b64url_decode(text)")
 RUNTIME_FUNCTIONS = (
@@ -60,11 +62,13 @@ RUNTIME_METADATA_TABLES = (
 #: Columns the verifier reads, and nothing else (no password hashes).
 VERIFIER_COLUMNS = {
     # deleted_at: reader_status() reads a deleted account as `gone` (ai/0043, IR-785).
-    "accounts_user": "id, is_active, is_locked, credential_version, role_id, deleted_at",
+    # first_name, middle_initial, last_name: research_advisers() names a readable paper's Adviser (IR-1278).
+    "accounts_user": "id, is_active, is_locked, credential_version, role_id, deleted_at,"
+                     " first_name, middle_initial, last_name",
     "accounts_role": "id, name",
     # added_by_id: research_record_ids() gives a draft to its creator alone (ai/0049, IR-1227).
     "records_record": "id, is_deleted, pipeline_status, adviser_id, added_by_id, abstract_file, title, abstract, dpa_accepted_at, ai_consent, is_ip, ip_released_at, "
-                      "is_embargoed, embargo_answered_at, embargo_released_at, embargoed_until",
+                      "is_embargoed, embargo_answered_at, embargo_released_at, embargoed_until, adviser_name",
     "publication_manuscriptwork": "id, record_id, revision, source_file, operation, revoked_at,"
                                   " created_at, grant_token, grant_expires_at, authority_generation",
     "publication_manuscriptinvalidation": "id, record_id, work_id, reason, authority_generation",
@@ -111,6 +115,7 @@ def problems(cursor) -> list[str]:
         [VERIFIER],
     )
     found += [f"function iris_authz.{name} is not owned by {VERIFIER}" for (name,) in cursor.fetchall()]
+    found += _verifier_column_problems(cursor)
     found += _policy_problems(cursor)
     cursor.execute("SELECT 1 FROM pg_roles WHERE rolname = 'iris_ai_runtime'")
     if cursor.fetchone() is not None:
@@ -133,6 +138,28 @@ def problems(cursor) -> list[str]:
         )
         if cursor.fetchone()[0]:
             found.append("role iris_ai_runtime can rewrite reservations")
+    return found
+
+
+def _verifier_column_problems(cursor) -> list[str]:
+    """A column the verifier's functions read but may not: they fail at the first read (IR-1285)."""
+    cursor.execute("SELECT 1 FROM pg_roles WHERE rolname = %s", [VERIFIER])
+    if cursor.fetchone() is None:
+        return []
+    found = []
+    for table, columns in VERIFIER_COLUMNS.items():
+        for column in (c.strip() for c in columns.split(",")):
+            # A table or column this database does not have yet is not a missing grant.
+            cursor.execute(
+                """SELECT has_column_privilege(%s, c.oid, a.attnum, 'SELECT')
+                     FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+                     JOIN pg_attribute a ON a.attrelid = c.oid AND NOT a.attisdropped
+                    WHERE n.nspname = 'public' AND c.relname = %s AND a.attname = %s""",
+                [VERIFIER, table, column],
+            )
+            row = cursor.fetchone()
+            if row is not None and not row[0]:
+                found.append(f"role {VERIFIER} cannot read {table}.{column}")
     return found
 
 
@@ -254,6 +281,10 @@ class Command(BaseCommand):
         # The AI runtime fences a departed reader's runs (IR-722).
         cursor.execute(
             "GRANT EXECUTE ON FUNCTION iris_authz.reader_status(bigint) TO iris_ai_runtime"
+        )
+        # paper_details names a readable paper's Adviser (IR-1278); Django never asks.
+        cursor.execute(
+            "GRANT EXECUTE ON FUNCTION iris_authz.research_advisers(bigint[]) TO iris_ai_runtime"
         )
         cursor.execute("GRANT EXECUTE ON FUNCTION iris_authz.processing_source(),"
                        " iris_authz.pending_manuscript_work(integer, uuid),"

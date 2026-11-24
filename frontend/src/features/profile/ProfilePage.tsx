@@ -1,18 +1,12 @@
-import { Link, useLocation } from "react-router-dom";
-
-import { PILL_SECONDARY } from "@/components/ui/pillStyles";
-import { FOCUS_RING } from "@/components/ui/interaction";
 import { useAuth } from "@/hooks/useAuth";
-import { pathFor } from "@/lib/access";
-import { cn } from "@/lib/utils";
 
 import { PersonProfileView, type ProfileSubject } from "./PersonProfileView";
 import { useOwnProfileLists } from "./usePersonProfile";
 
 /**
- * Your own Profile (IR-933): the page other signed-in people see for you, with
- * the way to edit it. Account matters (password, consent, role) are in
- * Settings, a separate page.
+ * Your own Profile (IR-933): the page other signed-in people see for you. It is
+ * only a preview: editing it, like the password, consent and role, is in
+ * Settings (IR-1304), which the note says and Settings links back from.
  *
  * The Profile itself is the shared view other people's Profiles use (IR-948),
  * so there is one design for everyone. It reads the signed-in user, so it shows
@@ -24,8 +18,6 @@ import { useOwnProfileLists } from "./usePersonProfile";
 export default function ProfilePage() {
   const { user } = useAuth();
   const lists = useOwnProfileLists(user?.id ?? null);
-  // Edit profile sends the person back here after a save and says so.
-  const saved = (useLocation().state as { saved?: boolean } | null)?.saved === true;
   if (!user) return null;
 
   // bio, interests and photo are optional on `User`, so an absent one reads as empty.
@@ -44,22 +36,12 @@ export default function ProfilePage() {
 
   return (
     <div className="max-w-4xl space-y-6">
-      {saved && (
-        <p role="status" className="flex items-center gap-1.5 text-small text-stone-700">
-          <i className="fas fa-check" aria-hidden />
-          Profile saved.
-        </p>
-      )}
       <p
         role="note"
-        className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-stone-200 bg-stone-100 py-2 pl-4 pr-2 text-small text-stone-700"
+        className="flex flex-wrap items-center gap-2 rounded-card border border-stone-200 bg-stone-100 px-4 py-2 text-small text-stone-700"
       >
         <i className="fas fa-eye" aria-hidden />
-        <span className="flex-1">This is how other IRIS accounts see your profile.</span>
-        <Link to={pathFor("profileEdit")} className={cn(PILL_SECONDARY, FOCUS_RING, "gap-1.5 bg-white")}>
-          <i className="fas fa-pencil text-label" aria-hidden />
-          Edit profile
-        </Link>
+        <span>This is how other IRIS accounts see your profile. Change it in Settings.</span>
       </p>
 
       <PersonProfileView profile={profile} lists={lists} self />

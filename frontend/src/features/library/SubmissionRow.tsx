@@ -9,7 +9,6 @@ import { ContinueProposal } from "@/features/records/ContinueProposal";
 import { waitingHref } from "@/features/records/waitingOnYou";
 import { usePublishHref } from "@/features/publish/publishLink";
 import { DeleteRecord, type DeleteKind } from "./DeleteRecord";
-import { waitingOn } from "./waitingOn";
 import { cn, formatDate } from "@/lib/utils";
 import type { MyResearchItem } from "@/types/records";
 
@@ -74,15 +73,12 @@ interface SubmissionRowProps {
  * One of the owner's records as a row in a ruled list (IR-410). The title is
  * the row's one link, stretched over the row, so a click anywhere opens it
  * (`rowHref`); only the actions and a draft's trash can sit above it. The
- * status words are the server's (`submitter_status.line`); the sentence under
- * the title says what the record waits on (`waitingOn`, IR-1084).
+ * status words are the server's (`submitter_status.line`). IR-1306 dropped the
+ * sentence under the title: the status, the clearance strip and the action say it.
  */
 export function SubmissionRow({ item, brief = false, onDeleted }: SubmissionRowProps) {
   const publishHref = usePublishHref();
-  const people = [
-    item.authors.map((author) => author.name).join(", "),
-    item.adviser_name && `Adviser: ${item.adviser_name}`,
-  ].filter(Boolean).join(" · ");
+  const authors = item.authors.map((author) => author.name).join(", ");
   const actions = rowActions(item, brief);
   const deleteKind = onDeleted ? deleteKindOf(item) : null;
 
@@ -112,8 +108,14 @@ export function SubmissionRow({ item, brief = false, onDeleted }: SubmissionRowP
                 {item.title}
               </Link>
             </h3>
-            {people && <p className="mt-0.5 break-words text-small text-stone-600">{people}</p>}
-            <p className="mt-1 text-small text-stone-800">{waitingOn(item)}</p>
+            {/* Who, without a sentence about it (IR-1306): authors, then the Adviser marked by an icon. */}
+            {(authors || item.adviser_name) && <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 break-words text-small text-stone-600">
+              {authors && <span>{authors}</span>}
+              {item.adviser_name && <span className="inline-flex items-center gap-1.5">
+                <i aria-hidden className="fas fa-user-tie text-label text-stone-400" />
+                <span className="sr-only">Adviser: </span>{item.adviser_name}
+              </span>}
+            </p>}
           </div>
 
           <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 md:flex-col md:items-end">

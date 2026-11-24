@@ -15,6 +15,12 @@ export const readingVariants = {
   "overview-wide": "@container overview (min-width: 64rem)",
   // Past a phone's width: the Overview's title takes its larger size (IR-1264).
   "overview-roomy": "@container overview (min-width: 40rem)",
+  // Ask IRIS's starter questions sit two to a row once their own box has room (IR-1306).
+  "starters-wide": "@container starters (min-width: 34rem)",
+  // A handbook page (Guidelines, Setup, Workflow analytics): its Contents rail
+  // sits beside the column once the page's own box has room for both, so the
+  // sidebar opening changes the layout as surely as a narrower window does.
+  "handbook-wide": "@container handbook (min-width: 52rem)",
 };
 
 const readingTiers = plugin(({ addVariant }) => {
@@ -112,6 +118,26 @@ export default {
           DEFAULT: "#B4474B",
           wash:    "#FBEAEA",
           now:     "#F5D5D6",
+        },
+
+        // Status hues (IR-1290; DESIGN.md "Colors"). Two, and for status only,
+        // so that a state that needs someone (maroon outline) never looks like
+        // the action to take (solid maroon). `cleared` is an office that
+        // cleared or kept its clearance; `review` is a review in progress,
+        // including one a new version reset. DEFAULT is the text (6.5:1 and
+        // 6.3:1 on white), `line` the outline or glyph (4.2:1, 3.7:1) and
+        // `wash` a fill that text still reads on (5.7:1, 5.6:1). Amber is
+        // always an outline, a glyph and a word, never a flat fill behind
+        // text, so it is never mistaken for the match yellow (`hl`).
+        cleared: {
+          DEFAULT: "#1E6B3F",
+          line:    "#3F8A5A",
+          wash:    "#EAF3EC",
+        },
+        review: {
+          DEFAULT: "#8A5300",
+          line:    "#B07A1E",
+          wash:    "#FBF0DA",
         },
 
         // Primary brand color -- deep maroon. `brand-50`, `brand-100` and
@@ -332,6 +358,13 @@ export default {
           "0%":   { opacity: "0" },
           "100%": { opacity: "1" },
         },
+        // A research verb arriving (IR-1306): it rises out of a soft focus, like
+        // a line coming clear on the page, instead of popping in.
+        "verb-in": {
+          "0%":   { opacity: "0", transform: "translateY(0.45em)", filter: "blur(3px)" },
+          "100%": { opacity: "1", transform: "translateY(0)", filter: "blur(0)" },
+        },
+
         // A citation's passage briefly reads stronger on arrival, so a
         // reader's eye finds it on the page rather than searching for a
         // static box among the surrounding text (IR-335). Maroon, the colour of
@@ -371,6 +404,7 @@ export default {
         "fade-in-up": "fade-in-up 0.3s ease-out",
         "fade-in":    "fade-in 0.2s ease-out",
         "citation-flash": "citation-flash 1.6s ease-out",
+        "verb-in": "verb-in 380ms cubic-bezier(0.16, 1, 0.3, 1) backwards",
       },
     },
   },

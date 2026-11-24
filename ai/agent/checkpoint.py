@@ -15,6 +15,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import asdict, dataclass
+from datetime import date
 from typing import Optional
 
 from ai.agent.protocol import (
@@ -155,14 +156,15 @@ def _count(fact: Count) -> dict:
     return {"total": fact.total, "filters": [list(f) for f in fact.filters], "group_by": fact.group_by,
             "groups": [list(g) for g in fact.groups], "ungrouped": fact.ungrouped,
             "scope_record_id": fact.scope_record_id, "population": sorted(fact.population),
-            "relative_to": fact.relative_to}
+            "relative_to": fact.relative_to,
+            **({"undated": fact.undated} if fact.undated is not None else {})}
 
 
 def _load_count(raw: dict) -> Count:
     return Count(total=raw["total"], filters=_tuples(raw["filters"]), group_by=raw["group_by"],
                  groups=_tuples(raw["groups"]), ungrouped=raw["ungrouped"],
                  scope_record_id=raw["scope_record_id"], population=frozenset(raw["population"]),
-                 relative_to=raw["relative_to"])
+                 relative_to=raw["relative_to"], undated=raw.get("undated"))
 
 
 def _investigation(found: Investigation) -> dict:
@@ -180,6 +182,7 @@ def _investigation(found: Investigation) -> dict:
         "searched": found.searched, "outages": list(found.outages),
         "readings": {revision: _reading(read) for revision, read in found.readings.items()},
         "recovered": {str(ordinal): answer for ordinal, answer in found.recovered.items()},
+        **({"dates": sorted(day.isoformat() for day in found.dates)} if found.dates else {}),
     }
 
 
@@ -204,6 +207,7 @@ def _restore_investigation(found: Investigation, raw: dict) -> None:
     found.readings = {str(revision): _load_reading(read) for revision, read in raw.get("readings", {}).items()}
     # Original Turns recovered before the takeover (IR-735); a body from before it has none.
     found.recovered = {int(ordinal): str(answer) for ordinal, answer in raw.get("recovered", {}).items()}
+    found.dates = {date.fromisoformat(day) for day in raw.get("dates", ())}
 
 
 def _span(span: Optional[Span]) -> Optional[list]:

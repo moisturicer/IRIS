@@ -4,10 +4,10 @@ What a submitter is told about their own record (IR-625).
 `submitter_status` is one block, sent to an owner only, on My Library's list
 and on Record detail:
 
-- `line`: one plain sentence saying where the record is -- *With your
-  Adviser*, *In specialist review: IERC, KTTO*, *Revision requested by IERC:
-  action needed*. The frontend shows it as sent and words nothing itself
-  (IR-342's rule).
+- `line`: a short label saying where the record is -- *Adviser review*,
+  *Office review · IERC, KTTO*, *Revision requested · IERC* (IR-1306 trimmed
+  the earlier sentences). The frontend shows it as sent and words nothing
+  itself (IR-342's rule).
 - `waiting_on_you`: one item per party with an open revision request or
   document request, each naming the act that answers it. It is non-empty
   exactly when `workflow_state` is in `OWNER_ACTION_STATES`, the states
@@ -80,22 +80,22 @@ def status_line(
 ) -> str:
     """Where the record is, in one sentence. `record` names terminal states."""
     if workflow_state == WorkflowState.AWAITING_RESUBMISSION:
-        return f"Revision requested by {_named(_ordered(revision_parties))}: action needed"
+        return f"Revision requested · {_named(_ordered(revision_parties))}"
     if workflow_state == WorkflowState.AWAITING_DOCUMENT:
-        return f"Documents requested by {_named(_ordered(document_parties))}: action needed"
+        return f"Documents requested · {_named(_ordered(document_parties))}"
     if workflow_state == PipelineStatus.DRAFT:
-        return "Draft: not yet submitted"
+        return "Draft"
     if workflow_state in (
         WorkflowState.SUBMITTED, WorkflowState.IN_REVIEW, WorkflowState.FINAL_REVIEW,
     ):
         held = _ordered(holders)
         offices = [p for p in held if p in _OFFICES]
         if offices:
-            return f"In specialist review: {_named(offices)}"
+            return f"Office review · {_named(offices)}"
         if str(Party.RDCO) in held:
-            return "With RDCO for a decision"
+            return "RDCO decision"
         if str(Party.ADVISER) in held:
-            return "With your Adviser"
+            return "Adviser review"
         return "In review"
     from .tracker import record_state_label
 

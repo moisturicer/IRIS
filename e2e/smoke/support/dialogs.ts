@@ -236,6 +236,8 @@ export const DIALOGS: DialogCase[] = [
   },
   {
     id: "notifications", screen: "help", sources: ["components/layout/NotificationBell.tsx"],
+    // The bell is the phone bar's since IR-1288; from md the sidebar has a link instead.
+    viewport: { width: 390, height: 844 },
     open: press(/^Notifications/), dialog: (page) => page.getByRole("dialog", { name: "Notifications" }),
   },
   {
@@ -374,6 +376,17 @@ export const DIALOGS: DialogCase[] = [
     dialog: (page) => page.getByRole("dialog"),
   },
   {
+    // A failed sign-in is said in a dialog in front of the form (IR-1303).
+    id: "sign-in failed", screen: "login", sources: ["components/auth/EntryErrorDialog.tsx"],
+    override: (api) => api.on("POST", "/auth/login/", { detail: "Invalid credentials." }, 401),
+    open: async (page) => {
+      await page.getByLabel("Email Address").fill("student@cit.edu");
+      await page.getByLabel("Password", { exact: true }).fill("not-the-password");
+      await page.getByRole("button", { name: "Sign In" }).click();
+    },
+    dialog: (page) => page.getByRole("alertdialog", { name: "Invalid email or password" }),
+  },
+  {
     // Why the session ended opens by itself on arrival (IR-1197).
     id: "session ended on arrival at sign-in", screen: "login", path: "/login?reason=session_expired&code=session_idle",
     sources: ["components/auth/SessionNoticeDialog.tsx"],
@@ -402,7 +415,7 @@ export const DIALOGS: DialogCase[] = [
     open: press(/^Delete draft/), dialog: anyDialog,
   },
   {
-    id: "crop a profile photo", screen: "profile-edit", sources: ["features/profile/PhotoCropDialog.tsx"],
+    id: "crop a profile photo", screen: "profile-settings", sources: ["features/profile/PhotoCropDialog.tsx"],
     open: async (page) => {
       await page.locator('input[type="file"]').first().setInputFiles({ name: "me.png", mimeType: "image/png", buffer: PNG });
     },

@@ -571,19 +571,29 @@ export const SCREENS: Screen[] = [
     primary: (p) => p.getByRole("link", { name: "Finding research" }).first(), primaryLabel: "Finding research (contents)",
   },
   {
+    // Only the preview since IR-1304: editing is in Settings, so the page's one
+    // control here is the paging of its Research list, which needs a next page.
     id: "profile", path: "/profile", route: "/profile", role: "Student",
     mocks: wrap("Student", (api) => {
-      api.on("GET", "/users/1/profile/research/", { next: null, results: [] });
+      api.on("GET", "/users/1/profile/research/", {
+        next: "page-2",
+        results: [{
+          id: 500, title: "Flood Risk Mapping in Cebu", authors: ["Student, S."],
+          classification_name: "Environmental Engineering", record_type_name: "Thesis / Research",
+          publication_year: 2025, views: 12,
+        }],
+      });
       api.on("GET", "/users/1/profile/advised/", { next: null, results: [] });
       api.on("GET", "/users/1/profile/collaborators/", { next: null, results: [] });
     }),
     heading: /Sam Student/,
-    primary: (p) => p.getByRole("link", { name: "Edit profile" }).first(), primaryLabel: "Edit profile",
+    primary: (p) => p.getByRole("button", { name: "Show more research papers" }), primaryLabel: "Show more research papers",
   },
   {
-    id: "profile-edit", path: "/profile/edit", route: "/profile/edit", role: "Student",
+    // Edit profile was a page of its own until IR-1304; it is Settings' first section.
+    id: "profile-settings", path: "/settings?tab=profile", route: "/settings", role: "Student",
     mocks: wrap("Student"),
-    heading: "Edit profile",
+    heading: "Settings",
     primary: (p) => p.getByRole("button", { name: "Save" }), primaryLabel: "Save",
   },
   {
@@ -615,7 +625,7 @@ export const SCREENS: Screen[] = [
     primary: (p) => p.getByRole("button", { name: "Show more research papers" }), primaryLabel: "Show more research papers",
   },
   {
-    id: "settings", path: "/settings", route: "/settings", role: "Student",
+    id: "settings", path: "/settings?tab=security", route: "/settings", role: "Student",
     mocks: wrap("Student"),
     heading: "Settings",
     primary: (p) => p.getByRole("button", { name: "Change password" }), primaryLabel: "Change password",

@@ -8,15 +8,17 @@ import type { ClearanceStripEntry, ClearanceStripKind } from "@/types/records";
  * resubmission kept; it prints what `clearance_strip` says (IR-1083).
  *
  * Exhaustive, so a kind the server starts sending fails `tsc` until it is
- * given a look here, rather than rendering unstyled. The tones are the shared
- * ones (`statusTones`): kept and cleared settle, reviewing and unclaimed wait,
- * an asked-for revision or a negative outcome needs someone.
+ * given a look here, rather than rendering unstyled. The tones follow the
+ * shared ones (`statusTones`, IR-1290): kept and cleared are green, a review in
+ * progress is amber, an unclaimed one waits in stone, and an asked-for revision
+ * or a negative outcome needs someone, in maroon. So a resubmission that kept
+ * two offices and reset one reads green, amber, green at a glance.
  */
 const KIND_META: Record<ClearanceStripKind, { icon: string; tone: string }> = {
   // The thesis contribution: the shield the tracker's *Preserved* badge wears.
-  kept:        { icon: "fa-shield-halved", tone: "text-stone-900" },
-  cleared:     { icon: "fa-check",         tone: "text-stone-900" },
-  reviewing:   { icon: "fa-hourglass-half", tone: "text-brand" },
+  kept:        { icon: "fa-shield-halved", tone: "text-cleared" },
+  cleared:     { icon: "fa-check",         tone: "text-cleared" },
+  reviewing:   { icon: "fa-hourglass-half", tone: "text-review" },
   unclaimed:   { icon: "fa-inbox",         tone: "text-stone-700" },
   revision:    { icon: "fa-rotate-left",   tone: "text-brand" },
   not_cleared: { icon: "fa-ban",           tone: "text-brand" },
@@ -25,6 +27,11 @@ const KIND_META: Record<ClearanceStripKind, { icon: string; tone: string }> = {
 interface ClearanceStripProps {
   /** Null or absent on a response that predates the field: nothing is drawn (F1). */
   entries?: ClearanceStripEntry[] | null;
+  /**
+   * One office per line instead of a wrapping row, for a phone card whose
+   * entries carry a note ("Kept from v1") too long to share a line (IR-1291).
+   */
+  stacked?: boolean;
   className?: string;
 }
 
@@ -37,13 +44,17 @@ interface ClearanceStripProps {
  *
  * Colour and icon are never the only signal: each entry carries its words.
  */
-export function ClearanceStrip({ entries, className }: ClearanceStripProps) {
+export function ClearanceStrip({ entries, stacked = false, className }: ClearanceStripProps) {
   if (!Array.isArray(entries) || entries.length === 0) return null;
 
   return (
     <ul
       aria-label="Clearances"
-      className={cn("flex flex-wrap items-center gap-x-4 gap-y-1 text-label", className)}
+      className={cn(
+        "flex gap-y-1 text-label",
+        stacked ? "flex-col items-start" : "flex-wrap items-center gap-x-4",
+        className,
+      )}
     >
       {entries.map((entry) => {
         const meta = KIND_META[entry.kind];

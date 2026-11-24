@@ -166,7 +166,8 @@ const approvedProposal: RecordDetail = {
   workflow_state: "approved",
   workflow_state_label: "Approved",
   current_holders: [],
-  capabilities: ["cite"],
+  // A Proposal is never published, so the server offers no `cite` (IR-1305).
+  capabilities: [],
   can_request_document: [],
   my_seats: [],
   is_participant: false,
@@ -1520,6 +1521,51 @@ describe("sharing the paper (IR-356)", () => {
 
     expect(await screen.findByRole("button", { name: /couldn.t copy/i })).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent(/copy it from the address bar/i);
+  });
+});
+
+/**
+ * Cite is for published work (IR-1305). The server offers `cite` only on a
+ * published paper, and the page shows Cite only where it is offered; Save and
+ * Share stay on every record.
+ */
+describe("Cite only where the server offers it (IR-1305)", () => {
+  beforeEach(() => {
+    signInAs(99, "Student");
+  });
+
+  it("shows Cite on a published paper", async () => {
+    shownRecord = record;
+    renderPaperView();
+    await waitForRecord(record.title);
+
+    expect(screen.getByRole("button", { name: "Cite" })).toBeInTheDocument();
+  });
+
+  it("hides Cite on a Proposal, and keeps Save and Share", async () => {
+    shownRecord = approvedProposal;
+    renderPaperView();
+    await waitForRecord(approvedProposal.title);
+
+    expect(screen.queryByRole("button", { name: "Cite" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Share" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Save/ })).toBeInTheDocument();
+  });
+
+  it("hides Cite on a Thesis still in review", async () => {
+    shownRecord = { ...inReview, capabilities: [] };
+    renderPaperView();
+    await waitForRecord(inReview.title);
+
+    expect(screen.queryByRole("button", { name: "Cite" })).not.toBeInTheDocument();
+  });
+
+  it("follows the server's offer, not the record's status", async () => {
+    shownRecord = { ...record, capabilities: [] };
+    renderPaperView();
+    await waitForRecord(record.title);
+
+    expect(screen.queryByRole("button", { name: "Cite" })).not.toBeInTheDocument();
   });
 });
 
@@ -3728,6 +3774,14 @@ describe("the Overview's header (IR-569)", () => {
     // Neither the publication year nor the view count is a second date or a stat in the header.
     expect(within(header).queryByText(/Published \d{4}/)).not.toBeInTheDocument();
     expect(within(header).queryByText(/\d+ views?$/)).not.toBeInTheDocument();
+  });
+
+  it("shows an import's completion year when the form recorded none (IR-1316)", async () => {
+    shownRecord = { ...record, year_accomplished: null, year_completed: 2019 };
+    renderPaperView();
+    await waitForRecord(record.title);
+    const details = screen.getByRole("complementary", { name: "Record details" });
+    expect(within(details).getByText("Year Accomplished").parentElement).toHaveTextContent("2019");
   });
 
   it("lists no documents in Record details: they are Review's to show (IR-1244)", async () => {

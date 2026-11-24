@@ -11,7 +11,6 @@ import { ReadFailedState } from "@/components/shared/ReadFailedState";
 import { LoadingRegion } from "@/components/ui/LoadingRegion";
 import { isRequestTimeout } from "@/api/requestPolicy";
 import { FOCUS_RING } from "@/components/ui/interaction";
-import { PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { cn, formatDate } from "@/lib/utils";
 import type { ReaderDownloadRequest } from "@/types/records";
 
@@ -36,7 +35,15 @@ function stateLabel(request: ReaderDownloadRequest): { text: string; tone: strin
   }
 }
 
-const ACTION = cn(PILL_SECONDARY, FOCUS_RING, "min-h-9 px-3 text-small");
+// The secondary pill at row size, written out whole (IR-1302): with no
+// tailwind-merge, PILL_SECONDARY's px-5 and gap-2 outranked a smaller px or gap
+// added after them, so these buttons rendered at 20px a side whatever was asked.
+const ACTION = cn(
+  "inline-flex items-center justify-center gap-1.5 min-h-9 px-4 rounded-full text-small font-semibold",
+  "bg-transparent text-stone-700 ring-1 ring-stone-300 hover:bg-stone-100 hover:text-stone-900",
+  "transition-colors duration-200 disabled:opacity-60 disabled:cursor-not-allowed",
+  FOCUS_RING,
+);
 
 interface RowProps {
   request: ReaderDownloadRequest;
@@ -83,6 +90,7 @@ function RequestRow({ request, onCancel, onDownload, onRequestAgain, busy }: Row
         )}
         {request.actions.includes("request_again") && (
           <button type="button" className={ACTION} onClick={() => onRequestAgain(request)}>
+            <i className="fas fa-download" aria-hidden />
             Request again
           </button>
         )}

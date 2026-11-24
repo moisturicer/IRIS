@@ -128,15 +128,16 @@ export const SCREEN_ACCESS = {
                    nav: { label: "Ask IRIS", icon: ASK_IRIS_ICON, section: "Main", onlyFor: RESEARCH_ROLES } },
   library:       { path: "/records/mine",  roles: EVERYONE,
                    nav: { label: "My Library", icon: "fa-bookmark", section: "Main", onlyFor: RESEARCH_ROLES } },
-  // The bell at the top of the sidebar is the entry; its "View all" opens the
-  // page, so a sidebar link would say the same thing twice (IR-519).
-  notifications: { path: "/notifications", roles: EVERYONE },
+  // A link of its own with the unread count, for every role. It replaced the
+  // bell that shared the sidebar's header with the logo and the collapse
+  // button. Phones keep the bell in their top bar, where the drawer is hidden.
+  notifications: { path: "/notifications", roles: EVERYONE,
+                   nav: { label: "Notifications", icon: "fa-bell", section: "Main" } },
   // Profile and Settings live in the account menu in the sidebar's user block
   // (IR-413, spec §4.2), not in the nav list. Profile (who you are) and
   // Settings (your account) are separate pages since IR-933. Help is a section
   // of Settings (IR-1245); `/help` is a redirect (`router/redirects.tsx`).
   profile:       { path: "/profile",       roles: EVERYONE },
-  profileEdit:   { path: "/profile/edit",  roles: EVERYONE },
   // Another person's Profile (IR-700), opened by clicking their name. Who may be
   // opened is the server's decision: a hidden account answers 404.
   person:        { path: "/people/:id",    roles: EVERYONE },

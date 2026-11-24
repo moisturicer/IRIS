@@ -98,12 +98,12 @@ test("whether someone authors is the server's flag, never their role (IR-1096)",
   assertEqual(canAuthor({ role_name: ROLES.ITSO, can_author: true } as never), true, "ITSO, flag true");
 });
 
-test("Notifications is the bell, not a sidebar link, and its page stays open (IR-519)", () => {
-  // The bell at the top of the sidebar is the one notification entry; a link
-  // beside it said the same thing twice. Its "View all" still reaches the page.
+test("Notifications is a sidebar link for every role, and its page stays open", () => {
+  // It replaced the bell in the sidebar's header, which crowded the logo and
+  // the collapse button. The phone bar keeps a bell of its own.
   for (const role of EVERY_ROLE) {
     assertEqual(
-      navFor(role).some((item) => item.key === "notifications"), false,
+      navFor(role).some((item) => item.key === "notifications" && item.to === "/notifications"), true,
       `${role} sidebar lists Notifications`,
     );
     assertEqual(canAccess(role, "notifications"), true, `${role} may open /notifications`);
@@ -120,20 +120,20 @@ const labels = (role: RoleName, access?: { my_reviews: boolean; is_coordinator?:
 
 test("every role shares one short main list, in the spec's order", () => {
   expect(labels(ROLES.STUDENT)).toEqual([
-    "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: Calls & Conferences", "Main: Guidelines",
+    "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: Notifications", "Main: Calls & Conferences", "Main: Guidelines",
   ]);
   // The Adviser included since IR-534: Discover is its home, so the Submit
   // Disclosure shortcut it kept until then is gone. No office, so nothing
   // nests under My Reviews. My Templates is the Adviser's alone (IR-975).
   expect(labels(ROLES.ADVISER, REVIEW_WORK)).toEqual([
-    "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: My Reviews", "Main: My Templates",
+    "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: Notifications", "Main: My Reviews", "Main: My Templates",
     "Main: Calls & Conferences", "Main: Guidelines",
   ]);
   // An office member has the same list: Workflow analytics is RDCO's alone
   // since IR-1216, and the console is the coordinator's alone.
   for (const role of [ROLES.ITSO, ROLES.IERC, ROLES.KTTO]) {
     expect(labels(role, REVIEW_WORK)).toEqual([
-      "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: My Reviews", "Main: Calls & Conferences",
+      "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: Notifications", "Main: My Reviews", "Main: Calls & Conferences",
       "Main: Guidelines",
     ]);
   }
@@ -142,7 +142,7 @@ test("every role shares one short main list, in the spec's order", () => {
 test("RDCO's coordination screens, Import records included, are one RDCO group", () => {
   // Workflow analytics is in this group since IR-1216, not under My Reviews.
   expect(labels(ROLES.RDCO, REVIEW_WORK)).toEqual([
-    "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: My Reviews", "Main: Calls & Conferences",
+    "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: Notifications", "Main: My Reviews", "Main: Calls & Conferences",
     "Main: Guidelines", "RDCO: Import Records", "RDCO: Users", "RDCO: Role Requests", "RDCO: Download Requests",
     "RDCO: Call Requests", "RDCO: Delete Requests", "RDCO: Reported Comments",
     "RDCO: Workflow Analytics", "RDCO: Setup",
@@ -190,10 +190,10 @@ describe("the pages nested under My Reviews (IR-1085, D5)", () => {
   });
 });
 
-test("the System Admin's nav is Discover, Users, Audit Log, Account Deletions, Reported comments and Retention (IR-783, IR-788, IR-693, IR-795, IR-972)", () => {
+test("the System Admin's nav is Discover, Notifications, Users, Audit Log, Account Deletions, Reported comments and Retention (IR-783, IR-788, IR-693, IR-795, IR-972)", () => {
   // No Guidelines link (IR-974, ADR-063 amendment 2026-11-19).
   expect(labels(ROLES.SYSTEM_ADMIN)).toEqual([
-    "Main: Discover",
+    "Main: Discover", "Main: Notifications",
     "Administration: Users", "Administration: Audit Log", "Administration: Account Deletions",
     "Administration: Reported Comments", "Administration: Retention",
   ]);

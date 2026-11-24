@@ -77,7 +77,7 @@ test("a retry that cannot start says the conversation changed and offers to reco
   expect(screen.getByRole("button", { name: "Reconnect" })).toBeInTheDocument();
 });
 
-test("any question can be asked again or edited as a new Turn (IR-1162)", async () => {
+test("the latest question is edited in place, and sending it sets the old Turn aside (IR-1306)", async () => {
   const asked = run({ state: "completed" });
   const again = run({ id: "run-2", state: "queued", question: "Compare" });
   reopened(asked);
@@ -89,7 +89,33 @@ test("any question can be asked again or edited as a new Turn (IR-1162)", async 
   render(<MemoryRouter><RuntimeReader conversationId="conversation-1" /></MemoryRouter>);
 
   await user.click(await screen.findByRole("button", { name: "Edit" }));
-  expect(screen.getByRole("textbox")).toHaveValue("Compare");
+  const edit = screen.getByRole("textbox", { name: "Edit your question" });
+  expect(edit).toHaveValue("Compare");
+  expect(post).not.toHaveBeenCalled();
+
+  await user.clear(edit);
+  await user.type(edit, "Compare the methods{Enter}");
+  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+  expect(post.mock.calls[0][0]).not.toContain("/retry");
+  expect(post.mock.calls[0][1]).toEqual(expect.objectContaining({ question: "Compare the methods" }));
+  expect(JSON.parse(localStorage.getItem("iris:replaced:conversation-1") ?? "[]")).toContain(asked.id);
+  localStorage.removeItem("iris:replaced:conversation-1");
+});
+
+test("Escape leaves an edited question as it was, and Ask again still asks it as a new Turn (IR-1162)", async () => {
+  const asked = run({ state: "completed" });
+  const again = run({ id: "run-2", state: "queued", question: "Compare" });
+  reopened(asked);
+  const post = vi.spyOn(apiClient, "post").mockImplementation(async () => {
+    server.latest = again;
+    return { data: again };
+  });
+  const user = userEvent.setup();
+  render(<MemoryRouter><RuntimeReader conversationId="conversation-1" /></MemoryRouter>);
+
+  await user.click(await screen.findByRole("button", { name: "Edit" }));
+  await user.keyboard("{Escape}");
+  expect(screen.queryByRole("textbox", { name: "Edit your question" })).not.toBeInTheDocument();
   expect(post).not.toHaveBeenCalled();
 
   await user.click(screen.getByRole("button", { name: "Ask again" }));

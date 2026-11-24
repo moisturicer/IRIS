@@ -55,8 +55,8 @@ export default function NoticeSection() {
   const current = list?.[0] ?? null;
 
   return (
-    <div className="space-y-4">
-      <p className="text-small text-stone-600">
+    <div className="space-y-6">
+      <p className="text-body text-stone-700">
         The privacy notice every account answers. Publishing a new version asks everyone to read it again.
       </p>
 
@@ -84,23 +84,21 @@ export default function NoticeSection() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-            <div className="order-2 lg:order-1">
-              <PublishForm current={current} onPublished={read.retry} />
-            </div>
-            <aside
-              role="group"
-              aria-label="Current version"
-              className="order-1 rounded-card border border-stone-200 bg-white p-5 lg:order-2"
-            >
-              <h2 className="text-heading font-semibold text-stone-900">Live now</h2>
-              <p className="mt-1 text-small font-semibold text-stone-900">
-                Version {current.version}, {published(current)}
-              </p>
-            </aside>
-          </div>
+          <aside
+            role="group"
+            aria-label="Current version"
+            className="flex flex-wrap items-baseline gap-x-4 gap-y-1 rounded-card bg-stone-100 px-5 py-4"
+          >
+            <h2 className="font-display text-title font-semibold text-stone-900">Live now</h2>
+            <p className="text-small font-semibold text-stone-800">
+              Version {current.version}, {published(current)}
+            </p>
+          </aside>
 
-          <VersionHistory versions={list} />
+          <div className="divide-y divide-stone-200">
+            <PublishForm current={current} onPublished={read.retry} />
+            <VersionHistory versions={list} />
+          </div>
         </>
       )}
     </div>
@@ -217,8 +215,8 @@ function PublishForm({ current, onPublished }: { current: NoticeVersion; onPubli
   };
 
   return (
-    <section aria-labelledby={`${fieldId}-title`} className="rounded-card border border-stone-200 bg-white p-5 space-y-4">
-      <h2 id={`${fieldId}-title`} className="text-heading font-semibold text-stone-900">Publish a new version</h2>
+    <section aria-labelledby={`${fieldId}-title`} className="space-y-4 pb-8">
+      <h2 id={`${fieldId}-title`} className="font-display text-section font-semibold text-stone-900">Publish a new version</h2>
 
       {alert && <p role="alert" className={WARNING_NOTICE}>{alert}</p>}
       {done && <p role="status" className="text-small text-stone-700">{done}</p>}
@@ -242,7 +240,7 @@ function PublishForm({ current, onPublished }: { current: NoticeVersion; onPubli
           rows={16}
           aria-invalid={textError ? true : undefined}
           aria-describedby={textError ? errorId : undefined}
-          className="mt-2 w-full rounded-control border border-field px-3 py-2 font-mono text-small text-stone-900"
+          className="mt-2 w-full rounded-control border border-field bg-surface px-3 py-2 font-mono text-small text-stone-900 outline-none focus:border-brand focus:ring-1 focus:ring-brand"
         />
         {textError && <p id={errorId} className="mt-1.5 text-small text-brand">{textError}</p>}
       </div>
@@ -305,9 +303,9 @@ function VersionHistory({ versions }: { versions: NoticeVersion[] }) {
   const [open, setOpen] = useState<number | null>(null);
 
   return (
-    <section aria-labelledby={titleId} className="rounded-card border border-stone-200 bg-white p-5">
-      <h2 id={titleId} className="text-heading font-semibold text-stone-900">Version history</h2>
-      <ul className="mt-4 divide-y divide-stone-100">
+    <section aria-labelledby={titleId} className="pt-8">
+      <h2 id={titleId} className="font-display text-section font-semibold text-stone-900">Version history</h2>
+      <ul className="mt-4 divide-y divide-stone-200 border-y border-stone-200">
         {versions.map((v) => {
           const expanded = open === v.version;
           return (

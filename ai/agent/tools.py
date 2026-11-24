@@ -14,15 +14,17 @@ import json
 import logging
 import re
 from dataclasses import dataclass, field
+from datetime import date
 from typing import Optional
 
 import asyncpg
 
 from ai.agent.prompts import TOOL_DESCRIPTIONS as _SAYS, quoted
 from ai.agent.protocol import ToolCall, ToolSpec
-from ai.research import metadata
+from ai.research import metadata, recency
 from ai.research.tools import (
-    OK, PARTIAL, UNAVAILABLE, Count, PassageRef, Reading, ToolResult as Evidence, valid_filters,
+    MAX_DETAILS_PAPERS, OK, PARTIAL, UNAVAILABLE, Count, PaperDetails, PassageRef, Reading, ToolResult as Evidence,
+    valid_filters,
 )
 
 log = logging.getLogger(__name__)
@@ -111,10 +113,38 @@ READ_MANUSCRIPT = ToolSpec(
 RECOVER_TURN = ToolSpec(
     "recover_turn", _SAYS["recover_turn"], _object({"turn": {"type": "integer", "minimum": 1}}, ["turn"]))
 
+#: What the Publish form recorded for named papers, under the research-13 tool version (IR-1278).
+PAPER_DETAILS = ToolSpec(
+    "paper_details", _SAYS["paper_details"], _object({
+        "papers": {"type": "array", "minItems": 1, "maxItems": MAX_DETAILS_PAPERS, "items": _HANDLE},
+    }, ["papers"]))
+
+#: research-14's tools: the three dates to filter, sort and group by (IR-1316).
+_DAY = {"type": "string", "description": "YYYY-MM-DD"}
+_DATE_FILTERS = {"year_from": _YEAR, "year_to": _YEAR, "published_from": _YEAR, "published_to": _YEAR,
+                 "added_from": _DAY, "added_to": _DAY}
+DATED_SEARCH = ToolSpec("search", _SAYS["dated_search"], _object({
+    "query": {"type": "string"}, "limit": {"type": "integer", "minimum": 1, "maximum": 20},
+    "classification": _NAME, "psced": _NAME, "record_type": _NAME, **_DATE_FILTERS,
+}, ["query"]))
+DATED_COUNT = ToolSpec("count_records", _SAYS["dated_count"], _object({
+    "classification": _NAME, "psced": _NAME, "record_type": _NAME, **_DATE_FILTERS,
+    "is_ip": {"type": "boolean"}, "group_by": {"type": "string", "enum": list(metadata.DATED_GROUPS)},
+}))
+DATED_LIST = ToolSpec("list_records", _SAYS["dated_list"], _object({
+    "classification": _NAME, "psced": _NAME, "record_type": _NAME, **_DATE_FILTERS,
+    "is_ip": {"type": "boolean"}, "sort": {"type": "string", "enum": list(metadata.SORTS)},
+    "offset": {"type": "integer", "minimum": 0},
+}))
+DATED_DETAILS = ToolSpec("paper_details", _SAYS["dated_details"], PAPER_DETAILS.parameters)
+SEARCHES, COUNTS = (HYBRID_SEARCH, DATED_SEARCH), (COUNT_RECORDS, DATED_COUNT)
+LISTS, DETAILS = (LIST_RECORDS, DATED_LIST), (PAPER_DETAILS, DATED_DETAILS)
+
 #: Read-only calls a tool group may fetch together (IR-1003). Not `read_manuscript`,
 #: whose room depends on the results before it, nor plan, focus or clarification.
 PREFETCHABLE = (SEARCH, HYBRID_SEARCH, OPEN_PASSAGE, READ_PAGE, OUTLINE, RESOLVE_PAPERS,
-                COUNT_RECORDS, LIST_RECORDS, RECOVER_TURN)
+                COUNT_RECORDS, LIST_RECORDS, RECOVER_TURN, PAPER_DETAILS,
+                DATED_SEARCH, DATED_COUNT, DATED_LIST, DATED_DETAILS)
 
 RESEARCH = (SEARCH, OPEN_PASSAGE, READ_PAGE, OUTLINE)
 #: Named papers and exact counts, offered only under the research-2 tool version (IR-750).
@@ -152,6 +182,33 @@ def _str(value) -> bool:
 
 def _int(value) -> bool:
     return type(value) is int
+
+
+def _handles(value) -> list[str]:
+    """`paper_details`' paper handles, each once and in order; anything else is invalid (IR-1278)."""
+    if not isinstance(value, list) or not 0 < len(value) <= MAX_DETAILS_PAPERS or not all(_str(h) for h in value):
+        raise InvalidArguments
+    return list(dict.fromkeys(value))
+
+
+def shown_details(found: PaperDetails, *, dated: bool = False) -> dict:
+    """One paper's recorded details as the model reads them (IR-1278)."""
+    if dated:
+        shown = shown_details(found)
+        for name in ("year_completed", "year_accomplished"):
+            del shown[name]
+        return {**shown, "completion_year": found.completion_year,
+                "date_added": found.date_added.isoformat() if found.date_added else None}
+    return {
+        "paper": found.handle, "title": found.title, "authors": list(found.authors), "adviser": found.adviser,
+        "year_completed": found.year_completed, "year_accomplished": found.year_accomplished,
+        "publication_year": found.publication_year, "record_type": found.record_type,
+        "classification": found.classification, "psced": found.psced, "keywords": list(found.keywords),
+        "abstract": found.abstract or None, "origin": found.origin, "is_ip": found.is_ip, "ip_type": found.ip_type,
+        "for_commercialization": found.for_commercialization, "community_extension": found.community_extension,
+        "requires_ethics_review": found.requires_ethics_review,
+        "requested_offices": list(found.requested_offices),
+    }
 
 
 def _arguments(call: ToolCall, spec: ToolSpec) -> dict:
@@ -276,11 +333,22 @@ class Investigation:
     recalled_sources: frozenset = frozenset()
     #: Wrap paper text in the paper-text markers (the research-11 tool version, IR-1196).
     delimit: bool = False
+    #: Offer paper_details (the research-13 tool version, IR-1278).
+    details: bool = False
+    #: The day the three dates are read on, under the research-14 tool version; None offers no dates (IR-1316).
+    today: Optional[date] = None
+    #: Recorded days, and the ends of ranges used, that an answer may state (IR-1316).
+    dates: set[date] = field(default_factory=set)
 
     def specs(self) -> tuple[ToolSpec, ...]:
         extra = (ASK_CLARIFICATION,) if self.clarify else ()
-        research = (HYBRID_SEARCH, *RESEARCH[1:]) if self.hybrid else RESEARCH
-        return (*research, *(METADATA if self.metadata else ()), *((LIST_RECORDS,) if self.listing else ()),
+        dated = self.today is not None
+        search = DATED_SEARCH if dated else HYBRID_SEARCH
+        research = (search, *RESEARCH[1:]) if self.hybrid else RESEARCH
+        counting = (RESOLVE_PAPERS, DATED_COUNT) if dated else METADATA
+        return (*research, *(counting if self.metadata else ()),
+                *((DATED_LIST if dated else LIST_RECORDS,) if self.listing else ()),
+                *((DATED_DETAILS if dated else PAPER_DETAILS,) if self.details else ()),
                 *(MANUSCRIPTS if self.manuscripts else ()), *(RECOVERY if self.recovery else ()),
                 UPDATE_PLAN, UPDATE_FOCUS, *extra)
 
@@ -332,16 +400,28 @@ class Investigation:
         return self._fetch(spec, args)
 
     async def _fetch(self, spec: ToolSpec, args: dict):
-        if spec is COUNT_RECORDS:
+        if spec in COUNTS:
             filters = {k: v for k, v in args.items() if k != "group_by"}
             return await self.research.count(filters, args.get("group_by"))
-        if spec is LIST_RECORDS:
-            return await self.research.list_records(args)
+        if spec in LISTS:
+            return await self._list(args)
         if spec is RECOVER_TURN:
             if not _int(args["turn"]):
                 raise InvalidArguments
             return await self.research.recover_turn(args["turn"])
+        if spec in DETAILS:
+            return await self.research.details(_handles(args["papers"]))
         return await self._research(spec, args)
+
+    async def _list(self, args: dict):
+        if ("offset" in args and (not _int(args["offset"]) or args["offset"] < 0)
+                or "sort" in args and args["sort"] not in metadata.SORTS):
+            raise InvalidArguments
+        filters = {k: v for k, v in args.items() if k not in ("offset", "sort")}
+        sort = {"sort": args["sort"]} if "sort" in args else {}
+        if sort and self.today:
+            self._recent()
+        return await self.research.list_records(filters, offset=args.get("offset", 0), **sort)
 
     async def execute(self, call: ToolCall, *, room: int = 0, fetched=None) -> Outcome:
         """Run one call; `room` is the bytes a manuscript read may return (IR-733).
@@ -357,10 +437,12 @@ class Investigation:
             args = _arguments(call, spec)
             if fetched is not None:
                 raw = await fetched
-                if spec is COUNT_RECORDS:
+                if spec in COUNTS:
                     return self._counted(raw)
-                if spec is LIST_RECORDS:
+                if spec in LISTS:
                     return self._listed(raw)
+                if spec in DETAILS:
+                    return self._detailed(raw, _handles(args["papers"]))
                 return self._evidence(raw)
             if spec is UPDATE_PLAN:
                 return await self._plan(args["steps"])
@@ -371,15 +453,13 @@ class Investigation:
                 if not _str(question) or len(question) > CLARIFICATION_CHARS:
                     raise InvalidArguments
                 return Outcome("", clarification=question.strip())
-            if spec is COUNT_RECORDS:
-                filters = {k: v for k, v in args.items() if k != "group_by"}
-                return self._counted(await self.research.count(filters, args.get("group_by")))
-            if spec is LIST_RECORDS:
-                offset = args.get("offset", 0)
-                if "offset" in args and (not _int(offset) or offset < 0):
-                    raise InvalidArguments
-                filters = {k: v for k, v in args.items() if k != "offset"}
-                return self._listed(await self.research.list_records(filters, offset=offset))
+            if spec in COUNTS:
+                return self._counted(await self._fetch(spec, args))
+            if spec in LISTS:
+                return self._listed(await self._list(args))
+            if spec in DETAILS:
+                papers = _handles(args["papers"])
+                return self._detailed(await self.research.details(papers), papers)
             if spec is READ_MANUSCRIPT:
                 return self._evidence(await self._read(args, room), call.id)
             if spec is RECOVER_TURN:
@@ -401,13 +481,15 @@ class Investigation:
 
 
     async def _research(self, spec: ToolSpec, args: dict) -> Evidence:
-        if spec is HYBRID_SEARCH:
+        if spec in SEARCHES:
             if not _str(args["query"]) or ("limit" in args and not _int(args["limit"])):
                 raise InvalidArguments
             filters = {k: v for k, v in args.items() if k not in ("query", "limit")}
             if not valid_filters(filters):
                 raise InvalidArguments
             self.searched = True
+            if self.today:
+                self._ranged(filters.items())
             return await self.research.hybrid_search(args["query"], args.get("limit", 10), filters)
         if spec is SEARCH:
             if not _str(args["query"]) or ("limit" in args and not _int(args["limit"])):
@@ -484,7 +566,7 @@ class Investigation:
                 "papers": [{"paper": r.handle, "title": r.title} for r in m.records],
             } for m in result.matches]
         elif result.records:
-            body["papers"] = [{"paper": r.handle, "title": r.title} for r in result.records]
+            body["papers"] = [{"paper": r.handle, "title": r.title, **self._dated(r)} for r in result.records]
         if result.passages:
             body["passages"] = []
         for passage in result.passages:
@@ -513,6 +595,9 @@ class Investigation:
                             "kind": turn.kind, "truncated": turn.truncated}
         if result.reading is not None:
             new = self._read_into(result, call_id, body) or new
+        if self.today and result.undated is not None:
+            body["undated"] = result.undated
+            self.figures.add(str(result.undated))
         if result.sections:
             outline = ("outline", *sorted(d.revision for d in result.dependencies))
             new = new or outline not in self.seen
@@ -586,9 +671,40 @@ class Investigation:
         body["list"] = {
             "kind": "record_list", "total": fact.total, "filters": dict(fact.filters),
             "truncated": result.coverage.truncated, "relative_to": fact.relative_to,
-            "papers": [{"paper": self.papers[r.record_id][0], "title": r.title, "year": r.year}
-                       for r in result.records],
+            "papers": [{"paper": self.papers[r.record_id][0], "title": r.title,
+                        **(self._dated(r) if self.today else {"year": r.year})} for r in result.records],
+            **self._left_out(fact),
         }
+        return Outcome(self._dump(body), progress=new, metadata_only=True)
+
+    def _detailed(self, result: Evidence, requested: list[str]) -> Outcome:
+        """What the submitter recorded for each readable paper: Record metadata, never Manuscript text (IR-1278).
+
+        Its years may then be stated without a passage handle; they are kept in `figures`, so a
+        resumed run (IR-724) allows the same. A number in the abstract still needs a cited passage.
+        """
+        body, _ = self._status(result)
+        new = False
+        for found in result.details:
+            self.papers.setdefault(found.record_id, (found.handle, found.title))
+            new = new or ("details", found.record_id) not in self.seen
+            self.seen.add(("details", found.record_id))
+            years = found.years if self.today is None else {found.completion_year, found.publication_year} - {None}
+            self.figures.update(str(year) for year in years)
+            # Catalogue names an answer may quote like titles (IR-750).
+            self.terms.update(v.casefold() for v in (found.record_type, found.classification, found.psced) if v)
+        if result.details:
+            body["details"] = [shown_details(found, dated=self.today is not None) for found in result.details]
+            for found in result.details if self.today else ():
+                if found.date_added:
+                    self._day(found.date_added)
+            body["recorded_by"] = "submitter"
+        returned = {found.handle for found in result.details}
+        missing = [h for h in requested if h not in returned]
+        if missing:
+            body["not_found"] = missing
+        if not result.details:
+            return Outcome(json.dumps(body), control_only=True)
         return Outcome(self._dump(body), progress=new, metadata_only=True)
 
     def _status(self, result: Evidence) -> tuple[dict, Optional[Count]]:
@@ -604,9 +720,48 @@ class Investigation:
         # Only the total speaks for the whole population; a group or remainder never does.
         self.exact.add(str(fact.total))
         self.figures.update(str(n) for n in fact.figures)
-        # Years a count was filtered by may be stated; they are not totals.
-        self.figures.update(str(v) for name, v in fact.filters if name in ("year_from", "year_to"))
-        self.terms.update(v.casefold() for _, v in fact.filters if isinstance(v, str))
+        # Dates a count was filtered by may be stated; they are not totals.
+        self._ranged(fact.filters)
+        self.terms.update(v.casefold() for name, v in fact.filters if name in metadata.TAXONOMIES)
+
+    def _ranged(self, filters) -> None:
+        """Let an answer state the date range it used, whose open end is today (IR-1316)."""
+        used = [(name, v) for name, v in filters if name in (*metadata.YEARS, *metadata.DAYS)]
+        for name, v in used:
+            if name in metadata.YEARS:
+                # "Before 2018" is a range ending in 2017, "after 2021" one starting in 2022.
+                near = v - 1 if name.endswith("_from") else v + 1
+                self.figures.update({str(v), str(near)} if self.today else {str(v)})
+            else:
+                self._day(date.fromisoformat(v))
+        if used and self.today:
+            self._recent()
+
+    def _recent(self) -> None:
+        """Let an answer state the recent ranges it was told, once a date is used (IR-1316)."""
+        window = recency.window(self.today)
+        self.figures.update(str(y) for y in window["recent_years"].values())
+        for day in window["recent_added"].values():
+            self._day(date.fromisoformat(day))
+
+    def _day(self, day: date) -> None:
+        self.dates.add(day)
+        self.figures.add(str(day.year))
+
+    def _dated(self, record) -> dict:
+        """A paper's three dates, which an answer may then state; nothing on earlier pins (IR-1316)."""
+        if self.today is None or record.added is None:
+            return {}
+        self.figures.update(str(y) for y in (record.year, record.publication_year) if y is not None)
+        self._day(record.added)
+        return {"completion_year": record.year, "publication_year": record.publication_year,
+                "date_added": record.added.isoformat()}
+
+    def _left_out(self, fact: Count) -> dict:
+        if self.today is None or fact.undated is None:
+            return {}
+        self.figures.add(str(fact.undated))
+        return {"undated": fact.undated}
 
     def _counted(self, result: Evidence) -> Outcome:
         """An exact count, typed for the model; the counted Records never leave the run (IR-750)."""
@@ -614,11 +769,11 @@ class Investigation:
         if fact is None:
             return Outcome(json.dumps(body), control_only=True)
         self._fact(fact)
-        if fact.group_by == "year":
+        if fact.group_by in ("year", "publication_year"):
             self.figures.update(str(v) for v, _ in fact.groups)
         else:
             self.terms.update(str(v).casefold() for v, _ in fact.groups)
-        body["count"] = counted(fact)
+        body["count"] = {**counted(fact), **self._left_out(fact)}
         key = ("count", fact.filters, fact.group_by)
         new = key not in self.seen
         self.seen.add(key)
@@ -672,7 +827,10 @@ class Investigation:
 
 
 #: Fields that carry text from a paper, or derived from one, wherever they appear (IR-1196).
-_PAPER_TEXT = frozenset({"text", "title", "heading", "question", "answer"})
+#: A paper's abstract and Adviser came from its submitter, like its title (IR-1278).
+_PAPER_TEXT = frozenset({"text", "title", "heading", "question", "answer", "abstract", "adviser"})
+#: Lists whose every string a submitter typed: each item is quoted (IR-1278).
+_PAPER_TEXT_LISTS = frozenset({"authors", "keywords"})
 
 
 def _framed(value, key=None, within=None):
@@ -681,6 +839,7 @@ def _framed(value, key=None, within=None):
         return {k: _framed(v, k, key or within) for k, v in value.items()}
     if isinstance(value, list):
         return [_framed(v, None, key) for v in value]
-    if isinstance(value, str) and (key in _PAPER_TEXT or (key == "section" and within == "passages")):
+    if isinstance(value, str) and (key in _PAPER_TEXT or (key == "section" and within == "passages")
+                                   or (key is None and within in _PAPER_TEXT_LISTS)):
         return quoted(value)
     return value

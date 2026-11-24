@@ -55,6 +55,11 @@ export const REDIRECTS: ReadonlyArray<{
     to: "/settings?tab=help",
     why: "Help became a Settings section, so opening it never leaves Settings (IR-1245)",
   },
+  {
+    path: "profile/edit",
+    to: "/settings?tab=profile",
+    why: "Edit profile became Settings' Profile section; Profile is only the preview (IR-1304)",
+  },
 ];
 
 function RetiredUrl({ to, byRole }: { to: string; byRole?: Partial<Record<RoleName, string>> }) {

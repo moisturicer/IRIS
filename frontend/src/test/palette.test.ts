@@ -40,6 +40,19 @@ describe("what counts as off-palette", () => {
     ]);
   });
 
+  // IR-1290: the two status hues are tokens (`cleared`, `review`), not Tailwind's
+  // green and amber, so the tokens pass and the raw hue families still fail.
+  it("lets the cleared and review status tokens through and still catches raw green and amber", () => {
+    expect(
+      offPaletteClasses(
+        "text-cleared ring-cleared-line bg-cleared-wash text-review ring-review-line bg-review-wash border-cleared-line",
+      ),
+    ).toEqual([]);
+    expect(offPaletteClasses("text-green-700 ring-amber-600 bg-green-50 bg-amber-100")).toEqual([
+      "text-green-700", "ring-amber-600", "bg-green-50", "bg-amber-100",
+    ]);
+  });
+
   it("catches brand-400 to brand-600, the bright reds, and no other brand shade", () => {
     expect(
       offPaletteClasses("bg-brand-400 text-brand-500 ring-brand-600 bg-brand-50 ring-brand-200 text-brand-700"),

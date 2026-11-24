@@ -20,8 +20,9 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { emitLiveHint } from "@/lib/live";
 import { expectNoBlockingA11yViolations } from "@/test/axe";
-import { fireEvent, renderScreen, screen, waitFor, within } from "@/test/render";
+import { act, fireEvent, renderScreen, screen, waitFor, within } from "@/test/render";
 import type { RecordFile, RecordUpload, SlotWithUploads } from "@/types/documents";
 import type { DocumentRequest, DocumentRequestItem, RecordDetail } from "@/types/records";
 
@@ -601,5 +602,19 @@ describe("downloading a document version", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Download Ethics Clearance version 1" }));
     await waitFor(() => expect(downloadBlob).toHaveBeenCalledWith(expect.any(Blob), "Ethics Clearance v1.pdf"));
+  });
+});
+
+describe("DocumentsTab, live (ADR-073, IR-1287)", () => {
+  it("shows a file someone else added once a hint for its record arrives", async () => {
+    attachments = [attachment(71, "clearance-certificate.pdf")];
+    renderFiles();
+    expect(await screen.findByText("clearance-certificate.pdf")).toBeInTheDocument();
+
+    attachments = [...attachments, attachment(73, "consent-form.pdf")];
+    act(() => { emitLiveHint([`record:${RECORD_ID}`]); });
+
+    expect(await screen.findByText("consent-form.pdf")).toBeInTheDocument();
+    expect(screen.getByText("clearance-certificate.pdf")).toBeInTheDocument();
   });
 });

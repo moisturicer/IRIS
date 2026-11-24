@@ -1,11 +1,12 @@
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import { useAuthStore } from "@/store/auth.store";
 import { Spinner } from "@/components/ui/Spinner";
 import { reloadPage } from "@/lib/readFailure";
 import { authApi } from "@/api/auth";
 import { startHeartbeat, startIdleWatch, trackActivity } from "@/lib/activity";
 import { redirectToLoginSessionExpired } from "@/lib/authSession";
-import { startLive, stopLive } from "@/lib/live";
+import { restartLive, startLive, stopLive } from "@/lib/live";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { refreshSession } from "@/api/client";
 
 /**
@@ -18,6 +19,8 @@ import { refreshSession } from "@/api/client";
  * them out when they have been idle that long. The redirect is a full page
  * load, so nothing the screen showed survives it.
  */
+const LIVE_DEPS = { token: () => useAuthStore.getState().accessToken, refresh: refreshSession };
+
 export function AuthBootstrap({ children }: { children: React.ReactNode }) {
   const authReady       = useAuthStore((s) => s.authReady);
   const hydrateAuth     = useAuthStore((s) => s.hydrateAuth);
@@ -49,9 +52,25 @@ export function AuthBootstrap({ children }: { children: React.ReactNode }) {
   // with the current access token and refreshed through the one refresh path.
   useEffect(() => {
     if (!isAuthenticated) return;
-    startLive({ token: () => useAuthStore.getState().accessToken, refresh: refreshSession });
+    startLive(LIVE_DEPS);
     return () => stopLive();
   }, [isAuthenticated]);
+
+  // The account itself (IR-1289): RDCO approving or declining a role request,
+  // or an admin changing the role, says `account`; a tab shown again checks
+  // too. The new role reaches the store, so the pending screen, sidebar and
+  // routes follow it, and the stream reopens to hear the new role's channel.
+  const reloadAccount = useCallback(() => {
+    authApi.me()
+      .then(({ data }) => {
+        const { user, updateUser } = useAuthStore.getState();
+        if (!user || user.id !== data.id) return; // signed out or switched meanwhile
+        updateUser(data);
+        if (user.role_name !== data.role_name) restartLive(LIVE_DEPS);
+      })
+      .catch(() => { /* keep the account shown; the next hint or focus retries */ });
+  }, []);
+  useLiveRefresh(["account"], reloadAccount, isAuthenticated);
 
   if (!authReady) {
     return (

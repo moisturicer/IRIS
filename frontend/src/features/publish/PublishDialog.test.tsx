@@ -7,12 +7,12 @@
  * the PR, because jsdom has no layout.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate, type NavigateFunction } from "react-router-dom";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { makeUser } from "@/test/authFixtures";
 import { pretendLaidOut } from "@/test/layout";
-import { fireEvent, renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
+import { act, fireEvent, renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
 import { ROLES } from "@/lib/constants";
 import { useAuthStore } from "@/store/auth.store";
 
@@ -152,6 +152,9 @@ function draftDetail(overrides: Record<string, unknown> = {}) {
     for_commercialization: false,
     pipeline_status: "draft",
     current_holders: [],
+    // The server always lists the owners, the author among them (IR-1312:
+    // without them the form held an owner list the draft never had).
+    owners: [{ user: SELF_ID, email: "ada@cit.edu" }],
     // Every paper starts embargoed with no date (IR-882).
     embargo: { state: "active", until: null },
     ...overrides,
@@ -1217,6 +1220,30 @@ describe("closing", () => {
       expect(within(question).getByRole("button", { name: "Keep editing" })).toBeInTheDocument();
     });
 
+    it("asks in its own popup over the form, and steps aside while the deletion is confirmed", async () => {
+      const user = await closeDraft();
+
+      const question = screen.getByRole("alertdialog", { name: "Leave this submission?" });
+      expect(screen.getByRole("dialog", { name: "Publish your research" })).not.toContainElement(question);
+
+      await user.click(screen.getByRole("button", { name: "Delete draft" }));
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+
+      await user.click(within(screen.getByRole("dialog", { name: "Delete this draft?" })).getByRole("button", { name: "Cancel" }));
+      const back = screen.getByRole("alertdialog", { name: "Leave this submission?" });
+      await waitFor(() => expect(within(back).getByRole("button", { name: "Keep as draft" })).toHaveFocus());
+    });
+
+    it("keeps editing when the popup is dismissed with Escape", async () => {
+      const user = await closeDraft();
+
+      await user.keyboard("{Escape}");
+
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+      expect(screen.getByRole("dialog", { name: "Publish your research" })).toBeInTheDocument();
+      expect(recordsApi.delete).not.toHaveBeenCalled();
+    });
+
     it("leaves the reader on the page it opened over, query and all (IR-1258)", async () => {
       const user = userEvent.setup();
       renderScreen(<><PublishDialog /><Address /></>, { route: "/records/mine?section=research&publish=42" });
@@ -1332,6 +1359,240 @@ describe("closing", () => {
 
       expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
       expect(screen.getByRole("radio", { name: /Thesis \/ Research/ })).toBeChecked();
+    });
+  });
+});
+
+// IR-1312: every way out of Publish asks, not only Close.
+describe("leaving by Back, another page, reload or Keep as draft (IR-1312)", () => {
+  let navigateTo: NavigateFunction;
+  /** The router's own navigate, as Back/Forward or a link elsewhere would use it. */
+  function Navigator() {
+    navigateTo = useNavigate();
+    return null;
+  }
+  const address = () => screen.getByRole("status", { name: "Address" });
+  const back = () => act(() => { void navigateTo(-1); });
+
+  /** Opened from My Library, so Back has somewhere to go. */
+  async function openFromLibrary(target: string) {
+    renderScreen(<><Navigator /><PublishDialog /><Address /></>, { route: "/records/mine" });
+    act(() => { void navigateTo(`/records/mine?publish=${target}`); });
+    await screen.findByRole("dialog", { name: "Publish your research" });
+  }
+
+  async function openDraftFromLibrary() {
+    await openFromLibrary("42");
+    await screen.findByRole("textbox", { name: /^Title/ });
+  }
+
+  /** Whether the browser would warn before a reload or tab close. */
+  function reloadWarns() {
+    const event = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(event);
+    return event.defaultPrevented;
+  }
+
+  it("asks before Back leaves a draft; Keep editing stays, Keep as draft goes", async () => {
+    const user = userEvent.setup();
+    await openDraftFromLibrary();
+
+    back();
+    const question = await screen.findByRole("alertdialog", { name: "Leave this submission?" });
+    await user.click(within(question).getByRole("button", { name: "Keep editing" }));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Publish your research" })).toBeInTheDocument();
+    expect(address()).toHaveTextContent("/records/mine?publish=42");
+
+    back();
+    await user.click(await screen.findByRole("button", { name: "Keep as draft" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(address()).toHaveTextContent(/^\/records\/mine$/);
+    expect(recordsApi.delete).not.toHaveBeenCalled();
+  });
+
+  it("asks before a navigation elsewhere drops ?publish=, and goes there once answered", async () => {
+    const user = userEvent.setup();
+    await openDraftFromLibrary();
+
+    act(() => { void navigateTo("/discover"); });
+    await user.click(await screen.findByRole("button", { name: "Keep as draft" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(address()).toHaveTextContent(/^\/discover$/);
+  });
+
+  it("asks to discard a type chosen with no manuscript when Back is pressed", async () => {
+    const user = userEvent.setup();
+    await openFromLibrary("new");
+    await chooseType(user, /Thesis \/ Research/);
+
+    back();
+    const question = await screen.findByRole("alertdialog", { name: "Discard what you've entered?" });
+    await user.click(within(question).getByRole("button", { name: "Discard" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(address()).toHaveTextContent(/^\/records\/mine$/);
+    expect(recordsApi.create).not.toHaveBeenCalled();
+  });
+
+  it("asks to stop an upload in flight when Back is pressed, and Stop aborts it", async () => {
+    const user = userEvent.setup();
+    vi.mocked(recordsApi.uploadManuscript).mockReturnValue(new Promise(() => {}) as never);
+    await openFromLibrary("new");
+    await chooseType(user, /Thesis \/ Research/);
+    dropFile(pdf());
+    await screen.findByRole("progressbar");
+
+    back();
+    await user.click(await screen.findByRole("button", { name: "Stop and close" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    const options = vi.mocked(recordsApi.uploadManuscript).mock.calls[0][2] as { signal: AbortSignal };
+    expect(options.signal.aborted).toBe(true);
+    expect(address()).toHaveTextContent(/^\/records\/mine$/);
+  });
+
+  it("leaves on Back with no question when nothing was entered", async () => {
+    await openFromLibrary("new");
+    await screen.findByRole("radio", { name: /Proposal/ });
+
+    back();
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(address()).toHaveTextContent(/^\/records\/mine$/);
+  });
+
+  it("asks once when Close is used, never a second time for its own navigation", async () => {
+    const user = userEvent.setup();
+    await openFromLibrary("new");
+    await chooseType(user, /Thesis \/ Research/);
+
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.getAllByRole("alertdialog")).toHaveLength(1);
+    await user.click(screen.getByRole("button", { name: "Discard" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(address()).toHaveTextContent(/^\/records\/mine$/);
+  });
+
+  it("warns before a reload only while something would be lost", async () => {
+    const user = userEvent.setup();
+    let finishUpload: () => void = () => {};
+    vi.mocked(recordsApi.uploadManuscript).mockReturnValue(
+      new Promise<void>((resolve) => { finishUpload = resolve; }) as never,
+    );
+    await openNew();
+    expect(reloadWarns()).toBe(false);
+
+    await chooseType(user, /Thesis \/ Research/);
+    expect(reloadWarns()).toBe(true);
+
+    dropFile(pdf());
+    await screen.findByRole("progressbar");
+    expect(reloadWarns()).toBe(true);
+
+    act(() => finishUpload());
+    await screen.findByText(/uploaded/i, { selector: "p" });
+    expect(reloadWarns()).toBe(false);
+  });
+
+  it("warns before a reload while Details has unsaved edits, and not once they are saved", async () => {
+    vi.mocked(recordsApi.update).mockResolvedValue({ data: { id: 42, details_revision: 4 } } as never);
+    const user = userEvent.setup();
+    await openDraftFromLibrary();
+    expect(reloadWarns()).toBe(false);
+
+    await user.type(screen.getByRole("textbox", { name: /^Title/ }), " Revised");
+    expect(reloadWarns()).toBe(true);
+
+    expect(await screen.findByText("All changes saved.", {}, { timeout: 4000 })).toBeInTheDocument();
+    expect(reloadWarns()).toBe(false);
+  });
+
+  describe("Keep as draft saves first", () => {
+    const titleField = () => screen.getByRole("textbox", { name: /^Title/ });
+
+    async function editThenKeep(user: ReturnType<typeof userEvent.setup>, title: string) {
+      await openDraftFromLibrary();
+      await user.clear(titleField());
+      await user.type(titleField(), title);
+      await user.click(screen.getByRole("button", { name: "Close" }));
+      await user.click(screen.getByRole("button", { name: "Keep as draft" }));
+    }
+
+    it("saves an edit still waiting for the pause, then closes", async () => {
+      vi.mocked(recordsApi.update).mockResolvedValue({ data: { id: 42, details_revision: 4 } } as never);
+      const user = userEvent.setup();
+      await editThenKeep(user, "A Title Typed Just Now");
+
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(recordsApi.update).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(recordsApi.update).mock.calls[0][1]).toMatchObject({ title: "A Title Typed Just Now" });
+    });
+
+    it("closes a new draft whose untouched fields can't be saved yet, without warning about them", async () => {
+      vi.mocked(recordsApi.update).mockResolvedValue({ data: { id: 42, details_revision: 4 } } as never);
+      const user = userEvent.setup();
+      await openFromLibrary("new");
+      await completeManuscript(user);
+      // The abstract and adviser are empty and never reach the server, but the author has not touched them.
+      expect(reloadWarns()).toBe(false);
+
+      await user.clear(titleField());
+      await user.type(titleField(), "A Title For A New Draft");
+      expect(reloadWarns()).toBe(true);
+      await user.click(screen.getByRole("button", { name: "Close" }));
+      await user.click(screen.getByRole("button", { name: "Keep as draft" }));
+
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(vi.mocked(recordsApi.update).mock.calls.at(-1)?.[1]).toMatchObject({ title: "A Title For A New Draft" });
+    });
+
+    it("stays open when the save fails, says so, and Try again saves and closes", async () => {
+      vi.mocked(recordsApi.update)
+        .mockRejectedValueOnce({ response: { status: 503, data: {} } })
+        .mockResolvedValue({ data: { id: 42, details_revision: 4 } } as never);
+      const user = userEvent.setup();
+      await editThenKeep(user, "A Title Typed Just Now");
+
+      const question = await screen.findByRole("alertdialog", { name: "Leave this submission?" });
+      await waitFor(() => expect(question).toHaveAccessibleDescription("Your latest changes weren't saved."));
+      expect(screen.getByRole("dialog", { name: "Publish your research" })).toBeInTheDocument();
+      expect(within(question).getByRole("button", { name: "Leave without saving" })).toBeInTheDocument();
+
+      await user.click(within(question).getByRole("button", { name: "Try again" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(recordsApi.update).toHaveBeenCalledTimes(2);
+    });
+
+    it("leaves without saving when the author chooses to", async () => {
+      vi.mocked(recordsApi.update).mockRejectedValue({ response: { status: 503, data: {} } });
+      const user = userEvent.setup();
+      await editThenKeep(user, "A Title Typed Just Now");
+
+      await user.click(await screen.findByRole("button", { name: "Leave without saving" }));
+
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(address()).toHaveTextContent(/^\/records\/mine$/);
+    });
+
+    it("says when an answer can't be saved until Continue, and Keep editing stays", async () => {
+      vi.mocked(recordsApi.update).mockResolvedValue({ data: { id: 42, details_revision: 4 } } as never);
+      const user = userEvent.setup();
+      await editThenKeep(user, "Abc");
+
+      const question = await screen.findByRole("alertdialog", { name: "Leave this submission?" });
+      await waitFor(() => expect(question).toHaveAccessibleDescription(
+        "Some answers aren't saved yet: Continue saves them, or shows what needs fixing.",
+      ));
+      expect(within(question).getByRole("button", { name: "Leave without them" })).toBeInTheDocument();
+      await user.click(within(question).getByRole("button", { name: "Keep editing" }));
+
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+      expect(titleField()).toHaveValue("Abc");
     });
   });
 });
