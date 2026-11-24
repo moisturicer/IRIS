@@ -935,6 +935,17 @@ describe("My Library: reading history follows the account (IR-756)", () => {
     expect(await screen.findByRole("heading", { name: "No reading history yet" })).toBeInTheDocument();
   });
 
+  // IR-1324: Recently opened lists the ten newest, ruled like Waiting on you.
+  it("lists the ten most recently opened papers on an author's Overview", async () => {
+    history(Array.from({ length: 12 }, (_, i) => visitEntry(paper(200 + i, `Opened paper ${i + 1}`))));
+    renderScreen(<MyLibraryPage />);
+
+    const block = await screen.findByRole("region", { name: "Recently opened" });
+    expect(await within(block).findByRole("link", { name: "Opened paper 10" })).toBeInTheDocument();
+    expect(within(block).getAllByRole("link").map((l) => l.textContent))
+      .toEqual(Array.from({ length: 10 }, (_, i) => `Opened paper ${i + 1}`));
+  });
+
   it("shows the most recent papers on an author's Overview, from the account", async () => {
     history([visitEntry(rice), { record_id: 77, available: false }, visitEntry(water, "2026-11-01T08:00:00Z")]);
     renderScreen(<MyLibraryPage />);

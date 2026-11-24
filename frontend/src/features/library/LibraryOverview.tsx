@@ -17,8 +17,8 @@ import { SubmissionPanel, SubmissionRow } from "./SubmissionRow";
 
 /** How many records Recent submissions shows before pointing at its tab. */
 const RECENT_SHOWN = 4;
-/** The side cards scroll (IR-1323); history is long, so it stops somewhere. */
-const RECENTLY_OPENED_SHOWN = 20;
+/** Recently opened lists the ten newest (IR-1324); it scrolls inside its card. */
+const RECENTLY_OPENED_SHOWN = 10;
 
 const LINK_TEXT = cn(
   "inline-flex min-h-9 items-center gap-2 rounded-control px-2 text-small font-semibold text-brand hover:bg-stone-100",
@@ -69,13 +69,13 @@ export function LibraryOverview({
       <div className="min-w-0 space-y-section lg:col-start-2 lg:row-start-1">
         <WaitingOnYou waiting={waiting} loading={loading} failed={failed} />
 
-        <SideCard id="overview-opened" title="Recently opened" height="h-64">
+        <SideCard id="overview-opened" title="Recently opened" height="h-80">
           {recentlyOpened.length === 0 ? (
             <p className="text-small text-stone-600">Papers you open appear here.</p>
           ) : (
-            <ul className="space-y-3">
+            <ul className="divide-y divide-stone-200 border-t border-stone-200">
               {recentlyOpened.map(({ record, viewedAt }) => (
-                <li key={record.id}>
+                <li key={record.id} className="py-3 last:pb-0">
                   <Link
                     to={`/records/${record.id}`}
                     className={cn("block break-words rounded-control text-small font-semibold text-stone-800 hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}
@@ -189,7 +189,7 @@ function WaitingOnYou({ waiting, loading, failed }: {
     <SideCard
       id="overview-waiting"
       title="Waiting on you"
-      height="h-96"
+      height="h-[28rem]"
       badge={any && (
         <span className="rounded-full border border-brand px-2 text-label font-semibold tabular-nums text-brand">
           {waiting.length}
