@@ -11,6 +11,11 @@
     font-family: theme('fontFamily.sans');
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Keep the scrollbar's room whether or not the page scrolls, so a page
+       does not move sideways when it grows past the window or shrinks under
+       it, as My Library's tabs did (IR-1335). Overlay scrollbars (macOS,
+       phones) take no room, so this changes nothing there. */
+    scrollbar-gutter: stable;
   }
 
   body {

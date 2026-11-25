@@ -26,7 +26,11 @@ export interface OverflowReport {
 export async function measureOverflow(page: Page): Promise<OverflowReport> {
   return page.evaluate(() => {
     const width = document.documentElement.clientWidth;
-    const overflow = document.documentElement.scrollWidth - width;
+    // How far the page sticks out past the window; never less than 0. The page
+    // keeps a scrollbar gutter (IR-1335), and the smoke browser hides its
+    // scrollbars yet still reserves that gutter, so the page can come out
+    // narrower than the window. That is not sideways scrolling.
+    const overflow = Math.max(0, document.documentElement.scrollWidth - width);
     const describe = (el: Element) => {
       const id = el.id ? `#${el.id}` : "";
       const cls = typeof el.className === "string" && el.className.trim()
