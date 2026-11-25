@@ -48,6 +48,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | FR-M2-02/03 | Download and delete request queues | [details](traceability/FR-M2-02-03.md) | **PARTIAL** |
 | FR-M2-04 | Bulk import from a template | [details](traceability/FR-M2-04.md) | **IMPLEMENTED** |
 | FR-M3-01 | PDF text extraction | [details](traceability/FR-M3-01.md) | **IMPLEMENTED** |
+| **IR-1337** | Sidebar: My Reviews (and an Adviser's My Templates) sit in a group named for the user's role — Adviser, ITSO, IERC, KTTO, or first in RDCO; Student unchanged — no FR- id | [details](traceability/IR-1337.md) | **IMPLEMENTED** |
 | **IR-1335** | A page keeps its width whether or not it scrolls (`scrollbar-gutter: stable`), so My Library and My Reviews no longer move sideways as their tabs switch — bug; no FR- id | [details](traceability/IR-1335.md) | **IMPLEMENTED** |
 | **IR-1332** | Documents tab: Remove is a maroon trash-can icon with a "Remove" tooltip, like a draft's in My Library — no FR- id | [details](traceability/IR-1332.md) | **IMPLEMENTED** |
 | **IR-1330** | Documents tab: each version of a document is downloaded from its row in the versions list only, with no second Download under the document's name — no FR- id | [details](traceability/IR-1330.md) | **IMPLEMENTED** |
