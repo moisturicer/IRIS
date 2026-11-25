@@ -12,7 +12,7 @@
 // Papers are made by the spec itself: one published with a real manuscript, so
 // Paper View draws the PDF with pdf.js and its worker, and one left in review at
 // its Adviser, so the review workspace is walked too.
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page, type Request } from "@playwright/test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { as, signInBrowser, type Client } from "../support/api";
 import { uniqueTitle } from "../support/accounts";
@@ -66,6 +66,25 @@ async function recorder(page: Page) {
   const current = { screen: "" };
   const found: Violation[] = [];
   const visited: string[] = [];
+  // Requests still in flight, but for ADR-073's live-hint stream (IR-1213):
+  // it stays open for the page's life, so Playwright's "networkidle" never
+  // comes on a signed-in page. A screen has settled when the rest is quiet.
+  const inFlight = new Set<Request>();
+  const live = (r: Request) => new URL(r.url()).pathname === "/api/v1/live/";
+  page.on("request", (r) => { if (!live(r)) inFlight.add(r); });
+  page.on("requestfinished", (r) => inFlight.delete(r));
+  page.on("requestfailed", (r) => inFlight.delete(r));
+  const settle = async () => {
+    await page.waitForLoadState("load");
+    const deadline = Date.now() + 30_000;
+    let quietSince = Date.now();
+    while (Date.now() < deadline) {
+      if (inFlight.size > 0) quietSince = Date.now();
+      else if (Date.now() - quietSince >= 500) return;
+      await page.waitForTimeout(100);
+    }
+    throw new Error(`still loading after 30 s: ${[...inFlight].map((r) => r.url()).join(", ")}`);
+  };
   page.on("console", (message) => {
     const text = message.text();
     if (/content.security.policy/i.test(text)) {
@@ -89,7 +108,7 @@ async function recorder(page: Page) {
     async show(name: string, path?: string) {
       current.screen = name;
       if (path) await page.goto(path);
-      await page.waitForLoadState("networkidle");
+      await settle();
       // A paper's PDF is drawn by pdf.js in a worker after the page settles.
       if (/\/records\/\d+/.test(page.url())) {
         await page.locator("canvas").first().waitFor({ state: "visible", timeout: 15_000 }).catch(() => {});
