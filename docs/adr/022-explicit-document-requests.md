@@ -15,7 +15,7 @@
 
 > **Amended 2026-11-24 ([IR-1322](https://citiris.atlassian.net/browse/IR-1322); decided by Hermoine Zozobrado; accepted 2026-11-24 when PR #1006 merged, with Ashlee Sean's security review of point 4).** A reviewer's *Request revision* is shown as *Request changes* and may ask for documents in the same act. An owner's uploads to a submitted record are held, seen by its owners only, until *Submit new version* or *Submit added documents* sends them. See *Amendment 8*.
 
-> **Amended 2026-11-24 ([IR-1325](https://citiris.atlassian.net/browse/IR-1325); decided by Hermoine Zozobrado; Proposed until its PR merges after review).** Documents are asked for only in the Documents tab, where each request waits as the reviewer's draft until their *Finish review* sends it. *Request changes* always asks for a new version and no longer carries documents. The owner gets *Upload* only on what was asked for. See *Amendment 9*.
+> **Amended 2026-11-24 ([IR-1325](https://citiris.atlassian.net/browse/IR-1325); decided by Hermoine Zozobrado; accepted 2026-11-24 when PR #1010 merged, approved by Ashlee Sean as relayed by Hermoine Zozobrado).** Documents are asked for only in the Documents tab, where each request waits as the reviewer's draft until their *Finish review* sends it. *Request changes* always asks for a new version and no longer carries documents. The owner gets *Upload* only on what was asked for. See *Amendment 9*.
 
 > **Amended 2026-11-18 ([IR-1226](https://citiris.atlassian.net/browse/IR-1226); accepted 2026-11-18 with PR #895's merge; security review approved verbally by Ashlee Sean, relayed by Hermoine Zozobrado).** Creating, deciding and withdrawing a request takes a seat on the requesting party, not membership of it. See *Amendment 7*.
 
@@ -414,7 +414,7 @@ Decided by Hermoine Zozobrado on 2026-11-24 for [IR-1322](https://citiris.atlass
 
 ## Amendment 9 — 2026-11-24: document requests are drafts until *Finish review* sends them
 
-**Status: Proposed.** It is accepted when IR-1325's pull request merges after review. Decided by Hermoine Zozobrado on 2026-11-24, in chat, while reviewing IR-1322's result. Transcribed by an agent. It replaces Amendment 8's points 2 and 8, and amends [ADR-032](032-adviser-first-review-and-office-reviewer-pools.md) §7 (what *Finish review* sends).
+**Status: Accepted** — 2026-11-24, when IR-1325's PR (#1010) merged after Ashlee Sean's review, as relayed by Hermoine Zozobrado. Decided by Hermoine Zozobrado on 2026-11-24, in chat, while reviewing IR-1322's result. Transcribed by an agent. It replaces Amendment 8's points 2 and 8, and amends [ADR-032](032-adviser-first-review-and-office-reviewer-pools.md) §7 (what *Finish review* sends).
 
 **The problem.**
 - **Two places to ask.** After Amendment 8, a reviewer could ask for documents in *Finish review → Request changes* and also with *Request documents* in the Documents tab. Nothing said which to use.
