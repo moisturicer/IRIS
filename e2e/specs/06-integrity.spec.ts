@@ -8,7 +8,7 @@ import { as, type Client } from "../support/api";
 import { uniqueTitle } from "../support/accounts";
 import { manage } from "../support/stack";
 import {
-  claimAndOpen, createDraft, party, requestRevision,
+  claimAndOpen, createDraft, party, requestRevision, sendComments,
   reviewRow, reviseAbstract, submit, throughRdco, tracker,
 } from "../support/workflow";
 
@@ -77,8 +77,10 @@ test("a stale decision form is refused and changes nothing", async () => {
   await claimAndOpen(adviser, id, "adviser");
   const staleToken = (await adviser.json(`/records/${id}/`)).decision.token;
 
-  // The record changes under the open dialog: a document request is opened.
+  // The record changes under the open dialog: a document request is opened,
+  // which takes Finish review to send (ADR-022 Amendment 9, IR-1325).
   await adviser.act(`/records/${id}/document-requests/`, { message: "One more page, please.", items: [{ label: "Signed endorsement" }] });
+  await sendComments(adviser, id, "One more page, please.");
 
   const res = await adviser.post(`/records/${id}/decide/`, { outcome: "accept", comment: "", token: staleToken });
   expect(res.status()).toBe(409);

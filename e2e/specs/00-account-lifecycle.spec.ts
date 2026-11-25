@@ -101,10 +101,15 @@ test("three wrong passwords lock the account, and the screen says what the serve
     await page.getByLabel("Email Address").fill(email);
     await page.getByLabel("Password", { exact: true }).fill(`wrong-${i}-password`);
     await page.getByRole("button", { name: "Sign in" }).click();
-    // The first two are inline errors; the third is the lockout itself, which
-    // the login screen shows as an "Account Locked" dialog with the server's
-    // own countdown and disables the form behind it.
-    if (i < 2) await expect(page.getByRole("alert").first()).toBeVisible();
+    // The first two say so in a dialog the reader closes (IR-1303); the third
+    // is the lockout itself, which the login screen shows as an "Account
+    // Locked" dialog with the server's own countdown and disables the form
+    // behind it.
+    if (i < 2) {
+      const refused = page.getByRole("alertdialog", { name: "Invalid email or password" });
+      await expect(refused).toContainText(`Attempt ${i + 1} of 3`);
+      await refused.getByRole("button", { name: "Close" }).click();
+    }
   }
   const notice = page.getByRole("dialog", { name: "Account Locked" });
   await expect(notice).toBeVisible();
