@@ -18,6 +18,7 @@ COLLEGE OF COMPUTER STUDIES
 | :---: | ----- | :---: |
 | May 2026 | v1: initial design for the planned system (seven modules, Qdrant, LangChain, OpenDataLoader, on-premise hosting). | |
 | November 2026 | **v2: rewritten to the built MVP; see SRS v2 Appendix A: v1 → v2 mapping.** Re-shaped into the seven SRS v2 modules. Architecture, technology stack, data model and every sequence are redrawn from the code. Designs for removed features (Auth PIN, file storage, KPI dashboard, `RAGConfiguration`) are dropped. | Pending review (IR-1275) |
+| November 24, 2026 | Re-pinned from `a46d7fc4` to `c01f0ef1`, after IR-1322. Review workflow components, sequences and schema updated for *Request changes* and held uploads (ADR-022 Amendment 8); `ai-migrate` added to the services; screens retaken from a local build. | Pending review (IR-1275) |
 
 **Preface**
 
