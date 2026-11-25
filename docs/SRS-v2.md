@@ -12,7 +12,7 @@ COLLEGE OF COMPUTER STUDIES
 
 **Version 2.0 (MVP as built)**
 
-> **How to read this version.** This document is derived from the Architecture Decision Records in `docs/adr/` and from the code at commit `c01f0ef1` on `main`. **Where they differ from this document, they win.** It is a thesis deliverable that describes the Minimum Viable Product (MVP) as built. It is not an engineering authority: the ADRs are. Requirement status lines are copied from `docs/testing/TRACEABILITY.md` at the same commit, and nothing here is called VERIFIED unless that file says so.
+> **How to read this version.** This document is derived from the Architecture Decision Records in `docs/adr/` and from the code at commit `2d8d4e4a` on `main`. **Where they differ from this document, they win.** It is a thesis deliverable that describes the Minimum Viable Product (MVP) as built. It is not an engineering authority: the ADRs are. Requirement status lines are copied from `docs/testing/TRACEABILITY.md` at the same commit, and nothing here is called VERIFIED unless that file says so.
 
 **Change History**
 
@@ -23,6 +23,7 @@ COLLEGE OF COMPUTER STUDIES
 | May 26, 2026 | Revised and expanded the SRS to reflect the confirmed full system scope. Corrected Qdrant deployment from cloud to self-hosted on-premise. Formalized type-differentiated workflow routing for Proposal, Thesis/Research, and Project record types. Rewrote the functional requirements table (28 FRs across 7 modules), correcting label-description mismatches and adding FR-M2-06 (Institutional File Storage Management), FR-M5-05 (Record IP Classification and Tagging), and Module 7 (KPI Dashboard, Phase 2). Added NFR-S6 (Brute-Force Login Protection) and NFR-R4 (Data Backup and RPO). Expanded software interfaces with new tables for Vite, Tailwind CSS, django-axes, pyexcel, and WhiteNoise. Corrected Django minimum version to 5.0 and PDF extraction hierarchy to OpenDataLoader (primary), PyMuPDF (fallback), and Tesseract OCR (tertiary). |  |
 | November 2026 | **v2: rewritten to the built MVP; see Appendix A: v1 → v2 mapping.** Hosting, extraction, embedding, language model, authentication transport, live updates, roles, record states and workflow routing are corrected to the ADRs and the code. Requirements are renumbered into seven modules. Features the team cut are listed in Appendix B with the reason. | Pending review (IR-1275) |
 | November 24, 2026 | Re-pinned from `a46d7fc4` to `c01f0ef1`, after IR-1322. Review workflow reworded for *Request changes* and held uploads (ADR-022 Amendment 8); Ask IRIS research tools and its quality caveat added; MVP defined as what is built at that commit; screens retaken from a local build. No requirement status changed. | Pending review (IR-1275) |
+| November 25, 2026 | Re-pinned from `c01f0ef1` to `2d8d4e4a`, after IR-1325. Document requests are drafted in the Documents tab and sent by *Finish review*; *Request changes* always asks for a new version; the owner uploads only what was asked (ADR-022 Amendment 9). Notes and highlights on published papers only (IR-1326); reading history cleared by choice (IR-1331). No requirement status changed. | Pending review (IR-1275) |
 
 **Table of Contents**
 
@@ -128,7 +129,7 @@ The intended audience of this SRS includes:
 
 IPAMS v2.0 had three limitations that made incremental repair unfeasible: (1) it degraded badly when more than about ten people used it at once; (2) its AI module was a stateless language-model wrapper with no institutional context, so its answers could not be checked; and (3) it had no structured approval workflow matching CIT-U's governance, and no technical controls for the Data Privacy Act of 2012 (RA 10173).
 
-IRIS is a web-based platform for submitting, reviewing, publishing and searching the research and intellectual-property (IP) outputs of CIT-U's students, faculty and research offices. Its MVP, what is built on `main` at commit `c01f0ef1`, covers:
+IRIS is a web-based platform for submitting, reviewing, publishing and searching the research and intellectual-property (IP) outputs of CIT-U's students, faculty and research offices. Its MVP, what is built on `main` at commit `2d8d4e4a`, covers:
 
 **Type-differentiated submission and review (the research contribution).** IRIS accepts three record types, each reviewed differently ([ADR-032](adr/032-adviser-first-review-and-office-reviewer-pools.md), [ADR-047](adr/047-rdco-routes-and-decides-at-any-time.md)):
 
@@ -162,7 +163,7 @@ Table 1: Definitions, Acronyms and Abbreviations
 | :---: | ----- |
 | **IPAMS** | Intellectual Property Asset Management System, the legacy CIT-U platform IRIS replaces. |
 | **IRIS** | Intelligent Research & IP System, the reimplemented platform. |
-| **MVP** | Minimum Viable Product. In this document: what is built on `main` at commit `c01f0ef1` (Section 3.2). Work accepted but not built is in Section 3.4. The commit the deployed server runs is not recorded here: the iris-demo server has been off since 2026-11-15 to save cost, and the screens in this document are local builds. |
+| **MVP** | Minimum Viable Product. In this document: what is built on `main` at commit `2d8d4e4a` (Section 3.2). Work accepted but not built is in Section 3.4. The commit the deployed server runs is not recorded here: the iris-demo server has been off since 2026-11-15 to save cost, and the screens in this document are local builds. |
 | **ADR** | Architecture Decision Record, a short document in `docs/adr/` that records one design decision, its alternatives and its consequences. The ADRs are IRIS's requirements authority. |
 | **Record** | One research or IP output in IRIS (a Proposal, Thesis / Research or Project), with its metadata, owners, Adviser and files. |
 | **Version** | One submitted state of a Record. Every resubmission creates a new Version that keeps its own manuscript, text and documents ([ADR-058](adr/058-each-version-keeps-its-text-and-its-files.md)). |
@@ -171,7 +172,7 @@ Table 1: Definitions, Acronyms and Abbreviations
 | **Assignment** | "This party has the Record": an open review task for one party. |
 | **Seat** | "This person is reviewing it for that party": a named reviewer on an Assignment. An office's unclaimed Assignment sits in its **Pool**. |
 | **Clearance** | One specialist office's recorded outcome for a Record (pending, cleared, declined, not cleared). Each office's clearance is stored separately. |
-| **Revision request** | The part of a reviewer's *Request changes* that asks the owner for a new Version (`ResubmissionRequest`). *Request changes* may also ask for documents in the same act, or for documents alone: that is a **document request**, which asks only for files ([ADR-022](adr/022-explicit-document-requests.md) Amendment 8). |
+| **Revision request** | What a reviewer's *Request changes* asks for: a new Version (`ResubmissionRequest`). Distinct from a **document request**, which asks only for files: a reviewer drafts it in the Documents tab and their *Finish review* sends it ([ADR-022](adr/022-explicit-document-requests.md) Amendment 9). |
 | **Held upload** | An owner's upload to a submitted Record that is not sent yet. Only the owners see it, until *Submit new version* or *Submit added documents* sends it. |
 | **Decision** | The act that ends a Record's review: accept (Proposal), publish, keep unlisted or reject. |
 | **Clearance-aware resubmission** | On a new Version, only the clearances of the parties that asked for revisions are reset; every other clearance is preserved. |
@@ -254,9 +255,9 @@ Zhang, Y., et al. (2025). Adaptive load balancing in microservices-based institu
 
 Django Software Foundation. (2025). *Django documentation* (Version 5.2). https://docs.djangoproject.com/en/5.2/
 
-IRIS Architecture Decision Records, `docs/adr/001`–`074`, at commit `c01f0ef1`. The ADR cited for a requirement is its authority.
+IRIS Architecture Decision Records, `docs/adr/001`–`074`, at commit `2d8d4e4a`. The ADR cited for a requirement is its authority.
 
-IRIS Requirements Traceability, `docs/testing/TRACEABILITY.md`, at commit `c01f0ef1`.
+IRIS Requirements Traceability, `docs/testing/TRACEABILITY.md`, at commit `2d8d4e4a`.
 
 pgvector. (n.d.). *Open-source vector similarity search for Postgres*. https://github.com/pgvector/pgvector
 
@@ -729,7 +730,7 @@ Table 32: External Cloud Services
 
 ## 3.2 Functional Requirements
 
-Table 33 lists every MVP functional requirement. Each subsection then gives its use-case diagram, use cases, activity diagrams and screens, as v1 did. Each entry's **Status** is copied from `docs/testing/TRACEABILITY.md` at commit `c01f0ef1`, using its vocabulary: VERIFIED (tested, evidence recorded), IMPLEMENTED (code exists, no recorded test evidence), PARTIAL (some of the requirement is met). Where a requirement has no `FR-` label in the matrix, its status is the matrix's row for the ticket that built it.
+Table 33 lists every MVP functional requirement. Each subsection then gives its use-case diagram, use cases, activity diagrams and screens, as v1 did. Each entry's **Status** is copied from `docs/testing/TRACEABILITY.md` at commit `2d8d4e4a`, using its vocabulary: VERIFIED (tested, evidence recorded), IMPLEMENTED (code exists, no recorded test evidence), PARTIAL (some of the requirement is met). Where a requirement has no `FR-` label in the matrix, its status is the matrix's row for the ticket that built it.
 
 Table 33: Functional Requirements
 
@@ -754,7 +755,7 @@ Table 33: Functional Requirements
 | **FR-3.2** | RDCO Routes and Decides at Any Time | From the Adviser's send onward, RDCO holds the record. |
 | **FR-3.3** | Parallel Office Clearance | Each routed office shall review in parallel, through its own **reviewer pool**. An office's assignment lands in its Pool; a member **claims** it, or a coordinator **assigns** or reassigns it, as a **Seat**. A reviewer may **add a colleague** from their own office. |
 | **FR-3.4** | Clearance-Aware Resubmission | **This is IRIS's primary research contribution.** When a reviewer requests changes to the paper itself, the owners answer every open revision request with one new Version. |
-| **FR-3.5** | Explicit Document Requests | A reviewer who needs only files shall ask for them in a **document request**, distinct from a revision request: from the Documents tab, or with *Request changes* and no new Version. |
+| **FR-3.5** | Explicit Document Requests | A reviewer who needs files shall ask for them in a **document request**, distinct from a revision request: drafted in the Documents tab and sent by their *Finish review*. |
 | **FR-3.6** | Review Threads and Comments | Reviewers shall discuss a Version in **threads** that may be anchored to a passage of the manuscript. |
 | **FR-3.7** | Turnaround, Reminders and Escalation | Each party's assignment shall carry a **due date** computed from that party's turnaround in **working days**, minus an administrator-kept holiday table, in Manila time. |
 | **FR-3.8** | IP Type on Published Records | Office staff shall be able to tag a record with an IP type: **Patent**, **Copyright**, **Trade Secret** or **Utility Model** (`IPType`). |
@@ -1376,7 +1377,7 @@ Screens of a production build of this repository on a local machine, with `seed_
 
 #### 3.2.2.8 Discover: Browse and Search Published Records
 
-**FR-ID: FR-2.8** · **Status: PARTIAL** (FR-M3-02)
+**FR-ID: FR-2.8** · **Status: PARTIAL** (IR-902; IR-697, IR-1082 and IR-1187 IMPLEMENTED)
 
 The system shall let any signed-in person browse published records and search them by keyword. Search uses a weighted PostgreSQL full-text index (title weight A, abstract weight B, GIN index) and ranks by relevance. Filters cover year, record type, classification, PSCED and IP type. A Sort control offers Best, Newest, Most viewed and Trending. A record opens on its **Paper View** page, with the in-browser reader. Paper View lists no documents for readers; attachments are sent only to those who may download them (IR-1244). A refusal or a missing record both answer **404**, so the API never confirms that someone else's unpublished record exists (NFR-S4).
 
@@ -1431,7 +1432,7 @@ Every record shall enter review with its Adviser.
 
 * **Proposal:** the Adviser alone decides: **request changes**, **reject** (`rejected`, shown as *Archived*) or **accept** (`approved`, shown as *Accepted*). A Proposal is never routed to an office and never published.
 * **Thesis / Research and Project:** the Adviser may **request changes**, **reject**, or **accept & send to RDCO**, with a required reason. Sending is not a Decision. It may nominate RDCO officers and suggest specialist offices, but the suggestion routes nothing. The Adviser's only Decision on these types is reject.
-* A reject needs a reason, shown to the owners. Neither the Adviser's reject nor the send is allowed while a revision request is open. *Request changes* is the `request_revision` verdict, shown under that name since IR-1322 ([ADR-032](adr/032-adviser-first-review-and-office-reviewer-pools.md) §7 as amended).
+* A reject needs a reason, shown to the owners. Neither the Adviser's reject nor the send is allowed while a revision request is open. *Request changes* is the `request_revision` verdict, shown under that name since IR-1322, and always asks for a new Version ([ADR-032](adr/032-adviser-first-review-and-office-reviewer-pools.md) §7 as amended).
 
 **Use Case Diagram**
 
@@ -1448,7 +1449,7 @@ Use Case M3-1.1: Adviser Reviews a Thesis
 | **Description** | The Adviser reviews the submission and decides what happens next. |
 | **Preconditions** | The record is `in_review` and the Adviser holds its review. |
 | **Main Flow** | 1. The Adviser opens the record from My Reviews (To review). 2. The Adviser reads the manuscript and may comment in threads (FR-3.6). 3. The Adviser chooses Accept & send to RDCO, gives a reason, and may nominate RDCO officers and tick suggested offices. 4. The system completes the Adviser's assignment, opens RDCO's assignment, notifies RDCO, and records the act. |
-| **Alternative Flow** | **Request changes:** the owners are asked for a new Version, documents, or both (FR-3.4, FR-3.5). **Reject:** with a reason, the record becomes `rejected` (*Archived*). |
+| **Alternative Flow** | **Request changes:** the owners are asked for a new Version (FR-3.4), with any document requests the Adviser drafted (FR-3.5). **Reject:** with a reason, the record becomes `rejected` (*Archived*). |
 | **Postconditions** | RDCO holds the record, or the owners have been asked to revise, or the record is archived. |
 
 **Activity Diagram**
@@ -1467,7 +1468,7 @@ Screens of a production build of this repository on a local machine, with `seed_
 *Figure 61: Review workspace (Adviser) (local build)*
 
 ![Figure 62](diagrams/srs-sdd-v2/screens/S-3.1c-request-changes.png)
-*Figure 62: Finish review: "Request changes", with "The paper itself needs changes" ticked and the documents picklist (Adviser) (local build)*
+*Figure 62: Finish review: "Request changes", which always asks for a new version and sends any draft document requests (Adviser) (local build)*
 
 #### 3.2.3.2 RDCO Routes and Decides at Any Time
 
@@ -1548,7 +1549,7 @@ Use Case M3-3.1: Review for an Office
 | **Description** | A specialist office reviews a record RDCO routed to it. |
 | **Preconditions** | RDCO (or another office) has requested this office. |
 | **Main Flow** | 1. The record lands in the office's Pool. 2. A member claims it, or the coordinator assigns a reviewer. 3. The reviewer reads the paper, may add a colleague or request another office. 4. The reviewer clears it, or records a finding. 5. IRIS records the office's clearance, completes its assignment and tells RDCO. |
-| **Alternative Flow** | **Needs a document:** the reviewer asks for it from the Documents tab, or with *Request changes* (FR-3.5). **Needs changes to the paper:** the reviewer chooses *Request changes* (FR-3.4). **Coordinator reassigns:** the Seat moves to another member. |
+| **Alternative Flow** | **Needs a document:** the reviewer drafts a request in the Documents tab, and *Finish review* sends it (FR-3.5). **Needs changes to the paper:** the reviewer chooses *Request changes* (FR-3.4). **Coordinator reassigns:** the Seat moves to another member. |
 | **Postconditions** | The office's clearance is recorded on its own row. |
 
 **Activity Diagram**
@@ -1565,9 +1566,9 @@ Screens of a production build of this repository on a local machine, with `seed_
 
 #### 3.2.3.4 Clearance-Aware Resubmission
 
-**FR-ID: FR-3.4** · **Status: VERIFIED** (FR-M5-01) · Sources: [ADR-003](adr/003-clearance-aware-resubmission.md), [ADR-004](adr/004-restart-all-comparison-mode.md), [ADR-022](adr/022-explicit-document-requests.md) Amendment 8
+**FR-ID: FR-3.4** · **Status: VERIFIED** (FR-M5-01) · Sources: [ADR-003](adr/003-clearance-aware-resubmission.md), [ADR-004](adr/004-restart-all-comparison-mode.md), [ADR-022](adr/022-explicit-document-requests.md) Amendments 8 and 9
 
-**This is IRIS's primary research contribution.** A reviewer asks for a revision by finishing their review with *Request changes* and *The paper itself needs changes* ticked, which is the default. Documents may be asked for in the same act (FR-3.5); if either request is refused, neither is made. The owners answer every open revision request with one new Version, uploaded and submitted from the Documents tab (IR-1318). An owner's uploads to a submitted record are **held**: only the owners see them until *Submit new version* sends them. On that Version:
+**This is IRIS's primary research contribution.** A reviewer asks for a revision by finishing their review with *Request changes*, which always asks for a new Version. Any document requests the reviewer drafted in the Documents tab go out in the same transaction (FR-3.5). The owners answer every open revision request with one new Version, uploaded and submitted from the Documents tab (IR-1318). An owner's uploads to a submitted record are **held**: only the owners see them until *Submit new version* sends them. On that Version:
 
 1. every held upload is sent, and the Version names it;
 2. every open revision request is resolved as `resubmitted`;
@@ -1608,7 +1609,7 @@ Use Case M3-4.1: Resubmit After a Revision Request
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
 ![Figure 73](diagrams/srs-sdd-v2/screens/S-3.1c-request-changes.png)
-*Figure 73: Finish review: "Request changes", with "The paper itself needs changes" ticked and the documents picklist (Adviser) (local build)*
+*Figure 73: Finish review: "Request changes", which always asks for a new version and sends any draft document requests (Adviser) (local build)*
 
 ![Figure 74](diagrams/srs-sdd-v2/screens/S-3.4-owner-revision.png)
 *Figure 74: Owner's Documents tab: changes requested by IERC; "Submit new version" waits for a change, and ITSO and KTTO keep their clearances (local build)*
@@ -1618,11 +1619,11 @@ Screens of a production build of this repository on a local machine, with `seed_
 
 #### 3.2.3.5 Explicit Document Requests
 
-**FR-ID: FR-3.5** · **Status: IMPLEMENTED** (FR-M5-03; IR-1322) · Source: [ADR-022](adr/022-explicit-document-requests.md), including Amendment 8
+**FR-ID: FR-3.5** · **Status: IMPLEMENTED** (FR-M5-03; IR-1322, IR-1325) · Source: [ADR-022](adr/022-explicit-document-requests.md), including Amendments 8 and 9
 
-A reviewer who needs only files shall ask for them in a **document request**, distinct from a revision request. The reviewer asks from the Documents tab (*Request documents*), or finishes their review with *Request changes*, chooses the documents and unticks *The paper itself needs changes*. The record stays in review (`awaiting_document`). No clearance resets, no assignment closes, and no new Version is needed.
+A reviewer who needs files shall ask for them in a **document request**, distinct from a revision request ([ADR-022](adr/022-explicit-document-requests.md) Amendment 9). The reviewer picks the documents with *Request documents* in the Documents tab. The request is a **draft**: only that reviewer sees it, nobody is notified, and they can delete it. Their *Finish review* sends every draft, with *Request changes* (a revision and documents) or *Comment only* (documents alone). Every other verdict is refused while drafts wait. Once sent, the record stays in review (`awaiting_document`). No clearance resets, no assignment closes, and no new Version is needed.
 
-While any request is open, the owner may upload to every one of the record type's slots. **An owner's upload is held**: only the owners see it, and it answers nothing and notifies nobody until the owner presses *Submit added documents* (`POST /api/v1/records/<id>/documents/send/`). That send answers each requested item from its slot, fulfils each request with nothing left missing, and tells each requesting party once. It is refused while a revision is open (the files then go with *Submit new version*), when nothing is held, and for anyone but an owner. The owner may delete a held file. The reviewer then accepts or rejects each upload with a reason, and a rejection reopens the request. The requesting party's turnaround clock pauses while its own request is open (FR-3.7).
+Once the record is submitted, the owner gets *Upload* only on what an open request names, while it still needs a file. **An owner's upload is held**: only the owners see it, and it answers nothing and notifies nobody until the owner presses *Submit added documents* (`POST /api/v1/records/<id>/documents/send/`). That send answers each requested item from its slot, fulfils each request with nothing left missing, and tells each requesting party once. It is refused while a revision is open (the files then go with *Submit new version*), when nothing is held, and for anyone but an owner. The owner may delete a held file. The reviewer then accepts or rejects each upload with a reason, and a rejection reopens the request. The requesting party's turnaround clock pauses while its own request is open (FR-3.7).
 
 **Use Case Diagram**
 
@@ -1638,8 +1639,8 @@ Use Case M3-5.1: Ask for a Missing Document
 | **Actors** | Reviewer; record owner |
 | **Description** | A reviewer asks for a file without sending the paper back for resubmission. |
 | **Preconditions** | The reviewer holds an open review of the record. |
-| **Main Flow** | 1. The reviewer picks the documents needed, from the Documents tab or with *Request changes* in *Finish review*, and writes a message. 2. IRIS opens the request, shows awaiting_document and pauses the reviewer's clock. 3. The owner is notified and uploads each item; each upload is held, seen only by the owners. 4. The owner presses *Submit added documents*. 5. IRIS sends the held uploads, answers the items, fulfils the request, restarts the clock and notifies the reviewer once. 6. The reviewer accepts each upload. |
-| **Alternative Flow** | **Reviewer rejects an item (with a reason):** the request reopens; the owner uploads and sends again. **A revision is also open:** the owner sends the files with *Submit new version* (FR-3.4). **A Decision ends the review:** open requests are withdrawn. |
+| **Main Flow** | 1. In the Documents tab the reviewer picks the documents needed and writes a message; the request waits as their draft. 2. The reviewer finishes their review with *Request changes* or *Comment only*. 3. IRIS sends the draft, shows awaiting_document, pauses the reviewer's clock and notifies the owners. 4. The owner uploads each item asked for; each upload is held, seen only by the owners. 5. The owner presses *Submit added documents*. 6. IRIS sends the held uploads, answers the items, fulfils the request, restarts the clock and notifies the reviewer once. 7. The reviewer accepts each upload. |
+| **Alternative Flow** | **Reviewer chooses another verdict while a draft waits:** refused, until the draft is removed or the verdict is *Request changes* or *Comment only*. **Reviewer rejects an item (with a reason):** the request reopens; the owner uploads and sends again. **A revision is also open:** the owner sends the files with *Submit new version* (FR-3.4). **A Decision ends the review:** open requests are withdrawn. |
 | **Postconditions** | The reviewer has the document; no clearance changed. |
 
 **Activity Diagram**
@@ -2115,9 +2116,9 @@ These features are built and on screen, so they are part of the MVP.
 
 #### 3.2.6.1 Saved Records and Reading Status
 
-**FR-ID: FR-6.1** · **Status: IMPLEMENTED** (IR-579, IR-756, IR-573) · Source: [ADR-044](adr/044-account-backed-research-library.md)
+**FR-ID: FR-6.1** · **Status: IMPLEMENTED** (IR-579, IR-756, IR-573, IR-1331) · Source: [ADR-044](adr/044-account-backed-research-library.md)
 
-A reader shall be able to save records to **My Library** with a reading status (*Want to read*, *Reading*, *Completed*). Saves, reading history and the reading position belong to the account, so they follow the reader to any device. Reading history is private and can be cleared. A paper reopens where the reader left off, on the same manuscript bytes they read.
+A reader shall be able to save records to **My Library** with a reading status (*Want to read*, *Reading*, *Completed*). Saves, reading history and the reading position belong to the account, so they follow the reader to any device. Reading history is private; it opens as a pop-up from My Library, where the reader ticks papers, or selects all, and confirms to clear them. There is no control to pause it (ADR-044 amendment, IR-1331). A paper reopens where the reader left off, on the same manuscript bytes they read.
 
 **Use Case Diagram**
 
@@ -2134,7 +2135,7 @@ Use Case M6-1.1: Save a Paper and Read It Later
 | **Description** | A reader keeps papers in My Library with a reading status. |
 | **Preconditions** | The reader may see the paper. |
 | **Main Flow** | 1. The reader saves the paper and sets a reading status. 2. The reader reads it; IRIS keeps the position on the account. 3. Later, on any device, the reader resumes where they left off. |
-| **Alternative Flow** | **Manuscript replaced since:** reading starts from the top. **Clear history:** IRIS deletes the reading history. |
+| **Alternative Flow** | **Manuscript replaced since:** reading starts from the top. **Clear history:** the reader ticks papers and confirms; IRIS deletes those rows. |
 | **Postconditions** | The paper is in My Library with its status. |
 
 **Activity Diagram**
@@ -2190,9 +2191,9 @@ Screens of a production build of this repository on a local machine, with `seed_
 
 #### 3.2.6.3 Private Notes and Highlights
 
-**FR-ID: FR-6.3** · **Status: IMPLEMENTED** (IR-580, IR-583) · Sources: [ADR-064](adr/064-private-reading-notes.md), [ADR-065](adr/065-highlights-are-bound-to-the-manuscript-bytes.md), **both proposed: design awaiting acceptance**
+**FR-ID: FR-6.3** · **Status: IMPLEMENTED** (IR-580, IR-583, IR-1326) · Sources: [ADR-064](adr/064-private-reading-notes.md), [ADR-065](adr/065-highlights-are-bound-to-the-manuscript-bytes.md), **both proposed: design awaiting acceptance**
 
-A reader shall be able to keep **private notes** on a record, which autosave. A conflicting save keeps both texts rather than overwriting. A reader may also make **highlights**, bound to the exact manuscript bytes they were made on. A highlight becomes stale after the manuscript is replaced, and is withheld if the reader loses access. Notes and highlights are visible only to their owner.
+A reader shall be able to keep **private notes** on a record, which autosave. A conflicting save keeps both texts rather than overwriting. A reader may also make **highlights**, bound to the exact manuscript bytes they were made on. A highlight becomes stale after the manuscript is replaced, and is withheld if the reader loses access. Notes and highlights are visible only to their owner, and are kept **only on published papers**: a draft or a paper in review answers like a missing record, and Review offers no highlighting, so that selecting text there is for a review comment (ADR-064 and ADR-065 amendments, IR-1326).
 
 **Use Case Diagram**
 
@@ -2530,13 +2531,13 @@ The v1 SRS numbered its requirements differently in its table and its contents (
 | FR-M2-02 | Document download | FR-2.5 | FR-M2-02/03 (Download and delete queues) |
 | FR-M2-03 | Soft deletion | FR-2.6 | FR-M2-02/03 |
 | FR-M2-04 | Excel import | FR-2.7 | FR-M2-04 |
-| FR-M2-05 | Browse and FTS | FR-2.8 | FR-M3-02 (Semantic indexing) |
+| FR-M2-05 | Browse and FTS | FR-2.8 | No FR- row: IR-902, IR-697, IR-1082, IR-1187 |
 | FR-M2-06/07 | Institutional / personal storage | **Removed** (App. B) | FR-M2-06/07 (DEFERRED) |
 | (assumption) | Document requirements per type | FR-2.2 | IR-971 |
 | NFR-P5 | Upload limit | FR-2.3, NFR-P5 | NFR-P2…P5; IR-665, IR-666 |
 | FR-M5-03 (version part) | Document versions | FR-2.4 | IR-871 |
 | FR-M3-01 | PDF extraction | FR-5.1 | FR-M3-01 |
-| FR-M3-02 | FTS indexing | FR-2.8 | FR-M3-02 |
+| FR-M3-02 | FTS indexing | FR-2.8 | No FR- row: the matrix reuses FR-M3-02 for semantic indexing (FR-5.2) |
 | FR-M3-03 | Vector embedding | FR-5.2 | FR-M3-03 |
 | FR-M4-01 | RAG chatbot | FR-5.4, FR-5.5 | FR-M4-01 (Ask IRIS) |
 | FR-M4-02 | Summarization | FR-5.6 | FR-M4-02 (AI Overview) |
