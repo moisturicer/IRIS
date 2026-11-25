@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import { ResearchOriginBadge } from "@/components/shared/ResearchOriginBadge";
-import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
+import { PILL_SECONDARY } from "@/components/ui/pillStyles";
 import type { Capability, PaperSection } from "@/features/records/capabilities";
 import { cn } from "@/lib/utils";
 import type { RecordDetail, RecordVersion } from "@/types/records";
@@ -29,20 +29,20 @@ export function LineageLinks({ lineage }: { lineage: RecordDetail["lineage"] }) 
   );
 }
 
-/** The one filled action a region offers (spec §4.6). */
-export type PrimaryAction = "elsewhere" | "open_review" | "view" | "save";
+/**
+ * The one filled action a region offers (spec §4.6). A review is started on the
+ * Review tab's cover, not from the header (IR-1336).
+ */
+export type PrimaryAction = "elsewhere" | "view" | "save";
 
 interface EditorialHeaderProps {
   record: RecordDetail;
   section: PaperSection;
   can: ReadonlySet<Capability>;
-  /** The header's filled action, as the page decides it. */
-  primary: PrimaryAction;
   versions: RecordVersion[];
   latestVersion: RecordVersion | null;
   viewedVersion: RecordVersion | null;
   onChooseVersion: (n: number | null) => void;
-  onOpenReview: () => Promise<void>;
   onEditDetails: () => void;
   /** View, where there is a paper to view. */
   viewAction: ReactNode;
@@ -59,12 +59,10 @@ export function EditorialHeader({
   record,
   section,
   can,
-  primary,
   versions,
   latestVersion,
   viewedVersion,
   onChooseVersion,
-  onOpenReview,
   onEditDetails,
   viewAction,
   saveCiteShareActions,
@@ -124,15 +122,8 @@ export function EditorialHeader({
         />
       )}
 
-      {(section !== "overview" || primary === "open_review" || can.has("edit_details")) && (
+      {(section !== "overview" || can.has("edit_details")) && (
         <div className="flex items-center gap-2 flex-wrap">
-          {primary === "open_review" && (
-            <button type="button" onClick={() => void onOpenReview()} className={PILL_PRIMARY}>
-              <i className="fas fa-clipboard-check text-xs" aria-hidden />
-              Open review
-            </button>
-          )}
-
           {section !== "overview" && viewAction}
 
           {can.has("edit_details") && (

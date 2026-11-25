@@ -342,43 +342,34 @@ export default function PaperViewPage() {
   // Ask IRIS open beside the page leaves no room for the rail (IR-569).
   const railHidden = showRail && chat.open && !chatMinimized;
   // One filled action per region (spec §4.6, 01-design-system §0): the
-  // owner's pending action, else the reviewer's Open review, else View (Save
+  // owner's pending action, else View (Save
   // where there is no paper to view, IR-569). When
   // the pending action has its own region -- the revision banner, the
   // Review section's action bar -- the header fills nothing. The bar fills
   // its first granted action, so any granted review action puts the primary
   // there. A draft never reaches this page (it opens in Publish, IR-1227), so
   // `continue_draft` has no action here.
+  // A reviewer starts a review on the Review tab's cover, not here (IR-1336).
   const primary: PrimaryAction = can.has("create_version")
     ? "elsewhere"
-    : can.has("open_review") && section !== "review"
-      ? "open_review"
-      : section === "review" && (can.has("finish_review") || REVIEW_ACTIONS.some((action) => can.has(action.capability)))
-        ? "elsewhere"
-        : hasPaper
-          ? "view"
-          : "save";
+    : section === "review" && (can.has("finish_review") || REVIEW_ACTIONS.some((action) => can.has(action.capability)))
+      ? "elsewhere"
+      : hasPaper
+        ? "view"
+        : "save";
 
-  // *Open review* (ADR-032 §4) records when this reviewer started -- the
-  // seat moves to `in_review` and the server stamps `opened_at` -- then moves
-  // into the Review section. With no unopened seat it only navigates. A
-  // failed recording still opens the review: the seat stays `assigned`, and
-  // the next *Open review* records it (IR-1206). A recorded seat re-reads the
-  // Record through `reloadRecord`, so one the viewer can no longer read falls
-  // to the not-available screen (IR-906, IR-1273).
-  const openReview = async () => {
+  // *Start review* (ADR-032 §4, IR-1336) records when this reviewer started --
+  // the seat moves to `in_review` and the server stamps `opened_at` -- from the
+  // cover over the Review tab's pane. It no longer opens the review regardless
+  // of a failure (IR-1206): the cover stays and says so, since the review can't
+  // be used until the start is recorded. A recorded seat re-reads the Record
+  // through `reloadRecord`, so one the viewer can no longer read falls to the
+  // not-available screen (IR-906, IR-1273).
+  const startReview = async () => {
     const seat = seatToOpen(record);
-    if (seat) {
-      let opened = false;
-      try {
-        await seatsApi.open(seat.id);
-        opened = true;
-      } catch {
-        // See above: the review opens regardless.
-      }
-      if (opened) await reloadRecord();
-    }
-    setViewParam("section", "review");
+    if (!seat) return;
+    await seatsApi.open(seat.id);
+    await reloadRecord();
   };
 
   // Paper mode's version: a compact picker whenever there is a version, v1
@@ -571,12 +562,10 @@ export default function PaperViewPage() {
                 record={record}
                 section={section}
                 can={can}
-                primary={primary}
                 versions={versions}
                 latestVersion={latestVersion}
                 viewedVersion={viewedVersion}
                 onChooseVersion={chooseVersion}
-                onOpenReview={openReview}
                 onEditDetails={() => setViewParam("edit", "details")}
                 viewAction={viewAction}
                 saveCiteShareActions={saveCiteShare}
@@ -611,7 +600,7 @@ export default function PaperViewPage() {
                 userIsOwner={userIsOwner}
                 reviewing={reviewing}
                 authorDetails={authorDetails}
-                onOpenReview={openReview}
+                onOpenReview={startReview}
                 onShowVersion={chooseVersion}
                 reader={reader}
                 shown={shown}
