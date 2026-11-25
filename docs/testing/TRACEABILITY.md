@@ -449,7 +449,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-1325** | My Library layout tweaks, plus document requests as drafts that *Finish review* sends, *Upload* only on what was asked, and smaller Download/Upload with no Open button — ADR-022 Amendment 9; no FR- id | [details](traceability/IR-1325.md) | **IMPLEMENTED** |
 | **IR-1326** | Private notes and highlights on published papers only, and none in Review, where selecting text is for a review comment — ADR-064 and ADR-065 amended 2026-11-24; no FR- id | [details](traceability/IR-1326.md) | **IMPLEMENTED** |
 | **IR-1328** | My Library's Overview: the rule under *Waiting on you* and *Recently opened* stays when a card is empty, and the empty text sits under it, with no icon; no FR- id | [details](traceability/IR-1328.md) | **IMPLEMENTED** |
-| **IR-1331** | My Library: reading history is a pop-up of compact rows; the reader ticks papers (or Select all) and confirms to clear them; no Pause control — ADR-044 amendment 2026-11-24 b (Proposed); no FR- id | [details](traceability/IR-1331.md) | **IMPLEMENTED** |
+| **IR-1331** | My Library: reading history is a pop-up of compact rows; the reader ticks papers (or Select all) and confirms to clear them; no Pause control — ADR-044 amendment 2026-11-24 b (Accepted); no FR- id | [details](traceability/IR-1331.md) | **IMPLEMENTED** |
 | NFR-U3 | Responsive at 360 px, no horizontal scroll | [details](traceability/NFR-U3.md) | **PARTIAL** |
 | NFR-A1 | WCAG 2.1 AA on interactive controls | [details](traceability/NFR-A1.md) | **PARTIAL** |
 

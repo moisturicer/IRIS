@@ -149,7 +149,7 @@ IR-553 asks for a per-Record reading position, keyed by owner, Record and Manusc
 
 ## Amendment — 2026-11-24 b (IR-1331): History is a pop-up, cleared by choice, with no pause
 
-**Status of this amendment: Proposed.** Decided by Hermoine Zozobrado on 2026-11-24 (option C of three weighed in chat), while building IR-1331. It becomes Accepted when IR-1331's PR merges after review.
+**Status of this amendment: Accepted** — 2026-11-24, when IR-1331's PR (#1017) merged after Lee Jasmin Adolfo's review, as relayed by Hermoine Zozobrado. Decided by Hermoine Zozobrado on 2026-11-24 (option C of three weighed in chat), while building IR-1331.
 
 **Why.** History opened inside the *Saved Papers* tab, so the tab highlight jumped there from the Overview and History looked misplaced.
 

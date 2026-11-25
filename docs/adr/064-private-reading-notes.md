@@ -4,7 +4,7 @@
 
 **Proposed** — 2026-11-12 (IR-580, under IR-553), awaiting acceptance by Lee Jasmin Adolfo. The note retention rule (§Decision 6) is the "decision before ready-for-agent" on IR-580; it was written into the IR-580 spec by Jive Tyler I. Revalde. This ADR records it and the choices that follow from it. Nothing in it is authorised until it is accepted.
 
-> **Amended 2026-11-24 ([IR-1326](https://citiris.atlassian.net/browse/IR-1326); decided by Hermoine Zozobrado; Proposed until its PR merges after review).** Notes are kept only on a **published** paper, and never in Review. See *Amendment — 2026-11-24*.
+> **Amended 2026-11-24 ([IR-1326](https://citiris.atlassian.net/browse/IR-1326); decided by Hermoine Zozobrado; accepted 2026-11-25 when PR #1014 merged, approved by Lee Jasmin Adolfo as relayed by Hermoine Zozobrado).** Notes are kept only on a **published** paper, and never in Review. See *Amendment — 2026-11-24*.
 
 ## Context
 
@@ -43,7 +43,7 @@ IR-553 gives a reader a private library in their account ([ADR-044](044-account-
 
 ## Amendment — 2026-11-24: published papers only, and none in Review
 
-**Status: Proposed.** It is accepted when IR-1326's pull request merges after review. Decided by Hermoine Zozobrado on 2026-11-24, in chat. Transcribed by an agent. It narrows §3 (the Record gate).
+**Status: Accepted** — 2026-11-25, when IR-1326's PR (#1014) merged after Lee Jasmin Adolfo's review, as relayed by Hermoine Zozobrado. Decided by Hermoine Zozobrado on 2026-11-24, in chat. Transcribed by an agent. It narrows §3 (the Record gate).
 
 **The problem.** In Review, selecting text offered both *Comment*, which is shared and part of the review ([ADR-032](032-adviser-first-review-and-office-reviewer-pools.md) §7), and *Highlight*, which is private and goes nowhere. The two look alike on the PDF, so a reviewer could think they had flagged a passage for the authors when they hadn't. Highlight's optional note also went to Notes, which Review doesn't open.
 
