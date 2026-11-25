@@ -370,7 +370,7 @@ Password guessing must be slow and visible, without hard-coding limits (NFR-S6).
 1. User Interface Design
 
 ![Figure 12](diagrams/srs-sdd-v2/screens/S-1.2c-sign-in-error.png)
-*Figure 12: Failed sign-in: the attempts left, said in a dialog (local build)*
+*Figure 12: Failed sign-in: the attempts left, in a dialog that closes with an X (local build)*
 
 2. ##### Frontend Components
 
@@ -1397,6 +1397,9 @@ Asking for a file must not send the paper back for resubmission (ADR-022). Since
 ![Figure 77](diagrams/srs-sdd-v2/screens/S-3.5-document-request.png)
 *Figure 77: Owner's Documents tab: an upload held as "Added, not sent yet", and "Submit added documents" (local build)*
 
+![Figure 78](diagrams/srs-sdd-v2/screens/S-3.5b-request-documents.png)
+*Figure 78: Request documents: added to the reviewer's review as a draft, sent when they finish it (Adviser) (local build)*
+
 2. ##### Frontend Components
 
 | Component Name | Description & Purpose | Component Format |
@@ -1417,18 +1420,18 @@ Asking for a file must not send the paper back for resubmission (ADR-022). Since
 
 4. Class Diagram
 
-![Figure 78](diagrams/srs-sdd-v2/png/C-3.5-doc-requests.png)
-*Figure 78: Classes: document requests*
+![Figure 79](diagrams/srs-sdd-v2/png/C-3.5-doc-requests.png)
+*Figure 79: Classes: document requests*
 
 5. Sequence Diagrams
 
-![Figure 79](diagrams/srs-sdd-v2/png/Q-3.5-doc-request.png)
-*Figure 79: Sequence Diagram for a document request*
+![Figure 80](diagrams/srs-sdd-v2/png/Q-3.5-doc-request.png)
+*Figure 80: Sequence Diagram for a document request*
 
 6. Schema
 
-![Figure 80](diagrams/srs-sdd-v2/png/E-3.5-doc-requests.png)
-*Figure 80: Database Schema for document requests*
+![Figure 81](diagrams/srs-sdd-v2/png/E-3.5-doc-requests.png)
+*Figure 81: Database Schema for document requests*
 
 7. Tests
 
@@ -1485,18 +1488,18 @@ See Figure 63 (Review workspace (Adviser) (local build)): its Threads tab. The d
 
 4. Class Diagram
 
-![Figure 81](diagrams/srs-sdd-v2/png/C-3.6-threads.png)
-*Figure 81: Classes: review threads*
+![Figure 82](diagrams/srs-sdd-v2/png/C-3.6-threads.png)
+*Figure 82: Classes: review threads*
 
 5. Sequence Diagrams
 
-![Figure 82](diagrams/srs-sdd-v2/png/Q-3.6-threads.png)
-*Figure 82: Sequence Diagram for a review thread*
+![Figure 83](diagrams/srs-sdd-v2/png/Q-3.6-threads.png)
+*Figure 83: Sequence Diagram for a review thread*
 
 6. Schema
 
-![Figure 83](diagrams/srs-sdd-v2/png/E-3.6-threads.png)
-*Figure 83: Database Schema for review threads*
+![Figure 84](diagrams/srs-sdd-v2/png/E-3.6-threads.png)
+*Figure 84: Database Schema for review threads*
 
 7. Tests
 
@@ -1522,8 +1525,8 @@ Late reviews must be visible, but a date never decides anything (ADR-043).
 
 1. User Interface Design
 
-![Figure 84](diagrams/srs-sdd-v2/screens/S-3.7-analytics.png)
-*Figure 84: Workflow analytics (RDCO) (local build)*
+![Figure 85](diagrams/srs-sdd-v2/screens/S-3.7-analytics.png)
+*Figure 85: Workflow analytics (RDCO) (local build)*
 
 2. ##### Frontend Components
 
@@ -1545,18 +1548,18 @@ Late reviews must be visible, but a date never decides anything (ADR-043).
 
 4. Class Diagram
 
-![Figure 85](diagrams/srs-sdd-v2/png/C-3.7-deadlines.png)
-*Figure 85: Classes: turnaround and reminders*
+![Figure 86](diagrams/srs-sdd-v2/png/C-3.7-deadlines.png)
+*Figure 86: Classes: turnaround and reminders*
 
 5. Sequence Diagrams
 
-![Figure 86](diagrams/srs-sdd-v2/png/Q-3.7-reminders.png)
-*Figure 86: Sequence Diagram for reminders and escalation*
+![Figure 87](diagrams/srs-sdd-v2/png/Q-3.7-reminders.png)
+*Figure 87: Sequence Diagram for reminders and escalation*
 
 6. Schema
 
-![Figure 87](diagrams/srs-sdd-v2/png/E-3.7-deadlines.png)
-*Figure 87: Database Schema for turnaround*
+![Figure 88](diagrams/srs-sdd-v2/png/E-3.7-deadlines.png)
+*Figure 88: Database Schema for turnaround*
 
 7. Tests
 
@@ -1597,18 +1600,18 @@ See Figure 68 (RDCO's view of a record ready to decide, with its embargo card (l
 
 4. Class Diagram
 
-![Figure 88](diagrams/srs-sdd-v2/png/C-3.8-ip-embargo.png)
-*Figure 88: Classes: IP and embargo on a record*
+![Figure 89](diagrams/srs-sdd-v2/png/C-3.8-ip-embargo.png)
+*Figure 89: Classes: IP and embargo on a record*
 
 5. Sequence Diagrams
 
-![Figure 89](diagrams/srs-sdd-v2/png/Q-3.8-ip.png)
-*Figure 89: Sequence Diagram for tag and release IP*
+![Figure 90](diagrams/srs-sdd-v2/png/Q-3.8-ip.png)
+*Figure 90: Sequence Diagram for tag and release IP*
 
 6. Schema
 
-![Figure 90](diagrams/srs-sdd-v2/png/E-3.8-embargo.png)
-*Figure 90: Database Schema for IP and embargo*
+![Figure 91](diagrams/srs-sdd-v2/png/E-3.8-embargo.png)
+*Figure 91: Database Schema for IP and embargo*
 
 7. Tests
 
@@ -1626,8 +1629,8 @@ People hear about events that concern them, and an action notice settles when it
 
 1. User Interface Design
 
-![Figure 91](diagrams/srs-sdd-v2/screens/S-4.1-notifications.png)
-*Figure 91: Notifications, with answered requests marked (local build)*
+![Figure 92](diagrams/srs-sdd-v2/screens/S-4.1-notifications.png)
+*Figure 92: Notifications, with answered requests marked (local build)*
 
 2. ##### Frontend Components
 
@@ -1648,18 +1651,18 @@ People hear about events that concern them, and an action notice settles when it
 
 4. Class Diagram
 
-![Figure 92](diagrams/srs-sdd-v2/png/C-4.1-notifications.png)
-*Figure 92: Classes: notifications and live hints*
+![Figure 93](diagrams/srs-sdd-v2/png/C-4.1-notifications.png)
+*Figure 93: Classes: notifications and live hints*
 
 5. Sequence Diagrams
 
-![Figure 93](diagrams/srs-sdd-v2/png/Q-4.1-notify.png)
-*Figure 93: Sequence Diagram for notify and settle*
+![Figure 94](diagrams/srs-sdd-v2/png/Q-4.1-notify.png)
+*Figure 94: Sequence Diagram for notify and settle*
 
 6. Schema
 
-![Figure 94](diagrams/srs-sdd-v2/png/E-4.1-notifications.png)
-*Figure 94: Database Schema for notifications*
+![Figure 95](diagrams/srs-sdd-v2/png/E-4.1-notifications.png)
+*Figure 95: Database Schema for notifications*
 
 7. Tests
 
@@ -1696,15 +1699,15 @@ No screen of its own: every wired page refreshes itself.
 
 4. Class Diagram
 
-See Figure 92 (Classes: notifications and live hints).
+See Figure 93 (Classes: notifications and live hints).
 
 5. Sequence Diagrams
 
-![Figure 95](diagrams/srs-sdd-v2/png/Q-4.2-live.png)
-*Figure 95: Sequence Diagram for a live hint*
+![Figure 96](diagrams/srs-sdd-v2/png/Q-4.2-live.png)
+*Figure 96: Sequence Diagram for a live hint*
 
-![Figure 96](diagrams/srs-sdd-v2/png/V-06-live-hints.png)
-*Figure 96: Sequence Diagram for Live updates by server-sent hints*
+![Figure 97](diagrams/srs-sdd-v2/png/V-06-live-hints.png)
+*Figure 97: Sequence Diagram for Live updates by server-sent hints*
 
 6. Schema
 
@@ -1751,18 +1754,18 @@ No screen of its own.
 
 4. Class Diagram
 
-![Figure 97](diagrams/srs-sdd-v2/png/C-5.1-extraction.png)
-*Figure 97: Classes: extraction*
+![Figure 98](diagrams/srs-sdd-v2/png/C-5.1-extraction.png)
+*Figure 98: Classes: extraction*
 
 5. Sequence Diagrams
 
-![Figure 98](diagrams/srs-sdd-v2/png/Q-5.1-extract.png)
-*Figure 98: Sequence Diagram for extract a published manuscript*
+![Figure 99](diagrams/srs-sdd-v2/png/Q-5.1-extract.png)
+*Figure 99: Sequence Diagram for extract a published manuscript*
 
 6. Schema
 
-![Figure 99](diagrams/srs-sdd-v2/png/E-5.1-extraction.png)
-*Figure 99: Database Schema for extraction*
+![Figure 100](diagrams/srs-sdd-v2/png/E-5.1-extraction.png)
+*Figure 100: Database Schema for extraction*
 
 7. Tests
 
@@ -1804,18 +1807,18 @@ None: this feature has no screen.
 
 4. Class Diagram
 
-![Figure 100](diagrams/srs-sdd-v2/png/C-5.2-indexing.png)
-*Figure 100: Classes: chunks and vectors*
+![Figure 101](diagrams/srs-sdd-v2/png/C-5.2-indexing.png)
+*Figure 101: Classes: chunks and vectors*
 
 5. Sequence Diagrams
 
-![Figure 101](diagrams/srs-sdd-v2/png/Q-5.2-index.png)
-*Figure 101: Sequence Diagram for chunk and embed*
+![Figure 102](diagrams/srs-sdd-v2/png/Q-5.2-index.png)
+*Figure 102: Sequence Diagram for chunk and embed*
 
 6. Schema
 
-![Figure 102](diagrams/srs-sdd-v2/png/E-5.2-indexing.png)
-*Figure 102: Database Schema for chunks and vectors*
+![Figure 103](diagrams/srs-sdd-v2/png/E-5.2-indexing.png)
+*Figure 103: Database Schema for chunks and vectors*
 
 7. Tests
 
@@ -1869,16 +1872,16 @@ See Figure 68 (RDCO's view of a record ready to decide, with its embargo card (l
 
 4. Class Diagram
 
-See Figure 88 (Classes: IP and embargo on a record).
+See Figure 89 (Classes: IP and embargo on a record).
 
 5. Sequence Diagrams
 
-![Figure 103](diagrams/srs-sdd-v2/png/Q-5.3-gate.png)
-*Figure 103: Sequence Diagram for release an embargo, then publish*
+![Figure 104](diagrams/srs-sdd-v2/png/Q-5.3-gate.png)
+*Figure 104: Sequence Diagram for release an embargo, then publish*
 
 6. Schema
 
-See Figure 90 (Database Schema for IP and embargo).
+See Figure 91 (Database Schema for IP and embargo).
 
 7. Tests
 
@@ -1920,8 +1923,8 @@ Questions are answered by the AI runtime from passages the reader may read, stre
 
 1. User Interface Design
 
-![Figure 104](diagrams/srs-sdd-v2/screens/S-5.4-ask-iris.png)
-*Figure 104: Ask IRIS: the conversation history on the left; it cannot load conversations because the AI runtime is not running locally (local build)*
+![Figure 105](diagrams/srs-sdd-v2/screens/S-5.4-ask-iris.png)
+*Figure 105: Ask IRIS: the conversation history on the left; it cannot load conversations because the AI runtime is not running locally (local build)*
 
 2. ##### Frontend Components
 
@@ -1943,23 +1946,23 @@ Questions are answered by the AI runtime from passages the reader may read, stre
 
 4. Class Diagram
 
-![Figure 105](diagrams/section-d/png/D-21-component-ai-runtime.png)
-*Figure 105: Class Diagram for AI runtime classes: ports and adapters (Section D-21)*
+![Figure 106](diagrams/section-d/png/D-21-component-ai-runtime.png)
+*Figure 106: Class Diagram for AI runtime classes: ports and adapters (Section D-21)*
 
 5. Sequence Diagrams
 
-![Figure 106](diagrams/srs-sdd-v2/png/Q-5.4-ask.png)
-*Figure 106: Sequence Diagram for an Ask IRIS run*
+![Figure 107](diagrams/srs-sdd-v2/png/Q-5.4-ask.png)
+*Figure 107: Sequence Diagram for an Ask IRIS run*
 
-![Figure 107](diagrams/section-d/png/D-18-architecture-ask-iris-flow.png)
-*Figure 107: Sequence Diagram for Ask IRIS request flow (Section D-18)*
+![Figure 108](diagrams/section-d/png/D-18-architecture-ask-iris-flow.png)
+*Figure 108: Sequence Diagram for Ask IRIS request flow (Section D-18)*
 
 **Run lifecycle:** submitted → `queued` → claimed by a worker (leased, fenced) → tool loop within Bounds → final draft checked (repaired once if needed) and sources rechecked → Turn and citations committed under the fence → delivered. A page that closes does not cancel the run, and reconnecting replays the journal from the cursor. A run that ended `cancelled`, `expired` or `failed` can be retried as a new linked run with fresh limits. A source replaced during the run stops it with `source_changed` rather than cite stale text. Django's old answer routes (`/ai/ask/`, `/ai/ask/stream/`, `/ai/search/`) answer **410 Gone**.
 
 6. Schema
 
-![Figure 108](diagrams/section-d/png/D-14-erd-iris-ai.png)
-*Figure 108: Database Schema for AI runtime schema iris_ai (Section D-14)*
+![Figure 109](diagrams/section-d/png/D-14-erd-iris-ai.png)
+*Figure 109: Database Schema for AI runtime schema iris_ai (Section D-14)*
 
 7. Tests
 
@@ -2022,16 +2025,16 @@ See Figure 41 (Paper View: a published paper's Overview; its AI Overview is unav
 
 4. Class Diagram
 
-See Figure 105 (Class Diagram for AI runtime classes: ports and adapters (Section D-21)).
+See Figure 106 (Class Diagram for AI runtime classes: ports and adapters (Section D-21)).
 
 5. Sequence Diagrams
 
-![Figure 109](diagrams/srs-sdd-v2/png/Q-5.5-paper-chat.png)
-*Figure 109: Sequence Diagram for Paper Chat*
+![Figure 110](diagrams/srs-sdd-v2/png/Q-5.5-paper-chat.png)
+*Figure 110: Sequence Diagram for Paper Chat*
 
 6. Schema
 
-See Figure 108 (Database Schema for AI runtime schema iris_ai (Section D-14)).
+See Figure 109 (Database Schema for AI runtime schema iris_ai (Section D-14)).
 
 7. Tests
 
@@ -2080,18 +2083,18 @@ See Figure 41 (Paper View: a published paper's Overview; its AI Overview is unav
 
 4. Class Diagram
 
-![Figure 110](diagrams/srs-sdd-v2/png/C-5.6-overview.png)
-*Figure 110: Classes: AI Overview, paper brief and index jobs*
+![Figure 111](diagrams/srs-sdd-v2/png/C-5.6-overview.png)
+*Figure 111: Classes: AI Overview, paper brief and index jobs*
 
 5. Sequence Diagrams
 
-![Figure 111](diagrams/srs-sdd-v2/png/Q-5.6-overview.png)
-*Figure 111: Sequence Diagram for the AI Overview*
+![Figure 112](diagrams/srs-sdd-v2/png/Q-5.6-overview.png)
+*Figure 112: Sequence Diagram for the AI Overview*
 
 6. Schema
 
-![Figure 112](diagrams/srs-sdd-v2/png/E-5.6-overview.png)
-*Figure 112: Database Schema for overviews, briefs and index jobs*
+![Figure 113](diagrams/srs-sdd-v2/png/E-5.6-overview.png)
+*Figure 113: Database Schema for overviews, briefs and index jobs*
 
 7. Tests
 
@@ -2125,12 +2128,12 @@ See Figure 44 (Paper View: saving a copy needs a request (local build)).
 
 4. Class Diagram
 
-See Figure 105 (Class Diagram for AI runtime classes: ports and adapters (Section D-21)).
+See Figure 106 (Class Diagram for AI runtime classes: ports and adapters (Section D-21)).
 
 5. Sequence Diagrams
 
-![Figure 113](diagrams/srs-sdd-v2/png/Q-5.7-degrade.png)
-*Figure 113: Sequence Diagram for when AI is unavailable*
+![Figure 114](diagrams/srs-sdd-v2/png/Q-5.7-degrade.png)
+*Figure 114: Sequence Diagram for when AI is unavailable*
 
 6. Schema
 
@@ -2168,16 +2171,16 @@ None: this feature has no screen.
 
 4. Class Diagram
 
-See Figure 110 (Classes: AI Overview, paper brief and index jobs).
+See Figure 111 (Classes: AI Overview, paper brief and index jobs).
 
 5. Sequence Diagrams
 
-![Figure 114](diagrams/srs-sdd-v2/png/Q-5.8-index-admin.png)
-*Figure 114: Sequence Diagram for re-embed records*
+![Figure 115](diagrams/srs-sdd-v2/png/Q-5.8-index-admin.png)
+*Figure 115: Sequence Diagram for re-embed records*
 
 6. Schema
 
-See Figure 112 (Database Schema for overviews, briefs and index jobs).
+See Figure 113 (Database Schema for overviews, briefs and index jobs).
 
 7. Tests
 
@@ -2196,11 +2199,14 @@ A reader's library follows the account (ADR-044).
 
 1. User Interface Design
 
-![Figure 115](diagrams/srs-sdd-v2/screens/S-6.1-my-library.png)
-*Figure 115: My Library: the count badge, and Waiting on you in the right column (local build)*
+![Figure 116](diagrams/srs-sdd-v2/screens/S-6.1-my-library.png)
+*Figure 116: My Library: the count badge, and Waiting on you in the right column (local build)*
 
-![Figure 116](diagrams/srs-sdd-v2/screens/S-6.1b-my-library-empty.png)
-*Figure 116: My Library with nothing submitted yet (Adviser) (local build)*
+![Figure 117](diagrams/srs-sdd-v2/screens/S-6.1b-my-library-empty.png)
+*Figure 117: My Library with nothing submitted yet (Adviser) (local build)*
+
+![Figure 118](diagrams/srs-sdd-v2/screens/S-6.1c-reading-history.png)
+*Figure 118: My Library: the reading history pop-up, cleared by choice (local build)*
 
 2. ##### Frontend Components
 
@@ -2219,18 +2225,18 @@ A reader's library follows the account (ADR-044).
 
 4. Class Diagram
 
-![Figure 117](diagrams/srs-sdd-v2/png/C-6.1-library.png)
-*Figure 117: Classes: the reader's library*
+![Figure 119](diagrams/srs-sdd-v2/png/C-6.1-library.png)
+*Figure 119: Classes: the reader's library*
 
 5. Sequence Diagrams
 
-![Figure 118](diagrams/srs-sdd-v2/png/Q-6.1-library.png)
-*Figure 118: Sequence Diagram for save, file and annotate*
+![Figure 120](diagrams/srs-sdd-v2/png/Q-6.1-library.png)
+*Figure 120: Sequence Diagram for save, file and annotate*
 
 6. Schema
 
-![Figure 119](diagrams/srs-sdd-v2/png/E-6.1-library.png)
-*Figure 119: Database Schema for the reader's library*
+![Figure 121](diagrams/srs-sdd-v2/png/E-6.1-library.png)
+*Figure 121: Database Schema for the reader's library*
 
 7. Tests
 
@@ -2260,7 +2266,7 @@ Folders are the reader's alone and never a discovery signal (ADR-070).
 
 1. User Interface Design
 
-See Figure 115 (My Library: the count badge, and Waiting on you in the right column (local build)).
+See Figure 116 (My Library: the count badge, and Waiting on you in the right column (local build)).
 
 2. ##### Frontend Components
 
@@ -2279,15 +2285,15 @@ See Figure 115 (My Library: the count badge, and Waiting on you in the right col
 
 4. Class Diagram
 
-See Figure 117 (Classes: the reader's library).
+See Figure 119 (Classes: the reader's library).
 
 5. Sequence Diagrams
 
-See Figure 118 (Sequence Diagram for save, file and annotate).
+See Figure 120 (Sequence Diagram for save, file and annotate).
 
 6. Schema
 
-See Figure 119 (Database Schema for the reader's library).
+See Figure 121 (Database Schema for the reader's library).
 
 7. Tests
 
@@ -2323,15 +2329,15 @@ No screen of its own.
 
 4. Class Diagram
 
-See Figure 117 (Classes: the reader's library).
+See Figure 119 (Classes: the reader's library).
 
 5. Sequence Diagrams
 
-See Figure 118 (Sequence Diagram for save, file and annotate).
+See Figure 120 (Sequence Diagram for save, file and annotate).
 
 6. Schema
 
-See Figure 119 (Database Schema for the reader's library).
+See Figure 121 (Database Schema for the reader's library).
 
 7. Tests
 
@@ -2355,11 +2361,11 @@ Calls are listed after RDCO confirms them (ADR-050).
 
 1. User Interface Design
 
-![Figure 120](diagrams/srs-sdd-v2/screens/S-6.4-calls.png)
-*Figure 120: Calls & Conferences: the empty board (local build)*
+![Figure 122](diagrams/srs-sdd-v2/screens/S-6.4-calls.png)
+*Figure 122: Calls & Conferences: the empty board (local build)*
 
-![Figure 121](diagrams/srs-sdd-v2/screens/S-6.4b-call-requests.png)
-*Figure 121: Call requests (RDCO) (local build)*
+![Figure 123](diagrams/srs-sdd-v2/screens/S-6.4b-call-requests.png)
+*Figure 123: Call requests (RDCO) (local build)*
 
 2. ##### Frontend Components
 
@@ -2379,18 +2385,18 @@ Calls are listed after RDCO confirms them (ADR-050).
 
 4. Class Diagram
 
-![Figure 122](diagrams/srs-sdd-v2/png/C-6.4-calls.png)
-*Figure 122: Classes: Calls & Conferences*
+![Figure 124](diagrams/srs-sdd-v2/png/C-6.4-calls.png)
+*Figure 124: Classes: Calls & Conferences*
 
 5. Sequence Diagrams
 
-![Figure 123](diagrams/srs-sdd-v2/png/Q-6.4-calls.png)
-*Figure 123: Sequence Diagram for post and confirm a call*
+![Figure 125](diagrams/srs-sdd-v2/png/Q-6.4-calls.png)
+*Figure 125: Sequence Diagram for post and confirm a call*
 
 6. Schema
 
-![Figure 124](diagrams/srs-sdd-v2/png/E-6.4-calls.png)
-*Figure 124: Database Schema for Calls & Conferences*
+![Figure 126](diagrams/srs-sdd-v2/png/E-6.4-calls.png)
+*Figure 126: Database Schema for Calls & Conferences*
 
 7. Tests
 
@@ -2431,18 +2437,18 @@ See Figure 56 (Discover (local build)).
 
 4. Class Diagram
 
-![Figure 125](diagrams/srs-sdd-v2/png/C-6.5-discovery.png)
-*Figure 125: Classes: personal discovery*
+![Figure 127](diagrams/srs-sdd-v2/png/C-6.5-discovery.png)
+*Figure 127: Classes: personal discovery*
 
 5. Sequence Diagrams
 
-![Figure 126](diagrams/srs-sdd-v2/png/Q-6.5-discovery.png)
-*Figure 126: Sequence Diagram for personal discovery*
+![Figure 128](diagrams/srs-sdd-v2/png/Q-6.5-discovery.png)
+*Figure 128: Sequence Diagram for personal discovery*
 
 6. Schema
 
-![Figure 127](diagrams/srs-sdd-v2/png/E-6.5-discovery.png)
-*Figure 127: Database Schema for personal discovery*
+![Figure 129](diagrams/srs-sdd-v2/png/E-6.5-discovery.png)
+*Figure 129: Database Schema for personal discovery*
 
 7. Tests
 
@@ -2461,8 +2467,8 @@ Every act and its audit row commit together; no role can edit the log (NFR-S5).
 
 1. User Interface Design
 
-![Figure 128](diagrams/srs-sdd-v2/screens/S-7.1-audit-log.png)
-*Figure 128: Audit Log (System Admin) (local build)*
+![Figure 130](diagrams/srs-sdd-v2/screens/S-7.1-audit-log.png)
+*Figure 130: Audit Log (System Admin) (local build)*
 
 2. ##### Frontend Components
 
@@ -2482,18 +2488,18 @@ Every act and its audit row commit together; no role can edit the log (NFR-S5).
 
 4. Class Diagram
 
-![Figure 129](diagrams/srs-sdd-v2/png/C-7.1-audit.png)
-*Figure 129: Classes: audit and administration*
+![Figure 131](diagrams/srs-sdd-v2/png/C-7.1-audit.png)
+*Figure 131: Classes: audit and administration*
 
 5. Sequence Diagrams
 
-![Figure 130](diagrams/srs-sdd-v2/png/Q-7.1-audit.png)
-*Figure 130: Sequence Diagram for write and read audit events*
+![Figure 132](diagrams/srs-sdd-v2/png/Q-7.1-audit.png)
+*Figure 132: Sequence Diagram for write and read audit events*
 
 6. Schema
 
-![Figure 131](diagrams/srs-sdd-v2/png/E-7.1-audit.png)
-*Figure 131: Database Schema for audit and settings*
+![Figure 133](diagrams/srs-sdd-v2/png/E-7.1-audit.png)
+*Figure 133: Database Schema for audit and settings*
 
 7. Tests
 
@@ -2511,11 +2517,11 @@ The System Admin runs IRIS with no workflow access; RDCO runs the workflow (ADR-
 
 1. User Interface Design
 
-![Figure 132](diagrams/srs-sdd-v2/screens/S-7.2a-retention.png)
-*Figure 132: Retention (System Admin) (local build)*
+![Figure 134](diagrams/srs-sdd-v2/screens/S-7.2a-retention.png)
+*Figure 134: Retention (System Admin) (local build)*
 
-![Figure 133](diagrams/srs-sdd-v2/screens/S-7.2b-deletion-requests.png)
-*Figure 133: Account deletion requests (System Admin) (local build)*
+![Figure 135](diagrams/srs-sdd-v2/screens/S-7.2b-deletion-requests.png)
+*Figure 135: Account deletion requests (System Admin) (local build)*
 
 See Figure 23 (Users page (RDCO) (local build)).
 
@@ -2537,16 +2543,16 @@ See Figure 23 (Users page (RDCO) (local build)).
 
 4. Class Diagram
 
-See Figure 129 (Classes: audit and administration).
+See Figure 131 (Classes: audit and administration).
 
 5. Sequence Diagrams
 
-![Figure 134](diagrams/srs-sdd-v2/png/Q-7.2-consoles.png)
-*Figure 134: Sequence Diagram for a System Admin setting*
+![Figure 136](diagrams/srs-sdd-v2/png/Q-7.2-consoles.png)
+*Figure 136: Sequence Diagram for a System Admin setting*
 
 6. Schema
 
-See Figure 131 (Database Schema for audit and settings).
+See Figure 133 (Database Schema for audit and settings).
 
 7. Tests
 
@@ -2569,8 +2575,8 @@ Each person manages their account in one place, with Help inside it.
 
 1. User Interface Design
 
-![Figure 135](diagrams/srs-sdd-v2/screens/S-7.3-settings-help.png)
-*Figure 135: Settings: Help (local build)*
+![Figure 137](diagrams/srs-sdd-v2/screens/S-7.3-settings-help.png)
+*Figure 137: Settings: Help (local build)*
 
 2. ##### Frontend Components
 
@@ -2592,8 +2598,8 @@ See Figure 26 (Classes: personal data rights).
 
 5. Sequence Diagrams
 
-![Figure 136](diagrams/srs-sdd-v2/png/Q-7.3-settings.png)
-*Figure 136: Sequence Diagram for change the AI answer*
+![Figure 138](diagrams/srs-sdd-v2/png/Q-7.3-settings.png)
+*Figure 138: Sequence Diagram for change the AI answer*
 
 6. Schema
 

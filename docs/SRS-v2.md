@@ -950,7 +950,7 @@ Use Case M1-3.1: Lock Out Repeated Sign-in Failures
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
 ![Figure 13](diagrams/srs-sdd-v2/screens/S-1.2c-sign-in-error.png)
-*Figure 13: Failed sign-in: the attempts left, said in a dialog (local build)*
+*Figure 13: Failed sign-in: the attempts left, in a dialog that closes with an X (local build)*
 
 #### 3.2.1.4 Account Recovery
 
@@ -1655,6 +1655,9 @@ Screens of a production build of this repository on a local machine, with `seed_
 ![Figure 78](diagrams/srs-sdd-v2/screens/S-3.5-document-request.png)
 *Figure 78: Owner's Documents tab: an upload held as "Added, not sent yet", and "Submit added documents" (local build)*
 
+![Figure 79](diagrams/srs-sdd-v2/screens/S-3.5b-request-documents.png)
+*Figure 79: Request documents: added to the reviewer's review as a draft, sent when they finish it (Adviser) (local build)*
+
 #### 3.2.3.6 Review Threads and Comments
 
 **FR-ID: FR-3.6** · **Status: VERIFIED** (IR-877) · Source: [ADR-032](adr/032-adviser-first-review-and-office-reviewer-pools.md) §7
@@ -1663,8 +1666,8 @@ Reviewers shall discuss a Version in **threads** that may be anchored to a passa
 
 **Use Case Diagram**
 
-![Figure 79](diagrams/srs-sdd-v2/png/U-3.6-threads.png)
-*Figure 79: Review Threads and Comments Use Case Diagram*
+![Figure 80](diagrams/srs-sdd-v2/png/U-3.6-threads.png)
+*Figure 80: Review Threads and Comments Use Case Diagram*
 
 **Use Case Description**
 
@@ -1681,15 +1684,15 @@ Use Case M3-6.1: Discuss a Passage in a Thread
 
 **Activity Diagram**
 
-![Figure 80](diagrams/srs-sdd-v2/png/A-3.6-thread.png)
-*Figure 80: A review thread Activity Diagram*
+![Figure 81](diagrams/srs-sdd-v2/png/A-3.6-thread.png)
+*Figure 81: A review thread Activity Diagram*
 
 **Wireframes**
 
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
-![Figure 81](diagrams/srs-sdd-v2/screens/S-3.1b-adviser-review.png)
-*Figure 81: Review workspace: the Threads tab beside Documents; the demo data has no threads (local build)*
+![Figure 82](diagrams/srs-sdd-v2/screens/S-3.1b-adviser-review.png)
+*Figure 82: Review workspace: the Threads tab beside Documents; the demo data has no threads (local build)*
 
 #### 3.2.3.7 Turnaround, Reminders and Escalation
 
@@ -1699,8 +1702,8 @@ Each party's assignment shall carry a **due date** computed from that party's tu
 
 **Use Case Diagram**
 
-![Figure 82](diagrams/srs-sdd-v2/png/U-3.7-turnaround.png)
-*Figure 82: Turnaround, Reminders and Escalation Use Case Diagram*
+![Figure 83](diagrams/srs-sdd-v2/png/U-3.7-turnaround.png)
+*Figure 83: Turnaround, Reminders and Escalation Use Case Diagram*
 
 **Use Case Description**
 
@@ -1717,15 +1720,15 @@ Use Case M3-7.1: Follow Due Dates
 
 **Activity Diagram**
 
-![Figure 83](diagrams/srs-sdd-v2/png/A-3.7-reminders.png)
-*Figure 83: Reminders and escalation Activity Diagram*
+![Figure 84](diagrams/srs-sdd-v2/png/A-3.7-reminders.png)
+*Figure 84: Reminders and escalation Activity Diagram*
 
 **Wireframes**
 
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
-![Figure 84](diagrams/srs-sdd-v2/screens/S-3.7-analytics.png)
-*Figure 84: Workflow analytics (RDCO) (local build)*
+![Figure 85](diagrams/srs-sdd-v2/screens/S-3.7-analytics.png)
+*Figure 85: Workflow analytics (RDCO) (local build)*
 
 #### 3.2.3.8 IP Type on Published Records
 
@@ -1735,8 +1738,8 @@ Office staff shall be able to tag a record with an IP type: **Patent**, **Copyri
 
 **Use Case Diagram**
 
-![Figure 85](diagrams/srs-sdd-v2/png/U-3.8-ip-type.png)
-*Figure 85: IP Type on Published Records Use Case Diagram*
+![Figure 86](diagrams/srs-sdd-v2/png/U-3.8-ip-type.png)
+*Figure 86: IP Type on Published Records Use Case Diagram*
 
 **Use Case Description**
 
@@ -1753,15 +1756,15 @@ Use Case M3-8.1: Tag and Release IP
 
 **Activity Diagram**
 
-![Figure 86](diagrams/srs-sdd-v2/png/A-3.8-ip.png)
-*Figure 86: Tag and release IP Activity Diagram*
+![Figure 87](diagrams/srs-sdd-v2/png/A-3.8-ip.png)
+*Figure 87: Tag and release IP Activity Diagram*
 
 **Wireframes**
 
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
-![Figure 87](diagrams/srs-sdd-v2/screens/S-3.2a-rdco-decide.png)
-*Figure 87: RDCO's view of a record ready to decide, with its embargo card (local build)*
+![Figure 88](diagrams/srs-sdd-v2/screens/S-3.2a-rdco-decide.png)
+*Figure 88: RDCO's view of a record ready to decide, with its embargo card (local build)*
 
 ### Module 4: Notifications
 
@@ -1773,8 +1776,8 @@ The system shall notify the relevant people in-app at each workflow event, for e
 
 **Use Case Diagram**
 
-![Figure 88](diagrams/srs-sdd-v2/png/U-4.1-notifications.png)
-*Figure 88: In-App and Email Notifications Use Case Diagram*
+![Figure 89](diagrams/srs-sdd-v2/png/U-4.1-notifications.png)
+*Figure 89: In-App and Email Notifications Use Case Diagram*
 
 **Use Case Description**
 
@@ -1791,15 +1794,15 @@ Use Case M4-1.1: Receive and Settle a Notification
 
 **Activity Diagram**
 
-![Figure 89](diagrams/srs-sdd-v2/png/A-4.1-notify.png)
-*Figure 89: Notify and resolve Activity Diagram*
+![Figure 90](diagrams/srs-sdd-v2/png/A-4.1-notify.png)
+*Figure 90: Notify and resolve Activity Diagram*
 
 **Wireframes**
 
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
-![Figure 90](diagrams/srs-sdd-v2/screens/S-4.1-notifications.png)
-*Figure 90: Notifications, with answered requests marked (local build)*
+![Figure 91](diagrams/srs-sdd-v2/screens/S-4.1-notifications.png)
+*Figure 91: Notifications, with answered requests marked (local build)*
 
 #### 3.2.4.2 Live Updates
 
@@ -1809,8 +1812,8 @@ Pages shall update themselves. Each tab holds one stream, `GET /api/v1/live/`. T
 
 **Use Case Diagram**
 
-![Figure 91](diagrams/srs-sdd-v2/png/U-4.2-live.png)
-*Figure 91: Live Updates Use Case Diagram*
+![Figure 92](diagrams/srs-sdd-v2/png/U-4.2-live.png)
+*Figure 92: Live Updates Use Case Diagram*
 
 **Use Case Description**
 
@@ -1827,8 +1830,8 @@ Use Case M4-2.1: See a Page Update Itself
 
 **Activity Diagram**
 
-![Figure 92](diagrams/srs-sdd-v2/png/A-4.2-live.png)
-*Figure 92: A live update Activity Diagram*
+![Figure 93](diagrams/srs-sdd-v2/png/A-4.2-live.png)
+*Figure 93: A live update Activity Diagram*
 
 ### Module 5: Indexing and AI (Thesis-Critical)
 
@@ -1842,8 +1845,8 @@ When a record is **published** (or a published record's embargo is released agai
 
 **Use Case Diagram**
 
-![Figure 93](diagrams/srs-sdd-v2/png/U-5.1-extraction.png)
-*Figure 93: Extraction Use Case Diagram*
+![Figure 94](diagrams/srs-sdd-v2/png/U-5.1-extraction.png)
+*Figure 94: Extraction Use Case Diagram*
 
 **Use Case Description**
 
@@ -1860,8 +1863,8 @@ Use Case M5-1.1: Extract a Published Manuscript
 
 **Activity Diagram**
 
-![Figure 94](diagrams/srs-sdd-v2/png/A-5.1-extract.png)
-*Figure 94: Extract a published manuscript Activity Diagram*
+![Figure 95](diagrams/srs-sdd-v2/png/A-5.1-extract.png)
+*Figure 95: Extract a published manuscript Activity Diagram*
 
 #### 3.2.5.2 Chunking and Embedding
 
@@ -1871,8 +1874,8 @@ After extraction, the system shall split the text into **chunks**, the retrievab
 
 **Use Case Diagram**
 
-![Figure 95](diagrams/srs-sdd-v2/png/U-5.2-indexing.png)
-*Figure 95: Chunking and Embedding Use Case Diagram*
+![Figure 96](diagrams/srs-sdd-v2/png/U-5.2-indexing.png)
+*Figure 96: Chunking and Embedding Use Case Diagram*
 
 **Use Case Description**
 
@@ -1889,8 +1892,8 @@ Use Case M5-2.1: Index a Paper's Passages
 
 **Activity Diagram**
 
-![Figure 96](diagrams/srs-sdd-v2/png/A-5.2-index.png)
-*Figure 96: Chunk and embed Activity Diagram*
+![Figure 97](diagrams/srs-sdd-v2/png/A-5.2-index.png)
+*Figure 97: Chunk and embed Activity Diagram*
 
 #### 3.2.5.3 Disclosure Gate
 
@@ -1907,8 +1910,8 @@ The gate is one module (`apps/ai/policy/disclosure.py`) consulted at every outbo
 
 **Use Case Diagram**
 
-![Figure 97](diagrams/srs-sdd-v2/png/U-5.3-gate.png)
-*Figure 97: Disclosure Gate Use Case Diagram*
+![Figure 98](diagrams/srs-sdd-v2/png/U-5.3-gate.png)
+*Figure 98: Disclosure Gate Use Case Diagram*
 
 **Use Case Description**
 
@@ -1925,15 +1928,15 @@ Use Case M5-3.1: Release an Embargo
 
 **Activity Diagram**
 
-![Figure 98](diagrams/srs-sdd-v2/png/A-5.3-gate.png)
-*Figure 98: The disclosure gate Activity Diagram*
+![Figure 99](diagrams/srs-sdd-v2/png/A-5.3-gate.png)
+*Figure 99: The disclosure gate Activity Diagram*
 
 **Wireframes**
 
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
-![Figure 99](diagrams/srs-sdd-v2/screens/S-3.2a-rdco-decide.png)
-*Figure 99: RDCO's view of a record ready to decide, with its embargo card (local build)*
+![Figure 100](diagrams/srs-sdd-v2/screens/S-3.2a-rdco-decide.png)
+*Figure 100: RDCO's view of a record ready to decide, with its embargo card (local build)*
 
 #### 3.2.5.4 Ask IRIS
 
@@ -1945,8 +1948,8 @@ The system shall let a signed-in person ask questions about the library in a con
 
 **Use Case Diagram**
 
-![Figure 100](diagrams/srs-sdd-v2/png/U-5.4-ask-iris.png)
-*Figure 100: Ask IRIS Use Case Diagram*
+![Figure 101](diagrams/srs-sdd-v2/png/U-5.4-ask-iris.png)
+*Figure 101: Ask IRIS Use Case Diagram*
 
 **Use Case Description**
 
@@ -1963,15 +1966,15 @@ Use Case M5-4.1: Ask a Question
 
 **Activity Diagram**
 
-![Figure 101](diagrams/srs-sdd-v2/png/A-5.4-ask.png)
-*Figure 101: Answer an Ask IRIS question Activity Diagram*
+![Figure 102](diagrams/srs-sdd-v2/png/A-5.4-ask.png)
+*Figure 102: Answer an Ask IRIS question Activity Diagram*
 
 **Wireframes**
 
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
-![Figure 102](diagrams/srs-sdd-v2/screens/S-5.4-ask-iris.png)
-*Figure 102: Ask IRIS: the conversation history on the left; it cannot load conversations because the AI runtime is not running locally (local build)*
+![Figure 103](diagrams/srs-sdd-v2/screens/S-5.4-ask-iris.png)
+*Figure 103: Ask IRIS: the conversation history on the left; it cannot load conversations because the AI runtime is not running locally (local build)*
 
 #### 3.2.5.5 Paper Chat
 
@@ -1981,8 +1984,8 @@ From a paper's page, a reader shall be able to ask questions about **that paper 
 
 **Use Case Diagram**
 
-![Figure 103](diagrams/srs-sdd-v2/png/U-5.5-paper-chat.png)
-*Figure 103: Paper Chat Use Case Diagram*
+![Figure 104](diagrams/srs-sdd-v2/png/U-5.5-paper-chat.png)
+*Figure 104: Paper Chat Use Case Diagram*
 
 **Use Case Description**
 
@@ -1999,15 +2002,15 @@ Use Case M5-5.1: Ask About One Paper
 
 **Activity Diagram**
 
-![Figure 104](diagrams/srs-sdd-v2/png/A-5.5-paper-chat.png)
-*Figure 104: Paper Chat Activity Diagram*
+![Figure 105](diagrams/srs-sdd-v2/png/A-5.5-paper-chat.png)
+*Figure 105: Paper Chat Activity Diagram*
 
 **Wireframes**
 
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
-![Figure 105](diagrams/srs-sdd-v2/screens/S-2.4-paper-view.png)
-*Figure 105: Paper View: a published paper's Overview; its AI Overview is unavailable because no AI vendor is reached locally (local build)*
+![Figure 106](diagrams/srs-sdd-v2/screens/S-2.4-paper-view.png)
+*Figure 106: Paper View: a published paper's Overview; its AI Overview is unavailable because no AI vendor is reached locally (local build)*
 
 #### 3.2.5.6 AI Overview
 
@@ -2017,8 +2020,8 @@ Each published paper the gate admits shall have a **stored, cited summary** (`Re
 
 **Use Case Diagram**
 
-![Figure 106](diagrams/srs-sdd-v2/png/U-5.6-overview.png)
-*Figure 106: AI Overview Use Case Diagram*
+![Figure 107](diagrams/srs-sdd-v2/png/U-5.6-overview.png)
+*Figure 107: AI Overview Use Case Diagram*
 
 **Use Case Description**
 
@@ -2035,15 +2038,15 @@ Use Case M5-6.1: Read a Paper's AI Overview
 
 **Activity Diagram**
 
-![Figure 107](diagrams/srs-sdd-v2/png/A-5.6-overview.png)
-*Figure 107: The AI Overview Activity Diagram*
+![Figure 108](diagrams/srs-sdd-v2/png/A-5.6-overview.png)
+*Figure 108: The AI Overview Activity Diagram*
 
 **Wireframes**
 
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
-![Figure 108](diagrams/srs-sdd-v2/screens/S-2.4-paper-view.png)
-*Figure 108: Paper View: a published paper's Overview; its AI Overview is unavailable because no AI vendor is reached locally (local build)*
+![Figure 109](diagrams/srs-sdd-v2/screens/S-2.4-paper-view.png)
+*Figure 109: Paper View: a published paper's Overview; its AI Overview is unavailable because no AI vendor is reached locally (local build)*
 
 #### 3.2.5.7 Degradation When AI Is Unavailable
 
@@ -2053,8 +2056,8 @@ When an AI vendor or the AI runtime is unavailable, all non-AI features shall ke
 
 **Use Case Diagram**
 
-![Figure 109](diagrams/srs-sdd-v2/png/U-5.7-degradation.png)
-*Figure 109: Degradation When AI Is Unavailable Use Case Diagram*
+![Figure 110](diagrams/srs-sdd-v2/png/U-5.7-degradation.png)
+*Figure 110: Degradation When AI Is Unavailable Use Case Diagram*
 
 **Use Case Description**
 
@@ -2071,15 +2074,15 @@ Use Case M5-7.1: Use IRIS While AI Is Down
 
 **Activity Diagram**
 
-![Figure 110](diagrams/srs-sdd-v2/png/A-5.7-degrade.png)
-*Figure 110: Degrade when AI is unavailable Activity Diagram*
+![Figure 111](diagrams/srs-sdd-v2/png/A-5.7-degrade.png)
+*Figure 111: Degrade when AI is unavailable Activity Diagram*
 
 **Wireframes**
 
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
-![Figure 111](diagrams/srs-sdd-v2/screens/S-2.5a-download-request.png)
-*Figure 111: Paper View: saving a copy needs a request (local build)*
+![Figure 112](diagrams/srs-sdd-v2/screens/S-2.5a-download-request.png)
+*Figure 112: Paper View: saving a copy needs a request (local build)*
 
 #### 3.2.5.8 Index Administration
 
@@ -2089,8 +2092,8 @@ Office staff shall be able to see the index's status, re-embed one record or all
 
 **Use Case Diagram**
 
-![Figure 112](diagrams/srs-sdd-v2/png/U-5.8-index-admin.png)
-*Figure 112: Index Administration Use Case Diagram*
+![Figure 113](diagrams/srs-sdd-v2/png/U-5.8-index-admin.png)
+*Figure 113: Index Administration Use Case Diagram*
 
 **Use Case Description**
 
@@ -2107,8 +2110,8 @@ Use Case M5-8.1: Re-embed Records
 
 **Activity Diagram**
 
-![Figure 113](diagrams/srs-sdd-v2/png/A-5.8-reembed.png)
-*Figure 113: Re-embed records Activity Diagram*
+![Figure 114](diagrams/srs-sdd-v2/png/A-5.8-reembed.png)
+*Figure 114: Re-embed records Activity Diagram*
 
 ### Module 6: Reader Library and Discovery
 
@@ -2122,8 +2125,8 @@ A reader shall be able to save records to **My Library** with a reading status (
 
 **Use Case Diagram**
 
-![Figure 114](diagrams/srs-sdd-v2/png/U-6.1-saved.png)
-*Figure 114: Saved Records and Reading Status Use Case Diagram*
+![Figure 115](diagrams/srs-sdd-v2/png/U-6.1-saved.png)
+*Figure 115: Saved Records and Reading Status Use Case Diagram*
 
 **Use Case Description**
 
@@ -2140,18 +2143,21 @@ Use Case M6-1.1: Save a Paper and Read It Later
 
 **Activity Diagram**
 
-![Figure 115](diagrams/srs-sdd-v2/png/A-6.1-save.png)
-*Figure 115: Save and read Activity Diagram*
+![Figure 116](diagrams/srs-sdd-v2/png/A-6.1-save.png)
+*Figure 116: Save and read Activity Diagram*
 
 **Wireframes**
 
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
-![Figure 116](diagrams/srs-sdd-v2/screens/S-6.1-my-library.png)
-*Figure 116: My Library: the count badge, and Waiting on you in the right column (local build)*
+![Figure 117](diagrams/srs-sdd-v2/screens/S-6.1-my-library.png)
+*Figure 117: My Library: the count badge, and Waiting on you in the right column (local build)*
 
-![Figure 117](diagrams/srs-sdd-v2/screens/S-6.1b-my-library-empty.png)
-*Figure 117: My Library with nothing submitted yet (Adviser) (local build)*
+![Figure 118](diagrams/srs-sdd-v2/screens/S-6.1b-my-library-empty.png)
+*Figure 118: My Library with nothing submitted yet (Adviser) (local build)*
+
+![Figure 119](diagrams/srs-sdd-v2/screens/S-6.1c-reading-history.png)
+*Figure 119: My Library: the reading history pop-up, cleared by choice (local build)*
 
 #### 3.2.6.2 Folders
 
@@ -2161,8 +2167,8 @@ A reader shall be able to group saved records into their own **folders**. Folder
 
 **Use Case Diagram**
 
-![Figure 118](diagrams/srs-sdd-v2/png/U-6.2-folders.png)
-*Figure 118: Folders Use Case Diagram*
+![Figure 120](diagrams/srs-sdd-v2/png/U-6.2-folders.png)
+*Figure 120: Folders Use Case Diagram*
 
 **Use Case Description**
 
@@ -2179,15 +2185,15 @@ Use Case M6-2.1: File Saves in Folders
 
 **Activity Diagram**
 
-![Figure 119](diagrams/srs-sdd-v2/png/A-6.2-folders.png)
-*Figure 119: File a save in a folder Activity Diagram*
+![Figure 121](diagrams/srs-sdd-v2/png/A-6.2-folders.png)
+*Figure 121: File a save in a folder Activity Diagram*
 
 **Wireframes**
 
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
-![Figure 120](diagrams/srs-sdd-v2/screens/S-6.1-my-library.png)
-*Figure 120: My Library: the count badge, and Waiting on you in the right column (local build)*
+![Figure 122](diagrams/srs-sdd-v2/screens/S-6.1-my-library.png)
+*Figure 122: My Library: the count badge, and Waiting on you in the right column (local build)*
 
 #### 3.2.6.3 Private Notes and Highlights
 
@@ -2197,8 +2203,8 @@ A reader shall be able to keep **private notes** on a record, which autosave. A 
 
 **Use Case Diagram**
 
-![Figure 121](diagrams/srs-sdd-v2/png/U-6.3-notes.png)
-*Figure 121: Private Notes and Highlights Use Case Diagram*
+![Figure 123](diagrams/srs-sdd-v2/png/U-6.3-notes.png)
+*Figure 123: Private Notes and Highlights Use Case Diagram*
 
 **Use Case Description**
 
@@ -2215,8 +2221,8 @@ Use Case M6-3.1: Keep a Private Note
 
 **Activity Diagram**
 
-![Figure 122](diagrams/srs-sdd-v2/png/A-6.3-note.png)
-*Figure 122: A private note Activity Diagram*
+![Figure 124](diagrams/srs-sdd-v2/png/A-6.3-note.png)
+*Figure 124: A private note Activity Diagram*
 
 #### 3.2.6.4 Calls & Conferences
 
@@ -2226,8 +2232,8 @@ The system shall list **calls for papers and conferences**. Each has a type, des
 
 **Use Case Diagram**
 
-![Figure 123](diagrams/srs-sdd-v2/png/U-6.4-calls.png)
-*Figure 123: Calls & Conferences Use Case Diagram*
+![Figure 125](diagrams/srs-sdd-v2/png/U-6.4-calls.png)
+*Figure 125: Calls & Conferences Use Case Diagram*
 
 **Use Case Description**
 
@@ -2244,18 +2250,18 @@ Use Case M6-4.1: Post and Confirm a Call
 
 **Activity Diagram**
 
-![Figure 124](diagrams/srs-sdd-v2/png/A-6.4-call.png)
-*Figure 124: Post a call Activity Diagram*
+![Figure 126](diagrams/srs-sdd-v2/png/A-6.4-call.png)
+*Figure 126: Post a call Activity Diagram*
 
 **Wireframes**
 
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
-![Figure 125](diagrams/srs-sdd-v2/screens/S-6.4-calls.png)
-*Figure 125: Calls & Conferences: the empty board (local build)*
+![Figure 127](diagrams/srs-sdd-v2/screens/S-6.4-calls.png)
+*Figure 127: Calls & Conferences: the empty board (local build)*
 
-![Figure 126](diagrams/srs-sdd-v2/screens/S-6.4b-call-requests.png)
-*Figure 126: Call requests (RDCO) (local build)*
+![Figure 128](diagrams/srs-sdd-v2/screens/S-6.4b-call-requests.png)
+*Figure 128: Call requests (RDCO) (local build)*
 
 #### 3.2.6.5 Personal Discovery
 
@@ -2265,8 +2271,8 @@ Discover shall offer a **For you** ordering built from a **transparent recipe** 
 
 **Use Case Diagram**
 
-![Figure 127](diagrams/srs-sdd-v2/png/U-6.5-discovery.png)
-*Figure 127: Personal Discovery Use Case Diagram*
+![Figure 129](diagrams/srs-sdd-v2/png/U-6.5-discovery.png)
+*Figure 129: Personal Discovery Use Case Diagram*
 
 **Use Case Description**
 
@@ -2283,15 +2289,15 @@ Use Case M6-5.1: Get Suggestions For You
 
 **Activity Diagram**
 
-![Figure 128](diagrams/srs-sdd-v2/png/A-6.5-for-you.png)
-*Figure 128: Personal discovery Activity Diagram*
+![Figure 130](diagrams/srs-sdd-v2/png/A-6.5-for-you.png)
+*Figure 130: Personal discovery Activity Diagram*
 
 **Wireframes**
 
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
-![Figure 129](diagrams/srs-sdd-v2/screens/S-2.8-discover.png)
-*Figure 129: Discover (local build)*
+![Figure 131](diagrams/srs-sdd-v2/screens/S-2.8-discover.png)
+*Figure 131: Discover (local build)*
 
 ### Module 7: Audit and Administration
 
@@ -2303,8 +2309,8 @@ The system shall write an `AuditEvent` for every security-relevant and workflow 
 
 **Use Case Diagram**
 
-![Figure 130](diagrams/srs-sdd-v2/png/U-7.1-audit.png)
-*Figure 130: Audit Log Use Case Diagram*
+![Figure 132](diagrams/srs-sdd-v2/png/U-7.1-audit.png)
+*Figure 132: Audit Log Use Case Diagram*
 
 **Use Case Description**
 
@@ -2321,15 +2327,15 @@ Use Case M7-1.1: Read the Audit Log
 
 **Activity Diagram**
 
-![Figure 131](diagrams/srs-sdd-v2/png/A-7.1-audit.png)
-*Figure 131: Write and read the audit log Activity Diagram*
+![Figure 133](diagrams/srs-sdd-v2/png/A-7.1-audit.png)
+*Figure 133: Write and read the audit log Activity Diagram*
 
 **Wireframes**
 
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
-![Figure 132](diagrams/srs-sdd-v2/screens/S-7.1-audit-log.png)
-*Figure 132: Audit Log (System Admin) (local build)*
+![Figure 134](diagrams/srs-sdd-v2/screens/S-7.1-audit-log.png)
+*Figure 134: Audit Log (System Admin) (local build)*
 
 #### 3.2.7.2 System Admin and RDCO Consoles
 
@@ -2342,8 +2348,8 @@ Django's own admin site (`/django-admin/`) is closed to outside networks and is 
 
 **Use Case Diagram**
 
-![Figure 133](diagrams/srs-sdd-v2/png/U-7.2-consoles.png)
-*Figure 133: System Admin and RDCO Consoles Use Case Diagram*
+![Figure 135](diagrams/srs-sdd-v2/png/U-7.2-consoles.png)
+*Figure 135: System Admin and RDCO Consoles Use Case Diagram*
 
 **Use Case Description**
 
@@ -2360,21 +2366,21 @@ Use Case M7-2.1: Run IRIS as System Admin
 
 **Activity Diagram**
 
-![Figure 134](diagrams/srs-sdd-v2/png/A-7.2-console.png)
-*Figure 134: The consoles Activity Diagram*
+![Figure 136](diagrams/srs-sdd-v2/png/A-7.2-console.png)
+*Figure 136: The consoles Activity Diagram*
 
 **Wireframes**
 
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
-![Figure 135](diagrams/srs-sdd-v2/screens/S-7.2a-retention.png)
-*Figure 135: Retention (System Admin) (local build)*
+![Figure 137](diagrams/srs-sdd-v2/screens/S-7.2a-retention.png)
+*Figure 137: Retention (System Admin) (local build)*
 
-![Figure 136](diagrams/srs-sdd-v2/screens/S-7.2b-deletion-requests.png)
-*Figure 136: Account deletion requests (System Admin) (local build)*
+![Figure 138](diagrams/srs-sdd-v2/screens/S-7.2b-deletion-requests.png)
+*Figure 138: Account deletion requests (System Admin) (local build)*
 
-![Figure 137](diagrams/srs-sdd-v2/screens/S-1.6-users.png)
-*Figure 137: Users page (RDCO) (local build)*
+![Figure 139](diagrams/srs-sdd-v2/screens/S-1.6-users.png)
+*Figure 139: Users page (RDCO) (local build)*
 
 #### 3.2.7.3 Settings and Help
 
@@ -2384,8 +2390,8 @@ Each person shall have a **Settings** page for their profile, password, AI answe
 
 **Use Case Diagram**
 
-![Figure 138](diagrams/srs-sdd-v2/png/U-7.3-settings.png)
-*Figure 138: Settings and Help Use Case Diagram*
+![Figure 140](diagrams/srs-sdd-v2/png/U-7.3-settings.png)
+*Figure 140: Settings and Help Use Case Diagram*
 
 **Use Case Description**
 
@@ -2402,15 +2408,15 @@ Use Case M7-3.1: Change My Settings
 
 **Activity Diagram**
 
-![Figure 139](diagrams/srs-sdd-v2/png/A-7.3-help.png)
-*Figure 139: Settings and Help Activity Diagram*
+![Figure 141](diagrams/srs-sdd-v2/png/A-7.3-help.png)
+*Figure 141: Settings and Help Activity Diagram*
 
 **Wireframes**
 
 Screens of a production build of this repository on a local machine, with `seed_demo` data (local build, not the live site).
 
-![Figure 140](diagrams/srs-sdd-v2/screens/S-7.3-settings-help.png)
-*Figure 140: Settings: Help (local build)*
+![Figure 142](diagrams/srs-sdd-v2/screens/S-7.3-settings-help.png)
+*Figure 142: Settings: Help (local build)*
 
 ## 3.3 Non-functional Requirements
 
@@ -2484,8 +2490,8 @@ A ***first-time user shall*** complete a submission in under 10 minutes; five of
 **NFR-U3 - Responsive Layout**  
 ***Every screen shall*** work at 360 px wide and above with no horizontal scroll. *Validation:* The viewport matrix in the smoke tier (360, 768, 1280, 1745 px). *Status:* PARTIAL
 
-![Figure 141](diagrams/srs-sdd-v2/v1-kept/SRS-v1-image15-responsive-activity.png)
-*Figure 141: Responsive layout activity diagram (v1, kept; v1 FR-M1-03 is now NFR-U3)*
+![Figure 143](diagrams/srs-sdd-v2/v1-kept/SRS-v1-image15-responsive-activity.png)
+*Figure 143: Responsive layout activity diagram (v1, kept; v1 FR-M1-03 is now NFR-U3)*
 
 **NFR-A1 - Accessibility (new)**  
 ***Interactive controls shall*** meet WCAG 2.1 AA. axe-core runs in the frontend tests and fails on serious or critical issues; colour contrast stays a manual check. *Validation:* axe-core in Vitest and in a real browser (smoke tier). *Status:* PARTIAL

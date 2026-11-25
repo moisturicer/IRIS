@@ -59,6 +59,11 @@ const SHOTS = [
   ['S-6.1b-my-library-empty', 'adviser', '/records/mine'],
   ['S-2.4-paper-view', 'student', '/records/1'],
   ['S-2.5a-download-request', 'student', '/records/2'],
+  // After S-2.4 and S-2.5a have opened two papers, so history has rows (ADR-044, IR-1331).
+  ['S-6.1c-reading-history', 'student', '/records/mine', async (p) => {
+    await p.getByRole('button', { name: /Manage (reading )?history/ }).filter({ visible: true }).first().click();
+    await p.waitForTimeout(1500);
+  }],
   ['S-5.4-ask-iris', 'student', '/ai'],
   ['S-6.4-calls', 'student', '/opportunities'],
   ['S-4.1-notifications', 'student', '/notifications'],
@@ -84,7 +89,7 @@ const SHOTS = [
   ['S-3.5-document-request', 'student', '/records/16?section=review', async (p) => {
     await p.getByRole('tab', { name: 'Documents' }).filter({ visible: true }).first().click();
     await p.waitForTimeout(1500);
-    // A held upload (ADR-022 Amendment 8): a placeholder PDF named by IRIS_SCREENSHOT_UPLOAD,
+    // A held upload (ADR-022 Amendments 8 and 9; Upload is offered only on what was asked): a placeholder PDF named by IRIS_SCREENSHOT_UPLOAD,
     // uploaded and not sent, so the shot shows "Added, not sent yet" and Submit added documents.
     if (process.env.IRIS_SCREENSHOT_UPLOAD) {
       const chooser = p.waitForEvent('filechooser', { timeout: 10000 });
@@ -92,6 +97,13 @@ const SHOTS = [
       await (await chooser).setFiles(process.env.IRIS_SCREENSHOT_UPLOAD);
       await p.waitForTimeout(4000);
     }
+  }],
+  // A reviewer drafts a document request in the Documents tab (ADR-022 Amendment 9).
+  ['S-3.5b-request-documents', 'adviser', '/records/15?section=review', async (p) => {
+    await p.getByRole('tab', { name: 'Documents' }).filter({ visible: true }).first().click();
+    await p.waitForTimeout(1200);
+    await p.getByRole('button', { name: /^Request documents/ }).filter({ visible: true }).first().click();
+    await p.waitForTimeout(1500);
   }],
   ['S-3.2a-rdco-decide', 'rdco', '/records/17?section=review'],
   ['S-3.2b-rdco-offices-reviewing', 'rdco', '/records/19?section=review'],
