@@ -9,7 +9,7 @@ import { VERDICT_ICON } from "./yourPart";
 
 /** The words on an item's link. The act behind it is the host's existing control. */
 const ACTION_WORDS: Record<string, string> = {
-  open_review: "Open review",
+  open_review: "Start review",
   claim: "Claim review",
   withdraw_revision: "Withdraw request",
   open_documents: "Open Documents",

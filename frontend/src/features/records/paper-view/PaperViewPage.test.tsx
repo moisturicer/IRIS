@@ -528,7 +528,10 @@ describe("Proposal lineage", () => {
     expect(screen.queryByRole("button", { name: "Continue as Thesis" })).not.toBeInTheDocument();
   });
 });
-const OPEN_REVIEW = { name: "Open review" } as const;
+// IR-1336: a review is started from the Review tab's cover, by Start review;
+// no "Open review" button is left, so the negative checks match either name.
+const OPEN_REVIEW = { name: /^(Open|Start) review$/ } as const;
+const START_REVIEW = { name: "Start review" } as const;
 const RESUBMIT = { name: "Resubmit for review" } as const;
 
 const researcherCard: PaperPerson = {
@@ -621,57 +624,57 @@ describe("the review control follows the server's capabilities", () => {
     vi.clearAllMocks();
   });
 
-  it("is offered when the API gives this viewer a seat to work", async () => {
-    shownRecord = { ...inReview, ...reviewing, capabilities: ["cite", "open_review"] };
+  // IR-1336 replaces "is offered when the API gives this viewer a seat to work",
+  // "opens the Review section without the retired fixed-stage decision form",
+  // "records the viewer's unopened seat, then opens the Review section" and
+  // "only navigates when every seat is already open": the Overview has no
+  // review button, and the Review tab covers a review not yet started.
+  const assignedSeat: ReviewerSeat = {
+    id: 77, assignment: 5, record: RECORD_ID, party: "itso", party_label: "ITSO",
+    reviewer: 2, reviewer_name: "ITSO Reviewer", state: "assigned", state_label: "Assigned",
+    source: "claimed", assigned_by: 2, assigned_at: "2026-10-01T08:00:00Z",
+    opened_at: null, done_at: null,
+  };
+
+  it("offers no review button on the Overview, which stays readable", async () => {
+    shownRecord = { ...inReview, my_seats: [assignedSeat], is_participant: true, capabilities: ["cite", "open_review"] };
     signInAs(2, "ITSO");
     const { container } = renderPaperView();
 
-    expect(await screen.findByRole("button", OPEN_REVIEW)).toBeInTheDocument();
+    await waitForRecord(inReview.title);
+    expect(screen.queryByRole("button", OPEN_REVIEW)).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Abstract" })).toBeInTheDocument();
     await expectNoBlockingA11yViolations(container);
   });
 
-  it("opens the Review section without the retired fixed-stage decision form", async () => {
-    shownRecord = { ...inReview, ...reviewing, capabilities: ["cite", "open_review"] };
+  it("covers the Review tab with Start review until the seat is recorded, then lifts the cover", async () => {
+    workspaceAt(1600);
+    shownRecord = { ...inReview, my_seats: [assignedSeat], is_participant: true, capabilities: ["cite", "open_review"] };
     signInAs(2, "ITSO");
-    renderPaperView();
+    const { container } = renderPaper(`/records/${RECORD_ID}?section=review`);
 
-    await userEvent.click(await screen.findByRole("button", OPEN_REVIEW));
-
-    expect(await screen.findByRole("tab", { name: "Review", selected: true })).toBeInTheDocument();
+    const start = await screen.findByRole("button", START_REVIEW);
+    expect(screen.getByRole("group", { name: "Your review hasn't started" })).toContainElement(start);
     expect(screen.queryByRole("link", { name: "Record a decision (current form)" })).not.toBeInTheDocument();
-    // The server still offers `open_review` for the opened seat, but the
-    // footer asks it only of a seat not yet opened (IR-875): this one is open.
-    // Changed deliberately: IR-681 expected the footer to keep offering it,
-    // which hid Finish review from every opened seat.
-    expect(within(screen.getByRole("contentinfo", { name: "Your part" })).queryByRole("button", OPEN_REVIEW)).not.toBeInTheDocument();
-  });
+    await expectNoBlockingA11yViolations(container);
 
-  // ADR-032 §4, IR-415: opening the review records when this reviewer started.
-  it("records the viewer's unopened seat, then opens the Review section", async () => {
-    const assigned: ReviewerSeat = {
-      id: 77, assignment: 5, record: RECORD_ID, party: "itso", party_label: "ITSO",
-      reviewer: 2, reviewer_name: "ITSO Reviewer", state: "assigned", state_label: "Assigned",
-      source: "claimed", assigned_by: 2, assigned_at: "2026-10-01T08:00:00Z",
-      opened_at: null, done_at: null,
-    };
-    shownRecord = { ...inReview, my_seats: [assigned], is_participant: true, capabilities: ["cite", "open_review"] };
-    signInAs(2, "ITSO");
-    renderPaperView();
-
-    await userEvent.click(await screen.findByRole("button", OPEN_REVIEW));
+    // The server now has the seat in review; the re-read lifts the cover.
+    shownRecord = { ...inReview, ...reviewing, capabilities: ["cite", "open_review"] };
+    await userEvent.click(start);
 
     expect(vi.mocked(seatsApi.open)).toHaveBeenCalledWith(77);
-    expect(await screen.findByRole("tab", { name: "Review", selected: true })).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("button", START_REVIEW)).not.toBeInTheDocument());
+    expect(screen.getByRole("contentinfo", { name: "Your part" })).toBeInTheDocument();
   });
 
-  it("only navigates when every seat is already open", async () => {
+  it("draws no cover once every seat is open, though the server still offers open_review", async () => {
+    workspaceAt(1600);
     shownRecord = { ...inReview, ...reviewing, capabilities: ["cite", "open_review"] };
     signInAs(2, "ITSO");
-    renderPaperView();
+    renderPaper(`/records/${RECORD_ID}?section=review`);
 
-    await userEvent.click(await screen.findByRole("button", OPEN_REVIEW));
-
-    expect(await screen.findByRole("tab", { name: "Review", selected: true })).toBeInTheDocument();
+    expect(await screen.findByRole("contentinfo", { name: "Your part" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", OPEN_REVIEW)).not.toBeInTheDocument();
     expect(vi.mocked(seatsApi.open)).not.toHaveBeenCalled();
   });
 
@@ -2064,18 +2067,18 @@ describe("the Review section (IR-412)", () => {
     expect(mid).toHaveAttribute("aria-valuenow", "520");
   });
 
-  it("keeps one filled footer action and words for an unopened review (IR-681)", async () => {
+  // Changed for IR-1336: the footer of an unopened review held Open review as
+  // its one filled action; the footer is now under the cover, which holds
+  // Start review, and the footer offers no Open review.
+  it("puts an unopened review's one action, Start review, on the cover over the footer (IR-681, IR-1336)", async () => {
     workspaceAt(1600);
     shownRecord = { ...inReview, ...reviewing, capabilities: ["open_review", "office_review", "request_revision"],
       my_seats: [{ ...reviewingSeat, state: "assigned", state_label: "Assigned", opened_at: null }] };
     signInAs(2, "ITSO");
     renderPaper(`/records/${RECORD_ID}?section=review`);
-    const foot = await screen.findByRole("contentinfo", { name: "Your part" });
-    expect(within(foot).getByText("Your review: Assigned")).toBeInTheDocument();
-    const primary = within(foot).getAllByRole("button").filter((b) => b.classList.contains("bg-brand"));
-    expect(primary).toHaveLength(1);
-    expect(primary[0]).toHaveAccessibleName("Open review");
-    await userEvent.click(primary[0]);
+    const start = await screen.findByRole("button", START_REVIEW);
+    expect(screen.queryByRole("contentinfo", { name: "Your part" })).not.toBeInTheDocument();
+    await userEvent.click(start);
     expect(seatsApi.open).toHaveBeenCalledWith(78);
   });
 
@@ -2087,13 +2090,13 @@ describe("the Review section (IR-412)", () => {
     const foot = await screen.findByRole("contentinfo", { name: "Your part" });
     const claim = within(foot).getByRole("button", { name: "Claim review" });
     expect(within(foot).getAllByRole("button").filter((b) => b.classList.contains("bg-brand"))).toEqual([claim]);
-    // Claimed, not yet opened, as the server leaves it (changed for IR-875:
-    // the footer offers Open review only to a seat still to open).
+    // Claimed, not yet opened, as the server leaves it: the cover offers Start
+    // review (changed for IR-1336; it was the footer's Open review, IR-875).
     shownRecord = { ...inReview, ...reviewing, capabilities: ["open_review"],
       my_seats: [{ ...reviewingSeat, state: "assigned", state_label: "Assigned", opened_at: null }] };
     await userEvent.click(claim);
     expect(seatsApi.claim).toHaveBeenCalledWith(55);
-    expect(await within(foot).findByRole("button", { name: "Open review" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", START_REVIEW)).toBeInTheDocument();
   });
 
   it.each([
@@ -2380,11 +2383,13 @@ describe("the Review section (IR-412)", () => {
     items: items.map((i) => ({ party: null, actor_name: null, since: null, paused: null, action: null, ...i }) as ReadinessItem),
   });
 
+  // Changed for IR-1336: this used a review not yet opened, whose footer and
+  // Details are now under the cover. It uses an opened review with a blocker
+  // of its own; the open_review link is out of reach until the review starts.
   it("says Your part in the server's words, and keeps the facts behind it in Details (IR-1094)", async () => {
     workspaceAt(1600);
-    shownRecord = { ...inReview, ...reviewing, capabilities: ["comment_review", "open_review"],
-      my_seats: [{ ...reviewingSeat, state: "assigned", state_label: "Assigned", opened_at: null }], readiness: readinessFor([
-      { kind: "open_review", severity: "blocker", label: "Open the review first.", action: { kind: "open_review", target: "78" } },
+    shownRecord = { ...inReview, ...reviewing, capabilities: ["comment_review", "request_revision"], readiness: readinessFor([
+      { kind: "revision_request", severity: "blocker", label: "IERC asked the author for a revision.", party: "ierc", actor_name: "Ina Ierc", since: "2026-09-03T08:00:00Z", action: { kind: "show_threads", target: "" } },
       { kind: "party_reviewing", severity: "info", label: "IERC is reviewing.", actor_name: "Ina Ierc", since: "2026-09-03T08:00:00Z" },
     ]) };
     signInAs(2, "ITSO");
@@ -2392,9 +2397,7 @@ describe("the Review section (IR-412)", () => {
     const foot = await screen.findByRole("contentinfo", { name: "Your part" });
     // One heading, one line, one filled action.
     expect(within(foot).getByText("You can't decide yet.")).toBeInTheDocument();
-    expect(within(foot).getByText("Open the review first.")).toBeInTheDocument();
-    expect(within(foot).getAllByRole("button").filter((b) => b.classList.contains("bg-brand")))
-      .toEqual([within(foot).getByRole("button", { name: "Open review" })]);
+    expect(within(foot).getByText("IERC asked the author for a revision.")).toBeInTheDocument();
     // The card is gone from Conversation, which is the timeline and the comment box.
     // Changed on purpose by IR-1203: a reviewer opens on Documents, so Conversation is a click away.
     await openConversation();
@@ -2406,11 +2409,9 @@ describe("the Review section (IR-412)", () => {
     const section = screen.getByRole("heading", { name: "Readiness" }).closest("section")!;
     const facts = within(section).getAllByRole("listitem");
     expect(facts).toHaveLength(1);
-    expect(facts[0]).toHaveTextContent("Blocker: Open the review first.");
+    expect(facts[0]).toHaveTextContent("Blocker: IERC asked the author for a revision.");
     expect(screen.queryByText("IERC is reviewing.")).not.toBeInTheDocument();
     await waitFor(() => expect(section).toHaveFocus());
-    await userEvent.click(within(section).getByRole("button", { name: "Open review" }));
-    expect(seatsApi.open).toHaveBeenCalledWith(78);
   });
 
   it("offers Withdraw request only on the Revision request whose action allows it (IR-682)", async () => {
@@ -3467,9 +3468,11 @@ describe("a record the viewer cannot read (IR-411)", () => {
     expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
   });
 
-  // IR-1273: Open review re-reads the Record once the seat is recorded, through
+  // IR-1273: Start review re-reads the Record once the seat is recorded, through
   // the same reload, so a Record revoked mid-review does not stay on screen.
-  it("falls to the not-available state when Open review's re-read finds access gone", async () => {
+  // (Was Open review on the Overview, until IR-1336.)
+  it("falls to the not-available state when Start review's re-read finds access gone", async () => {
+    workspaceAt(1600);
     const assigned: ReviewerSeat = {
       id: 77, assignment: 5, record: RECORD_ID, party: "itso", party_label: "ITSO",
       reviewer: 2, reviewer_name: "ITSO Reviewer", state: "assigned", state_label: "Assigned",
@@ -3478,19 +3481,22 @@ describe("a record the viewer cannot read (IR-411)", () => {
     };
     shownRecord = { ...inReview, my_seats: [assigned], is_participant: true, capabilities: ["cite", "open_review"] };
     signInAs(2, "ITSO");
-    renderPaperView();
+    renderPaper(`/records/${RECORD_ID}?section=review`);
 
-    const open = await screen.findByRole("button", OPEN_REVIEW);
+    const start = await screen.findByRole("button", START_REVIEW);
     vi.mocked(recordsApi.detail).mockRejectedValueOnce({ response: { status: 404, data: { detail: "Not found." } } });
-    await userEvent.click(open);
+    await userEvent.click(start);
 
     expect(vi.mocked(seatsApi.open)).toHaveBeenCalledWith(77);
     expect(await screen.findByRole("heading", { name: "Record not available" })).toBeInTheDocument();
     expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
   });
 
-  // IR-1206 still holds: a seat that fails to record still opens the review.
-  it("still opens the review when recording the seat fails", async () => {
+  // IR-1336 reverses IR-1206 here, deliberately: a seat that fails to record
+  // used to open the review anyway. The review is unusable until its start is
+  // recorded, so the cover stays, says so, and Start review can be pressed again.
+  it("keeps the cover, says so, and lets Start review be pressed again when recording fails", async () => {
+    workspaceAt(1600);
     const assigned: ReviewerSeat = {
       id: 77, assignment: 5, record: RECORD_ID, party: "itso", party_label: "ITSO",
       reviewer: 2, reviewer_name: "ITSO Reviewer", state: "assigned", state_label: "Assigned",
@@ -3499,12 +3505,14 @@ describe("a record the viewer cannot read (IR-411)", () => {
     };
     shownRecord = { ...inReview, my_seats: [assigned], is_participant: true, capabilities: ["cite", "open_review"] };
     signInAs(2, "ITSO");
-    renderPaperView();
+    renderPaper(`/records/${RECORD_ID}?section=review`);
 
     vi.mocked(seatsApi.open).mockRejectedValueOnce(new Error("Network Error"));
-    await userEvent.click(await screen.findByRole("button", OPEN_REVIEW));
+    await userEvent.click(await screen.findByRole("button", START_REVIEW));
 
-    expect(await screen.findByRole("tab", { name: "Review", selected: true })).toBeInTheDocument();
+    expect(await screen.findByRole("alert")).toHaveTextContent("Your review could not be started. Try again.");
+    await userEvent.click(screen.getByRole("button", START_REVIEW));
+    expect(vi.mocked(seatsApi.open)).toHaveBeenCalledTimes(2);
   });
 
   // IR-1273: Submit new version re-reads the Record through the same reload.

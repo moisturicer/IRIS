@@ -916,6 +916,14 @@ Decided by Hermoine Zozobrado while building IR-1226, and awaiting review on its
     - The Decision dialog's line beside each review it closes names the drafts that will be discarded. It leaves out that reviewer's open threads and requests, which the dialog already lists for the whole paper.
 6. **Not here:** an unsubmitted draft record is visible to its owners only. That is IR-1228, with its own amendment.
 
+**Amendment, 2026-11-25 (IR-1336; decided by Hermoine Zozobrado; Proposed until its pull request merges after review): a review is started from a cover over the Review tab, by *Start review*.** Transcribed by an agent. The act §4 and §9 call *Open review* keeps its meaning: it records when this reviewer started (`opened_at`, the time-on-task start of IR-144), and it stays in Paper View alone. Only where it is offered, and its name, change.
+
+- **On the Review tab, a review not yet started is covered.** While the viewer holds a seat that is `assigned` and not yet opened, a translucent grey layer covers the whole review pane (and a tab opened beside it). A **Start review** button sits in the layer's middle. On a narrow window the pane is a drawer, and the layer covers the opened drawer, with *Back to paper* under the button.
+- **Nothing under the cover can be reached** until the review starts, by pointer, keyboard or screen reader. The paper reader beside it stays usable, so the paper can be read first.
+- ***Start review* is the act's only button.** The Overview's *Open review* and the pane footer's *Open review* are removed, and the Overview stays readable with no review action. A Readiness link for this act reads *Start review*.
+- **Recording the start must succeed.** IR-1206 opened the review even when the recording failed. Behind the cover a failed start leaves the review unusable, so the cover stays, says the review could not be started, and offers *Start review* again.
+- **Once recorded, the cover is gone for good**, because the seat is no longer unopened. *Claim* is unchanged: an office review nobody holds is claimed first, and then the cover appears.
+
 ### 11. Lifecycle
 
 `pipeline_status` stores:

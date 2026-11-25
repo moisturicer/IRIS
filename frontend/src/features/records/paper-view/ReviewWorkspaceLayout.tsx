@@ -133,6 +133,11 @@ function useShownOnce(shown: boolean): boolean {
   return once || shown;
 }
 
+/** Out of reach -- unclickable, unfocusable and unread -- while `hidden` (IR-1336). */
+function hiddenWhile(hidden: boolean) {
+  return hidden ? { inert: "", "aria-hidden": true } : {};
+}
+
 /**
  * Who sent the Version under review, and when, as a pull request says who
  * opened it (IR-1131): "Ana Cruz sent v2 · Nov 3, 2026". The name and date
@@ -229,6 +234,22 @@ export function ReviewWorkspaceLayout({
   // opened one included, so only a seat not yet opened asks for it here: an
   // opened one finishes instead (IR-875).
   const unopened = can.has("open_review") && seatToOpen(record) !== null;
+  // A review not yet started is covered until Start review records it (IR-1336).
+  // Claim comes first: an office review nobody holds is claimed, not started.
+  const covered = unopened && !authorView && !record.review_claim;
+  const [starting, setStarting] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
+  const startReview = async () => {
+    setStarting(true);
+    setStartError(null);
+    try {
+      await onOpenReview?.();
+    } catch {
+      setStartError("Your review could not be started. Try again.");
+    } finally {
+      setStarting(false);
+    }
+  };
   // Changes needs two Versions to compare (ADR-058 §3, IR-873).
   const versions = record.versions ?? [];
   const comparable = versions.length >= 2;
@@ -500,7 +521,7 @@ export function ReviewWorkspaceLayout({
           aria-hidden={drawer && !open || undefined} {...(drawer && !open ? { inert: "" } : {})}
           className={cn("review-pane", open && "review-pane-open")}>
           {!drawer && reader && edge("mid", "Resize the review pane")}
-          <header id={target.head} className="review-pane-head">
+          <header id={target.head} className="review-pane-head" {...hiddenWhile(covered)}>
             <div className="-mr-2 flex items-center gap-1">
               <h2 className="mr-auto font-display text-xl font-semibold text-stone-900">Review</h2>
               {!authorView && <button ref={tourButton} type="button"
@@ -557,6 +578,7 @@ export function ReviewWorkspaceLayout({
             aria-label="Review pane content"
             tabIndex={0}
             className={cn("review-pane-body", FOCUS_RING)}
+            {...hiddenWhile(covered)}
           >
             {allTabs.map(panel)}
           </div>
@@ -569,18 +591,32 @@ export function ReviewWorkspaceLayout({
               </footer>
             )
           ) : (
-          <YourPartFooter footerRef={footer} id={target.foot} part={part} hasFacts={hasFacts} onShowFacts={() => goTo("readiness")}>
+          <YourPartFooter footerRef={footer} id={target.foot} part={part} hasFacts={hasFacts} onShowFacts={() => goTo("readiness")}
+            hidden={covered}>
             <ReviewFooterActions record={record} can={can} actions={REVIEWER_FOOTER_ACTIONS} onChanged={onChanged}
               finishing={finishing && !record.review_claim && !unopened} onFinish={tw.finish} drafts={tw.threads.drafts.length}
               lead={record.review_claim
                 ? <button type="button" disabled={claiming} onClick={() => void claim()} className={cn(PILL_PRIMARY, FOCUS_RING)}>{claiming ? "Claiming…" : record.review_claim.label}</button>
-                : unopened ? <button type="button" onClick={() => void onOpenReview?.()} className={cn(PILL_PRIMARY, FOCUS_RING)}>Open review</button> : undefined} />
+                : undefined} />
             {claimError && <p role="alert" className="basis-full text-small text-brand">{claimError}</p>}
           </YourPartFooter>
           )}
+          {covered && (
+            // IR-1336: until the review starts, the pane is covered and its one
+            // control is Start review, which records the start (ADR-032 §4).
+            <div role="group" aria-label="Your review hasn't started" className="review-cover">
+              <p className="text-body font-semibold text-stone-900">Your review hasn&apos;t started</p>
+              <p className="max-w-xs text-small text-stone-700">Read the paper on the left at any time. Start the review to comment and decide.</p>
+              <button type="button" disabled={starting} onClick={() => void startReview()} className={cn(PILL_PRIMARY, FOCUS_RING)}>
+                {starting ? "Starting…" : "Start review"}
+              </button>
+              {startError && <p role="alert" className="text-small font-semibold text-brand">{startError}</p>}
+              {drawer && <button type="button" onClick={() => setOpen(false)} className={cn("review-control text-brand font-semibold", FOCUS_RING)}>Back to paper</button>}
+            </div>
+          )}
         </section>
         {sideTab && (
-          <aside id={target.side} aria-label={`${TAB_NAMES[sideTab]} on the right`} className="review-side">
+          <aside id={target.side} aria-label={`${TAB_NAMES[sideTab]} on the right`} className="review-side" {...hiddenWhile(covered)}>
             {edge("side", "Resize the right column")}
             <header className="review-side-head">
               <h2 className="font-display text-xl font-semibold text-stone-900">{TAB_NAMES[sideTab]}</h2>

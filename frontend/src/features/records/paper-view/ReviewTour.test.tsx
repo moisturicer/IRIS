@@ -212,7 +212,7 @@ describe("walking through the tour (IR-997)", () => {
     expect(titles.slice(-2)).toEqual(["Your part", "How a review goes"]);
     expect(titles).not.toContain("People & details");
     const step = within(screen.getByRole("dialog", { name: "Review workspace tour" }));
-    expect(step.getByText("1. Claim or open it")).toBeInTheDocument();
+    expect(step.getByText("1. Claim or start it")).toBeInTheDocument();
     expect(step.getByText("3. Finish review")).toBeInTheDocument();
   });
 
