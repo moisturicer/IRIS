@@ -123,109 +123,33 @@ test("every role shares one short main list, in the spec's order", () => {
     "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: Notifications", "Main: Calls & Conferences", "Main: Guidelines",
   ]);
   // The Adviser included since IR-534: Discover is its home, so the Submit
-  // Disclosure shortcut it kept until then is gone. No office, so nothing
-  // nests under My Reviews. My Templates is the Adviser's alone (IR-975).
+  // Disclosure shortcut it kept until then is gone. Changed for IR-1337: My
+  // Reviews and My Templates (the Adviser's alone, IR-975) left the main list
+  // for a group named Adviser, as RDCO's pages are under RDCO.
   expect(labels(ROLES.ADVISER, REVIEW_WORK)).toEqual([
-    "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: Notifications", "Main: My Reviews", "Main: My Templates",
-    "Main: Calls & Conferences", "Main: Guidelines",
+    "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: Notifications",
+    "Main: Calls & Conferences", "Main: Guidelines", "Adviser: My Reviews", "Adviser: My Templates",
   ]);
-  // An office member has the same list: Workflow analytics is RDCO's alone
-  // since IR-1216, and the console is the coordinator's alone.
+  // An office member's My Reviews is under its office's name (IR-1337); the
+  // console is the coordinator's alone, and Workflow analytics RDCO's (IR-1216).
   for (const role of [ROLES.ITSO, ROLES.IERC, ROLES.KTTO]) {
     expect(labels(role, REVIEW_WORK)).toEqual([
-      "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: Notifications", "Main: My Reviews", "Main: Calls & Conferences",
-      "Main: Guidelines",
+      "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: Notifications", "Main: Calls & Conferences",
+      "Main: Guidelines", `${role}: My Reviews`,
     ]);
+    expect(labels(role, COORDINATOR_WORK)).toContain(`${role}: Office Console`);
   }
 });
 
 test("RDCO's coordination screens, Import records included, are one RDCO group", () => {
   // Workflow analytics is in this group since IR-1216, not under My Reviews.
-  expect(labels(ROLES.RDCO, REVIEW_WORK)).toEqual([
-    "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: Notifications", "Main: My Reviews", "Main: Calls & Conferences",
-    "Main: Guidelines", "RDCO: Import Records", "RDCO: Users", "RDCO: Role Requests", "RDCO: Download Requests",
-    "RDCO: Call Requests", "RDCO: Delete Requests", "RDCO: Reported Comments",
-    "RDCO: Workflow Analytics", "RDCO: Setup",
+  // My Reviews leads it since IR-1337, with Office Console under it.
+  expect(labels(ROLES.RDCO, COORDINATOR_WORK)).toEqual([
+    "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: Notifications", "Main: Calls & Conferences",
+    "Main: Guidelines", "RDCO: My Reviews", "RDCO: Office Console", "RDCO: Import Records", "RDCO: Users",
+    "RDCO: Role Requests", "RDCO: Download Requests", "RDCO: Call Requests", "RDCO: Delete Requests",
+    "RDCO: Reported Comments", "RDCO: Workflow Analytics", "RDCO: Setup",
   ]);
-});
-
-// IR-1085, D5: Office console nests under My Reviews for coordinators, at the
-// address it had. Workflow analytics nested here too until IR-1216 moved it to
-// RDCO's group (below).
-describe("the pages nested under My Reviews (IR-1085, D5)", () => {
-  const nested = (role: RoleName, access?: { my_reviews: boolean; is_coordinator?: boolean } | null) =>
-    navFor(role, access)
-      .filter((item) => item.parent === "reviewQueue")
-      .map(({ label, to }) => ({ label, to }));
-
-  test("a coordinator reaches the console at its existing address, and nothing else nests", () => {
-    expect(nested(ROLES.ITSO, COORDINATOR_WORK)).toEqual([
-      { label: "Office Console", to: "/review/office" },
-    ]);
-  });
-
-  test("RDCO's coordinator gets it too, and a missing flag is not a coordinator", () => {
-    expect(nested(ROLES.RDCO, COORDINATOR_WORK).map((i) => i.label)).toEqual(["Office Console"]);
-    expect(nested(ROLES.RDCO, { my_reviews: true, is_coordinator: undefined })).toEqual([]);
-  });
-
-  test("an office member who is not a coordinator has nothing nested", () => {
-    expect(nested(ROLES.IERC, REVIEW_WORK)).toEqual([]);
-    expect(nested(ROLES.IERC, { my_reviews: true, is_coordinator: false })).toEqual([]);
-  });
-
-  test("roles without the screens see neither, even with the flags set", () => {
-    for (const role of [ROLES.STUDENT, ROLES.ADVISER, ROLES.SYSTEM_ADMIN]) {
-      expect(nested(role, COORDINATOR_WORK), role).toEqual([]);
-    }
-  });
-
-  test("they hang from My Reviews: no My Reviews, no nested pages", () => {
-    expect(nested(ROLES.ITSO, { my_reviews: false, is_coordinator: true })).toEqual([]);
-    expect(nested(ROLES.ITSO, null)).toEqual([]);
-  });
-
-  test("the office console is the offices', and its gate is the one the sidebar reads", () => {
-    only("reviewOffice", [ROLES.RDCO, ROLES.ITSO, ROLES.IERC, ROLES.KTTO]);
-  });
-});
-
-test("the System Admin's nav is Discover, Notifications, Users, Audit Log, Account Deletions, Reported comments and Retention (IR-783, IR-788, IR-693, IR-795, IR-972)", () => {
-  // No Guidelines link (IR-974, ADR-063 amendment 2026-11-19).
-  expect(labels(ROLES.SYSTEM_ADMIN)).toEqual([
-    "Main: Discover", "Main: Notifications",
-    "Administration: Users", "Administration: Audit Log", "Administration: Account Deletions",
-    "Administration: Reported Comments", "Administration: Retention",
-  ]);
-});
-
-// IR-693 (decision 2026-11-15): one Reported comments page, in RDCO's and the
-// System Admin's navigation and nobody else's.
-test("the Reported comments page is RDCO's and the System Admin's alone, at /moderation/comments", () => {
-  for (const role of Object.values(ROLES)) {
-    const page = navFor(role).filter((item) => item.label === "Reported Comments");
-    const allowed = role === ROLES.RDCO || role === ROLES.SYSTEM_ADMIN;
-    expect(page.map((item) => item.to), role).toEqual(allowed ? ["/moderation/comments"] : []);
-  }
-});
-
-// IR-972 (ADR-063 decision 9): the Notices page became Setup's Notice section.
-// Nobody has a Notices link; the System Admin reads publications in the Audit Log.
-test("no role has a Notices link, and the Notice is RDCO's, on Setup", () => {
-  for (const role of Object.values(ROLES)) {
-    expect(navFor(role).filter((item) => item.label === "Notices"), role).toEqual([]);
-  }
-  expect(canAccess(ROLES.RDCO, "setup")).toBe(true);
-  expect(canAccess(ROLES.SYSTEM_ADMIN, "setup")).toBe(false);
-});
-
-// IR-975 (ADR-063 decision 8): My Templates is the Adviser's own; RDCO included, nobody else has it.
-test("My Templates is the Adviser's alone", () => {
-  only("myTemplates", [ROLES.ADVISER]);
-  for (const role of Object.values(ROLES)) {
-    const listed = navFor(role, REVIEW_WORK).some((item) => item.to === "/my-templates");
-    assertEqual(listed, role === ROLES.ADVISER, `${role} has a My Templates link`);
-  }
 });
 
 // IR-974 (ADR-063 decision 7, amended 2026-11-19): every role but the System

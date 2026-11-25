@@ -77,7 +77,23 @@ const SYSTEM_ADMIN: RoleName[] = [ROLES.SYSTEM_ADMIN];
  * sections before IR-413 (Research Exploration, IP Management, Review Queue,
  * Tools, Administration) made a one-item "Tools" heading the commonest sight.
  */
-export type NavSectionName = "Main" | "RDCO" | "Administration";
+export type NavSectionName = "Main" | "Adviser" | "ITSO" | "IERC" | "KTTO" | "RDCO" | "Administration";
+
+/**
+ * A nav entry's section may be "Role": listed under a heading named for the
+ * user's own role (IR-1337), so a reviewer's My Reviews sits with their role's
+ * other pages -- under Adviser, ITSO, IERC or KTTO, or first in RDCO's group.
+ * A role with no group of its own keeps it in the main list.
+ */
+type NavSectionSpec = NavSectionName | "Role";
+
+const ROLE_SECTION: Partial<Record<RoleName, NavSectionName>> = {
+  [ROLES.ADVISER]: "Adviser",
+  [ROLES.ITSO]: "ITSO",
+  [ROLES.IERC]: "IERC",
+  [ROLES.KTTO]: "KTTO",
+  [ROLES.RDCO]: "RDCO",
+};
 
 interface ScreenDef {
   /** Route path, as registered in `router/index.tsx`. */
@@ -87,7 +103,7 @@ interface ScreenDef {
   nav?: {
     label: string;
     icon: string;
-    section: NavSectionName;
+    section: NavSectionSpec;
     /**
      * Narrows who sees the sidebar item, never who may open the route: a
      * role outside it can still reach the screen by link or redirect.
@@ -167,20 +183,20 @@ export const SCREEN_ACCESS = {
   // user with review work, and `/review` sends anyone else to Discover
   // (IR-413, `ReviewAccessRoute`).
   reviewQueue: { path: "/review",  roles: REVIEWERS,
-                 nav: { label: "My Reviews", icon: "fa-list-check", section: "Main",
+                 nav: { label: "My Reviews", icon: "fa-list-check", section: "Role",
                         needsReviewAccess: true } },
 
   // The coordinator's console (IR-623). The sidebar lists it only for a
   // coordinator; the server refuses anyone else. Nested under My Reviews in the
   // sidebar (IR-1085, D5), at the address it always had.
   reviewOffice: { path: "/review/office", roles: OFFICES,
-                  nav: { label: "Office Console", icon: "fa-users-gear", section: "Main",
+                  nav: { label: "Office Console", icon: "fa-users-gear", section: "Role",
                          parent: "reviewQueue", needsCoordinator: true } },
 
   // An Adviser's own proposal Templates (ADR-063 decision 8, IR-975). Only
   // the Adviser's; the server refuses anyone else, RDCO included.
   myTemplates: { path: "/my-templates", roles: [ROLES.ADVISER],
-                 nav: { label: "My Templates", icon: "fa-file-lines", section: "Main" } },
+                 nav: { label: "My Templates", icon: "fa-file-lines", section: "Role" } },
 
   // Declared after My Reviews because the sidebar lists entries in
   // declaration order, and spec §4.1 puts it last in the main list.
@@ -312,7 +328,8 @@ export interface NavReviewAccess {
 }
 
 /**
- * Every nav entry this role may open, in declaration order.
+ * Every nav entry this role may open, by section in the sidebar's order, then
+ * in declaration order.
  *
  * Sections are not listed separately: a section exists for a role exactly when
  * it has an entry here, which is what keeps an empty "Administration" heading
@@ -340,10 +357,16 @@ export function navFor(
     if (onlyFor && !onlyFor.includes(role)) return [];
     if (needsReviewAccess && !hasReviewWork(reviewAccess)) return [];
     if (needsCoordinator && !isCoordinator(reviewAccess)) return [];
-    return [{ key, to: def.path, ...item } as NavEntry];
+    const section = item.section === "Role" ? ROLE_SECTION[role] ?? "Main" : item.section;
+    return [{ key, to: def.path, ...item, section } as NavEntry];
   });
-  // A child with no parent in the list has nothing to hang from.
-  return entries.filter((entry) => !entry.parent || entries.some((other) => other.key === entry.parent));
+  // A child with no parent in the list has nothing to hang from. Grouped in
+  // the sidebar's section order, so this list reads as the sidebar does now
+  // that a role's review pages sit in its own group (IR-1337); the sort is
+  // stable, so each section keeps declaration order.
+  return entries
+    .filter((entry) => !entry.parent || entries.some((other) => other.key === entry.parent))
+    .sort((a, b) => NAV_SECTION_ORDER.indexOf(a.section) - NAV_SECTION_ORDER.indexOf(b.section));
 }
 
 /**
@@ -376,4 +399,4 @@ export function canAuthor(user?: { can_author?: boolean } | null): boolean {
 }
 
 /** The sidebar's section order. */
-export const NAV_SECTION_ORDER: NavSectionName[] = ["Main", "RDCO", "Administration"];
+export const NAV_SECTION_ORDER: NavSectionName[] = ["Main", "Adviser", "ITSO", "IERC", "KTTO", "RDCO", "Administration"];
