@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { Button } from "@/components/ui/Button";
+import { DialogCloseX } from "@/components/ui/DialogCloseX";
 import { useDialogFocus } from "@/hooks/useDialogFocus";
 import type { AccountLock } from "@/features/auth/loginFailure";
 
@@ -62,6 +62,9 @@ export function AccountLockedModal({ open, onClose, lock, returnTo }: AccountLoc
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
       >
+        {/* Closed by the X, Escape or a click outside (IR-1327). */}
+        <DialogCloseX onClose={onClose} />
+
         <div className="mx-auto w-14 h-14 rounded-full bg-stone-100 flex items-center justify-center mb-5">
           <svg className="w-7 h-7 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
             <path
@@ -75,7 +78,7 @@ export function AccountLockedModal({ open, onClose, lock, returnTo }: AccountLoc
         <h2 id={titleId} className="text-title font-bold text-stone-900">
           Account Locked
         </h2>
-        <p id={descriptionId} className="mt-3 text-body text-stone-600 leading-relaxed">
+        <p id={descriptionId} className="mt-3 text-body text-stone-600 leading-relaxed text-justified">
           {lock.by === "admin" ? (
             <>
               An administrator has locked this account, and it stays locked until they unlock it, so
@@ -93,16 +96,6 @@ export function AccountLockedModal({ open, onClose, lock, returnTo }: AccountLoc
             </>
           )}
         </p>
-
-        <Button
-          type="button"
-          variant="secondary"
-          size="full"
-          onClick={onClose}
-          className="mt-8"
-        >
-          Close
-        </Button>
       </div>
     </div>
   );

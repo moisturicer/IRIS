@@ -58,9 +58,31 @@ class DocumentRequestTestBase(TrackerTestBase):
         )
 
     def requested(self, record, actor, items, **extra):
+        """
+        `actor` asks for `items` and the request goes out, as their *Finish
+        review* sends it (ADR-022 Amendment 9, IR-1325): a new request is a
+        draft until then. `drafted` stops at the draft.
+        """
+        data = self.drafted(record, actor, items, **extra)
+        return self.send_drafts(record, actor, data)
+
+    def drafted(self, record, actor, items, **extra):
         response = self.request_documents(record, actor, items, **extra)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
         return response.data
+
+    def send_drafts(self, record, actor, data):
+        """Send `actor`'s drafts for `data`'s party as *Finish review* does, and re-read `data`."""
+        from django.db import transaction
+
+        from apps.documents import requests as document_requests
+        from apps.documents.request_serializers import serialize_request
+
+        with self.captureOnCommitCallbacks(execute=True), transaction.atomic():
+            document_requests.send_drafts(record, actor, data["party"])
+        return serialize_request(
+            document_requests.requests_for(record, actor).get(pk=data["id"]), actor
+        )
 
     def listed(self, record, viewer=None):
         self.client.force_authenticate(viewer or self.owner)

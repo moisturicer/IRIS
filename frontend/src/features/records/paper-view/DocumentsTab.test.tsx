@@ -78,6 +78,16 @@ function hold(slotId: number, id: number) {
   });
 }
 
+/** A version already sent (not held), as the server lists it. */
+function sentUpload(slotId: number, id: number, version = 1): RecordUpload {
+  return {
+    id, record: RECORD_ID, slot: slotId, slot_name: "Patent Draft", file: `/media/uploads/9/${id}.pdf`,
+    version, status: null, status_name: null, uploaded_by: 50,
+    uploaded_by_name: "Sam Student", created_at: "2026-10-09T02:00:00Z", reviews: [],
+    delete_refused: null, held: false,
+  } as RecordUpload;
+}
+
 /** *Submit added documents*: every held upload is sent and answers what it matches, by slot or name. */
 function send() {
   const sent = slots.filter((s) => s.uploads.some((u) => u.held));
@@ -161,6 +171,9 @@ const record = {
   decision: { party: null, outcomes: [], blocked: null, closes: null, token: null, author_hints: [] },
 } as unknown as RecordDetail;
 
+/** A draft: its owner may upload to every slot (IR-1325). */
+const drafting = { ...record, pipeline_status: "draft" } as RecordDetail;
+
 /** A record on the new model with a revision asked for (IR-273): the owner is offered a new version. */
 const revising = {
   ...record,
@@ -234,17 +247,44 @@ function renderFiles(
 const pdf = (name: string) => new File(["%PDF-1.4"], name, { type: "application/pdf" });
 
 describe("the Documents tab, for the owner of a record in review", () => {
-  it("offers an upload on every slot while something is asked for, and says who asked", async () => {
+  // Upload only on what was asked for (ADR-022 Amendment 9, IR-1325, replacing IR-1322's every slot).
+  it("offers an upload only on what was asked for, and says who asked", async () => {
     const { container } = renderFiles();
 
     const ethics = await screen.findByRole("group", { name: "Ethics Clearance" });
     expect(within(ethics).getByRole("button", { name: /^Upload Ethics Clearance/ })).toBeInTheDocument();
     expect(within(ethics).getByText(/Requested by IERC/)).toBeInTheDocument();
     expect(within(ethics).getByText("Requested")).toBeInTheDocument();
-    // Nobody asked for it, and the owner may still add it (IR-1322).
-    const patent = screen.getByRole("group", { name: "Patent Draft" });
-    expect(within(patent).getByRole("button", { name: /^Upload Patent Draft/ })).toBeInTheDocument();
+    // Nobody asked for it, so it is not offered.
+    expect(screen.queryByRole("group", { name: "Patent Draft" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Upload Patent Draft/ })).not.toBeInTheDocument();
     await expectNoBlockingA11yViolations(container);
+  });
+
+  it("shows a file in a slot nobody asked for with no Upload", async () => {
+    slots = slots.map((s) => s.id === PATENT ? { ...s, uploads: [sentUpload(PATENT, 610)] } : s);
+    renderFiles();
+
+    const patent = await screen.findByRole("group", { name: "Patent Draft" });
+    // Its Download is in its versions list (IR-1330).
+    fireEvent.click(within(patent).getByRole("button", { name: "1 version of Patent Draft" }));
+    expect(within(patent).getByRole("button", { name: "Download Patent Draft version 1" })).toBeInTheDocument();
+    expect(within(patent).queryByRole("button", { name: /^Upload/ })).not.toBeInTheDocument();
+  });
+
+  // IR-1330: the newest version had a Download under the document's name and
+  // another on its row in the list. Only the row's remains.
+  it("downloads each version from its row in the list, and nowhere else", async () => {
+    slots = slots.map((s) => s.id === PATENT ? { ...s, uploads: [sentUpload(PATENT, 612, 2), sentUpload(PATENT, 611, 1)] } : s);
+    renderFiles();
+
+    const patent = await screen.findByRole("group", { name: "Patent Draft" });
+    expect(within(patent).queryByRole("button", { name: /^Download/ })).not.toBeInTheDocument();
+
+    fireEvent.click(within(patent).getByRole("button", { name: "2 versions of Patent Draft" }));
+    expect(within(patent).getAllByRole("button", { name: /^Download/ })).toHaveLength(2);
+    expect(within(patent).getByRole("button", { name: "Download Patent Draft version 2" })).toBeInTheDocument();
+    expect(within(patent).getByRole("button", { name: "Download Patent Draft version 1" })).toBeInTheDocument();
   });
 
   it("lists no unrequested slot, and offers no upload, when nothing is asked for", async () => {
@@ -308,8 +348,8 @@ describe("the Documents tab, for the owner of a record in review", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Remove" }));
 
     await waitFor(() => expect(deleteUpload).toHaveBeenCalledWith(600));
-    await waitFor(() => expect(within(screen.getByRole("group", { name: "Patent Draft" }))
-      .queryByText("Added, not sent yet")).not.toBeInTheDocument());
+    // Nobody asked for it and it holds no file now, so its row goes (IR-1325).
+    await waitFor(() => expect(screen.queryByRole("group", { name: "Patent Draft" })).not.toBeInTheDocument());
   });
 
   it("keeps Submit added documents grey, saying why, until something is added", async () => {
@@ -381,7 +421,7 @@ describe("the Documents tab, for the owner of a record in review", () => {
 describe("the Documents tab, for the owner of an editable record", () => {
   it("offers an upload on every slot", async () => {
     requests = [];
-    renderFiles({ editable: true });
+    renderFiles({ editable: true }, drafting);
 
     expect(await screen.findByRole("button", { name: /^Upload Ethics Clearance/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Upload Patent Draft/ })).toBeInTheDocument();
@@ -395,7 +435,7 @@ describe("requirement labels and Templates", () => {
 
   it("labels each requirement Required or Optional and offers its Template, and the Manuscript its type's", async () => {
     requests = [];
-    renderFiles({ editable: true });
+    renderFiles({ editable: true }, drafting);
 
     const ethics = await row("Ethics Clearance");
     expect(await within(ethics).findByText("Required")).toBeInTheDocument();
@@ -412,7 +452,7 @@ describe("requirement labels and Templates", () => {
 
   it("downloads a Template under its own file name", async () => {
     requests = [];
-    renderFiles({ editable: true });
+    renderFiles({ editable: true }, drafting);
 
     fireEvent.click(await screen.findByRole("button", { name: "Download the Ethics Clearance Template, ethics-form.docx" }));
 
@@ -423,7 +463,7 @@ describe("requirement labels and Templates", () => {
   it("gives a slot that is no longer one of RDCO's requirements no label and no Template", async () => {
     requests = [];
     slots = [...slots, { ...slot(99, "Old Endorsement"), hidden: true, is_required: true, template_name: "old.docx" }];
-    renderFiles({ editable: true });
+    renderFiles({ editable: true }, drafting);
 
     const old = await row("Old Endorsement");
     await within(await row("Ethics Clearance")).findByText("Required");
@@ -434,7 +474,7 @@ describe("requirement labels and Templates", () => {
   it("says when the labels and Templates didn't load, and still offers every upload", async () => {
     requests = [];
     guidelinesList.mockRejectedValueOnce({ isAxiosError: true, response: { status: 500, data: {} } });
-    renderFiles({ editable: true });
+    renderFiles({ editable: true }, drafting);
 
     expect(await screen.findByText(/labels and the Templates didn't load/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Upload Ethics Clearance/ })).toBeInTheDocument();
@@ -443,7 +483,7 @@ describe("requirement labels and Templates", () => {
 
   it("passes axe with labels and Templates shown", async () => {
     requests = [];
-    const { container } = renderFiles({ editable: true });
+    const { container } = renderFiles({ editable: true }, drafting);
     await within(await row("Ethics Clearance")).findByText("Required");
 
     await expectNoBlockingA11yViolations(container);
@@ -477,8 +517,19 @@ describe("removing a document version", () => {
   const openVersions = async () =>
     fireEvent.click(await screen.findByRole("button", { name: "2 versions of Ethics Clearance" }));
 
+  // IR-1332: Remove is a trash can alone, like a draft's in My Library: its
+  // name says what it removes, and the word "Remove" is its tooltip, not text.
+  it("draws Remove as a trash can with no word, and Download with its word", async () => {
+    renderFiles({ editable: true }, drafting);
+    await openVersions();
+
+    const versions = await screen.findByRole("list", { name: "Versions of Ethics Clearance" });
+    expect(within(versions).getByRole("button", { name: "Remove Ethics Clearance version 2" })).toHaveTextContent(/^$/);
+    expect(within(versions).getByRole("button", { name: "Download Ethics Clearance version 2" })).toHaveTextContent("Download");
+  });
+
   it("offers no Remove on a kept version, and says why", async () => {
-    const { container } = renderFiles({ editable: true });
+    const { container } = renderFiles({ editable: true }, drafting);
     await openVersions();
 
     const versions = await screen.findByRole("list", { name: "Versions of Ethics Clearance" });
@@ -489,7 +540,7 @@ describe("removing a document version", () => {
   });
 
   it("asks before removing, and Cancel removes nothing", async () => {
-    renderFiles({ editable: true });
+    renderFiles({ editable: true }, drafting);
     await openVersions();
     fireEvent.click(await screen.findByRole("button", { name: "Remove Ethics Clearance version 2" }));
 
@@ -507,7 +558,7 @@ describe("removing a document version", () => {
     deleteUpload.mockRejectedValueOnce({
       response: { status: 400, data: { detail: "This file answered a document request, so it can't be deleted." } },
     });
-    renderFiles({ editable: true });
+    renderFiles({ editable: true }, drafting);
     await openVersions();
     fireEvent.click(await screen.findByRole("button", { name: "Remove Ethics Clearance version 2" }));
     const dialog = await screen.findByRole("dialog");
@@ -662,7 +713,7 @@ describe("the manuscript, while a revision is asked for (IR-273)", () => {
   });
 
   it("offers no manuscript upload without the replace_manuscript capability", async () => {
-    renderFiles({ editable: true });
+    renderFiles({ editable: true }, drafting);
     await screen.findByRole("button", { name: /^Upload Ethics Clearance/ });
     expect(screen.queryByRole("button", { name: /^Upload revised manuscript/ })).not.toBeInTheDocument();
   });
@@ -770,7 +821,9 @@ describe("downloading a document version", () => {
     }] }];
     renderFiles({ owner: false, reviewing: true, onOpen: vi.fn() });
 
-    fireEvent.click(await screen.findByRole("button", { name: "Download Ethics Clearance version 2" }));
+    // Downloaded from its row in the versions list (IR-1330).
+    fireEvent.click(await screen.findByRole("button", { name: "1 version of Ethics Clearance" }));
+    fireEvent.click(screen.getByRole("button", { name: "Download Ethics Clearance version 2" }));
     await waitFor(() => expect(downloadBlob).toHaveBeenCalledWith(expect.any(Blob), "Ethics Clearance v2.png"));
     // A slot's upload is served as a PDF (IR-1203's image half covers attachments only), so no image Open.
     expect(screen.queryByRole("button", { name: "Open Ethics Clearance version 2" })).not.toBeInTheDocument();
@@ -785,7 +838,9 @@ describe("downloading a document version", () => {
     }] }];
     renderFiles({ owner: false, reviewing: true });
 
-    fireEvent.click(await screen.findByRole("button", { name: "Download Ethics Clearance version 1" }));
+    // Downloaded from its row in the versions list (IR-1330).
+    fireEvent.click(await screen.findByRole("button", { name: "1 version of Ethics Clearance" }));
+    fireEvent.click(screen.getByRole("button", { name: "Download Ethics Clearance version 1" }));
     await waitFor(() => expect(downloadBlob).toHaveBeenCalledWith(expect.any(Blob), "Ethics Clearance v1.pdf"));
   });
 });

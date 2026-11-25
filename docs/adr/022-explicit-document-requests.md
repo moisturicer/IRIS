@@ -15,6 +15,8 @@
 
 > **Amended 2026-11-24 ([IR-1322](https://citiris.atlassian.net/browse/IR-1322); decided by Hermoine Zozobrado; accepted 2026-11-24 when PR #1006 merged, with Ashlee Sean's security review of point 4).** A reviewer's *Request revision* is shown as *Request changes* and may ask for documents in the same act. An owner's uploads to a submitted record are held, seen by its owners only, until *Submit new version* or *Submit added documents* sends them. See *Amendment 8*.
 
+> **Amended 2026-11-24 ([IR-1325](https://citiris.atlassian.net/browse/IR-1325); decided by Hermoine Zozobrado; accepted 2026-11-24 when PR #1010 merged, approved by Ashlee Sean as relayed by Hermoine Zozobrado).** Documents are asked for only in the Documents tab, where each request waits as the reviewer's draft until their *Finish review* sends it. *Request changes* always asks for a new version and no longer carries documents. The owner gets *Upload* only on what was asked for. See *Amendment 9*.
+
 > **Amended 2026-11-18 ([IR-1226](https://citiris.atlassian.net/browse/IR-1226); accepted 2026-11-18 with PR #895's merge; security review approved verbally by Ashlee Sean, relayed by Hermoine Zozobrado).** Creating, deciding and withdrawing a request takes a seat on the requesting party, not membership of it. See *Amendment 7*.
 
 **Accepted** — 2026-09-15 · **amended 2026-09-24, §Amendment (fulfilment, who may read request data, refusals)**. Settled as a business decision by **Lee Jasmin Adolfo** (project lead);
@@ -409,6 +411,46 @@ Decided by Hermoine Zozobrado on 2026-11-24 for [IR-1322](https://citiris.atlass
 - **Access matrix** (`apps/tests/access/table.py`): gains the send route, and a held upload's 404 for every role but the owners.
 - **An unsent upload is sent to nobody.** An owner who uploads and never presses Submit has sent nothing. *Waiting on you* keeps the request open, and the button stays maroon while something is held.
 - **Research Impact is unchanged:** a documents-only request still makes no resubmission.
+
+## Amendment 9 — 2026-11-24: document requests are drafts until *Finish review* sends them
+
+**Status: Accepted** — 2026-11-24, when IR-1325's PR (#1010) merged after Ashlee Sean's review, as relayed by Hermoine Zozobrado. Decided by Hermoine Zozobrado on 2026-11-24, in chat, while reviewing IR-1322's result. Transcribed by an agent. It replaces Amendment 8's points 2 and 8, and amends [ADR-032](032-adviser-first-review-and-office-reviewer-pools.md) §7 (what *Finish review* sends).
+
+**The problem.**
+- **Two places to ask.** After Amendment 8, a reviewer could ask for documents in *Finish review → Request changes* and also with *Request documents* in the Documents tab. Nothing said which to use.
+- **A request went out mid-review.** *Request documents* sent the request at once, so the owner was asked for a form while the reviewer was still reading and before their review came.
+- **Upload on every slot.** Amendment 8 point 8 offered *Upload* on every slot while anything was asked, which the owner did not want: a slot nobody asked for should take no file.
+
+**The decision.**
+1. **Documents are asked for in one place: the Documents tab.** *Request changes* in *Finish review* no longer has the picklist or *The paper itself needs changes* tick. It always asks for a new version (`revisions.request_revision`), as it did before Amendment 8. `POST /records/<id>/finish-review/` no longer reads `documents` or `new_version`.
+2. **A request is a draft until its reviewer finishes.** `DocumentRequestState` gains `draft`. `POST /records/<id>/document-requests/` makes a draft:
+   - Only its asker sees it. The list endpoint and the tracker leave out everyone else's drafts, and the request routes answer someone else's draft with 404 (`request_on_visible_record`).
+   - It writes no audit event and sends no notification, since nobody has been asked yet.
+   - Every reader that counts open requests reads `open` and is unchanged: the owner's *Waiting on you*, the tracker's `awaiting_document`, deadlines, readiness, withdrawal and a Decision. A draft makes no one a participant (`may_read_requests`).
+   - Its asker can undo it with the same `PATCH /document-requests/<id>/ {"action": "withdraw"}`. A draft is deleted, not withdrawn, because it was never sent (204).
+3. ***Finish review* sends the drafts.** Under the record lock, in the round's transaction, *Request changes* and *Comment only* open the caller's drafts for the Seat's party (`requests.send_drafts`). Each is dated now, takes the party's current assignment, writes `document_requested`, and notifies the owners once the transaction commits.
+   - Request changes plus drafts is a revision and document requests from one party. The owner still sees one *Changes requested by {party}* entry (Amendment 8 point 3).
+   - Comment only plus drafts is documents only, with no revision.
+4. **Every other verdict is refused while drafts wait (400).** *Send to RDCO*, *Clear*, *Record finding*, *Accept*, *Accept & publish*, *Keep unlisted* and *Reject* all say: *"You have N document requests waiting. Remove them in the Documents tab, or choose Request changes or Comment only."* The pop-up shows those verdicts as unavailable with the same words. This follows the *Must fix* rule (ADR-032 §7): a verdict that says the paper needs nothing more can't go out with an ask that says it does.
+5. **Upload only on what was asked for** (replaces Amendment 8 point 8).
+   - While the paper is a draft, the owner may upload to every slot.
+   - Once submitted, *Upload* is offered only on a slot or **Other** item an open request names, and only while it still needs a file.
+   - A revision asks for the manuscript, which its own row takes.
+   - Every other slot shows its files with no *Upload*. This is a screen rule: the server's upload routes are unchanged (Amendment 8 point 4 still holds what an owner uploads until they send it).
+
+**Who can still send at once.** Nobody needs to. Since IR-1226, asking for documents needs an open Seat (`requestable_parties`), the same thing *Finish review* needs, so every reviewer who can draft a request can also send it. A reviewer whose Seat is assigned but not yet opened can draft one; they send it by opening the review and finishing it, as *Finish review* already requires.
+
+**Rejected alternatives.**
+- **Keep the picklist in *Request changes*, and remove it from the Documents tab** (Amendment 8's shape, kept). The reviewer asks for documents where they look at them, which is the Documents tab. Asking for documents would also always finish the review.
+- **Send drafts with any verdict.** *Accept* with an open request for a missing form contradicts itself.
+- **Discard drafts quietly on any other verdict.** A reviewer could lose a request without noticing.
+- **Keep *The paper itself needs changes* tick for documents only.** *Comment only* already sends the drafts without a revision, so the tick would be a second way to say the same thing.
+
+**Consequences.**
+- **Code:** one migration (`0030_document_request_draft`). It adds the choice and alters no stored row, because every existing request is already `open`, `fulfilled` or `withdrawn`.
+- **Removed:** the screen's *Request changes* fields (`RequestChangesFields.tsx`).
+- **A draft that is never sent asks nobody anything.** If the reviewer's seat closes another way (a Decision, a withdrawal, being taken off the paper), it stays a draft that only they could see, as draft comments do.
+- **Research Impact is unchanged:** a documents-only request still makes no resubmission, and a revision still resets only its party's clearance.
 
 ## Alternatives Considered
 

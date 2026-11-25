@@ -1257,9 +1257,6 @@ export interface FinishReviewRequest {
   to?:                RouteRequest["to"];
   suggested_offices?: string[];
   token?:             string;
-  /** *Request changes* only (ADR-022 Amendment 8, IR-1322). */
-  new_version?:       boolean;
-  documents?:         DocumentRequestItemInput[];
 }
 
 /** One finished review, on the tracker (IR-874). Review content. */
@@ -1608,7 +1605,8 @@ export interface DeleteRequest {
 // Document requests (ADR-022, IR-262)
 // ---------------------------------------------------------------------------
 
-export type DocumentRequestState = "open" | "fulfilled" | "withdrawn";
+/** `draft`: asked, not sent yet; only its asker sees it (ADR-022 Amendment 9, IR-1325). */
+export type DocumentRequestState = "draft" | "open" | "fulfilled" | "withdrawn";
 export type DocumentRequestItemState = "missing" | "uploaded" | "accepted" | "rejected";
 
 export interface DocumentRequestItem {

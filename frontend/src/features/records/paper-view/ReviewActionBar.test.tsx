@@ -244,7 +244,7 @@ describe("the real actions (REVIEW_ACTIONS)", () => {
     const dialog = screen.getByRole("dialog", { name: "Request documents" });
     await userEvent.click(await within(dialog).findByRole("checkbox", { name: "Ethics Clearance" }));
     await userEvent.type(within(dialog).getByRole("textbox", { name: /Message to the owner/ }), "Please attach it.");
-    await userEvent.click(within(dialog).getByRole("button", { name: "Send request" }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "Add to review" }));
 
     expect(recordsApi.createDocumentRequest).toHaveBeenCalledWith(7, {
       message: "Please attach it.",

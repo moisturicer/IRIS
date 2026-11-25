@@ -273,10 +273,34 @@ class VisibilityTests(NoteTestCase):
         Record.objects.filter(pk=record.pk).update(pipeline_status=PipelineStatus.PUBLISHED)
         self.assertEqual(self.client.get(note_url(record)).data["body"], "kept through revocation")
 
-    def test_an_owner_may_keep_a_note_on_their_own_draft(self):
-        draft = self.record("My draft", status=PipelineStatus.DRAFT, owner=self.reader)
+    # Changed deliberately by IR-1326 (ADR-064 as amended 2026-11-24): a paper
+    # that isn't published takes no note, even its owner's. It had review
+    # comments instead; this test said an owner could keep a note on a draft.
+    def test_an_unpublished_record_takes_no_note_even_its_owners(self):
+        for status in (PipelineStatus.DRAFT, PipelineStatus.IN_REVIEW):
+            draft = self.record(f"My {status} paper", status=status, owner=self.reader)
+            missing_id = draft.id + 10_000
 
-        self.assertEqual(self.write(draft, "plan", base_revision=0).status_code, 200)
+            for call in (
+                lambda r: self.client.get(note_url(r)),
+                lambda r: self.write(r, "plan", base_revision=0),
+                lambda r: self.client.delete(note_url(r)),
+            ):
+                hidden, missing = call(draft), call(missing_id)
+                self.assertEqual((hidden.status_code, missing.status_code), (404, 404), status)
+                self.assertEqual(hidden.data, missing.data)
+        self.assertFalse(ReadingNote.objects.exists())
+
+    def test_a_note_on_a_paper_sent_back_to_review_is_kept_until_it_is_published_again(self):
+        record = self.record("Published, then revised", owner=self.reader)
+        self.write(record, "my reading", base_revision=0)
+        Record.objects.filter(pk=record.pk).update(pipeline_status=PipelineStatus.IN_REVIEW)
+
+        self.assertEqual(self.client.get(note_url(record)).status_code, 404)
+        self.assertEqual(ReadingNote.objects.get(owner=self.reader, record=record).body, "my reading")
+
+        Record.objects.filter(pk=record.pk).update(pipeline_status=PipelineStatus.PUBLISHED)
+        self.assertEqual(self.client.get(note_url(record)).data["body"], "my reading")
 
     def test_deleting_the_record_deletes_its_notes(self):
         record = self.record()

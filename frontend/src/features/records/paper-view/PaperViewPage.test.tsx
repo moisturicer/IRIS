@@ -1076,16 +1076,28 @@ describe("Ask IRIS beside a paper not yet published (IR-1252)", () => {
     useUIStore.setState({ sidebarCollapsed: false, sidebarOpen: false, readingRail: null });
   });
 
-  it("isn't opened on entering Paper, offered as an icon, or linked from Notes", async () => {
+  // Changed deliberately by IR-1326: Notes went with Ask IRIS here, and this
+  // test opened it. A paper not yet published now offers neither.
+  it("isn't opened on entering Paper or offered as an icon, and neither is Notes", async () => {
     renderPaper(`/records/${RECORD_ID}?section=paper`);
     await screen.findByText(/paper reader open/i);
 
     expect(screen.queryByRole("complementary", { name: "Ask IRIS" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Ask IRIS" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Notes" })).not.toBeInTheDocument();
+  });
 
-    await userEvent.click(screen.getByRole("button", { name: "Notes" }));
-    await screen.findByRole("heading", { name: "Notes" });
-    expect(screen.queryByRole("button", { name: "Ask IRIS" })).not.toBeInTheDocument();
+  // IR-1326 (ADR-064/065 as amended 2026-11-24): private notes and highlights
+  // are kept on published papers only.
+  it("offers no Save highlight, and reads no note or highlight", async () => {
+    vi.mocked(libraryApi.note).mockClear();
+    vi.mocked(libraryApi.highlights).mockClear();
+    renderPaper(`/records/${RECORD_ID}?section=paper`);
+    await screen.findByText(/paper reader open/i);
+
+    expect(screen.queryByRole("button", { name: "Selection: Save highlight" })).not.toBeInTheDocument();
+    expect(libraryApi.note).not.toHaveBeenCalled();
+    expect(libraryApi.highlights).not.toHaveBeenCalled();
   });
 
   it("is offered again once the paper is published", async () => {
@@ -1843,6 +1855,17 @@ describe("the header's actions follow the capabilities (IR-411)", () => {
 // The Review section (IR-412; spec §4.7): the paper, the timeline beside it,
 // and an action bar whose buttons are the capabilities adapter's, nothing
 // else. Ask IRIS is not part of it (spec §4.6, decided 2026-09-26).
+/**
+ * A document version opens by its title in the row's versions list (IR-1325):
+ * the row's arrow shows the list, then "Version N" is the control.
+ */
+async function versionTitle(row: HTMLElement, version: number) {
+  const name = row.getAttribute("aria-labelledby") ? within(row).getByRole("heading").textContent ?? "" : "";
+  const toggle = within(row).getByRole("button", { name: new RegExp(`versions? of ${name}$`) });
+  if (toggle.getAttribute("aria-expanded") !== "true") await userEvent.click(toggle);
+  return within(row).getByRole("button", { name: `Open ${name} version ${version}` });
+}
+
 describe("the Review section (IR-412)", () => {
   const trackerPayload = {
     record_id: RECORD_ID,
@@ -2872,9 +2895,10 @@ describe("the Review section (IR-412)", () => {
       const consent = await within(panel).findByRole("group", { name: "Consent Paper" });
       expect(consent).toHaveTextContent(`v2 · Rhea Owner · ${formatDate("2026-11-03T08:00:00Z")}`);
       expect(within(panel).getByRole("group", { name: "Manuscript" })).toBeInTheDocument();
-      // A reviewer downloads; only an owner uploads.
-      expect(within(consent).getByRole("button", { name: "Download Consent Paper version 2" })).toBeInTheDocument();
+      // A reviewer downloads, from the versions list (IR-1330); only an owner uploads.
       expect(within(consent).queryByRole("button", { name: /^Upload/ })).not.toBeInTheDocument();
+      await userEvent.click(within(consent).getByRole("button", { name: "2 versions of Consent Paper" }));
+      expect(within(consent).getByRole("button", { name: "Download Consent Paper version 2" })).toBeInTheDocument();
       expect(screen.queryByRole("dialog", { name: "All documents" })).not.toBeInTheDocument();
     });
 
@@ -2908,8 +2932,8 @@ describe("the Review section (IR-412)", () => {
       await userEvent.click(screen.getByRole("tab", { name: "Documents" }));
       const consent = await within(screen.getByRole("tabpanel", { name: "Documents" }))
         .findByRole("group", { name: "Consent Paper" });
-      // The owner of an editable record may add a version to any slot.
-      expect(within(consent).getByRole("button", { name: /^Upload Consent Paper/ })).toBeInTheDocument();
+      // In review, with nothing asked for it, it takes no upload (ADR-022 Amendment 9, IR-1325).
+      expect(within(consent).queryByRole("button", { name: /^Upload Consent Paper/ })).not.toBeInTheDocument();
     });
 
     it.each([
@@ -2928,10 +2952,9 @@ describe("the Review section (IR-412)", () => {
       expect(screen.queryByRole("dialog", { name: "All documents" })).not.toBeInTheDocument();
     });
 
-    // Changed deliberately by IR-1322: while anything is asked for, every
-    // slot takes an upload, held until the owner submits. Only the requested
-    // slot did (IR-1203).
-    it("offers the owner Upload on every slot while a request on the record in review is open", async () => {
+    // Changed deliberately by IR-1325 (ADR-022 Amendment 9), back to IR-1203's
+    // rule: only the requested slot takes an upload, not every slot as IR-1322 had it.
+    it("offers the owner Upload only on the slot a request on the record in review names", async () => {
       workspaceAt(1600);
       documentRequests.mockResolvedValue({ data: [{
         id: 1, party: "ierc", label: "IERC", state: "open", state_label: "Open", message: "The signed form, please.",
@@ -2952,8 +2975,8 @@ describe("the Review section (IR-412)", () => {
       const consent = await within(panel).findByRole("group", { name: "Consent Paper" });
       expect(await within(consent).findByText("Requested by IERC.")).toBeInTheDocument();
       expect(within(consent).getByRole("button", { name: /^Upload Consent Paper/ })).toBeInTheDocument();
-      expect(within(within(panel).getByRole("group", { name: "Ethics Clearance" })).getByRole("button", { name: /^Upload Ethics Clearance/ }))
-        .toBeInTheDocument();
+      expect(within(within(panel).getByRole("group", { name: "Ethics Clearance" })).queryByRole("button", { name: /^Upload Ethics Clearance/ }))
+        .not.toBeInTheDocument();
     });
 
     it("opens a reviewer's pane on Documents at 320px, reached by keyboard, with no serious axe violations", async () => {
@@ -3001,7 +3024,7 @@ describe("the Review section (IR-412)", () => {
       renderPaper(`/records/${RECORD_ID}?section=review`);
 
       const consent = await screen.findByRole("group", { name: "Consent Paper" });
-      await userEvent.click(within(consent).getByRole("button", { name: "Open Consent Paper version 2" }));
+      await userEvent.click(await versionTitle(consent, 2));
 
       expect(await screen.findByText(/reading upload 12/)).toBeInTheDocument();
       const shown = screen.getByRole("group", { name: "Shown in the reader" });
@@ -3012,7 +3035,9 @@ describe("the Review section (IR-412)", () => {
       await userEvent.click(within(shown).getByRole("button", { name: "Back to the manuscript" }));
       expect(await screen.findByText(/reading the current paper/)).toBeInTheDocument();
       expect(screen.queryByRole("group", { name: "Shown in the reader" })).not.toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Selection: Save highlight" })).toBeInTheDocument();
+      // Changed deliberately by IR-1326: the manuscript in Review offers no
+      // Save highlight either; selecting text there is for a review comment.
+      expect(screen.queryByRole("button", { name: /^Selection:/ })).not.toBeInTheDocument();
     });
 
     it("opens an author's older version and PDF attachment, while a Word file only downloads", async () => {
@@ -3148,7 +3173,7 @@ describe("the Review section (IR-412)", () => {
       await userEvent.click(await screen.findByRole("button", { name: "Open review pane" }));
       const pane = screen.getByRole("dialog", { name: "Review pane" });
       const consent = await within(pane).findByRole("group", { name: "Consent Paper" });
-      await userEvent.click(within(consent).getByRole("button", { name: "Open Consent Paper version 2" }));
+      await userEvent.click(await versionTitle(consent, 2));
 
       await waitFor(() => expect(screen.queryByRole("dialog", { name: "Review pane" })).not.toBeInTheDocument());
       expect(screen.getByText(/reading upload 12/)).toBeInTheDocument();
@@ -3163,7 +3188,7 @@ describe("the Review section (IR-412)", () => {
       const { container } = renderPaper(`/records/${RECORD_ID}?section=review`);
 
       const consent = await screen.findByRole("group", { name: "Consent Paper" });
-      const open = within(consent).getByRole("button", { name: "Open Consent Paper version 2" });
+      const open = await versionTitle(consent, 2);
       open.focus();
       await userEvent.keyboard("{Enter}");
 
@@ -3195,7 +3220,7 @@ describe("the Review section (IR-412)", () => {
       expect(screen.getByRole("combobox", { name: "Version" })).toBeInTheDocument();
 
       const consent = await screen.findByRole("group", { name: "Consent Paper" });
-      await userEvent.click(within(consent).getByRole("button", { name: "Open Consent Paper version 2" }));
+      await userEvent.click(await versionTitle(consent, 2));
       expect(await screen.findByText(/reading upload 12/)).toBeInTheDocument();
       // The bar would describe the manuscript, so it says nothing of it while a document is shown.
       expect(screen.queryByRole("combobox", { name: "Version" })).not.toBeInTheDocument();
@@ -3330,9 +3355,10 @@ describe("the Review section (IR-412)", () => {
     const dialog = screen.getByRole("dialog", { name: "Request documents" });
     await userEvent.click(await within(dialog).findByRole("checkbox", { name: "Ethics Clearance" }));
     await userEvent.type(within(dialog).getByRole("textbox", { name: /Message to the owner/ }), "Please.");
-    await userEvent.click(within(dialog).getByRole("button", { name: "Send request" }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "Add to review" }));
 
-    expect(await screen.findByText("Documents requested. The owner has been notified.")).toBeInTheDocument();
+    // A draft until Finish review sends it (ADR-022 Amendment 9, IR-1325).
+    expect(await screen.findByText(/^Added to your review\./)).toBeInTheDocument();
     await waitFor(() => expect(recordsApi.tracker).toHaveBeenCalledTimes(2));
   });
 
@@ -3435,7 +3461,7 @@ describe("a record the viewer cannot read (IR-411)", () => {
     await userEvent.click(await within(dialog).findByRole("checkbox", { name: "Ethics Clearance" }));
     await userEvent.type(within(dialog).getByRole("textbox", { name: /Message to the owner/ }), "Please.");
     vi.mocked(recordsApi.detail).mockRejectedValueOnce({ response: { status: 404, data: { detail: "Not found." } } });
-    await userEvent.click(within(dialog).getByRole("button", { name: "Send request" }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "Add to review" }));
 
     expect(await screen.findByRole("heading", { name: "Record not available" })).toBeInTheDocument();
     expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
@@ -4652,6 +4678,22 @@ describe("highlights on the paper (IR-583)", () => {
 
     expect(await screen.findByText(/open at page 3, 1 region\(s\) to highlight, reading v1/i)).toBeInTheDocument();
     expect(screen.getByText("1 saved highlight(s) drawn")).toBeInTheDocument();
+  });
+
+  // IR-1326: in Review, selecting text is for a review comment alone, so even
+  // a published paper offers no Save highlight there and draws none.
+  it("offers no Save highlight in Review, and draws and reads none there", async () => {
+    workspaceAt(1600);
+    list(entry());
+    // A reviewer's Review of a published paper: the tab, not the status, withholds it.
+    shownRecord = { ...inReview, ...reviewing, pipeline_status: "published" };
+    signInAs(2, "ITSO");
+    renderPaper(`/records/${RECORD_ID}?section=review`);
+    await screen.findByText(/reading the current paper/);
+
+    expect(screen.queryByRole("button", { name: "Selection: Save highlight" })).not.toBeInTheDocument();
+    expect(screen.getByText("0 saved highlight(s) drawn")).toBeInTheDocument();
+    expect(libraryApi.highlights).not.toHaveBeenCalled();
   });
 
   it("asks for no highlights while only the overview is showing", async () => {

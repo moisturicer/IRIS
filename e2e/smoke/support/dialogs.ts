@@ -393,6 +393,47 @@ export const DIALOGS: DialogCase[] = [
     open: async () => {},
     dialog: (page) => page.getByRole("dialog", { name: "Session Expired" }),
   },
+  // IR-1324: Saved Papers names a new folder, and renames one, in a dialog.
+  {
+    id: "name a new folder", screen: "my-library", path: "/records/mine?section=saved",
+    sources: ["features/library/ReadingPanel.tsx"],
+    open: press("Folder"),
+    dialog: (page) => page.getByRole("dialog", { name: "New folder" }),
+  },
+  {
+    id: "rename a folder", screen: "my-library", path: "/records/mine?section=saved",
+    sources: ["features/library/ReadingPanel.tsx"],
+    override: (api) => api.on("GET", "/library/folders/", { limit: 10, results: [
+      { id: 1, name: "Thesis", record_ids: [], created_at: "2026-11-01T08:00:00+08:00", updated_at: "2026-11-01T08:00:00+08:00" },
+    ] }),
+    open: fromRowMenu("Rename"),
+    dialog: (page) => page.getByRole("dialog", { name: "Rename folder" }),
+  },
+  // IR-1331: reading history is a pop-up over the Overview, and clearing asks once more.
+  {
+    id: "reading history", screen: "my-library",
+    sources: ["features/library/HistoryDialog.tsx"],
+    override: (api) => api.on("GET", "/library/history/", { results: [
+      { record_id: PAPER.id, available: true, viewed_at: "2026-11-20T08:00:00+08:00", record: PAPER },
+      { record_id: 77, available: false },
+    ] }),
+    open: press(/^Manage history/),
+    dialog: (page) => page.getByRole("dialog", { name: "History" }),
+  },
+  {
+    id: "clear chosen papers from history", screen: "my-library",
+    sources: ["features/library/HistoryDialog.tsx"],
+    override: (api) => api.on("GET", "/library/history/", { results: [
+      { record_id: PAPER.id, available: true, viewed_at: "2026-11-20T08:00:00+08:00", record: PAPER },
+      { record_id: 77, available: false },
+    ] }),
+    open: async (page) => {
+      await press(/^Manage history/)(page);
+      await page.getByRole("checkbox", { name: `Select ${PAPER.title}` }).check();
+      await press("Clear history")(page);
+    },
+    dialog: (page) => page.getByRole("dialog", { name: "Clear 1 paper from your history?" }),
+  },
   {
     id: "ask again for a download", screen: "my-library", path: "/records/mine?section=downloads",
     sources: ["components/records/DownloadRequestModal.tsx"],

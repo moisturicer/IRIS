@@ -126,7 +126,12 @@ class AuditTestBase(NewVersionTestBase, DecisionTestBase):
             reverse("record-document-requests", args=[record.pk]),
             {"message": message, "items": items}, format="json",
         )
-        return self.ok(response, status.HTTP_201_CREATED).data
+        data = self.ok(response, status.HTTP_201_CREATED).data
+        # A request is a draft until Finish review sends it (ADR-022 Amendment 9, IR-1325).
+        from apps.documents.testing import send_drafted_requests
+
+        send_drafted_requests(self, record, user, data["party"])
+        return data
 
     def upload(self, record, **target):
         self.client.force_authenticate(self.owner)

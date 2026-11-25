@@ -17,7 +17,9 @@ import { useAuthStore } from "./auth.store";
  * - **Cleared on every session change**, and every answer is fenced by the
  *   epoch it was asked in, so the next person on a shared PC never sees the
  *   last one's history or inherits their pause.
- * - **Pausing is the reader's.** While history is paused the paper view sends
+ * - **Pausing is the reader's.** My Library no longer offers a pause
+ *   (IR-1331), only turning a paused history back on, but the server keeps the
+ *   setting. While history is paused the paper view sends
  *   no visit, asking the setting again on each paper so a resume elsewhere is
  *   seen; the server refuses to record anyway, so a second device that has not
  *   heard of a pause still records nothing.
@@ -49,7 +51,8 @@ interface HistoryState {
   refresh:        () => Promise<void>;
   /** Called by the paper view once a Record has loaded. Never throws. */
   recordVisit:    (recordId: number) => Promise<void>;
-  clear:          () => Promise<boolean>;
+  /** Remove the chosen papers from the history (IR-1331); false when nothing was removed. */
+  remove:         (recordIds: number[]) => Promise<boolean>;
   setKeepHistory: (keep: boolean) => Promise<boolean>;
   dismissFailure: () => void;
 }
@@ -109,12 +112,14 @@ export const useHistoryStore = create<HistoryState>()((set, get) => ({
     }
   },
 
-  clear: async () => {
+  remove: async (recordIds) => {
+    if (recordIds.length === 0) return true;
     const epoch = currentEpoch();
     const previous = get().items;
-    set({ items: [], failure: null });
+    const gone = new Set(recordIds);
+    set({ items: previous.filter((i) => !gone.has(i.recordId)), failure: null });
     try {
-      await libraryApi.clearHistory();
+      await libraryApi.removeHistory(recordIds);
       return true;
     } catch {
       if (currentEpoch() !== epoch) return false;

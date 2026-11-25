@@ -72,7 +72,7 @@ describe("Saved calls", () => {
 
     await userEvent.setup().click(within(row).getByRole("button", { name: "Remove unavailable call" }));
     expect(unsave).toHaveBeenCalledWith(9);
-    expect(await screen.findByRole("heading", { name: "No saved calls" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "No saved calls right now" })).toBeInTheDocument();
   });
 
   it("removes a call, and puts it back with a toast when that fails", async () => {
@@ -86,7 +86,7 @@ describe("Saved calls", () => {
 
   it("points a reader with no saved calls to the board", async () => {
     await open([]);
-    expect(screen.getByRole("heading", { name: "No saved calls" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "No saved calls right now" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Go to Calls & Conferences" })).toHaveAttribute("href", "/opportunities");
   });
 
@@ -109,7 +109,7 @@ describe("Saved calls", () => {
 
     saved.mockResolvedValue({ data: { results: [] } });
     await userEvent.setup().click(screen.getByRole("button", { name: "Retry" }));
-    expect(await screen.findByRole("heading", { name: "No saved calls" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "No saved calls right now" })).toBeInTheDocument();
   });
 
   it("has no serious accessibility violations", async () => {

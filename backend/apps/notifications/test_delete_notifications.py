@@ -63,6 +63,10 @@ class DeleteNotificationTestBase(DecisionTestBase):
             {"message": "Please attach the consent form.", "items": [{"label": "Consent form"}]},
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        # A request is a draft until Finish review sends it (ADR-022 Amendment 9, IR-1325).
+        from apps.documents.testing import send_drafted_requests
+
+        send_drafted_requests(self, record, as_user, response.data["party"])
 
     def published(self):
         record = self.at_adviser()
