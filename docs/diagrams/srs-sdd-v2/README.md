@@ -10,7 +10,7 @@ The figures for `docs/SRS-v2.md` and `docs/SDD-v2.md`, which keep v1's structure
 | `png/C-*` | Class diagrams per SDD feature group (23) | `tools/classes.py` |
 | `png/E-*` | Schema extracts per feature group (18) | `tools/schemas.py`, generated from the Django models |
 | `png/V-03`…`V-06` | Record states; clearance-aware resubmission; sign-in and refresh; live hints | `src/V-*.mjs`, by hand |
-| `screens/S-*` | Screens of a **local build** (40) | `tools/screenshots.mjs` |
+| `screens/S-*` | Screens of a **local build** (42) | `tools/screenshots.mjs` |
 | `v1-kept/` | The 11 v1 figures still accurate, unchanged | copied from v1's embedded images |
 
 Every diagram is drawn by the Section D renderer, so the typeface, sizes and colours match Section D. Activity diagrams name who does each action on its first line, the UML alternative to v1's swimlane columns.
