@@ -144,14 +144,17 @@ export default function PaperViewPage() {
   // Ask IRIS reads published papers only (ADR-052 as amended, IR-1252), so it isn't
   // offered beside any other: the Ask IRIS page still searches the published ones.
   const askOffered = record?.pipeline_status === PIPELINE_STATUS.PUBLISHED;
+  // Notes and highlights are kept on published papers only, and never in Review,
+  // where selecting text is for a review comment (ADR-064/065 as amended, IR-1326).
+  const notesOffered = askOffered;
   // Ask IRIS and Notes (IR-569, IR-580): one panel, laid out by reading tier.
   const panel = useSidePanel({
-    chat, id, onPaperTab, onReviewTab, tier, workspaceWidth, askOffered, arriving, openAtPage, arrivalKey,
+    chat, id, onPaperTab, onReviewTab, tier, workspaceWidth, askOffered, notesOffered, arriving, openAtPage, arrivalKey,
   });
   const { notesWanted, askAbout, addToNote, chatMinimized, chatModal, stepAsideForHighlight } = panel;
-  // The reader draws the reader's own highlights wherever the paper shows, so
-  // they are read then, and when Notes lists them (IR-583).
-  const highlights = useReadingHighlights(Number(id), !arriving && (onPaperTab || onReviewTab || notesWanted));
+  // The reader draws the reader's own highlights on the Paper tab, so they are
+  // read then, and when Notes lists them (IR-583); never in Review (IR-1326).
+  const highlights = useReadingHighlights(Number(id), !arriving && notesOffered && (onPaperTab || notesWanted));
 
   // Reading collapses the sidebar to its rail, for this visit only (IR-569).
   useEffect(() => {
@@ -239,7 +242,7 @@ export default function PaperViewPage() {
     openedHere && openedHere.version === (viewedVersion?.number ?? null) ? openedHere : null;
   // What the reader draws: highlights made on the bytes it shows. A stale one is
   // drawn only on the version that still holds its bytes -- never on the paper now.
-  const drawnHighlights = highlights.items
+  const drawnHighlights = (onReviewTab ? [] : highlights.items)
     .filter((h) => (viewedVersion ? h.state === "stale" && h.open_version === viewedVersion.number : h.state === "current"))
     .map((h) => ({ key: h.id, regions: h.regions }));
   // The menu is offered on the current paper only (ADR-065 §8), so this names the current version.
@@ -261,7 +264,9 @@ export default function PaperViewPage() {
         });
       },
     } satisfies SelectionAction]),
-    {
+    // Not in Review, where a selection is for a review comment, and only on a
+    // published paper (IR-1326).
+    ...(onReviewTab || !notesOffered ? [] : [{
       id: "save-highlight", label: "Save highlight", short: "Highlight", sendIcon: "fa-check",
       placeholder: "Add a note to your Notes (optional)…",
       icon: <HighlightSwatch />,
@@ -273,7 +278,7 @@ export default function PaperViewPage() {
           addToNote(`Page ${passage.page}: ${text}`);
         }
       },
-    },
+    } satisfies SelectionAction]),
   ];
   const openHighlight = (h: ReadableHighlight) => {
     setHighlightsShown(true);
@@ -694,6 +699,7 @@ export default function PaperViewPage() {
         }
         onReviewTab={onReviewTab}
         askOffered={askOffered}
+        notesOffered={notesOffered}
         highlights={highlights}
         onOpenHighlight={openHighlight}
         canOpenVersion={(n) => versions.some((v) => v.number === n && v.manuscript_url && (v !== latestVersion || record.manuscript_unsubmitted))}
