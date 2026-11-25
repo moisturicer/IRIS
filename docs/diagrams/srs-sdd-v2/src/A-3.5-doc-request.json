@@ -2,7 +2,7 @@
  "format": "portrait",
  "direction": "DOWN",
  "title": "A-3.5  Activity: a document request",
- "caption": "SRS v2 §3.2.3.5. From apps/documents/requests.py, records/views.py send_documents, ADR-022 Amendment 8 at c01f0ef1 (IR-1275).",
+ "caption": "SRS v2 §3.2.3.5. From apps/documents/requests.py, reviews/finish_review.py, ADR-022 Amendments 8-9 at 2d8d4e4a (IR-1275).",
  "elk": {
   "elk.layered.spacing.nodeNodeBetweenLayers": "16",
   "elk.spacing.nodeNode": "22",
@@ -16,16 +16,19 @@
    "shape": "start"
   },
   {
-   "id": "q1",
-   "shape": "diamond",
-   "wrap": 150,
-   "label": "Asked how?"
+   "id": "a1",
+   "shape": "box",
+   "tag": "Reviewer",
+   "label": "Request documents on the Documents tab: a draft only they see",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
   },
   {
    "id": "a2",
    "shape": "box",
    "tag": "Reviewer",
-   "label": "Request documents on the Documents tab",
+   "label": "Finish review: Request changes or Comment only",
    "plain": true,
    "tone": "plain",
    "wrap": 150
@@ -33,32 +36,23 @@
   {
    "id": "a3",
    "shape": "box",
-   "tag": "Reviewer",
-   "label": "Finish review: Request changes, documents only",
-   "plain": true,
-   "tone": "plain",
-   "wrap": 150
-  },
-  {
-   "id": "a4",
-   "shape": "box",
    "tag": "IRIS",
-   "label": "Open the request; awaiting_document; pause this party's clock",
+   "label": "Send the drafts: open each request; awaiting_document; pause this party's clock; notify the owners",
    "plain": true,
    "tone": "core",
    "wrap": 150
   },
   {
-   "id": "a5",
+   "id": "a4",
    "shape": "box",
    "tag": "Owner",
-   "label": "Upload each item: held, seen by the owners only",
+   "label": "Upload each item asked for: held, seen by the owners only",
    "plain": true,
    "tone": "plain",
    "wrap": 150
   },
   {
-   "id": "a6",
+   "id": "a5",
    "shape": "box",
    "tag": "Owner",
    "label": "Submit added documents",
@@ -67,7 +61,7 @@
    "wrap": 150
   },
   {
-   "id": "a7",
+   "id": "a6",
    "shape": "box",
    "tag": "IRIS",
    "label": "Send the held uploads; answer the items; fulfil the request; notify the party once",
@@ -76,7 +70,7 @@
    "wrap": 150
   },
   {
-   "id": "a8",
+   "id": "a7",
    "shape": "box",
    "tag": "Reviewer",
    "label": "Accept or reject each upload, with a reason",
@@ -85,13 +79,13 @@
    "wrap": 150
   },
   {
-   "id": "q9",
+   "id": "q8",
    "shape": "diamond",
    "wrap": 150,
    "label": "Any rejected?"
   },
   {
-   "id": "a10",
+   "id": "a9",
    "shape": "box",
    "tag": "IRIS",
    "label": "Reopen the request: the item is missing again",
@@ -100,7 +94,7 @@
    "wrap": 150
   },
   {
-   "id": "a11",
+   "id": "a10",
    "shape": "box",
    "tag": "Owner",
    "label": "Upload again and send",
@@ -109,7 +103,7 @@
    "wrap": 150
   },
   {
-   "id": "a12",
+   "id": "a11",
    "shape": "box",
    "tag": "IRIS",
    "label": "Request stays fulfilled",
@@ -125,21 +119,15 @@
  "edges": [
   {
    "from": "start",
-   "to": "q1"
+   "to": "a1"
   },
   {
-   "from": "q1",
-   "to": "a2",
-   "label": "Documents tab"
-  },
-  {
-   "from": "q1",
-   "to": "a3",
-   "label": "Finish review"
+   "from": "a1",
+   "to": "a2"
   },
   {
    "from": "a2",
-   "to": "a4"
+   "to": "a3"
   },
   {
    "from": "a3",
@@ -159,32 +147,28 @@
   },
   {
    "from": "a7",
-   "to": "a8"
+   "to": "q8"
   },
   {
-   "from": "a8",
-   "to": "q9"
-  },
-  {
-   "from": "q9",
-   "to": "a10",
+   "from": "q8",
+   "to": "a9",
    "label": "yes"
   },
   {
-   "from": "a10",
-   "to": "a11"
+   "from": "a9",
+   "to": "a10"
   },
   {
-   "from": "q9",
-   "to": "a12",
+   "from": "q8",
+   "to": "a11",
    "label": "no"
   },
   {
-   "from": "a11",
+   "from": "a10",
    "to": "stop"
   },
   {
-   "from": "a12",
+   "from": "a11",
    "to": "stop"
   }
  ],

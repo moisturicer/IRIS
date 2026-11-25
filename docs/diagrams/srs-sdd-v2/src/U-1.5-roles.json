@@ -2,7 +2,7 @@
  "kind": "usecase",
  "format": "portrait",
  "title": "U-1.5  Use cases: roles, role requests and coordinators (FR-1.5)",
- "caption": "SRS v2 §3.2.1.5. From core/permissions.py (role_change_refusal), apps/accounts/views.py, ADR-051 decision 4 at c01f0ef1 (IR-1275).",
+ "caption": "SRS v2 §3.2.1.5. From core/permissions.py (role_change_refusal), apps/accounts/views.py, ADR-051 decision 4 at 2d8d4e4a (IR-1275).",
  "system": "Roles",
  "left": [
   {

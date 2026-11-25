@@ -4,7 +4,7 @@ participants: (id, label, sub, tone); steps: ("m"|"r", from, to, label) or
 ("loop", label, [steps]). "r" draws a dashed response.
 """
 
-C = "at c01f0ef1 (IR-1275)."
+C = "at 2d8d4e4a (IR-1275)."
 P = lambda i, l, s=None: (i, l, s, "plain")  # a person
 DB = ("db", "PostgreSQL", None)
 
@@ -216,10 +216,10 @@ FIGURES = {
         ("m", "dj", "db", "complete the assignment; audit"),
         ("r", "dj", "rdco", "the office is done"),
     ]),
-    "Q-3.4-resubmission": fig("3.4", "3.3.4", "clearance-aware resubmission", "apps/reviews/finish_review.py, new_version.py, documents/requests.py, ADR-003, ADR-022 Amendment 8",
+    "Q-3.4-resubmission": fig("3.4", "3.3.4", "clearance-aware resubmission", "apps/reviews/finish_review.py, new_version.py, documents/requests.py, ADR-003, ADR-022 Amendments 8-9",
         [P("rv", "Reviewer (ITSO)"), P("o", "Owner"), DJ("finish_review · new_version"), DB, P("peers", "IERC, KTTO (cleared)")], [
-        ("m", "rv", "dj", "POST /records/<id>/finish-review/ (request_revision, new_version, documents?)"),
-        ("m", "dj", "db", "ResubmissionRequest (+ DocumentRequest) in one transaction; clearances untouched"),
+        ("m", "rv", "dj", "POST /records/<id>/finish-review/ (request_revision)"),
+        ("m", "dj", "db", "ResubmissionRequest; send any draft document requests; clearances untouched"),
         ("m", "o", "dj", "upload in the Documents tab: RecordUpload, sent_at null (held)"),
         ("m", "o", "dj", "POST /records/<id>/new-version/"),
         ("m", "dj", "db", "lock; changed? Must fix answered?"),
@@ -229,11 +229,13 @@ FIGURES = {
         ("r", "dj", "rv", "after commit: review the new Version"),
         ("r", "dj", "peers", "nothing: their clearances stand"),
     ]),
-    "Q-3.5-doc-request": fig("3.5", "3.3.5", "a document request", "apps/documents/requests.py, records/views.py send_documents, ADR-022 Amendment 8",
+    "Q-3.5-doc-request": fig("3.5", "3.3.5", "a document request", "apps/documents/requests.py, reviews/finish_review.py, records/views.py send_documents, ADR-022 Amendments 8-9",
         [P("rv", "Reviewer"), DJ("document requests"), DB, P("o", "Owner")], [
-        ("m", "rv", "dj", "POST /records/<id>/document-requests/ (items), or finish-review without a new version"),
-        ("m", "dj", "db", "DocumentRequest (open); pause the party's clock"),
-        ("r", "dj", "o", "notification"),
+        ("m", "rv", "dj", "POST /records/<id>/document-requests/ (items)"),
+        ("m", "dj", "db", "DocumentRequest (draft): only the reviewer sees it; no notice"),
+        ("m", "rv", "dj", "POST /records/<id>/finish-review/ (request_revision or comment_only)"),
+        ("m", "dj", "db", "send_drafts: open, dated now; pause the party's clock"),
+        ("r", "dj", "o", "after commit: notification"),
         ("m", "o", "dj", "upload each item: RecordUpload, sent_at null (held, owners only)"),
         ("m", "o", "dj", "POST /records/<id>/documents/send/ (409 if a revision is open)"),
         ("m", "dj", "db", "send_held_uploads: set sent_at; answer missing items; fulfil; restart the clock"),

@@ -2,7 +2,7 @@
  "kind": "usecase",
  "format": "portrait",
  "title": "U-2.5  Use cases: download requests and watermarked copies (FR-2.5)",
- "caption": "SRS v2 §3.2.2.5. From apps/records/download_service.py, watermark.py, DownloadRequestViewSet, ADR-048 at c01f0ef1 (IR-1275).",
+ "caption": "SRS v2 §3.2.2.5. From apps/records/download_service.py, watermark.py, DownloadRequestViewSet, ADR-048 at 2d8d4e4a (IR-1275).",
  "system": "Downloads",
  "left": [
   {

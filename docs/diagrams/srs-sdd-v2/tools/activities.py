@@ -6,7 +6,7 @@ UML alternative instead: each action names who does it on its first line.
 
 ACTORS = {"Guest", "Person", "Author", "Owner", "Adviser", "RDCO", "KTTO", "Reviewer", "Office member",
           "Coordinator", "Reader", "Staff", "System Admin", "Contact person", "Browser"}
-C = "at c01f0ef1 (IR-1275)."
+C = "at 2d8d4e4a (IR-1275)."
 
 
 def fig(fid, sec, name, src, steps, aspect=0.7):
@@ -220,8 +220,8 @@ FIGURES = {
         (S, "Complete the office's assignment; notify RDCO"),
     ]),
     "A-3.4-resubmit": fig("3.4", "3.2.3.4", "clearance-aware resubmission", "apps/reviews/finish_review.py, new_version.py, ADR-003, ADR-004, ADR-022 Amendment 8", [
-        ("Reviewer", "Finish review: Request changes, the paper needs a new version"),
-        (S, "Open a ResubmissionRequest (and any documents asked for) in one transaction"),
+        ("Reviewer", "Finish review: Request changes (a new version)"),
+        (S, "Open a ResubmissionRequest, and send the reviewer's draft document requests, in one transaction"),
         ("Owner", "Answer each Must fix thread"),
         ("Owner", "Upload in the Documents tab: held, seen by the owners only"),
         ("Owner", "Submit new version"),
@@ -233,11 +233,11 @@ FIGURES = {
             ("Reviewer", "Review the new Version"),
         ], [(S, "Refuse, saying what is missing"), "end"]),
     ]),
-    "A-3.5-doc-request": fig("3.5", "3.2.3.5", "a document request", "apps/documents/requests.py, records/views.py send_documents, ADR-022 Amendment 8", [
-        ("?", "Asked how?", [("Reviewer", "Request documents on the Documents tab")],
-         [("Reviewer", "Finish review: Request changes, documents only")], ("Documents tab", "Finish review")),
-        (S, "Open the request; awaiting_document; pause this party's clock"),
-        ("Owner", "Upload each item: held, seen by the owners only"),
+    "A-3.5-doc-request": fig("3.5", "3.2.3.5", "a document request", "apps/documents/requests.py, reviews/finish_review.py, ADR-022 Amendments 8-9", [
+        ("Reviewer", "Request documents on the Documents tab: a draft only they see"),
+        ("Reviewer", "Finish review: Request changes or Comment only"),
+        (S, "Send the drafts: open each request; awaiting_document; pause this party's clock; notify the owners"),
+        ("Owner", "Upload each item asked for: held, seen by the owners only"),
         ("Owner", "Submit added documents"),
         (S, "Send the held uploads; answer the items; fulfil the request; notify the party once"),
         ("Reviewer", "Accept or reject each upload, with a reason"),
@@ -363,8 +363,10 @@ FIGURES = {
         ("Reader", "Add saved papers to it"),
         ("?", "Unsave a paper?", [(S, "Remove it from every folder")], []),
     ]),
-    "A-6.3-note": fig("6.3", "3.2.6.3", "a private note", "apps/library notes, ADR-064 (proposed)", [
-        ("Reader", "Type a note on a paper"),
+    "A-6.3-note": fig("6.3", "3.2.6.3", "a private note", "apps/library notes, ADR-064 (proposed; amended for IR-1326)", [
+        ("Reader", "Open a paper outside Review"),
+        ("?", "Paper published?", [], [(S, "No notes: 404, as for a missing record"), "end"]),
+        ("Reader", "Type a note"),
         (S, "Autosave with the note's revision"),
         ("?", "Saved from another tab meanwhile?", [(S, "Keep both texts; ask the reader to merge")],
          [(S, "Save")]),

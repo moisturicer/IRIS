@@ -2,7 +2,7 @@
  "kind": "sequence",
  "format": "portrait",
  "title": "Q-3.4  Sequence: clearance-aware resubmission",
- "caption": "SDD v2 §3.3.4. From apps/reviews/finish_review.py, new_version.py, documents/requests.py, ADR-003, ADR-022 Amendment 8 at c01f0ef1 (IR-1275).",
+ "caption": "SDD v2 §3.3.4. From apps/reviews/finish_review.py, new_version.py, documents/requests.py, ADR-003, ADR-022 Amendments 8-9 at 2d8d4e4a (IR-1275).",
  "participants": [
   {
    "id": "rv",
@@ -33,12 +33,12 @@
   {
    "from": "rv",
    "to": "dj",
-   "label": "POST /records/<id>/finish-review/ (request_revision, new_version, documents?)"
+   "label": "POST /records/<id>/finish-review/ (request_revision)"
   },
   {
    "from": "dj",
    "to": "db",
-   "label": "ResubmissionRequest (+ DocumentRequest) in one transaction; clearances untouched"
+   "label": "ResubmissionRequest; send any draft document requests; clearances untouched"
   },
   {
    "from": "o",

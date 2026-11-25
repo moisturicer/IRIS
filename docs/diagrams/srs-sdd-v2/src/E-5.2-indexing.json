@@ -1,6 +1,6 @@
 {
  "title": "E-5.2  Schema: chunks and vectors",
- "caption": "SDD v2 §3.5.2. Generated from backend/apps/*/models*.py at c01f0ef1; all keys and up to four other fields per table; the full schema is D-8 to D-15.",
+ "caption": "SDD v2 §3.5.2. Generated from backend/apps/*/models*.py at 2d8d4e4a; all keys and up to four other fields per table; the full schema is D-8 to D-15.",
  "kind": "erd",
  "format": "portrait",
  "nodes": [

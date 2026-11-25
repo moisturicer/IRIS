@@ -2,7 +2,7 @@
  "kind": "usecase",
  "format": "portrait",
  "title": "U-3.6  Use cases: review threads and comments (FR-3.6)",
- "caption": "SRS v2 §3.2.3.6. From apps/reviews/threads.py, comments.py, mentions.py, saved_replies.py, ADR-032 §7 at c01f0ef1 (IR-1275).",
+ "caption": "SRS v2 §3.2.3.6. From apps/reviews/threads.py, comments.py, mentions.py, saved_replies.py, ADR-032 §7 at 2d8d4e4a (IR-1275).",
  "system": "Review discussion",
  "left": [
   {

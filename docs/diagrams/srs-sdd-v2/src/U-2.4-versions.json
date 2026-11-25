@@ -2,7 +2,7 @@
  "kind": "usecase",
  "format": "portrait",
  "title": "U-2.4  Use cases: versions (FR-2.4)",
- "caption": "SRS v2 §3.2.2.4. From apps/records/versions.py, review_text/, apps/reviews/version_comparison.py, ADR-058 at c01f0ef1 (IR-1275).",
+ "caption": "SRS v2 §3.2.2.4. From apps/records/versions.py, review_text/, apps/reviews/version_comparison.py, ADR-058 at 2d8d4e4a (IR-1275).",
  "system": "Versions",
  "left": [
   {

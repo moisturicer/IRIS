@@ -2,7 +2,7 @@
  "kind": "usecase",
  "format": "portrait",
  "title": "U-6.5  Use cases: personal discovery (FR-6.5)",
- "caption": "SRS v2 §3.2.6.5. From apps/records/discovery.py, apps/library/feeds.py, ADR-062 at c01f0ef1 (IR-1275).",
+ "caption": "SRS v2 §3.2.6.5. From apps/records/discovery.py, apps/library/feeds.py, ADR-062 at 2d8d4e4a (IR-1275).",
  "system": "Personal discovery",
  "left": [
   {

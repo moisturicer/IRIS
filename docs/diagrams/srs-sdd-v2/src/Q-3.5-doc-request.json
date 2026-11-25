@@ -2,7 +2,7 @@
  "kind": "sequence",
  "format": "portrait",
  "title": "Q-3.5  Sequence: a document request",
- "caption": "SDD v2 §3.3.5. From apps/documents/requests.py, records/views.py send_documents, ADR-022 Amendment 8 at c01f0ef1 (IR-1275).",
+ "caption": "SDD v2 §3.3.5. From apps/documents/requests.py, reviews/finish_review.py, records/views.py send_documents, ADR-022 Amendments 8-9 at 2d8d4e4a (IR-1275).",
  "participants": [
   {
    "id": "rv",
@@ -28,17 +28,27 @@
   {
    "from": "rv",
    "to": "dj",
-   "label": "POST /records/<id>/document-requests/ (items), or finish-review without a new version"
+   "label": "POST /records/<id>/document-requests/ (items)"
   },
   {
    "from": "dj",
    "to": "db",
-   "label": "DocumentRequest (open); pause the party's clock"
+   "label": "DocumentRequest (draft): only the reviewer sees it; no notice"
+  },
+  {
+   "from": "rv",
+   "to": "dj",
+   "label": "POST /records/<id>/finish-review/ (request_revision or comment_only)"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "send_drafts: open, dated now; pause the party's clock"
   },
   {
    "from": "dj",
    "to": "o",
-   "label": "notification",
+   "label": "after commit: notification",
    "dash": true
   },
   {

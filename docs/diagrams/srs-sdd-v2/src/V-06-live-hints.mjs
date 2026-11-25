@@ -5,7 +5,7 @@ export default {
   kind: 'sequence',
   format: 'portrait',
   title: 'V-6  Live updates by server-sent hints',
-  caption: 'From apps/live (channels.py, publish.py, stream.py, views.py) and frontend/src/lib/live.ts at c01f0ef1 (IR-1275). ADR-073. A hint names what changed and never carries data; what a page shows after a hint is what a manual refresh would show.',
+  caption: 'From apps/live (channels.py, publish.py, stream.py, views.py) and frontend/src/lib/live.ts at 2d8d4e4a (IR-1275). ADR-073. A hint names what changed and never carries data; what a page shows after a hint is what a manual refresh would show.',
   participants: [
     { id: 'tab', label: 'React tab', sub: 'lib/live.ts' },
     { id: 'stream', label: 'Django ASGI', sub: 'GET /api/v1/live/' },

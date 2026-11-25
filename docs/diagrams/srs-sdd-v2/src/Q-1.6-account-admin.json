@@ -2,7 +2,7 @@
  "kind": "sequence",
  "format": "portrait",
  "title": "Q-1.6  Sequence: lock an account and revoke a session",
- "caption": "SDD v2 §3.1.6. From LockUserView, ActiveSessionsView, RevokeSessionView at c01f0ef1 (IR-1275).",
+ "caption": "SDD v2 §3.1.6. From LockUserView, ActiveSessionsView, RevokeSessionView at 2d8d4e4a (IR-1275).",
  "participants": [
   {
    "id": "rdco",

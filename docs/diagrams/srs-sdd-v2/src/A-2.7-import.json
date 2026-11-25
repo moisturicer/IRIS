@@ -2,7 +2,7 @@
  "format": "portrait",
  "direction": "DOWN",
  "title": "A-2.7  Activity: import records from Excel",
- "caption": "SRS v2 §3.2.2.7. From RecordViewSet.import_excel, apps/records/services.py at c01f0ef1 (IR-1275).",
+ "caption": "SRS v2 §3.2.2.7. From RecordViewSet.import_excel, apps/records/services.py at 2d8d4e4a (IR-1275).",
  "elk": {
   "elk.layered.spacing.nodeNodeBetweenLayers": "16",
   "elk.spacing.nodeNode": "22",

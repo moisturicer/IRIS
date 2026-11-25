@@ -2,7 +2,7 @@
  "kind": "usecase",
  "format": "portrait",
  "title": "U-4.2  Use cases: live updates (FR-4.2)",
- "caption": "SRS v2 §3.2.4.2. From apps/live, frontend/src/lib/live.ts, ADR-073 at c01f0ef1 (IR-1275).",
+ "caption": "SRS v2 §3.2.4.2. From apps/live, frontend/src/lib/live.ts, ADR-073 at 2d8d4e4a (IR-1275).",
  "system": "Live updates",
  "left": [
   {

@@ -2,7 +2,7 @@
  "kind": "sequence",
  "format": "portrait",
  "title": "Q-7.3  Sequence: change the AI answer",
- "caption": "SDD v2 §3.7.3. From AiAnswerView, features/settings at c01f0ef1 (IR-1275).",
+ "caption": "SDD v2 §3.7.3. From AiAnswerView, features/settings at 2d8d4e4a (IR-1275).",
  "participants": [
   {
    "id": "p",

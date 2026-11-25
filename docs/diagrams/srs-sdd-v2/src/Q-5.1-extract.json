@@ -2,7 +2,7 @@
  "kind": "sequence",
  "format": "portrait",
  "title": "Q-5.1  Sequence: extract a published manuscript",
- "caption": "SDD v2 §3.5.1. From apps/documents/tasks.py, apps/ai/extraction, policy/disclosure.py at c01f0ef1 (IR-1275).",
+ "caption": "SDD v2 §3.5.1. From apps/documents/tasks.py, apps/ai/extraction, policy/disclosure.py at 2d8d4e4a (IR-1275).",
  "participants": [
   {
    "id": "dec",

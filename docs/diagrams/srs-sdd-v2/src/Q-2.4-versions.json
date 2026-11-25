@@ -2,7 +2,7 @@
  "kind": "sequence",
  "format": "portrait",
  "title": "Q-2.4  Sequence: compare two Versions",
- "caption": "SDD v2 §3.2.4. From RecordViewSet versions_compare, apps/reviews/version_comparison.py at c01f0ef1 (IR-1275).",
+ "caption": "SDD v2 §3.2.4. From RecordViewSet versions_compare, apps/reviews/version_comparison.py at 2d8d4e4a (IR-1275).",
  "participants": [
   {
    "id": "rv",

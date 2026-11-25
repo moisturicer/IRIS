@@ -2,7 +2,7 @@
  "format": "portrait",
  "direction": "DOWN",
  "title": "A-1.3  Activity: lockout and throttling",
- "caption": "SRS v2 §3.2.1.3. From config/settings/base.py, apps/accounts/lockout.py at c01f0ef1 (IR-1275).",
+ "caption": "SRS v2 §3.2.1.3. From config/settings/base.py, apps/accounts/lockout.py at 2d8d4e4a (IR-1275).",
  "elk": {
   "elk.layered.spacing.nodeNodeBetweenLayers": "16",
   "elk.spacing.nodeNode": "22",

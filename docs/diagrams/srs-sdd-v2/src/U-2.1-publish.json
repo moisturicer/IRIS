@@ -2,7 +2,7 @@
  "kind": "usecase",
  "format": "portrait",
  "title": "U-2.1  Use cases: publish a record (FR-2.1)",
- "caption": "SRS v2 §3.2.2.1. From RecordViewSet (create, submit), features/publish, ADR-032, ADR-046 at c01f0ef1 (IR-1275).",
+ "caption": "SRS v2 §3.2.2.1. From RecordViewSet (create, submit), features/publish, ADR-032, ADR-046 at 2d8d4e4a (IR-1275).",
  "system": "Publish",
  "left": [
   {

@@ -2,7 +2,7 @@
  "kind": "usecase",
  "format": "portrait",
  "title": "U-1.1  Use cases: sign-up, consent and email verification (FR-1.1)",
- "caption": "SRS v2 §3.2.1.1. From apps/accounts (RegisterView, notice.py, recovery/), ADR-045, ADR-054 at c01f0ef1 (IR-1275).",
+ "caption": "SRS v2 §3.2.1.1. From apps/accounts (RegisterView, notice.py, recovery/), ADR-045, ADR-054 at 2d8d4e4a (IR-1275).",
  "system": "Sign-up and verification",
  "left": [
   {

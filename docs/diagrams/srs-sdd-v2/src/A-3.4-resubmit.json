@@ -2,7 +2,7 @@
  "format": "portrait",
  "direction": "DOWN",
  "title": "A-3.4  Activity: clearance-aware resubmission",
- "caption": "SRS v2 §3.2.3.4. From apps/reviews/finish_review.py, new_version.py, ADR-003, ADR-004, ADR-022 Amendment 8 at c01f0ef1 (IR-1275).",
+ "caption": "SRS v2 §3.2.3.4. From apps/reviews/finish_review.py, new_version.py, ADR-003, ADR-004, ADR-022 Amendment 8 at 2d8d4e4a (IR-1275).",
  "elk": {
   "elk.layered.spacing.nodeNodeBetweenLayers": "16",
   "elk.spacing.nodeNode": "22",
@@ -19,7 +19,7 @@
    "id": "a1",
    "shape": "box",
    "tag": "Reviewer",
-   "label": "Finish review: Request changes, the paper needs a new version",
+   "label": "Finish review: Request changes (a new version)",
    "plain": true,
    "tone": "plain",
    "wrap": 150
@@ -28,7 +28,7 @@
    "id": "a2",
    "shape": "box",
    "tag": "IRIS",
-   "label": "Open a ResubmissionRequest (and any documents asked for) in one transaction",
+   "label": "Open a ResubmissionRequest, and send the reviewer's draft document requests, in one transaction",
    "plain": true,
    "tone": "core",
    "wrap": 150

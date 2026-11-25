@@ -5,7 +5,7 @@ export default {
   kind: 'sequence',
   format: 'portrait',
   title: 'V-4  Clearance-aware resubmission (the thesis contribution)',
-  caption: 'From apps/reviews/finish_review.py, revisions.py and new_version.py submit_new_version at c01f0ef1 (IR-1275). ADR-003, ADR-004, ADR-032 §5 and §7, ADR-022 Amendment 8. Example: RDCO routed ITSO, IERC and KTTO; IERC and KTTO have cleared; ITSO requests changes, asking for a new version. Under the restart-all comparison arm (ADR-004, WORKFLOW_TABLE) the reset step resets every office instead.',
+  caption: 'From apps/reviews/finish_review.py, revisions.py and new_version.py submit_new_version at 2d8d4e4a (IR-1275). ADR-003, ADR-004, ADR-032 §5 and §7, ADR-022 Amendments 8 and 9. Example: RDCO routed ITSO, IERC and KTTO; IERC and KTTO have cleared; ITSO requests changes, asking for a new version. Under the restart-all comparison arm (ADR-004, WORKFLOW_TABLE) the reset step resets every office instead.',
   participants: [
     { id: 'itso', label: 'ITSO reviewer', tone: 'plain' },
     { id: 'owner', label: 'Owner', tone: 'plain' },
@@ -15,8 +15,8 @@ export default {
     { id: 'peers', label: 'IERC and KTTO', sub: 'already cleared', tone: 'plain' },
   ],
   steps: [
-    msg('itso', 'dj', 'Finish review: Request changes (a new version), with Must fix threads'),
-    msg('dj', 'db', 'open ResubmissionRequest (party itso); every clearance left as it is'),
+    msg('itso', 'dj', 'Finish review: Request changes, with Must fix threads and any draft document requests'),
+    msg('dj', 'db', 'open ResubmissionRequest (party itso); send the drafts; every clearance left as it is'),
     reply('dj', 'owner', 'notified: changes requested (record awaiting_resubmission)'),
     msg('owner', 'spa', 'answer each Must fix thread; upload in Documents (held until sent)'),
     msg('spa', 'dj', 'store the upload with sent_at null: the owners alone see it'),

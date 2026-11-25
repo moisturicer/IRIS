@@ -2,7 +2,7 @@
  "kind": "sequence",
  "format": "portrait",
  "title": "Q-1.1  Sequence: register and verify",
- "caption": "SDD v2 §3.1.1. From apps/accounts/views.py, serializers.py, recovery/ at c01f0ef1 (IR-1275).",
+ "caption": "SDD v2 §3.1.1. From apps/accounts/views.py, serializers.py, recovery/ at 2d8d4e4a (IR-1275).",
  "participants": [
   {
    "id": "g",

@@ -2,7 +2,7 @@
  "kind": "sequence",
  "format": "portrait",
  "title": "Q-3.8  Sequence: tag and release IP",
- "caption": "SDD v2 §3.3.8. From RecordViewSet.tags, ip_release.py at c01f0ef1 (IR-1275).",
+ "caption": "SDD v2 §3.3.8. From RecordViewSet.tags, ip_release.py at 2d8d4e4a (IR-1275).",
  "participants": [
   {
    "id": "s",

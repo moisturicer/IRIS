@@ -2,7 +2,7 @@
  "kind": "sequence",
  "format": "portrait",
  "title": "Q-2.3  Sequence: check and store an upload",
- "caption": "SDD v2 §3.2.3. From apps/documents/validators.py, scanning.py, ADR-074 at c01f0ef1 (IR-1275).",
+ "caption": "SDD v2 §3.2.3. From apps/documents/validators.py, scanning.py, ADR-074 at 2d8d4e4a (IR-1275).",
  "participants": [
   {
    "id": "p",

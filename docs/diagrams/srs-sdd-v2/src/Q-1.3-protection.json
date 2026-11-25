@@ -2,7 +2,7 @@
  "kind": "sequence",
  "format": "portrait",
  "title": "Q-1.3  Sequence: lockout and throttling",
- "caption": "SDD v2 §3.1.3. From config/settings/base.py, apps/accounts/lockout.py at c01f0ef1 (IR-1275).",
+ "caption": "SDD v2 §3.1.3. From config/settings/base.py, apps/accounts/lockout.py at 2d8d4e4a (IR-1275).",
  "participants": [
   {
    "id": "p",
