@@ -21,6 +21,16 @@ import { measureOverflow } from "./viewport";
  * the same bar. With `testInfo`, every violation is attached as `axe-<label>.json`.
  */
 export async function axeScan(page: Page, label: string, testInfo?: TestInfo) {
+  // Contrast is judged on the settled screen. A screen that fades in (the
+  // sign-up step's `animate-step-fade`) measures blended, too-pale colours if
+  // scanned mid-fade, which no reader sees once it has appeared. Only finite
+  // animations and transitions are awaited, for 3 s at most, so an endless
+  // one (a spinner, a skeleton) cannot hang the scan.
+  await page.evaluate(async () => {
+    const finite = document.getAnimations().filter((a) => a.effect?.getComputedTiming().endTime !== Infinity);
+    const ended = Promise.all(finite.map((a) => a.finished.catch(() => undefined)));
+    await Promise.race([ended, new Promise((resolve) => setTimeout(resolve, 3000))]);
+  });
   const results = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
     .analyze();

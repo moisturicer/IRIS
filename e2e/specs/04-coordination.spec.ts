@@ -92,9 +92,10 @@ test("an overdue turn escalates to the coordinators and decides nothing", async 
   await a11y.scan(page, testInfo, "my-reviews-overdue");
 });
 
-test("analytics are scoped: an office reads its own, RDCO reads every party", async () => {
-  const own = await itso.json("/reviews/analytics/");
-  expect((own.parties as any[]).map((p) => p.party)).toEqual(["itso"]);
+// Changed deliberately by IR-1334: analytics is RDCO's alone since IR-1216
+// (ADR-043 as amended 2026-11-18), so an office member is refused, not scoped.
+test("analytics are RDCO's: RDCO reads every party, and an office or a student is refused", async () => {
+  expect((await itso.get("/reviews/analytics/")).status(), "an office member").toBe(403);
   expect((await itso.get("/reviews/analytics/", { office: "ierc" })).status()).toBe(403);
 
   const all = await rdco.json("/reviews/analytics/");

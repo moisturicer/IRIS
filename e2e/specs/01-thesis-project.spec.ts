@@ -16,7 +16,7 @@ import { ACCOUNTS, uniqueTitle } from "../support/accounts";
 import { A11yLedger } from "../support/a11y";
 import {
   claimAndOpen, clear, createDraft, decide, newVersion, party, releaseEmbargo,
-  requestRevision, reviewRow, reviseAbstract, route, sendToRdco, submit, tracker,
+  requestRevision, reviewRow, reviseAbstract, route, sendComments, sendToRdco, submit, tracker,
 } from "../support/workflow";
 
 test.describe.configure({ mode: "serial" });
@@ -65,6 +65,9 @@ test("the Adviser requests a document and the owner fulfils it", async () => {
     items: [{ label: "Signed adviser endorsement" }],
   });
   expect(created).toBeTruthy();
+  // A request waits as the reviewer's draft until Finish review sends it
+  // (ADR-022 Amendment 9, IR-1325); Comment only sends it and keeps the Seat.
+  await sendComments(adviser, recordId, "Asking for the endorsement.");
   let t = await tracker(student, recordId);
   expect(party(t, "adviser").awaiting_document).toBe(true);
 
@@ -78,6 +81,9 @@ test("the Adviser requests a document and the owner fulfils it", async () => {
     request_item: String(item.id),
     file: { name: "endorsement.pdf", mimeType: "application/pdf", buffer: manuscriptPdf("Signed adviser endorsement") },
   }), "owner fulfils the document request");
+  // The owner's upload is held, theirs alone, until they send it (ADR-022
+  // Amendment 8 point 4, IR-1322): Submit added documents.
+  await ok(await student.post(`/records/${recordId}/documents/send/`), "owner sends the added document");
   await ok(await adviser.patch(`/document-request-items/${item.id}/`, { action: "accept" }), "adviser accepts the document");
 
   t = await tracker(student, recordId);
