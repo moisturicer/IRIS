@@ -75,9 +75,13 @@ def requesting_party(record, user, party=None) -> str:
     return party
 
 
-def create_request(record, user, *, party, message, specs: list[ItemSpec]) -> DocumentRequest:
+def create_request(record, user, *, party, message, specs: list[ItemSpec], draft: bool = False) -> DocumentRequest:
     """
     Open a request as `party`, which `requesting_party` has already vetted.
+
+    `draft` (ADR-022 Amendment 9, IR-1325) keeps it the asker's alone until
+    their *Finish review* sends it (`send_drafts`): no audit event and no
+    notification yet, since nobody else has been asked anything.
 
     Under the record's row lock, re-checking that `party` still holds it: a
     Decision (IR-270) takes the same lock and closes every assignment, so a
@@ -101,13 +105,68 @@ def create_request(record, user, *, party, message, specs: list[ItemSpec]) -> Do
             party=party,
             requested_by=user,
             message=message,
+            state=DocumentRequestState.DRAFT if draft else DocumentRequestState.OPEN,
         )
         DocumentRequestItem.objects.bulk_create(
             DocumentRequestItem(request=request, slot=s.slot, label=s.label, sort_order=i)
             for i, s in enumerate(specs)
         )
-        audit.document_requested(request, user)
+        if not draft:
+            audit.document_requested(request, user)
     return request
+
+
+def drafts_of(record, user, party):
+    """`user`'s unsent requests on `record` as `party`, oldest first (Amendment 9)."""
+    return DocumentRequest.objects.filter(
+        record=record, requested_by=user, party=party, state=DocumentRequestState.DRAFT,
+    ).order_by("created_at", "pk")
+
+
+def send_drafts(record, user, party) -> list[DocumentRequest]:
+    """
+    Send `user`'s draft requests as `party` (ADR-022 Amendment 9, IR-1325):
+    each opens, dated now, under the party's current assignment, with its
+    audit event, and the owners are told once the transaction commits.
+    *Finish review* calls this inside its transaction, under the record lock.
+    """
+    from apps.notifications.services import notify_document_requested
+    from apps.reviews.models import RecordAssignment
+    from apps.reviews.tracker import party_label
+    from core.enums import AssignmentState
+
+    drafts = list(drafts_of(record, user, party).select_for_update())
+    if not drafts:
+        return []
+    assignment = RecordAssignment.objects.filter(
+        record=record, party=party, state=AssignmentState.ACTIVE
+    ).first()
+    if assignment is None:
+        raise NotAHolder("You no longer hold this record as that party.")
+    now = timezone.now()
+    for request in drafts:
+        request.state = DocumentRequestState.OPEN
+        request.assignment = assignment
+        request.created_at = now
+        request.save(update_fields=["state", "assignment", "created_at"])
+        audit.document_requested(request, user)
+        transaction.on_commit(lambda r=request: notify_document_requested(
+            r, party_label=party_label(r.party, staff_viewer=False)
+        ))
+    return drafts
+
+
+def discard_draft(request: DocumentRequest, user) -> None:
+    """
+    Undo a draft request (Amendment 9): it was never sent, so it is deleted,
+    not withdrawn, and leaves no history. Only its asker reaches it
+    (`request_on_visible_record`).
+    """
+    with transaction.atomic():
+        request = DocumentRequest.objects.select_for_update().get(pk=request.pk)
+        if request.state != DocumentRequestState.DRAFT or request.requested_by_id != user.pk:
+            raise DocumentRequestError("Only your own unsent request can be removed.")
+        request.delete()
 
 
 def slot_accepts_uploads_for(slot: UploadSlot, record) -> bool:
@@ -168,7 +227,7 @@ def resolve_item_for_upload(record, item_id, slot_id=None) -> tuple[DocumentRequ
     return item, slot
 
 
-def fulfil_item(item: DocumentRequestItem, upload, *, uploaded_by) -> DocumentRequest:
+def fulfil_item(item: DocumentRequestItem, upload, *, uploaded_by, notify: bool = True) -> DocumentRequest:
     """
     Mark `item` uploaded. When it was the last one missing, the request is
     fulfilled, and the requesting party is told once the transaction commits
@@ -184,13 +243,86 @@ def fulfil_item(item: DocumentRequestItem, upload, *, uploaded_by) -> DocumentRe
         request.closed_at = timezone.now()
         request.save(update_fields=["state", "closed_at"])
         audit.document_request_fulfilled(request, uploaded_by)
-
-        from apps.notifications.services import notify_document_request_fulfilled
-
-        transaction.on_commit(
-            lambda: notify_document_request_fulfilled(request, uploaded_by=uploaded_by)
-        )
+        if notify:
+            _notify_fulfilled(request, uploaded_by)
     return request
+
+
+def _notify_fulfilled(request: DocumentRequest, uploaded_by) -> None:
+    from apps.notifications.services import notify_document_request_fulfilled
+
+    transaction.on_commit(
+        lambda: notify_document_request_fulfilled(request, uploaded_by=uploaded_by)
+    )
+
+
+@dataclass(frozen=True)
+class Sent:
+    """What one send did: how many uploads went, and the requests it fulfilled."""
+    uploads: int
+    fulfilled: list
+
+
+def send_held_uploads(record, user) -> Sent:
+    """
+    Send every upload held on `record` and answer what they answer (ADR-022
+    Amendment 8, points 4-5, IR-1322). *Submit new version* calls it in the
+    transaction that writes the Version; *Submit added documents* on its own.
+
+    **Call inside a transaction.** The Record, the held uploads, then each
+    item and its request are locked, in `resolve_item_for_upload`'s order.
+    An open request's missing item is answered by the newest upload this send
+    put in its slot (an Other item's own ad-hoc slot), never by a file sent
+    before. Each requesting party is told once, however many of its requests
+    or files the send answered.
+    """
+    from apps.records.models import Record
+
+    from .models import RecordUpload
+
+    Record.objects.select_for_update().get(pk=record.pk)
+    held = list(
+        RecordUpload.objects.select_for_update().filter(record=record).held()
+        .order_by("slot_id", "-version", "-pk")
+    )
+    if not held:
+        return Sent(uploads=0, fulfilled=[])
+    RecordUpload.objects.filter(pk__in=[u.pk for u in held]).update(sent_at=timezone.now())
+    newest = {}
+    for upload in held:
+        newest.setdefault(upload.slot_id, upload)
+
+    # An Other item has no slot of its own; its file is in this record's
+    # ad-hoc slot named for it (`_adhoc_slot`), the oldest if a race made two.
+    adhoc = {}
+    for name, pk in UploadSlot.objects.filter(record=record).order_by("pk").values_list("name", "pk"):
+        adhoc.setdefault(name, pk)
+    items = list(
+        DocumentRequestItem.objects.select_for_update(of=("self",))
+        .filter(
+            state=DocumentRequestItemState.MISSING,
+            request__record=record,
+            request__state=DocumentRequestState.OPEN,
+        )
+        .order_by("request_id", "pk")
+    )
+    fulfilled, told = [], set()
+    for item in items:
+        slot_id = item.slot_id if item.slot_id is not None else adhoc.get(item.label)
+        upload = newest.get(slot_id)
+        if upload is None:
+            continue
+        request = DocumentRequest.objects.select_for_update().get(pk=item.request_id)
+        if request.state != DocumentRequestState.OPEN:
+            continue
+        item.request = request
+        fulfil_item(item, upload, uploaded_by=user, notify=False)
+        if request.state == DocumentRequestState.FULFILLED and request not in fulfilled:
+            fulfilled.append(request)
+            if request.party not in told:
+                told.add(request.party)
+                _notify_fulfilled(request, user)
+    return Sent(uploads=len(held), fulfilled=fulfilled)
 
 
 def fulfil_by_slot_upload(record, slot: UploadSlot, upload, *, uploaded_by) -> list[DocumentRequest]:
@@ -258,8 +390,10 @@ def may_read_requests(record, user) -> bool:
     staffable = staffable_parties(record, user)
     if not staffable:
         return False
+    # A draft asked nobody anything yet (Amendment 9), so it makes no one a participant.
     requesting = set(
-        DocumentRequest.objects.filter(record=record).values_list("party", flat=True)
+        DocumentRequest.objects.filter(record=record)
+        .exclude(state=DocumentRequestState.DRAFT).values_list("party", flat=True)
     )
     return bool(staffable & (participating_parties(record) | requesting))
 
@@ -306,6 +440,9 @@ def request_on_visible_record(request_id, user) -> Optional[DocumentRequest]:
     except (DocumentRequest.DoesNotExist, TypeError, ValueError):
         return None
     if not Record.objects.visible_to(user).filter(pk=request.record_id).exists():
+        return None
+    # Someone else's draft reads as missing (Amendment 9): it is its asker's alone.
+    if request.state == DocumentRequestState.DRAFT and request.requested_by_id != getattr(user, "pk", None):
         return None
     return request
 
@@ -409,10 +546,18 @@ def withdraw_request(request: DocumentRequest, user) -> DocumentRequest:
     return request
 
 
-def requests_for(record):
-    """Every request on `record`, oldest first, ready for `payload`."""
+def requests_for(record, viewer=None):
+    """
+    Every request on `record`, oldest first, ready for `payload`. Drafts
+    (Amendment 9) only for `viewer`, who asked them; for nobody else.
+    """
+    from django.db.models import Q
+
+    drafts = Q(state=DocumentRequestState.DRAFT)
+    if viewer is not None and getattr(viewer, "pk", None) is not None:
+        drafts &= ~Q(requested_by=viewer)
     return (
-        DocumentRequest.objects.filter(record=record)
+        DocumentRequest.objects.filter(record=record).exclude(drafts)
         .select_related("requested_by")
         .prefetch_related("items__upload")
         .order_by("created_at", "pk")

@@ -58,9 +58,31 @@ class DocumentRequestTestBase(TrackerTestBase):
         )
 
     def requested(self, record, actor, items, **extra):
+        """
+        `actor` asks for `items` and the request goes out, as their *Finish
+        review* sends it (ADR-022 Amendment 9, IR-1325): a new request is a
+        draft until then. `drafted` stops at the draft.
+        """
+        data = self.drafted(record, actor, items, **extra)
+        return self.send_drafts(record, actor, data)
+
+    def drafted(self, record, actor, items, **extra):
         response = self.request_documents(record, actor, items, **extra)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
         return response.data
+
+    def send_drafts(self, record, actor, data):
+        """Send `actor`'s drafts for `data`'s party as *Finish review* does, and re-read `data`."""
+        from django.db import transaction
+
+        from apps.documents import requests as document_requests
+        from apps.documents.request_serializers import serialize_request
+
+        with self.captureOnCommitCallbacks(execute=True), transaction.atomic():
+            document_requests.send_drafts(record, actor, data["party"])
+        return serialize_request(
+            document_requests.requests_for(record, actor).get(pk=data["id"]), actor
+        )
 
     def listed(self, record, viewer=None):
         self.client.force_authenticate(viewer or self.owner)
@@ -72,11 +94,28 @@ class DocumentRequestTestBase(TrackerTestBase):
         self.client.force_authenticate(uploader or self.owner)
         # The fulfilment notice is sent on commit; a TestCase never commits.
         with self.captureOnCommitCallbacks(execute=True):
-            return self.client.post(
+            response = self.client.post(
                 SUBMIT_DOCUMENT,
                 {"record": record.pk, "request_item": item_id, "file": pdf(), **extra},
                 format="multipart",
             )
+        self.send_what_is_held(record, uploader or self.owner, response)
+        return response
+
+    def send_what_is_held(self, record, uploader, response):
+        """
+        The owner presses *Submit added documents* after a stored upload, as
+        the Documents tab has them do: an owner's upload to a submitted Record
+        answers nothing until it is sent (ADR-022 Amendment 8, IR-1322).
+        """
+        if response.status_code != status.HTTP_201_CREATED:
+            return
+        if not RecordUpload.objects.filter(record=record, uploaded_by=uploader).held().exists():
+            return
+        self.client.force_authenticate(uploader)
+        with self.captureOnCommitCallbacks(execute=True):
+            sent = self.client.post(f"/api/v1/records/{record.pk}/documents/send/", format="json")
+        self.assertEqual(sent.status_code, status.HTTP_200_OK, sent.data)
 
     def uploaded(self, record, item_id):
         response = self.upload_against(record, item_id)
@@ -292,7 +331,9 @@ class SlotUploadsFulfilTheRequestTests(DocumentRequestTestBase):
                 format="multipart",
             )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
-        return RecordUpload.objects.filter(record=record, slot=slot).latest("pk")
+        upload = RecordUpload.objects.filter(record=record, slot=slot).latest("pk")
+        self.send_what_is_held(record, uploader or self.owner, response)
+        return upload
 
     def item(self, record, item_id, viewer=None):
         return next(
@@ -417,9 +458,11 @@ class SlotUploadsFulfilTheRequestTests(DocumentRequestTestBase):
         self.assertEqual(request["items"][0]["upload"], first.pk)
         self.assertEqual(Notification.objects.count(), notices_before)
 
-    def test_an_upload_into_an_ad_hoc_slot_answers_nothing(self):
-        # An ad-hoc slot is only ever answered through `request_item`, even
-        # when another open item's label happens to name it.
+    def test_a_sent_upload_into_an_ad_hoc_slot_answers_every_other_item_it_names(self):
+        # Changed deliberately by IR-1322 (ADR-022 Amendment 8 point 5): an
+        # Other item is answered through its own ad-hoc slot when the upload is
+        # sent, and items naming the same document share that slot. It used to
+        # be answered only through `request_item`, at upload time.
         record = self.at_parallel_review()
         [first] = self.requested(record, self.ierc, [{"label": "Consent form"}])["items"]
         self.uploaded(record, first["id"])
@@ -428,7 +471,7 @@ class SlotUploadsFulfilTheRequestTests(DocumentRequestTestBase):
 
         self.upload_to_slot(record, adhoc)
 
-        self.assertEqual(self.item(record, second["id"])["state"], "missing")
+        self.assertEqual(self.item(record, second["id"])["state"], "uploaded")
 
     def test_a_withdrawn_request_is_not_answered(self):
         record = self.at_parallel_review()

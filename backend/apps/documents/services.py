@@ -13,8 +13,26 @@ def get_next_version(record_id: int, slot_id: int) -> int:
     return (latest.version + 1) if latest else 1
 
 
+def holds_upload(record, uploaded_by) -> bool:
+    """
+    Is an upload by `uploaded_by` to `record` held until they send it?
+    (ADR-022 Amendment 8, IR-1322.) An owner's, on a submitted Record. A
+    draft's uploads are sent at once, since the draft is its creator's alone,
+    and anyone else's upload is sent at once, as before.
+    """
+    from apps.records.models import PipelineStatus, Record
+    from core.permissions import is_record_owner
+
+    # Read now, not from the caller's copy: a copy loaded before submission
+    # would still say draft and send the file early.
+    status = Record.objects.filter(pk=record.pk).values_list("pipeline_status", flat=True).first()
+    return status not in (None, PipelineStatus.DRAFT) and is_record_owner(uploaded_by, record)
+
+
 def create_upload(record, slot: UploadSlot, file, uploaded_by) -> RecordUpload:
-    """Upload a new version of a document to a slot."""
+    """Upload a new version of a document to a slot, held or sent (`holds_upload`)."""
+    from django.utils import timezone
+
     version = get_next_version(record.id, slot.id)
     return RecordUpload.objects.create(
         record=record,
@@ -22,6 +40,7 @@ def create_upload(record, slot: UploadSlot, file, uploaded_by) -> RecordUpload:
         file=file,
         version=version,
         uploaded_by=uploaded_by,
+        sent_at=None if holds_upload(record, uploaded_by) else timezone.now(),
     )
 
 

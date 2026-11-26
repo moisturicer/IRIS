@@ -17,12 +17,13 @@
  *   awaiting review → Accepted, or Replacement needed with the reviewer's
  *   reason (`document-requests/itemStatus`).
  *
- * - **One place to answer a request** (IR-1318). The owner uploads what
- *   reviewers ask for here, not on the Overview. While a revision is asked
- *   for, the top of the tab names who asked and what is not sent yet, with
- *   *Submit new version* (`SubmitNewVersionBar`), and every file no version
- *   carries yet is marked *not yet submitted*. A document request alone is
- *   answered by the upload, and the top of the tab says so.
+ * - **One place to answer a request** (IR-1318, IR-1322). The owner uploads
+ *   what reviewers ask for here, not on the Overview. While anything is asked
+ *   for, every slot takes an upload, and each upload stays the owner's alone,
+ *   marked *Added, not sent yet* with a trash can, until they submit
+ *   (ADR-022 Amendment 8). The top of the tab (`SubmitChangesBar`) names who
+ *   asked and what is not sent yet: *Submit new version* while a revision is
+ *   open, *Submit added documents* otherwise, grey until there is something.
  *
  * The page decides who is looking: `owner`, `editable` (the `edit_details`
  * capability, so a draft or a record awaiting revision), `reviewing`, and
@@ -38,10 +39,11 @@ import { recordsApi } from "@/api/records";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { UploadDropzone } from "@/components/shared/UploadDropzone";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { FOCUS_RING } from "@/components/ui/interaction";
+import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
+import { Tooltip } from "@/components/ui/Tooltip";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
-import { PILL_SECONDARY } from "@/components/ui/pillStyles";
-import { cn, downloadBlob, formatDate } from "@/lib/utils";
+import { SMALL_ACTION_PILL, SMALL_ACTION_TARGET } from "@/components/ui/pillStyles";
+import { cn, downloadBlob, formatDate, joinLabels } from "@/lib/utils";
 import type { RecordFile, RecordUpload, SlotWithUploads } from "@/types/documents";
 import type { DocumentRequest, DocumentRequestItem, RecordDetail } from "@/types/records";
 
@@ -58,7 +60,7 @@ import { useReviewPane } from "./reviewPane";
 import { extensionOf, opensInReader, readerFormat, slotUploadDocument, type ReaderDocument } from "./readerDocument";
 import { SectionHeading } from "./headings";
 import { useRowUploads } from "./rowUploads";
-import { DocumentsAskedNote, SubmitNewVersionBar } from "./SubmitNewVersionBar";
+import { SubmitChangesBar, unsentChanges } from "./SubmitNewVersionBar";
 
 /** What an office may attach (IR-1220, ADR-032 §10 as amended 2026-11-18). */
 const SUPPLEMENTARY_TYPES = ".pdf,.docx,.png,.jpg,.jpeg";
@@ -68,7 +70,7 @@ interface DocumentsTabProps {
     RecordDetail,
     "id" | "abstract_file" | "can_request_document" | "current_holders" | "manuscript_unsubmitted"
     | "record_type_name" | "versions"
-  > & Partial<Pick<RecordDetail, "revision">>;
+  > & Partial<Pick<RecordDetail, "revision" | "pipeline_status">>;
   /** The viewer owns the record: they upload what is asked for. */
   owner:     boolean;
   /** The owner may add or replace any document, not only a requested one. */
@@ -132,8 +134,9 @@ const needsUpload = (asked: Asked) => {
 function askedFor(requests: DocumentRequest[]): { bySlot: Map<number, Asked>; other: Asked[] } {
   const bySlot = new Map<number, Asked>();
   const other: Asked[] = [];
+  // A draft asks nobody anything until its reviewer finishes (ADR-022 Amendment 9).
   const live = requests
-    .filter((r) => r.state !== "withdrawn")
+    .filter((r) => r.state !== "withdrawn" && r.state !== "draft")
     .sort((a, b) => Number(a.state === "open") - Number(b.state === "open"));
   for (const r of live) {
     for (const item of r.items) {
@@ -169,6 +172,7 @@ export function DocumentsTab({
   const [requests, setRequests] = useState<DocumentRequest[]>([]);
   const [failed, setFailed] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
   // Every removal asks first (IR-872): a removed file is gone from storage.
   const [removing, setRemoving] = useState<{ name: string; run: () => Promise<void> } | null>(null);
   const [removeBusy, setRemoveBusy] = useState(false);
@@ -241,38 +245,68 @@ export function DocumentsTab({
   if (slots == null) return <Skeleton rows={6} label="Loading the files…" onRetry={() => void load()} />;
 
   const { bySlot, other } = askedFor(requests);
-  const shownSlots = slots.filter((s) => editable || s.uploads.length > 0 || bySlot.has(s.id));
+  // Upload only where it was asked for (IR-1325): every document while the
+  // paper is a draft, otherwise just what a reviewer requested. A revision
+  // asks for the manuscript, which its own row takes (`replaceManuscript`).
+  const drafting = editable && record.pipeline_status === "draft";
+  const shownSlots = slots.filter((s) => drafting || s.uploads.length > 0 || bySlot.has(s.id));
   // What the top of the tab says to the owner (IR-1318): a revision's bar,
   // else what reviewers still need uploaded.
   const revision = record.revision;
-  const hint = owner && onSubmitNewVersion && revision && revision.open.length > 0 ? revision.new_version : null;
-  const unsentUploads = new Set((hint?.unsent?.uploads ?? []).map((u) => u.id));
-  const waiting = owner ? [...bySlot.values(), ...other].filter(needsUpload) : [];
+  const revisionOpen = (revision?.open.length ?? 0) > 0;
+  const hint = owner && onSubmitNewVersion && revisionOpen ? revision?.new_version ?? null : null;
+  // Who is asking, a party once whether it asked for a revision, documents or
+  // both (ADR-022 Amendment 8, IR-1322).
+  const documentAskers = requests.filter((r) => r.state === "open").map((r) => r.label);
+  const askers = [...new Set([...(revision?.open ?? []).map((r) => r.label), ...documentAskers])];
+  const heldNames = [...new Set(slots.filter((s) => s.uploads.some((u) => u.held)).map((s) => s.name))];
+  const submitDocuments = async () => {
+    setSending(true);
+    setNotice(null);
+    try {
+      const { data } = await recordsApi.sendDocuments(record.id);
+      setNotice(`${data.sent === 1 ? "1 document" : `${data.sent} documents`} sent to ${joinLabels(documentAskers)}.`);
+      await changed();
+    } catch (err) {
+      setNotice(errorDetail(err, "Could not send your documents. Nothing was sent. Please try again."));
+    } finally {
+      setSending(false);
+    }
+  };
   const download = (fetch: () => Promise<{ data: unknown }>, filename: string) =>
     saveBlob(fetch, filename).catch(() => setNotice(`Could not download ${filename}. Please try again.`));
   const manuscript = record.versions?.[record.versions.length - 1] ?? null;
   const downloadVersion = (name: string, u: RecordUpload) =>
     download(() => documentsApi.downloadUpload(u.id), `${name} v${u.version}.${extensionOf(u.file)}`);
-  /** A slot version's Open, when there is a reader and the version is a PDF. */
   /** Shows `document` in the reader, making room for it when the pane covers the paper. */
   const open = (document: ReaderDocument, opener: HTMLElement) => {
     onOpen?.(document, opener);
     pane?.showReader();
   };
-  /** A slot version's Open, when there is a reader and the version is a PDF. */
-  // A slot's upload is a PDF, served as one, so only a PDF version opens (images are attachments only).
-  // `newest`: the version a reviewer may open a thread on from the reader (IR-1204).
-  const openVersion = (name: string, u: RecordUpload, newest: boolean) => onOpen && readerFormat(u.file) === "pdf" && (
-    <RowAction icon="fa-book-open" verb="Open" name={`${name} version ${u.version}`}
-      onClick={(opener) => open(slotUploadDocument(name, u, extensionOf(u.file), newest), opener)} />
-  );
+  /**
+   * Opening a slot version, when there is a reader and the version is a PDF:
+   * its title in the versions list opens it (IR-1325), with no Open button.
+   * A slot's upload is a PDF, served as one, so only a PDF version opens
+   * (images are attachments only). `newest`: the version a reviewer may open
+   * a thread on from the reader (IR-1204).
+   */
+  const openVersion = (name: string, u: RecordUpload, newest: boolean) =>
+    onOpen && readerFormat(u.file) === "pdf"
+      ? (opener: HTMLElement) => open(slotUploadDocument(name, u, extensionOf(u.file), newest), opener)
+      : null;
 
   return (
     <div className="space-y-section">
-      {hint && onSubmitNewVersion ? (
-        <SubmitNewVersionBar requests={revision?.open ?? []} hint={hint} onSubmit={onSubmitNewVersion} />
-      ) : waiting.length > 0 && (
-        <DocumentsAskedNote askers={[...new Set(waiting.map((a) => a.asker))]} count={waiting.length} />
+      {owner && hint && onSubmitNewVersion ? (
+        <SubmitChangesBar mode="version" askers={askers} hint={hint} changes={unsentChanges(hint)} onSubmit={onSubmitNewVersion} />
+      ) : owner && !revisionOpen && (documentAskers.length > 0 || heldNames.length > 0) && (
+        <SubmitChangesBar
+          mode="documents"
+          askers={documentAskers.length > 0 ? [...new Set(documentAskers)] : ["your reviewers"]}
+          changes={heldNames}
+          sending={sending}
+          onSubmit={() => void submitDocuments()}
+        />
       )}
       {reviewing && (
         <ReviewerDocumentRequests record={record} reviewing onChanged={() => void changed()} />
@@ -307,7 +341,7 @@ export function DocumentsTab({
         {shownSlots.map((slot) => {
           const asked = bySlot.get(slot.id);
           const key = `slot:${slot.id}`;
-          const canUpload = owner && (editable || (asked != null && needsUpload(asked)));
+          const canUpload = owner && (drafting || (asked != null && needsUpload(asked)));
           // Newest first, as the server lists them.
           const [latest] = slot.uploads;
           const requirement = guide?.requirement(slot.id) ?? null;
@@ -319,16 +353,24 @@ export function DocumentsTab({
               template={<RequirementTemplate requirement={requirement} />}
               latest={latest ? byline(latest.version, latest.uploaded_by_name, latest.created_at) : null}
               status={asked && <ItemStatusChip item={asked.item} />}
-              // A requested document's chip says where it stands; any other
-              // upload since the latest version waits for the new one.
-              note={asked
-                ? <AskedNote asked={asked} />
-                : latest && unsentUploads.has(latest.id) && <NotYetSubmitted>Uploaded, not yet submitted</NotYetSubmitted>}
-              actions={(latest || canUpload) && (
+              // Who asked, and whether the newest file is still the owner's
+              // alone: added, not sent yet (ADR-022 Amendment 8, IR-1322).
+              note={(asked || latest?.held) && (
                 <>
-                  {latest && openVersion(slot.name, latest, true)}
-                  {latest && (
-                    <DownloadButton name={`${slot.name} version ${latest.version}`} onClick={() => downloadVersion(slot.name, latest)} />
+                  {asked && <AskedNote asked={asked} />}
+                  {latest?.held && <NotYetSubmitted>Added, not sent yet</NotYetSubmitted>}
+                </>
+              )}
+              // No Download here: each version, the newest too, is downloaded
+              // from its own row in the versions list (IR-1330).
+              actions={((owner && latest?.held) || canUpload) && (
+                <>
+                  {owner && latest?.held && (
+                    <RemoveButton name={`${slot.name} version ${latest.version}`} onClick={() =>
+                      askToRemove(`${slot.name} version ${latest.version}`, async () => {
+                        await documentsApi.deleteUpload(latest.id);
+                        await changed();
+                      })} />
                   )}
                   {canUpload && pdfUpload(key, `Upload ${slot.name}`,
                     (file, onProgress) => documentsApi.upload(record.id, slot.id, file, { onProgress }))}
@@ -340,8 +382,8 @@ export function DocumentsTab({
                   <Versions
                     name={slot.name}
                     uploads={slot.uploads}
-                    removable={owner && editable}
-                    open={(u) => openVersion(slot.name, u, u.id === latest?.id)}
+                    removable={(u) => owner && (editable || u.held === true)}
+                    openable={(u) => openVersion(slot.name, u, u.id === latest?.id)}
                     onDownload={(u) => downloadVersion(slot.name, u)}
                     onRemove={(u) =>
                       askToRemove(`${slot.name} version ${u.version}`, async () => {
@@ -357,6 +399,8 @@ export function DocumentsTab({
         })}
         {other.map((asked) => {
           const key = `item:${asked.item.id}`;
+          // Its file sits in a slot named for it, held like any other (IR-1322).
+          const held = slots.some((s) => s.name === asked.item.label && s.uploads[0]?.held);
           return (
             <DocumentRow
               key={key}
@@ -364,8 +408,11 @@ export function DocumentsTab({
               // An Other item keeps no versions of its own: only whether it was answered.
               latest={itemStatus(asked.item) === "requested" ? null : "Uploaded"}
               status={<ItemStatusChip item={asked.item} />}
-              note={<AskedNote asked={asked} />}
-              actions={owner && needsUpload(asked) && pdfUpload(key, `Upload ${asked.item.label}`,
+              note={<>
+                <AskedNote asked={asked} />
+                {held && <NotYetSubmitted>Added, not sent yet</NotYetSubmitted>}
+              </>}
+              actions={owner && needsUpload(asked) && !held && pdfUpload(key, `Upload ${asked.item.label}`,
                 (file, onProgress) => documentsApi.uploadForRequestItem(record.id, asked.item.id, file, { onProgress }))}
             />
           );
@@ -401,14 +448,13 @@ export function DocumentsTab({
                 <DocumentRow
                   key={f.id}
                   name={f.filename}
+                  // Its name opens it (IR-1325), as a version's title does.
+                  onOpenName={onOpen && opensInReader(f.filename, "") ? (opener) => open({
+                    kind: "file", id: f.id, label: f.filename, fileName: f.filename,
+                  }, opener) : undefined}
                   latest={[f.uploaded_by_name, formatDate(f.created_at)].filter(Boolean).join(" · ")}
                   actions={
                     <>
-                      {onOpen && opensInReader(f.filename, "") && (
-                        <RowAction icon="fa-book-open" verb="Open" name={f.filename} onClick={(opener) => open({
-                          kind: "file", id: f.id, label: f.filename, fileName: f.filename,
-                        }, opener)} />
-                      )}
                       <DownloadButton name={f.filename} onClick={() => download(() => documentsApi.downloadFile(f.id), f.filename)} />
                       {f.can_remove && (
                         <RemoveButton
@@ -469,36 +515,49 @@ function Versions({
   name,
   uploads,
   removable,
-  open,
+  openable,
   onDownload,
   onRemove,
 }: {
   /** The document's name, so each version's controls are named apart. */
   name: string;
   uploads: RecordUpload[];
-  removable: boolean;
-  /** A version's Open control, where it opens in the reader (IR-1203). */
-  open: (upload: RecordUpload) => ReactNode;
+  /** Whether this viewer may remove a version: a draft's, or one still held (IR-1322). */
+  removable: (upload: RecordUpload) => boolean;
+  /** Opens a version in the reader (IR-1203), where it can be: its title is the control (IR-1325). */
+  openable: (upload: RecordUpload) => ((opener: HTMLElement) => void) | null;
   onDownload: (upload: RecordUpload) => void;
   onRemove: (upload: RecordUpload) => void;
 }) {
   if (uploads.length === 0) return null;
   return (
     <ul aria-label={`Versions of ${name}`} className="divide-y divide-stone-100">
-      {uploads.map((u) => (
+      {uploads.map((u) => {
+        const opens = openable(u);
+        return (
         <li key={u.id} className="flex flex-wrap items-center justify-between gap-2 py-2 first:pt-0 last:pb-0">
           <span className="text-small text-stone-700">
-            <span className="font-semibold text-stone-900">Version {u.version}</span>
+            {opens ? (
+              <button
+                type="button"
+                onClick={(e) => opens(e.currentTarget)}
+                aria-label={`Open ${name} version ${u.version}`}
+                className={cn(CONTROL_SIZE, "rounded-control font-semibold text-brand underline-offset-2 hover:underline", FOCUS_RING)}
+              >
+                Version {u.version}
+              </button>
+            ) : (
+              <span className="font-semibold text-stone-900">Version {u.version}</span>
+            )}
             {" · "}
             {[u.uploaded_by_name, formatDate(u.created_at)].filter(Boolean).join(" · ")}
           </span>
           <span className="flex items-center gap-2">
-            {open(u)}
             <DownloadButton name={`${name} version ${u.version}`} onClick={() => onDownload(u)} />
-            {removable && !u.delete_refused && (
+            {removable(u) && !u.delete_refused && (
               <RemoveButton name={`${name} version ${u.version}`} onClick={() => onRemove(u)} />
             )}
-            {removable && u.delete_refused && (
+            {removable(u) && u.delete_refused && (
               // The server's own reason (ADR-058 §2, IR-872): part of the review, so kept.
               <span className="inline-flex items-center gap-1 text-small text-stone-600">
                 <i className="fas fa-lock text-2xs" aria-hidden />
@@ -508,15 +567,17 @@ function Versions({
             )}
           </span>
         </li>
-      ))}
+        );
+      })}
     </ul>
   );
 }
 
 /**
  * One action on a row's document: an icon and a verb, named for the document
- * it acts on ("Open Consent Paper version 2"). Hands back the button pressed,
- * so a caller can return focus to it.
+ * it acts on ("Download Consent Paper version 2"), drawn as a small pill in a
+ * full-size target (IR-1325). Hands back the button pressed, so a caller can
+ * return focus to it.
  */
 function RowAction({ icon, verb, name, onClick }: {
   icon: string;
@@ -529,10 +590,12 @@ function RowAction({ icon, verb, name, onClick }: {
       type="button"
       onClick={(e) => onClick(e.currentTarget)}
       aria-label={`${verb} ${name}`}
-      className={cn(PILL_SECONDARY, FOCUS_RING, CONTROL_SIZE, "px-3")}
+      className={cn(SMALL_ACTION_TARGET, FOCUS_RING)}
     >
-      <i className={cn("fas text-2xs", icon)} aria-hidden />
-      {verb}
+      <span className={SMALL_ACTION_PILL}>
+        <i className={cn("fas text-2xs", icon)} aria-hidden />
+        {verb}
+      </span>
     </button>
   );
 }
@@ -541,6 +604,28 @@ function DownloadButton({ name, onClick }: { name: string; onClick: () => void }
   return <RowAction icon="fa-download" verb="Download" name={name} onClick={onClick} />;
 }
 
+/**
+ * Remove is a trash can alone (IR-1332), the one a draft has in My Library
+ * (`DeleteRecord`): maroon, no fill or outline at rest, "Remove" as its
+ * tooltip, and named for what it removes. Its target is the row actions' own,
+ * 44px on touch and 36px beside a pointer, so the row does not grow.
+ */
 export function RemoveButton({ name, onClick }: { name: string; onClick: () => void }) {
-  return <RowAction icon="fa-trash-can" verb="Remove" name={name} onClick={onClick} />;
+  return (
+    <Tooltip label="Remove">
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label={`Remove ${name}`}
+        className={cn(
+          "inline-flex min-h-11 min-w-11 reading-split:min-h-9 reading-split:min-w-9 items-center justify-center rounded-full",
+          "text-brand hover:bg-stone-100 hover:text-brand-dark",
+          COLOUR_TRANSITION,
+          FOCUS_RING,
+        )}
+      >
+        <i className="fas fa-trash-can" aria-hidden />
+      </button>
+    </Tooltip>
+  );
 }

@@ -26,6 +26,8 @@ interface SidePanelInput {
   workspaceWidth: number;
   /** Ask IRIS is offered on this Record (published papers only). */
   askOffered: boolean;
+  /** Notes is offered on this Record (published papers only, IR-1326). */
+  notesOffered: boolean;
   /** Still on the Record being left while the next one loads. */
   arriving: boolean;
   /** The page a citation or `?page=` asks for. */
@@ -50,6 +52,7 @@ export function useSidePanel({
   tier,
   workspaceWidth,
   askOffered,
+  notesOffered,
   arriving,
   openAtPage,
   arrivalKey,
@@ -57,7 +60,7 @@ export function useSidePanel({
   // The reader's private note (IR-580): held here so closing Notes keeps the
   // draft, and read only once Notes is first opened.
   const [notesWanted, setNotesWanted] = useState(false);
-  const note = useReadingNote(Number(id), notesWanted);
+  const note = useReadingNote(Number(id), notesWanted && notesOffered);
   // Lines a Highlight's note adds to the reader's Notes once their note has loaded (IR-581).
   const pendingNote = useRef<string[]>([]);
   const noteRef = useRef(note);

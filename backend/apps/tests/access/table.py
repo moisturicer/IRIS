@@ -51,6 +51,10 @@ RDCO_ONLY = row(ANON, DENY, DENY, DENY, DENY, DENY, DENY, OK, DENY, DENY)
 OFFICE_ONLY = row(ANON, DENY, DENY, DENY, OK, OK, OK, OK, DENY, DENY)
 #: `record` read through `visible_to()`: owner, Adviser, every office.
 READS_RECORD = row(ANON, HIDE, OK, OK, OK, OK, OK, OK, HIDE, HIDE)
+#: Notes and highlights on `record`, which is in review (IR-1326, ADR-064 and
+#: ADR-065 as amended 2026-11-24): only a published paper takes them, so every
+#: account, its owner included, gets the 404 of a missing Record.
+UNPUBLISHED_ANNOTATION = row(ANON, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE)
 #: `record`, an owner's act: visible non-owners are refused, others hidden.
 OWNER_ACTS = row(ANON, HIDE, OK, DENY, DENY, DENY, DENY, DENY, HIDE, HIDE)
 # ADR-052 §5 as amended for IR-882: the Adviser or RDCO date an embargo, and no
@@ -304,6 +308,13 @@ RECORDS: dict[str, Entry | Shadowed] = {
     # and told so (400), the way `new-version/` is (IR-1047).
     "record-discard-revised-manuscript": Entry({
         "POST": _case(OWNER_ACTS, kwargs={"pk": Ref("revising")}, data={}),
+    }),
+    # *Submit added documents* (ADR-022 Amendment 8, IR-1322): owner only. On
+    # `record` the owner holds nothing, so is authorized and told so (400). A
+    # held upload is the owners' alone, a 404 to anyone else: the world's upload
+    # is sent, and `documents/tests/test_held_uploads.py` covers a held one.
+    "record-send-documents": Entry({
+        "POST": _case(OWNER_ACTS, kwargs=RECORD, data={}),
     }),
     # The review discussion (IR-419, ADR-032 §7): read under `may_read_review`
     # (participants, and the pool of a party holding the record now), written by
@@ -884,23 +895,23 @@ LIBRARY = {
         "DELETE": _case(SIGNED_IN, kwargs={"record_id": Ref("record")}),
     }),
     # IR-580, ADR-064 §2-§3: a note is the caller's own, so it never differs by
-    # role -- staff, the Record's owner and an administrator all read their own,
-    # empty one. What the matrix pins is the Record gate: every call, DELETE
-    # included, is a 404 for a caller who cannot read the Record.
+    # role. What the matrix pins is the Record gate: every call, DELETE
+    # included, is a 404 for a caller who cannot read the Record, and since
+    # IR-1326 for everyone on a Record that isn't published, as `record` isn't.
     "library-note": Entry({
-        "GET": _case(READS_RECORD, kwargs={"record_id": Ref("record")}),
-        "PUT": _case(READS_RECORD, kwargs={"record_id": Ref("record")}, data={"body": "A note", "base_revision": 0}),
-        "DELETE": _case(READS_RECORD, kwargs={"record_id": Ref("record")}),
+        "GET": _case(UNPUBLISHED_ANNOTATION, kwargs={"record_id": Ref("record")}),
+        "PUT": _case(UNPUBLISHED_ANNOTATION, kwargs={"record_id": Ref("record")}, data={"body": "A note", "base_revision": 0}),
+        "DELETE": _case(UNPUBLISHED_ANNOTATION, kwargs={"record_id": Ref("record")}),
     }),
     # IR-583, ADR-065: a highlight is the caller's own, so the account list is
     # anyone's own and removing one answers 204 to everybody (it discloses
     # nothing). Reading or saving on a Record is gated by the Record: a caller
-    # who cannot read it gets the 404 of a missing one. A permitted save may
-    # still be refused for its body or its Manuscript revision (a 400 or 409).
+    # who cannot read it gets the 404 of a missing one, and since IR-1326 so does
+    # everyone on a Record that isn't published, as `record` isn't.
     "library-highlights": Entry({"GET": _case(SIGNED_IN)}),
     "library-record-highlights": Entry({
-        "GET": _case(READS_RECORD, kwargs={"record_id": Ref("record")}),
-        "POST": _case(READS_RECORD, kwargs={"record_id": Ref("record")}, data={
+        "GET": _case(UNPUBLISHED_ANNOTATION, kwargs={"record_id": Ref("record")}),
+        "POST": _case(UNPUBLISHED_ANNOTATION, kwargs={"record_id": Ref("record")}, data={
             "manuscript_revision": "00000000-0000-4000-8000-000000000000",
             "page": 1, "quote": "A passage", "regions": [],
         }),
@@ -942,6 +953,11 @@ LIBRARY = {
     "library-history": Entry({
         "GET": _case(SIGNED_IN),
         "DELETE": _case(SIGNED_IN),
+    }),
+    # IR-1331: removing chosen papers touches only the caller's own rows, so it
+    # is anyone's and answers 204 whatever the ids name.
+    "library-history-remove": Entry({
+        "POST": _case(SIGNED_IN, data={"record_ids": [Ref("record")]}),
     }),
     "library-visit": Entry({
         "PUT": _case(READS_RECORD, kwargs={"record_id": Ref("record")}, data={}),

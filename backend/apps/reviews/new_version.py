@@ -130,7 +130,7 @@ def unchanged_reason(record, requests) -> Optional[str]:
         return None
     if RecordUpload.objects.filter(
         record=record, created_at__gt=since, uploaded_by__owned_records__record=record,
-    ).exists():
+    ).exists() or RecordUpload.objects.filter(record=record).held().exists():
         return None
     who = revisions.join_labels([_label(p) for p in _parties(requests)])
     return (
@@ -185,9 +185,8 @@ def unsent(record) -> dict:
     """
     What the owner has changed that no version carries yet (IR-1318), so the
     Documents tab can mark it *not yet submitted*: a revised manuscript, edited
-    details, and every document uploaded since the latest version. The same
-    uploads the next version will list as added during this one
-    (`documents_added_during`). Read from upload times, never stored.
+    details, and every upload still held (ADR-022 Amendment 8, IR-1322), which
+    the next send carries.
     """
     from apps.documents.models import RecordUpload
 
@@ -195,7 +194,7 @@ def unsent(record) -> dict:
     if latest is None:
         return {"manuscript": False, "details": False, "uploads": []}
     uploads = (
-        RecordUpload.objects.filter(record=record, created_at__gt=latest.created_at)
+        RecordUpload.objects.filter(record=record).held()
         .select_related("slot").order_by("created_at", "pk")
     )
     return {
@@ -317,6 +316,11 @@ def submit_new_version(record, actor):
     now = timezone.now()
 
     previous = latest_version(record)
+    # Every held upload goes with this version, so it names them, and they
+    # answer what they answer (ADR-022 Amendment 8, point 4; IR-1322).
+    from apps.documents.requests import send_held_uploads
+
+    send_held_uploads(record, actor)
     version = write_version(record, actor, VersionCause.REVISION)
     # Frozen before the requests resolve, from the same open threads the
     # owner was shown (ADR-032 §7, IR-876).

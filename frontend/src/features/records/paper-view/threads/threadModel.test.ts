@@ -101,7 +101,7 @@ describe("verdictOptions", () => {
       ["comment_only", "Comment only"],
       ["cleared", "Clear for ITSO"],
       ["finding", "Record a finding"],
-      ["request_revision", "Request revision"],
+      ["request_revision", "Request changes"],
     ]);
   });
 

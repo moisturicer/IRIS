@@ -13,6 +13,10 @@
 >
 > Uploads answering a request now join the current Version ([ADR-058](058-each-version-keeps-its-text-and-its-files.md) §2).
 
+> **Amended 2026-11-24 ([IR-1322](https://citiris.atlassian.net/browse/IR-1322); decided by Hermoine Zozobrado; accepted 2026-11-24 when PR #1006 merged, with Ashlee Sean's security review of point 4).** A reviewer's *Request revision* is shown as *Request changes* and may ask for documents in the same act. An owner's uploads to a submitted record are held, seen by its owners only, until *Submit new version* or *Submit added documents* sends them. See *Amendment 8*.
+
+> **Amended 2026-11-24 ([IR-1325](https://citiris.atlassian.net/browse/IR-1325); decided by Hermoine Zozobrado; accepted 2026-11-24 when PR #1010 merged, approved by Ashlee Sean as relayed by Hermoine Zozobrado).** Documents are asked for only in the Documents tab, where each request waits as the reviewer's draft until their *Finish review* sends it. *Request changes* always asks for a new version and no longer carries documents. The owner gets *Upload* only on what was asked for. See *Amendment 9*.
+
 > **Amended 2026-11-18 ([IR-1226](https://citiris.atlassian.net/browse/IR-1226); accepted 2026-11-18 with PR #895's merge; security review approved verbally by Ashlee Sean, relayed by Hermoine Zozobrado).** Creating, deciding and withdrawing a request takes a seat on the requesting party, not membership of it. See *Amendment 7*.
 
 **Accepted** — 2026-09-15 · **amended 2026-09-24, §Amendment (fulfilment, who may read request data, refusals)**. Settled as a business decision by **Lee Jasmin Adolfo** (project lead);
@@ -349,6 +353,106 @@ Decided by Hermoine Zozobrado on 2026-11-18 for [IR-1226](https://citiris.atlass
 - **The request still belongs to the party, not the person.** §3's *"permission never depends on who `requested_by` is"* stands: any seat holder of the requesting party may decide or withdraw it. A reviewer taken off the paper leaves their requests open for whoever holds the seat.
 - **Reading request data is unchanged** (§Amendment 5, `may_read_requests`).
 
+## Amendment 8 — 2026-11-24: *Request changes*, and the owner sends what they added
+
+Decided by Hermoine Zozobrado on 2026-11-24 for [IR-1322](https://citiris.atlassian.net/browse/IR-1322); **accepted 2026-11-24**, when its pull request (#1006) merged. Point 4 changes who may read a file; Ashlee Sean reviewed it for security before it was built. Transcribed by an agent. It amends §3 and the 2026-09-24 Amendment's point 1 (fulfilment), [ADR-032](032-adviser-first-review-and-office-reviewer-pools.md) §7 (the verdict's name) and [ADR-058](058-each-version-keeps-its-text-and-its-files.md) §2 (when a file joins a Version).
+
+**The problem.**
+- **Two acts, two items.** A reviewer who wanted both a revision and a form made two acts, and the owner saw two items for one reviewer: *Revision requested by Adviser* and *Documents requested by Adviser*.
+- **Each file went out at once.** Every upload reached the reviewer the moment it landed, so a reviewer who asked for five documents got five notifications and could see a half-finished set.
+- **No taking back.** An upload could not be withdrawn once it answered a request (ADR-058, IR-872 point 3).
+- **Upload only on requested slots.** While a paper was in review, the Documents tab offered *Upload* only on a requested slot. An owner could not add a file nobody had named, though the server accepts it.
+
+**The decision: one request in the screens, two records underneath.** `ResubmissionRequest` and `DocumentRequest` stay as they are, and so does clearance-aware resubmission: a revision still resets only the asking party's clearance (ADR-021, ADR-032 §5).
+
+1. **The verdict is called *Request changes*.** ADR-032 §7's *Request revision* verdict is shown as *Request changes*. Its value (`request_revision`), its capability and the service that checks it (`revisions`) are unchanged.
+2. **One act may ask for both.** *Request changes* in *Finish review* has the §2 picklist beside it, and *The paper itself needs changes (a new version)*, ticked by default:
+   - Ticked, it opens a `ResubmissionRequest`. Any documents chosen open a `DocumentRequest` from the same party in the **same transaction**: if either is refused, neither is made.
+   - Unticked, with documents chosen, it opens the `DocumentRequest` alone, and no revision.
+   - Unticked with nothing chosen is refused, because that is *Comment only*.
+   - *Request documents* on the Documents tab (ADR-032 §7, IR-1254 amendment) stays, for asking for a document without finishing a review.
+3. **The owner sees one item per party.** `submitter_status.waiting_on_you` merges a party's open revision and document request into one entry, labelled *Changes requested by {party}*. Its `kind` is `revision` while that party's revision is open, otherwise `document`, so the act offered stays the right one.
+4. **An owner's upload is held until they send it.** `RecordUpload` gains `sent_at` (nullable).
+   - **Sent at once:** an upload by anyone but one of the Record's owners, as now. Also an owner's upload while the Record is a draft, since a draft is its creator's alone (ADR-009 decision 6).
+   - **Held:** an owner's upload on a submitted Record (`sent_at` null), until the owner sends it by either:
+     - **Submit new version** (ADR-032 §5), which sends every held upload in the transaction that writes the Version, so the Version names them; or
+     - **Submit added documents**, the new `POST /api/v1/records/<id>/documents/send/`, for a Record with no open revision.
+   - **A held upload is the owners' alone.** Every route that lists, downloads or opens an upload shows it only to the Record's owners: Amendment 6's table, the reader and a Version comparison. To anyone else it does not exist, and they get a 404, as for an unreadable record. `RecordUpload.objects.visible_to(user, record)` is the one predicate.
+   - **A held upload answers nothing.** It fulfils no item, notifies nobody, and does not stop the requesting party's clock (ADR-043 §4).
+5. **Sending fulfils what it answers.** In the sending transaction:
+   - Each open request's `missing` item whose slot now has a sent upload is answered by the newest one. Items are matched as `fulfil_by_slot_upload` matches them today, and an **Other** item through its own ad-hoc slot.
+   - Each request with nothing left missing is `fulfilled`.
+   - Each requesting party is notified **once** per send, not once per file.
+   - Files nobody asked for are sent too, and join the current Version (ADR-058 §2).
+6. ***Submit added documents* is refused**:
+   - with 409 while a revision is open, because the owner sends with *Submit new version*;
+   - with 400 when nothing is held;
+   - with 403 for anyone who is not an owner (`may_fulfil`).
+
+   It writes no Version and starts no review round.
+7. **A held upload can be deleted by its owner**, whatever its version number. The *version 1 needs staff* rule in `delete_upload` and ADR-058's refusal apply only to a sent upload, since a held one is named by no Version and answers no request.
+8. **Upload is offered on every slot while a request is open.** While any party has an open revision or document request, the Documents tab offers *Upload* on each of the Record type's slots, not only the requested ones. The server already accepts these, so only the screen changes.
+9. **"Added during vN" is read from `sent_at`** (ADR-058, IR-872 amendment point 2), so a held file is added when it is sent, not when it was stored. The owner's new-version hint (IR-1318, `unsent`) reads the held uploads instead of upload times.
+10. **Nothing in flight is re-sent.** The migration sets `sent_at = created_at` on every existing upload. An item already `uploaded` stays answered.
+
+**What the owner sees.**
+- One bar at the top of the Documents tab. Its button reads *Submit new version* while a revision is open, and *Submit added documents* otherwise.
+- The button is grey (disabled, with the reason as its description) until something is held, and solid maroon once something is.
+- Each held file says *Added, not sent yet* and has a trash can.
+
+**Rejected alternatives.**
+- **Fully merging the two records, so every request is answered by a new Version.** A party that needs only a signed form would force a new Version and a new review round. The change would also reach clearance-aware resubmission, the thesis contribution.
+- **Keeping each upload sent at once and adding only a trash can.** A file the reviewer has already seen, accepted or rejected can't honestly be taken back (ADR-058 §2). The reviewer would still get a notification per file.
+- **Holding uploads but letting reviewers see them.** The reviewer would read and judge a set the owner has not finished, which is what holding is meant to stop.
+- **Removing *Request documents* from the Documents tab.** A reviewer would have to finish their review to ask for one form.
+
+**Consequences.**
+- **Code:** one additive migration (`RecordUpload.sent_at`, with its backfill) and one new route.
+- **Access matrix** (`apps/tests/access/table.py`): gains the send route, and a held upload's 404 for every role but the owners.
+- **An unsent upload is sent to nobody.** An owner who uploads and never presses Submit has sent nothing. *Waiting on you* keeps the request open, and the button stays maroon while something is held.
+- **Research Impact is unchanged:** a documents-only request still makes no resubmission.
+
+## Amendment 9 — 2026-11-24: document requests are drafts until *Finish review* sends them
+
+**Status: Accepted** — 2026-11-24, when IR-1325's PR (#1010) merged after Ashlee Sean's review, as relayed by Hermoine Zozobrado. Decided by Hermoine Zozobrado on 2026-11-24, in chat, while reviewing IR-1322's result. Transcribed by an agent. It replaces Amendment 8's points 2 and 8, and amends [ADR-032](032-adviser-first-review-and-office-reviewer-pools.md) §7 (what *Finish review* sends).
+
+**The problem.**
+- **Two places to ask.** After Amendment 8, a reviewer could ask for documents in *Finish review → Request changes* and also with *Request documents* in the Documents tab. Nothing said which to use.
+- **A request went out mid-review.** *Request documents* sent the request at once, so the owner was asked for a form while the reviewer was still reading and before their review came.
+- **Upload on every slot.** Amendment 8 point 8 offered *Upload* on every slot while anything was asked, which the owner did not want: a slot nobody asked for should take no file.
+
+**The decision.**
+1. **Documents are asked for in one place: the Documents tab.** *Request changes* in *Finish review* no longer has the picklist or *The paper itself needs changes* tick. It always asks for a new version (`revisions.request_revision`), as it did before Amendment 8. `POST /records/<id>/finish-review/` no longer reads `documents` or `new_version`.
+2. **A request is a draft until its reviewer finishes.** `DocumentRequestState` gains `draft`. `POST /records/<id>/document-requests/` makes a draft:
+   - Only its asker sees it. The list endpoint and the tracker leave out everyone else's drafts, and the request routes answer someone else's draft with 404 (`request_on_visible_record`).
+   - It writes no audit event and sends no notification, since nobody has been asked yet.
+   - Every reader that counts open requests reads `open` and is unchanged: the owner's *Waiting on you*, the tracker's `awaiting_document`, deadlines, readiness, withdrawal and a Decision. A draft makes no one a participant (`may_read_requests`).
+   - Its asker can undo it with the same `PATCH /document-requests/<id>/ {"action": "withdraw"}`. A draft is deleted, not withdrawn, because it was never sent (204).
+3. ***Finish review* sends the drafts.** Under the record lock, in the round's transaction, *Request changes* and *Comment only* open the caller's drafts for the Seat's party (`requests.send_drafts`). Each is dated now, takes the party's current assignment, writes `document_requested`, and notifies the owners once the transaction commits.
+   - Request changes plus drafts is a revision and document requests from one party. The owner still sees one *Changes requested by {party}* entry (Amendment 8 point 3).
+   - Comment only plus drafts is documents only, with no revision.
+4. **Every other verdict is refused while drafts wait (400).** *Send to RDCO*, *Clear*, *Record finding*, *Accept*, *Accept & publish*, *Keep unlisted* and *Reject* all say: *"You have N document requests waiting. Remove them in the Documents tab, or choose Request changes or Comment only."* The pop-up shows those verdicts as unavailable with the same words. This follows the *Must fix* rule (ADR-032 §7): a verdict that says the paper needs nothing more can't go out with an ask that says it does.
+5. **Upload only on what was asked for** (replaces Amendment 8 point 8).
+   - While the paper is a draft, the owner may upload to every slot.
+   - Once submitted, *Upload* is offered only on a slot or **Other** item an open request names, and only while it still needs a file.
+   - A revision asks for the manuscript, which its own row takes.
+   - Every other slot shows its files with no *Upload*. This is a screen rule: the server's upload routes are unchanged (Amendment 8 point 4 still holds what an owner uploads until they send it).
+
+**Who can still send at once.** Nobody needs to. Since IR-1226, asking for documents needs an open Seat (`requestable_parties`), the same thing *Finish review* needs, so every reviewer who can draft a request can also send it. A reviewer whose Seat is assigned but not yet opened can draft one; they send it by opening the review and finishing it, as *Finish review* already requires.
+
+**Rejected alternatives.**
+- **Keep the picklist in *Request changes*, and remove it from the Documents tab** (Amendment 8's shape, kept). The reviewer asks for documents where they look at them, which is the Documents tab. Asking for documents would also always finish the review.
+- **Send drafts with any verdict.** *Accept* with an open request for a missing form contradicts itself.
+- **Discard drafts quietly on any other verdict.** A reviewer could lose a request without noticing.
+- **Keep *The paper itself needs changes* tick for documents only.** *Comment only* already sends the drafts without a revision, so the tick would be a second way to say the same thing.
+
+**Consequences.**
+- **Code:** one migration (`0030_document_request_draft`). It adds the choice and alters no stored row, because every existing request is already `open`, `fulfilled` or `withdrawn`.
+- **Removed:** the screen's *Request changes* fields (`RequestChangesFields.tsx`).
+- **A draft that is never sent asks nobody anything.** If the reviewer's seat closes another way (a Decision, a withdrawal, being taken off the paper), it stays a draft that only they could see, as draft comments do.
+- **Research Impact is unchanged:** a documents-only request still makes no resubmission, and a revision still resets only its party's clearance.
+
+## Alternatives Considered
 
 **Keep asking in a decline comment (the status quo).** Rejected because of the three side effects
 above.
@@ -440,4 +544,4 @@ FR-M2-01 (partially) · FR-M5-03 · NFR-U2. These IDs are stable labels only.
 
 ## Related Tasks
 
-IR-254 · IR-262 · IR-263 · IR-346 · IR-349 · IR-118 (still deferred) · IR-144, IR-216 · ADR-018 §Status.
+IR-254 · IR-262 · IR-263 · IR-1322 · IR-346 · IR-349 · IR-118 (still deferred) · IR-144, IR-216 · ADR-018 §Status.

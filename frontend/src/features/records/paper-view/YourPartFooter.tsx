@@ -28,17 +28,20 @@ const CIRCLE: Record<string, { tone: string; glyph: string }> = {
  * It words nothing: `part` is built from the server's own strings
  * (`yourPartSummary`), and `children` holds the host's real controls.
  */
-export function YourPartFooter({ id, part, hasFacts, onShowFacts, footerRef, children }: {
+export function YourPartFooter({ id, part, hasFacts, onShowFacts, footerRef, hidden = false, children }: {
   id: string;
   part: YourPart;
   /** The server sent facts beyond the line: offer the way to them. */
   hasFacts: boolean;
   onShowFacts: () => void;
   footerRef?: Ref<HTMLElement>;
+  /** Out of reach under the cover of a review not yet started (IR-1336). */
+  hidden?: boolean;
   children?: ReactNode;
 }) {
   return (
-    <footer ref={footerRef} id={id} className="review-pane-foot" aria-label="Your part">
+    <footer ref={footerRef} id={id} className="review-pane-foot" aria-label="Your part"
+      {...(hidden ? { inert: "", "aria-hidden": true } : {})}>
       {/* One row, as the prototype's merge box: who-and-what on the left, the
           actions on the right, wrapping under it in a narrow pane (IR-1139). */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">

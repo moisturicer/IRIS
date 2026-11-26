@@ -111,7 +111,7 @@ It reports five steps, and the first that fails stops the run and names itself:
 |---|---|---|
 | 1. pull | Fast-forwards the clone to GitHub's `main` | the clone isn't on `main`, has uncommitted changes, or has commits GitHub doesn't. Nothing is changed |
 | 2. check | Checks `.env`, `backend/.env` and `ai/.env` exist, the compose file is valid, and 5 GB is free | any is missing. Nothing is rebuilt |
-| 3. rebuild | `docker compose -f docker-compose.prod.yml up -d --build` | the build fails, or `migrate` (the database update) fails: its log is shown |
+| 3. rebuild | `docker compose -f docker-compose.prod.yml up -d --build`. Django's `migrate` runs first, then `ai-migrate` (the AI's own tables), and the AI gateway and workers start only after both | the build fails, or `migrate` or `ai-migrate` fails: its log is shown |
 | 4. health | Waits until every service is running, and healthy where it has a check, on three checks in a row, so a crash-looping one doesn't pass. Then it fetches the home page and `/api/v1/colleges/` over HTTPS. If the page answers and the API doesn't, it restarts `frontend` once and says so, a fallback kept from before IR-200's fix | a service isn't ready, or the site doesn't answer, within 10 minutes for the whole step. The logs of what failed are shown |
 | 5. report | Prints `done, running <commit> (<title>)` | |
 
@@ -136,6 +136,14 @@ Going back never undoes a database migration. Run `git checkout main` before the
 | `IRIS_DEPLOY_MIN_FREE_GB` | `5`: free disk a rebuild needs |
 
 It doesn't back up the database first; do that yourself before an update that migrates.
+
+### The AI's own tables: ai-migrate (IR-1320)
+
+The AI runtime keeps its runs and conversations in its own schema, `iris_ai`, which Django's `migrate` doesn't touch. `ai-migrate` updates it on every `up`, by `deploy.sh` or by hand. It runs `python -m ai.runs.migrate`, which applies each new `ai/runs/migrations/*.sql` once, prints `applied: <files>` or `applied: nothing`, and exits. It runs after Django's `migrate`, because some of its files read tables Django creates. `ai-gateway` and `ai-runs-worker` wait for it, so new AI code never starts against older tables.
+
+- **Its login** is the database owner from the repo-root `.env` (`DB_USER`, `DB_PASSWORD`). Only this one-shot container gets it, never `ai/.env` or a running service (ADR-014), and the AI services refuse to run with it set.
+- **On a new server** it needs the runtime logins first: `docker compose -f docker-compose.prod.yml run --rm migrate python manage.py provision_research_roles`. Without them it fails with `role "iris_django_runtime" does not exist`, and the deploy stops at step 3.
+- **What it applied:** `docker compose -f docker-compose.prod.yml logs ai-migrate`.
 
 ### Malware scanning (ADR-074, IR-666)
 

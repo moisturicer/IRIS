@@ -30,7 +30,7 @@ from apps.records.discovery import invalidate_feed
 from apps.records.models import Record
 from apps.records.serializers import RecordListSerializer
 from apps.records.versions import served_manuscript_identity
-from core.enums import ReadingStatus
+from core.enums import PipelineStatus, ReadingStatus
 
 from . import feeds, folders, highlights, positions
 from .models import (
@@ -148,13 +148,31 @@ class SavedRecordDetailView(APIView):
 # The owner is the authenticated user and every queryset starts from
 # `ReadingNote.objects.filter(owner=request.user)`, so another reader's note --
 # staff's, the Record owner's, anyone's -- cannot be addressed. Every call,
-# DELETE included, rechecks `Record.objects.visible_to()`: an unreadable Record
-# is the same 404 as a missing one, and the text is kept until access returns.
+# DELETE included, rechecks `annotatable()`: an unreadable or unpublished Record
+# is the same 404 as a missing one, and the text is kept until it returns.
+
+
+def annotatable(user):
+    """
+    The Records `user` may keep notes and highlights on: the ones they may read
+    that are published (ADR-064 and ADR-065 as amended 2026-11-24, IR-1326).
+    A draft or a paper in review has review comments instead, and a note or
+    highlight on one is withheld, not deleted, until it is published.
+    """
+    return Record.objects.visible_to(user).filter(pipeline_status=PipelineStatus.PUBLISHED)
 
 
 def _readable_or_404(user, record_id):
     """The Record, if `user` may read it; else the same 404 as a missing one."""
     record = Record.objects.visible_to(user).filter(pk=record_id).first()
+    if record is None:
+        raise NotFound()
+    return record
+
+
+def _annotatable_or_404(user, record_id):
+    """The Record, if `user` may keep notes or highlights on it; else the 404 of a missing one."""
+    record = annotatable(user).filter(pk=record_id).first()
     if record is None:
         raise NotFound()
     return record
@@ -205,7 +223,7 @@ class ReadingNoteView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, record_id):
-        _readable_or_404(request.user, record_id)
+        _annotatable_or_404(request.user, record_id)
         return Response(_note_entry(_own_note(request.user, record_id).first()))
 
     def put(self, request, record_id):
@@ -219,7 +237,7 @@ class ReadingNoteView(APIView):
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        _readable_or_404(request.user, record_id)
+        _annotatable_or_404(request.user, record_id)
 
         with transaction.atomic():
             note = _own_note(request.user, record_id).select_for_update().first()
@@ -243,7 +261,7 @@ class ReadingNoteView(APIView):
     def delete(self, request, record_id):
         # A Record the reader cannot read is a 404 here too (ADR-064 §3), so the
         # endpoint never confirms that a hidden Record exists.
-        _readable_or_404(request.user, record_id)
+        _annotatable_or_404(request.user, record_id)
         _own_note(request.user, record_id).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -267,14 +285,15 @@ class HighlightListView(APIView):
     """
     GET /library/highlights/ -- every highlight the reader has saved, newest
     first. A highlight whose Record the reader cannot read is listed as
-    `{id, record_id, available: false}` and nothing else (ADR-065 §4).
+    `{id, record_id, available: false}` and nothing else (ADR-065 §4), and so
+    is one on a paper that isn't published (IR-1326).
     """
 
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         rows = list(ReadingHighlight.objects.filter(owner=request.user).order_by("-created_at", "-pk"))
-        readable = {r.pk: r for r in Record.objects.visible_to(request.user).filter(pk__in={h.record_id for h in rows})}
+        readable = {r.pk: r for r in annotatable(request.user).filter(pk__in={h.record_id for h in rows})}
         contexts = {pk: highlights.context_for(record, request.user) for pk, record in readable.items()}
         results = [
             highlights.entry(h, contexts[h.record_id]) if h.record_id in readable else highlights.unavailable(h)
@@ -289,7 +308,8 @@ class RecordHighlightsView(APIView):
     POST /library/highlights/<record_id>/ -- save the passage the reader selected:
          `{manuscript_revision, page, quote, prefix, suffix, regions}`.
 
-    A Record the reader cannot read is the same 404 as a missing one on both.
+    A Record the reader cannot read, or one not published (IR-1326), is the
+    same 404 as a missing one on both.
     `manuscript_revision` is what the reader's own reader showed; it must be the
     revision the server serves them now, else a `409 manuscript_changed` and
     nothing is stored. Saving the same passage again returns the one already there.
@@ -298,18 +318,14 @@ class RecordHighlightsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, record_id):
-        record = Record.objects.visible_to(request.user).filter(pk=record_id).first()
-        if record is None:
-            raise NotFound()
+        record = _annotatable_or_404(request.user, record_id)
         context = highlights.context_for(record, request.user)
         rows = ReadingHighlight.objects.filter(owner=request.user, record=record).order_by("-created_at", "-pk")
         return Response({"results": [highlights.entry(h, context) for h in rows]})
 
     def post(self, request, record_id):
         fields = highlights.clean(request.data)
-        record = Record.objects.visible_to(request.user).filter(pk=record_id).first()
-        if record is None:
-            raise NotFound()
+        record = _annotatable_or_404(request.user, record_id)
 
         revision, sha256 = served_manuscript_identity(record, request.user)
         if revision is None:
@@ -639,6 +655,34 @@ class ReadingHistoryView(APIView):
     def delete(self, request):
         """Clear history: the rows are deleted, not hidden."""
         ReadingVisit.objects.filter(owner=request.user).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ReadingHistoryRemoveView(APIView):
+    """
+    POST /library/history/remove/ -- `{"record_ids": [1, 2]}` deletes those
+    papers from the caller's history, in one transaction (IR-1331). Only the
+    caller's own rows are touched, so an id that is not in their history, or a
+    Record they can no longer read, is simply removed or skipped: the answer is
+    the same 204 and discloses nothing. The ids must be a non-empty list of
+    integers, no longer than the history can hold, so a mistake never reads as
+    "clear everything".
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        ids = _body(request).get("record_ids")
+        valid = (
+            isinstance(ids, list)
+            and 0 < len(ids) <= MAX_HISTORY_ENTRIES
+            and all(isinstance(i, int) and not isinstance(i, bool) for i in ids)
+        )
+        if not valid:
+            raise ValidationError({"record_ids": [
+                f"Send a list of 1 to {MAX_HISTORY_ENTRIES} paper ids to remove from your history.",
+            ]})
+        ReadingVisit.objects.filter(owner=request.user, record_id__in=ids).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 

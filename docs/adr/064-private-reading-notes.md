@@ -4,6 +4,8 @@
 
 **Proposed** — 2026-11-12 (IR-580, under IR-553), awaiting acceptance by Lee Jasmin Adolfo. The note retention rule (§Decision 6) is the "decision before ready-for-agent" on IR-580; it was written into the IR-580 spec by Jive Tyler I. Revalde. This ADR records it and the choices that follow from it. Nothing in it is authorised until it is accepted.
 
+> **Amended 2026-11-24 ([IR-1326](https://citiris.atlassian.net/browse/IR-1326); decided by Hermoine Zozobrado; accepted 2026-11-25 when PR #1014 merged, approved by Lee Jasmin Adolfo as relayed by Hermoine Zozobrado).** Notes are kept only on a **published** paper, and never in Review. See *Amendment — 2026-11-24*.
+
 ## Context
 
 IR-553 gives a reader a private library in their account ([ADR-044](044-account-backed-research-library.md)). Its User Stories 10–11 and 20 add **private notes** typed beside a paper in the reading workspace. A note is the reader's own writing, so three things matter more than they do for a save or a reading status:
@@ -38,6 +40,19 @@ IR-553 gives a reader a private library in their account ([ADR-044](044-account-
 8. **The reader's data rights cover notes.** Account deletion deletes them (`deletion/registry.py`). The personal-data export includes each note's text and revision (`personal_data/registry.py`), with the Record's title only while the reader may read it.
 
 9. **The draft is never stored in the browser.** Autosave sends the text to the server and the editor holds the draft in memory. `localStorage` is not used (ADR-044 §7 and its shared-PC finding). The status line reads **Saving**, **Saved** or **Could not save**, with a Retry after a failure. A failure keeps the draft and never shows Saved. Closing the browser tab or reloading with an unsaved draft asks first (`beforeunload`).
+
+## Amendment — 2026-11-24: published papers only, and none in Review
+
+**Status: Accepted** — 2026-11-25, when IR-1326's PR (#1014) merged after Lee Jasmin Adolfo's review, as relayed by Hermoine Zozobrado. Decided by Hermoine Zozobrado on 2026-11-24, in chat. Transcribed by an agent. It narrows §3 (the Record gate).
+
+**The problem.** In Review, selecting text offered both *Comment*, which is shared and part of the review ([ADR-032](032-adviser-first-review-and-office-reviewer-pools.md) §7), and *Highlight*, which is private and goes nowhere. The two look alike on the PDF, so a reviewer could think they had flagged a passage for the authors when they hadn't. Highlight's optional note also went to Notes, which Review doesn't open.
+
+**The decision.**
+1. **Only a published paper takes notes.** The server's gate is `annotatable(user)`: `Record.objects.visible_to(user)` narrowed to `pipeline_status = published`. A draft or a paper in review answers the same `404` as a missing Record, to its owner too. This is the rule Ask IRIS already follows ([ADR-052](052-each-paper-states-its-embargo-and-a-person-ends-it.md) as amended for IR-1252).
+2. **Nothing is deleted.** A note on a paper that is not published, or one sent back to review after it was, is kept and withheld, as §6 keeps one whose access is revoked, and it returns when the paper is published.
+3. **Review shows none.** The selection menu offers no *Save highlight* there and no private highlight is drawn, so selecting text in Review is for a review comment alone. Notes is not offered there, as before.
+
+**Cost.** An author or Adviser can no longer keep private notes or highlights on their own draft or a paper in review; review comments are the tool for that stage.
 
 ## Alternatives Considered
 

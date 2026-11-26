@@ -51,7 +51,8 @@ class VersionDocumentsTestBase(NewVersionTestBase):
             file=SimpleUploadedFile(f"{slot.name}.pdf", b"%PDF-1.4 doc", content_type="application/pdf"),
             version=get_next_version(record.pk, slot.pk), uploaded_by=self.owner,
         )
-        RecordUpload.objects.filter(pk=upload.pk).update(created_at=when)
+        # Sent when stored: "added during" reads `sent_at` (ADR-022 Amendment 8, IR-1322).
+        RecordUpload.objects.filter(pk=upload.pk).update(created_at=when, sent_at=when)
         upload.refresh_from_db()
         return upload
 

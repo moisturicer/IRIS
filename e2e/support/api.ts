@@ -11,6 +11,19 @@ export const API = "/api/v1";
 
 export type Session = { access: string; refresh: string; user: Record<string, unknown> };
 
+// ADR-072 (IR-1222): the refresh token travels only in this HttpOnly cookie,
+// scoped to the auth routes. It is never in a response body.
+export const REFRESH_COOKIE = "iris_refresh";
+const REFRESH_COOKIE_PATH = `${API}/auth/`;
+
+/** The refresh token a sign-in set in its cookie. */
+function refreshCookie(res: APIResponse): string {
+  const prefix = `${REFRESH_COOKIE}=`;
+  const header = res.headersArray().find((h) => h.name.toLowerCase() === "set-cookie" && h.value.startsWith(prefix));
+  expect(header, "sign-in sets the refresh cookie").toBeTruthy();
+  return header!.value.slice(prefix.length).split(";")[0];
+}
+
 export async function anonymous(): Promise<APIRequestContext> {
   return playwrightRequest.newContext({ baseURL: BASE, extraHTTPHeaders: HEADERS });
 }
@@ -19,9 +32,10 @@ export async function login(email: string, password = PASSWORD): Promise<Session
   const ctx = await anonymous();
   const res = await ctx.post(`${API}/auth/login/`, { data: { email, password } });
   const body = await res.json().catch(() => ({}));
-  await ctx.dispose();
   expect(res.status(), `sign in as ${email}: ${JSON.stringify(body)}`).toBe(200);
-  return body as Session;
+  const session = { ...body, refresh: refreshCookie(res) } as Session;
+  await ctx.dispose();
+  return session;
 }
 
 /** An API client signed in as one of the seeded accounts, or any email. */
@@ -79,17 +93,30 @@ export async function ok<T = any>(res: APIResponse, what: string): Promise<T> {
 }
 
 /**
- * Open the app in the browser already signed in as `who`. The frontend keeps
- * only the refresh token, in sessionStorage, and hydrates from it on load
- * (frontend/src/lib/authStorage.ts), so that is all that is placed. Signing in
- * through the form itself is the account-lifecycle journey's subject.
+ * Place `session`'s refresh cookie in the page's browser, as a sign-in would.
+ * The app keeps no token of its own (ADR-072, frontend/src/lib/authStorage.ts):
+ * on load it asks the server, which reads this cookie.
+ */
+export async function placeSession(page: Page, session: Session): Promise<void> {
+  await page.context().addCookies([{
+    name: REFRESH_COOKIE,
+    value: session.refresh,
+    domain: new URL(BASE).hostname,
+    path: REFRESH_COOKIE_PATH,
+    httpOnly: true,
+    secure: false,
+    sameSite: "Strict",
+  }]);
+}
+
+/**
+ * Open the app in the browser already signed in as `who`. Signing in through
+ * the form itself is the account-lifecycle journey's subject.
  */
 export async function signInBrowser(page: Page, who: AccountName | string, path = "/", password = PASSWORD): Promise<Session> {
   const email = who in ACCOUNTS ? ACCOUNTS[who as AccountName] : who;
   const session = await login(email, password);
-  await page.addInitScript((refresh) => {
-    window.sessionStorage.setItem("iris_refresh_token", refresh);
-  }, session.refresh);
+  await placeSession(page, session);
   await page.goto(path);
   return session;
 }

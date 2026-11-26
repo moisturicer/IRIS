@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.http import FileResponse
 from django.db import transaction
+from core.enums import DocumentRequestState
 from core.permissions import IsStaff, hides_draft, may_read_record_documents, owns_or_staffs_record
 from core.text_limits import too_long, too_long_message
 from .models import RecordUpload, UploadSlot, UploadStatus, UploadReview, RecordFile
@@ -118,22 +119,30 @@ def _on_visible_record(user, queryset, pk):
     obj = queryset.filter(pk=pk).first()
     if obj is None or not Record.objects.visible_to(user).filter(pk=obj.record_id).exists():
         return None
+    # A held upload is its owners' alone: to anyone else it does not exist
+    # (ADR-022 Amendment 8, point 4; IR-1322). A RecordFile is never held.
+    if getattr(obj, "held", False):
+        from core.permissions import is_record_owner
+
+        if not is_record_owner(user, obj.record):
+            return None
     return obj
 
 
 def _store_slot_upload(record, slot, file, user):
     """
-    Store a file uploaded into a slot. An owner's upload also answers every
-    open request item asking for that slot (ADR-022 §Amendment 1, IR-346),
-    in the same transaction, so a request is never fulfilled for a file that
-    was not stored. Anyone else's upload is stored and answers nothing.
+    Store a file uploaded into a slot. An owner's upload to a submitted Record
+    is held and answers nothing until they send it (ADR-022 Amendment 8,
+    IR-1322). An owner's sent upload (a draft's) still answers every open
+    request item asking for that slot (§Amendment 1, IR-346), in the same
+    transaction. Anyone else's upload is stored and answers nothing.
     """
     from django.db import transaction
     from .requests import fulfil_by_slot_upload, may_fulfil
 
     with transaction.atomic():
         upload = create_upload(record, slot, file, uploaded_by=user)
-        if may_fulfil(record, user):
+        if not upload.held and may_fulfil(record, user):
             fulfil_by_slot_upload(record, slot, upload, uploaded_by=user)
     return upload
 
@@ -216,7 +225,9 @@ class SubmitDocumentView(APIView):
                 with transaction.atomic():
                     item, slot = resolve_item_for_upload(record, item_id, slot_id)
                     upload = create_upload(record, slot, file, uploaded_by=request.user)
-                    fulfil_item(item, upload, uploaded_by=request.user)
+                    # Held until the owner sends it (ADR-022 Amendment 8).
+                    if not upload.held:
+                        fulfil_item(item, upload, uploaded_by=request.user)
             except DocumentRequestError as exc:
                 return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         else:
@@ -308,8 +319,15 @@ class RecordUploadListView(generics.ListAPIView):
         return super().list(request, *args, **kwargs)
 
     def get_queryset(self):
-        record_id = self.request.query_params.get("record")
-        return RecordUpload.objects.filter(record_id=record_id).select_related("slot", "status", "uploaded_by")
+        from apps.records.models import Record
+
+        # `list` has authorized the record, so it exists and is readable.
+        record = Record.objects.get(pk=self.request.query_params.get("record"))
+        # A held upload is its owners' alone (ADR-022 Amendment 8, IR-1322).
+        return (
+            RecordUpload.objects.filter(record=record).visible_to(self.request.user, record)
+            .select_related("slot", "status", "uploaded_by")
+        )
 
 
 class UploadReviewCreateView(APIView):
@@ -344,7 +362,8 @@ class UploadReviewCreateView(APIView):
             return Response({"comment": [too_long_message("A comment")]}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            upload        = RecordUpload.objects.select_related("record").get(pk=upload_id)
+            # A held upload is not there to review (ADR-022 Amendment 8).
+            upload        = RecordUpload.objects.sent().select_related("record").get(pk=upload_id)
             upload_status = UploadStatus.objects.get(pk=status_id)
         except (RecordUpload.DoesNotExist, UploadStatus.DoesNotExist):
             return Response(
@@ -707,7 +726,7 @@ def _apply(document_request, user, body, change):
     except DocumentRequestError as exc:
         return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
     return Response(serialize_request(
-        requests_for(document_request.record).get(pk=document_request.pk), user
+        requests_for(document_request.record, user).get(pk=document_request.pk), user
     ))
 
 
@@ -727,6 +746,19 @@ class DocumentRequestDecisionView(APIView):
         document_request, refused = _managed_request(pk, request.user)
         if refused:
             return refused
+        if document_request.state == DocumentRequestState.DRAFT:
+            # Never sent, so undone without a trace (ADR-022 Amendment 9, IR-1325).
+            from .request_serializers import first_error
+            from .requests import DocumentRequestError, discard_draft
+
+            body = WithdrawSerializer(data=request.data)
+            if not body.is_valid():
+                return Response({"detail": first_error(body.errors)}, status=status.HTTP_400_BAD_REQUEST)
+            try:
+                discard_draft(document_request, request.user)
+            except DocumentRequestError as exc:
+                return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(status=status.HTTP_204_NO_CONTENT)
         return _apply(
             document_request, request.user, WithdrawSerializer(data=request.data),
             lambda data: withdraw_request(document_request, request.user),

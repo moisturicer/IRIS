@@ -144,14 +144,17 @@ export default function PaperViewPage() {
   // Ask IRIS reads published papers only (ADR-052 as amended, IR-1252), so it isn't
   // offered beside any other: the Ask IRIS page still searches the published ones.
   const askOffered = record?.pipeline_status === PIPELINE_STATUS.PUBLISHED;
+  // Notes and highlights are kept on published papers only, and never in Review,
+  // where selecting text is for a review comment (ADR-064/065 as amended, IR-1326).
+  const notesOffered = askOffered;
   // Ask IRIS and Notes (IR-569, IR-580): one panel, laid out by reading tier.
   const panel = useSidePanel({
-    chat, id, onPaperTab, onReviewTab, tier, workspaceWidth, askOffered, arriving, openAtPage, arrivalKey,
+    chat, id, onPaperTab, onReviewTab, tier, workspaceWidth, askOffered, notesOffered, arriving, openAtPage, arrivalKey,
   });
   const { notesWanted, askAbout, addToNote, chatMinimized, chatModal, stepAsideForHighlight } = panel;
-  // The reader draws the reader's own highlights wherever the paper shows, so
-  // they are read then, and when Notes lists them (IR-583).
-  const highlights = useReadingHighlights(Number(id), !arriving && (onPaperTab || onReviewTab || notesWanted));
+  // The reader draws the reader's own highlights on the Paper tab, so they are
+  // read then, and when Notes lists them (IR-583); never in Review (IR-1326).
+  const highlights = useReadingHighlights(Number(id), !arriving && notesOffered && (onPaperTab || notesWanted));
 
   // Reading collapses the sidebar to its rail, for this visit only (IR-569).
   useEffect(() => {
@@ -239,7 +242,7 @@ export default function PaperViewPage() {
     openedHere && openedHere.version === (viewedVersion?.number ?? null) ? openedHere : null;
   // What the reader draws: highlights made on the bytes it shows. A stale one is
   // drawn only on the version that still holds its bytes -- never on the paper now.
-  const drawnHighlights = highlights.items
+  const drawnHighlights = (onReviewTab ? [] : highlights.items)
     .filter((h) => (viewedVersion ? h.state === "stale" && h.open_version === viewedVersion.number : h.state === "current"))
     .map((h) => ({ key: h.id, regions: h.regions }));
   // The menu is offered on the current paper only (ADR-065 §8), so this names the current version.
@@ -261,7 +264,9 @@ export default function PaperViewPage() {
         });
       },
     } satisfies SelectionAction]),
-    {
+    // Not in Review, where a selection is for a review comment, and only on a
+    // published paper (IR-1326).
+    ...(onReviewTab || !notesOffered ? [] : [{
       id: "save-highlight", label: "Save highlight", short: "Highlight", sendIcon: "fa-check",
       placeholder: "Add a note to your Notes (optional)…",
       icon: <HighlightSwatch />,
@@ -273,7 +278,7 @@ export default function PaperViewPage() {
           addToNote(`Page ${passage.page}: ${text}`);
         }
       },
-    },
+    } satisfies SelectionAction]),
   ];
   const openHighlight = (h: ReadableHighlight) => {
     setHighlightsShown(true);
@@ -337,43 +342,34 @@ export default function PaperViewPage() {
   // Ask IRIS open beside the page leaves no room for the rail (IR-569).
   const railHidden = showRail && chat.open && !chatMinimized;
   // One filled action per region (spec §4.6, 01-design-system §0): the
-  // owner's pending action, else the reviewer's Open review, else View (Save
+  // owner's pending action, else View (Save
   // where there is no paper to view, IR-569). When
   // the pending action has its own region -- the revision banner, the
   // Review section's action bar -- the header fills nothing. The bar fills
   // its first granted action, so any granted review action puts the primary
   // there. A draft never reaches this page (it opens in Publish, IR-1227), so
   // `continue_draft` has no action here.
+  // A reviewer starts a review on the Review tab's cover, not here (IR-1336).
   const primary: PrimaryAction = can.has("create_version")
     ? "elsewhere"
-    : can.has("open_review") && section !== "review"
-      ? "open_review"
-      : section === "review" && (can.has("finish_review") || REVIEW_ACTIONS.some((action) => can.has(action.capability)))
-        ? "elsewhere"
-        : hasPaper
-          ? "view"
-          : "save";
+    : section === "review" && (can.has("finish_review") || REVIEW_ACTIONS.some((action) => can.has(action.capability)))
+      ? "elsewhere"
+      : hasPaper
+        ? "view"
+        : "save";
 
-  // *Open review* (ADR-032 §4) records when this reviewer started -- the
-  // seat moves to `in_review` and the server stamps `opened_at` -- then moves
-  // into the Review section. With no unopened seat it only navigates. A
-  // failed recording still opens the review: the seat stays `assigned`, and
-  // the next *Open review* records it (IR-1206). A recorded seat re-reads the
-  // Record through `reloadRecord`, so one the viewer can no longer read falls
-  // to the not-available screen (IR-906, IR-1273).
-  const openReview = async () => {
+  // *Start review* (ADR-032 §4, IR-1336) records when this reviewer started --
+  // the seat moves to `in_review` and the server stamps `opened_at` -- from the
+  // cover over the Review tab's pane. It no longer opens the review regardless
+  // of a failure (IR-1206): the cover stays and says so, since the review can't
+  // be used until the start is recorded. A recorded seat re-reads the Record
+  // through `reloadRecord`, so one the viewer can no longer read falls to the
+  // not-available screen (IR-906, IR-1273).
+  const startReview = async () => {
     const seat = seatToOpen(record);
-    if (seat) {
-      let opened = false;
-      try {
-        await seatsApi.open(seat.id);
-        opened = true;
-      } catch {
-        // See above: the review opens regardless.
-      }
-      if (opened) await reloadRecord();
-    }
-    setViewParam("section", "review");
+    if (!seat) return;
+    await seatsApi.open(seat.id);
+    await reloadRecord();
   };
 
   // Paper mode's version: a compact picker whenever there is a version, v1
@@ -566,12 +562,10 @@ export default function PaperViewPage() {
                 record={record}
                 section={section}
                 can={can}
-                primary={primary}
                 versions={versions}
                 latestVersion={latestVersion}
                 viewedVersion={viewedVersion}
                 onChooseVersion={chooseVersion}
-                onOpenReview={openReview}
                 onEditDetails={() => setViewParam("edit", "details")}
                 viewAction={viewAction}
                 saveCiteShareActions={saveCiteShare}
@@ -606,7 +600,7 @@ export default function PaperViewPage() {
                 userIsOwner={userIsOwner}
                 reviewing={reviewing}
                 authorDetails={authorDetails}
-                onOpenReview={openReview}
+                onOpenReview={startReview}
                 onShowVersion={chooseVersion}
                 reader={reader}
                 shown={shown}
@@ -694,6 +688,7 @@ export default function PaperViewPage() {
         }
         onReviewTab={onReviewTab}
         askOffered={askOffered}
+        notesOffered={notesOffered}
         highlights={highlights}
         onOpenHighlight={openHighlight}
         canOpenVersion={(n) => versions.some((v) => v.number === n && v.manuscript_url && (v !== latestVersion || record.manuscript_unsubmitted))}

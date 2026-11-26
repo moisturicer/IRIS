@@ -6,6 +6,13 @@ import { Button } from "./Button";
 export const SLOW_AFTER_MS = 2_000;
 /** ...and offers Try again after this long, where the screen can read again. */
 export const STUCK_AFTER_MS = 10_000;
+/**
+ * A loader draws its placeholder shapes only once the wait reaches this long
+ * (IR-1314). A load that answers sooner goes straight to its content or its
+ * empty state, so an empty list never flashes the shape of rows it won't have.
+ * The status label is announced from the start either way.
+ */
+export const SHOW_PLACEHOLDER_AFTER_MS = 400;
 
 export type LoadStage = "loading" | "slow" | "stuck";
 
@@ -30,6 +37,20 @@ export function useLoadStage(): { stage: LoadStage; restart: () => void } {
 
   const restart = useCallback(() => setRun((n) => n + 1), []);
   return { stage, restart };
+}
+
+/**
+ * Whether a loader may draw its placeholder shapes yet: false for the first
+ * `SHOW_PLACEHOLDER_AFTER_MS` after mount, then true for the rest of its life
+ * (a Try again leaves the shapes up rather than blanking them).
+ */
+export function usePlaceholderDelay(): boolean {
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setShow(true), SHOW_PLACEHOLDER_AFTER_MS);
+    return () => clearTimeout(timer);
+  }, []);
+  return show;
 }
 
 interface SlowLoadNoticeProps {

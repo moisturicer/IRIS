@@ -31,7 +31,7 @@ interface Choice {
  * offered, and a held one is disabled with the server's reason. Where *Finish
  * review* is granted, a verdict opens it with that verdict chosen, so drafts
  * still go with the verdict (ADR-032 §7, IR-875): RDCO's *Accept & publish*
- * and *Keep unlisted*, *Request revision* and *Reject* all do. Everyone else
+ * and *Keep unlisted*, *Request changes* and *Reject* all do. Everyone else
  * finishes with one *Finish review…*. The other acts (Request documents, Add
  * a colleague, Withdraw revision request) are in the menu.
  *
@@ -89,7 +89,7 @@ export function ReviewFooterActions({ record, can, actions, finishing, onFinish,
       primary = publish ?? unlisted;
       secondary = publish ? unlisted : null;
       if (can.has("request_revision")) {
-        menu.push({ key: "request_revision", label: "Request revision…", icon: "fa-arrow-rotate-left",
+        menu.push({ key: "request_revision", label: "Request changes…", icon: "fa-arrow-rotate-left",
           blocked: record.revision?.blocked ?? null, onSelect: () => onFinish("request_revision") });
       }
       if (can.has("reject")) {

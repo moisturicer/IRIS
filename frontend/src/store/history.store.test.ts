@@ -16,7 +16,7 @@ vi.mock("@/api/library", () => ({
   libraryApi: {
     history: vi.fn(),
     visit: vi.fn(),
-    clearHistory: vi.fn(),
+    removeHistory: vi.fn(),
     preferences: vi.fn(),
     updatePreferences: vi.fn(),
   },
@@ -128,18 +128,25 @@ describe("history store", () => {
     expect(useHistoryStore.getState().failure).toMatch(/could not pause/i);
   });
 
-  it("clears the account's history, and puts it back if the server refuses", async () => {
+  // IR-1331 replaces clearing everything with clearing the papers the reader chose, on purpose.
+  it("removes only the chosen papers, and puts them back if the server refuses", async () => {
     await useHistoryStore.getState().refresh();
-    vi.mocked(libraryApi.clearHistory).mockRejectedValueOnce(new Error("offline"));
+    const id = useHistoryStore.getState().items[0].recordId;
+    vi.mocked(libraryApi.removeHistory).mockRejectedValueOnce(new Error("offline"));
 
-    await useHistoryStore.getState().clear();
+    expect(await useHistoryStore.getState().remove([id])).toBe(false);
     expect(useHistoryStore.getState().items).toHaveLength(1);
     expect(useHistoryStore.getState().failure).toMatch(/could not clear/i);
 
-    vi.mocked(libraryApi.clearHistory).mockResolvedValueOnce({} as Answer<typeof libraryApi.clearHistory>);
-    await useHistoryStore.getState().clear();
-    expect(libraryApi.clearHistory).toHaveBeenCalledTimes(2);
+    vi.mocked(libraryApi.removeHistory).mockResolvedValueOnce({} as Answer<typeof libraryApi.removeHistory>);
+    expect(await useHistoryStore.getState().remove([id])).toBe(true);
+    expect(libraryApi.removeHistory).toHaveBeenLastCalledWith([id]);
     expect(useHistoryStore.getState().items).toEqual([]);
+  });
+
+  it("sends nothing when no paper is chosen", async () => {
+    expect(await useHistoryStore.getState().remove([])).toBe(true);
+    expect(libraryApi.removeHistory).not.toHaveBeenCalled();
   });
 
   it("never writes history to browser storage", async () => {

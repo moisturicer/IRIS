@@ -54,8 +54,11 @@ test("the owner's next action follows a Revision request and the new Version", a
   // One item per party with an open revision request or document request.
   expect(detail.submitter_status.waiting_on_you, "waiting on the owner").toHaveLength(1);
 
-  await signInBrowser(page, ACCOUNTS.student, `/records/${recordId}`);
-  await expect(page.getByText(detail.submitter_status.line)).toBeVisible();
+  // The owner reads it under My Library's Waiting on you (IR-1324, IR-1325);
+  // the paper's own page no longer repeats the server's line.
+  await signInBrowser(page, ACCOUNTS.student, "/records/mine");
+  const waiting = page.getByRole("region", { name: "Waiting on you" }).getByRole("listitem").filter({ hasText: title });
+  await expect(waiting.getByText(detail.submitter_status.line)).toBeVisible();
   await a11y.scan(page, testInfo, "owner-next-action");
   await a11y.reflow360(page, "owner-next-action");
 

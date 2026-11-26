@@ -143,7 +143,7 @@ Party = adviser | itso | ierc | ktto | rdco
 
 | Adviser action | Result |
 |---|---|
-| **Request revision** | `ResubmissionRequest` opened. The owner uploads a new **version** of the *same* record (§5). |
+| **Request revision** (shown as *Request changes* since IR-1322; [ADR-022](022-explicit-document-requests.md) Amendment 8) | `ResubmissionRequest` opened. The owner uploads a new **version** of the *same* record (§5). |
 | **Reject** | `rejected`, shown as **Archived**. Terminal. To try again, the student submits a new Proposal. |
 | **Accept** | `approved`, shown as **Accepted**. The owner may now **continue it as a Thesis or a Project** (§6). |
 
@@ -500,6 +500,10 @@ Moving an anchor never resolves a thread, and a removed passage still needs reso
 - **The composer preselects *Suggestion*.** This is a deviation from "defaults to *Must fix* in a review finished with *Request revision*" above. The composer comes before the verdict is known, and the backend's default is *Suggestion*. The reviewer chooses *Must fix* there, or changes a draft's severity before finishing. *Rejected:* leaving severity unset until *Finish review* sets it by verdict. That is a client-only state, and it costs a call per draft.
 
 **Amendment, 2026-11-21 (IR-1254; decided by Hermoine Zozobrado, accepted when its pull request merges): *Request documents* is the Documents tab's.** Transcribed by an agent. It changes one clause of the note above: of the two acts that "stay in the footer, since they are not verdicts", only *Withdraw revision request* stays. *Request documents* leaves the footer and its *More review actions* menu, and is offered only on the Review pane's Documents tab. That tab is where a reviewer lands, and it already holds the requests that act makes (*Documents you requested*: Accept, Reject, Withdraw), so everything about a paper's documents is in one place. The Documents tab offers it to exactly the viewers the footer did: those the server names a party for (`can_request_document`). *Rejected: keeping both.* The two opened the same dialog, on the same screen, for every reviewer who opened Review. *Rejected: keeping only the footer's.* On the tab about documents, the act would sit behind ⋯.
+
+**Amendment, 2026-11-24 (IR-1322; decided by Hermoine Zozobrado, accepted when its pull request merges): *Request changes*.** Transcribed by an agent. The *Request revision* verdict is shown as *Request changes*, and may ask for documents in the same act, or for documents alone. Its value, capability and service are unchanged. [ADR-022](022-explicit-document-requests.md) Amendment 8 holds the decision and its reasons.
+
+**Amendment, 2026-11-24 (IR-1325; decided by Hermoine Zozobrado; Proposed until its pull request merges after review): document requests go with *Finish review*.** Transcribed by an agent. A reviewer asks for documents only in the Documents tab. Each request waits as their draft and goes out with their *Finish review*, alongside their draft comments. *Request changes* and *Comment only* send the drafts. Every other verdict is refused while any wait. *Request changes* no longer carries documents and always asks for a new version. [ADR-022](022-explicit-document-requests.md) Amendment 9 holds the decision and its reasons.
 
 **Build notes, 2026-11-09 (Hermoine Zozobrado, IR-876 design session; Accepted): Outdated threads, suggested wording and the response to reviewers.** Transcribed by an agent. They settle what the amendment above left open.
 
@@ -911,6 +915,14 @@ Decided by Hermoine Zozobrado while building IR-1226, and awaiting review on its
     - *Replace Adviser* discards the previous Adviser's Adviser drafts whatever state their seat ended in, because they no longer read the review (point 2).
     - The Decision dialog's line beside each review it closes names the drafts that will be discarded. It leaves out that reviewer's open threads and requests, which the dialog already lists for the whole paper.
 6. **Not here:** an unsubmitted draft record is visible to its owners only. That is IR-1228, with its own amendment.
+
+**Amendment, 2026-11-25 (IR-1336; decided by Hermoine Zozobrado; Proposed until its pull request merges after review): a review is started from a cover over the Review tab, by *Start review*.** Transcribed by an agent. The act §4 and §9 call *Open review* keeps its meaning: it records when this reviewer started (`opened_at`, the time-on-task start of IR-144), and it stays in Paper View alone. Only where it is offered, and its name, change.
+
+- **On the Review tab, a review not yet started is covered.** While the viewer holds a seat that is `assigned` and not yet opened, a translucent grey layer covers the whole review pane (and a tab opened beside it). A **Start review** button sits in the layer's middle. On a narrow window the pane is a drawer, and the layer covers the opened drawer, with *Back to paper* under the button.
+- **Nothing under the cover can be reached** until the review starts, by pointer, keyboard or screen reader. The paper reader beside it stays usable, so the paper can be read first.
+- ***Start review* is the act's only button.** The Overview's *Open review* and the pane footer's *Open review* are removed, and the Overview stays readable with no review action. A Readiness link for this act reads *Start review*.
+- **Recording the start must succeed.** IR-1206 opened the review even when the recording failed. Behind the cover a failed start leaves the review unusable, so the cover stays, says the review could not be started, and offers *Start review* again.
+- **Once recorded, the cover is gone for good**, because the seat is no longer unopened. *Claim* is unchanged: an office review nobody holds is claimed first, and then the cover appears.
 
 ### 11. Lifecycle
 

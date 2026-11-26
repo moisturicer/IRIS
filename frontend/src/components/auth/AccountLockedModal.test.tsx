@@ -42,6 +42,21 @@ describe("the locked-account dialog", () => {
     expect(trigger).toHaveFocus();
   });
 
+  // IR-1327: an X in the corner closes it, not a "Close" button.
+  it("closes with an X rather than a Close button", async () => {
+    const user = userEvent.setup();
+    renderScreen(<LockDialog />);
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Account Locked" });
+    const close = within(dialog).getByRole("button", { name: "Close" });
+    expect(close).toHaveTextContent(/^$/);
+    expect(within(dialog).queryByText("Close")).not.toBeInTheDocument();
+
+    await user.click(close);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
   it("has no blocking accessibility violations", async () => {
     const { container } = renderScreen(<LockDialog />);
     await userEvent.click(screen.getByRole("button", { name: "Sign in" }));

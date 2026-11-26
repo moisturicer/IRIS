@@ -29,7 +29,7 @@ caller who may not read gets the same 404 as a missing record.
   *Must fix* of a party with an open Revision request has an answer;
 - `approval_blocked_reason`: its own party's approval -- the Adviser's
   *Accept & send to RDCO* or *Accept* (a Proposal), an office's *Clear*.
-  *Request revision*, *Record a finding* and *Reject* never are;
+  *Request changes*, *Record a finding* and *Reject* never are;
 - `decision_needs_reason`: no Decision is blocked, but while any *Must fix*
   is open a Decision needs its comment, which `close_by_decision` records as
   the reason each open thread closed.

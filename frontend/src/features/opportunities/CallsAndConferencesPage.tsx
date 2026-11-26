@@ -273,9 +273,12 @@ export function CallsAndConferencesPage() {
   const ready = !loading && !loadFailed;
 
   // An empty board has nothing to search, filter or count (audit US-13):
-  // its empty state says so instead. While loading or after a failure the
-  // controls stay, without numbers or disabled, as they always did.
+  // its empty state says so instead.
   const emptyBoard = ready && items.length === 0;
+  // The controls appear with the rows, once the board is known to have calls
+  // (IR-1314). Shown while loading, they flashed and then vanished whenever the
+  // board turned out empty; after a failure there is nothing to filter either.
+  const hasBoard = ready && items.length > 0;
 
   const summary = !ready || emptyBoard
     ? ""
@@ -294,9 +297,9 @@ export function CallsAndConferencesPage() {
       {/* ---- Search and filters ------------------------------------------ */}
       {/* Search first, in its own row under the title: it is the first thing
           a reader reaches for, and at the end of the chip row it was missed.
-          Counts appear only once there is a board to count; a 0 before the
-          data arrives would be a number IRIS does not know. */}
-      {!emptyBoard && (
+          The row appears with the board itself, so its counts are never
+          a number IRIS does not know yet. */}
+      {hasBoard && (
       <div className="space-y-3 mb-3">
         <div className="flex flex-wrap items-center gap-2">
           <div className="basis-full sm:basis-auto flex-1 min-w-0 sm:max-w-md">
@@ -307,10 +310,14 @@ export function CallsAndConferencesPage() {
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search calls"
               aria-label="Search calls by title, location or Area"
-              disabled={loadFailed}
               leading={<SearchGlyph className="h-3 w-3" />}
             />
           </div>
+          {/* One width whatever the Areas are (IR-1313): it grew with the
+              longest Area on the board. 18rem from `sm`, the row below it. That
+              holds every Area IRIS has (the longest needs about 190px); an Area
+              is typed by staff, up to 200 characters, so a longer one is clipped
+              closed and read in full in the open list or on hover. */}
           <div className="w-full sm:w-auto">
             <Select
               id={`${ids}-area`}
@@ -319,7 +326,8 @@ export function CallsAndConferencesPage() {
               size="sm"
               value={activeArea}
               onChange={(e) => setActiveArea(e.target.value)}
-              disabled={loadFailed}
+              title={activeArea || "All Areas"}
+              className="sm:w-72"
             >
               <option value="">All Areas</option>
               {areas.map((name) => <option key={name} value={name}>{name}</option>)}
@@ -329,12 +337,11 @@ export function CallsAndConferencesPage() {
             type="button"
             aria-pressed={savedOnly}
             onClick={() => setSavedOnly((v) => !v)}
-            disabled={loadFailed}
             className={chipClass(savedOnly)}
           >
             <i className={cn(savedOnly ? "fas" : "far", "fa-bookmark text-3xs")} aria-hidden="true" />
             Saved
-            {ready && <span className="tabular-nums opacity-80">{savedOnBoard}</span>}
+            <span className="tabular-nums opacity-80">{savedOnBoard}</span>
           </button>
         </div>
 
@@ -349,11 +356,10 @@ export function CallsAndConferencesPage() {
             type="button"
             aria-pressed={activeType === null}
             onClick={() => setActiveType(null)}
-            disabled={loadFailed}
             className={chipClass(activeType === null)}
           >
             All
-            {ready && <span className="tabular-nums opacity-80">{searched.length}</span>}
+            <span className="tabular-nums opacity-80">{searched.length}</span>
           </button>
           {OPPORTUNITY_TYPES.map((t) => (
             <button
@@ -361,12 +367,11 @@ export function CallsAndConferencesPage() {
               type="button"
               aria-pressed={activeType === t.id}
               onClick={() => setActiveType(activeType === t.id ? null : t.id)}
-              disabled={loadFailed}
               className={chipClass(activeType === t.id)}
             >
               <i className={cn("fas", t.icon, "text-3xs")} aria-hidden="true" />
               {t.label}
-              {ready && <span className="tabular-nums opacity-80">{typeCounts.get(t.id) ?? 0}</span>}
+              <span className="tabular-nums opacity-80">{typeCounts.get(t.id) ?? 0}</span>
             </button>
           ))}
         </div>

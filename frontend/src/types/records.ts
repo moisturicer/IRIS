@@ -146,7 +146,7 @@ export interface ClearanceStripEntry {
 export interface WaitingItem {
   kind:         "revision" | "document";
   party:        Party;
-  /** "Revision requested by IERC". */
+  /** "Changes requested by IERC" (IR-1322). */
   label:        string;
   /** The act that answers it: "Submit a new version". */
   action_label: string;
@@ -1605,7 +1605,8 @@ export interface DeleteRequest {
 // Document requests (ADR-022, IR-262)
 // ---------------------------------------------------------------------------
 
-export type DocumentRequestState = "open" | "fulfilled" | "withdrawn";
+/** `draft`: asked, not sent yet; only its asker sees it (ADR-022 Amendment 9, IR-1325). */
+export type DocumentRequestState = "draft" | "open" | "fulfilled" | "withdrawn";
 export type DocumentRequestItemState = "missing" | "uploaded" | "accepted" | "rejected";
 
 export interface DocumentRequestItem {

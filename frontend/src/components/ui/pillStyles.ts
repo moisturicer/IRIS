@@ -16,6 +16,18 @@ const PILL =
 /** The one filled action in a row. */
 export const PILL_PRIMARY = `${PILL} bg-brand text-white shadow-card hover:bg-brand-light active:bg-brand-press`;
 
+/**
+ * A small row action, such as a document's Download or Upload (IR-1325): a
+ * 28px pill drawn inside a target that stays 44px on touch and 36px beside a
+ * pointer, so it looks small without becoming harder to hit (IR-1092).
+ * `SMALL_ACTION_TARGET` goes on the button, `SMALL_ACTION_PILL` on a span inside it.
+ */
+export const SMALL_ACTION_TARGET =
+  "group inline-flex items-center min-h-11 reading-split:min-h-9 rounded-full disabled:cursor-not-allowed disabled:opacity-60";
+export const SMALL_ACTION_PILL =
+  "inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold text-stone-700 ring-1 ring-stone-300 " +
+  "transition-colors duration-200 group-hover:bg-stone-100 group-hover:text-stone-900";
+
 /** Every other action. */
 export const PILL_SECONDARY = `${PILL} bg-transparent text-stone-700 ring-1 ring-stone-300 hover:bg-stone-100 hover:text-stone-900`;
 

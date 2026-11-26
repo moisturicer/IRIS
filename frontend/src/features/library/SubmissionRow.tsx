@@ -4,7 +4,6 @@ import { Link } from "react-router-dom";
 import { ClearanceStrip } from "@/components/shared/ClearanceStrip";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
-import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { ContinueProposal } from "@/features/records/ContinueProposal";
 import { waitingHref } from "@/features/records/waitingOnYou";
 import { usePublishHref } from "@/features/publish/publishLink";
@@ -15,38 +14,14 @@ import type { MyResearchItem } from "@/types/records";
 /**
  * Where the row itself leads: a draft opens Publish over this page, since a
  * draft has no paper page (IR-1227) and going through one would leave My
- * Library (IR-1258); anything else opens Paper View. The whole row is that
- * link (IR-1261), so it carries no "Continue draft" or "Open review" button.
+ * Library (IR-1258). A paper waiting on its author opens where the request is
+ * answered (IR-1321), so the row carries no per-request button; anything else
+ * opens Paper View. The whole row is that link (IR-1261).
  */
 function rowHref(item: MyResearchItem, publishHref: (target: number) => string) {
-  return item.pipeline_status === "draft" ? publishHref(item.id) : `/records/${item.id}`;
-}
-
-/**
- * The acts a row offers beyond opening it (IR-1084): continuing a finished
- * proposal, or the act that answers each open request. The Overview's short
- * list (`brief`) shows only the first request. Null when there is none.
- */
-function rowActions(item: MyResearchItem, brief: boolean): ReactNode {
-  if (item.can_continue) return <ContinueProposal recordId={item.id} />;
-  if (item.pipeline_status === "draft") return null;
-  // One link per open request, straight to the act on Paper View (IR-625).
-  const waiting = brief ? item.submitter_status.waiting_on_you.slice(0, 1) : item.submitter_status.waiting_on_you;
-  if (waiting.length === 0) return null;
-  return (
-    <>
-      {waiting.map((request, i) => (
-        <Link
-          key={`${request.kind}-${request.party}`}
-          to={waitingHref(item.id, request)}
-          className={cn(i === 0 ? PILL_PRIMARY : PILL_SECONDARY, "min-h-9 px-4", FOCUS_RING)}
-        >
-          {request.action_label}{" "}
-          <span className="sr-only">({request.label})</span>
-        </Link>
-      ))}
-    </>
-  );
+  if (item.pipeline_status === "draft") return publishHref(item.id);
+  const [request] = item.submitter_status.waiting_on_you;
+  return request ? waitingHref(item.id, request) : `/records/${item.id}`;
 }
 
 /**
@@ -63,7 +38,7 @@ function deleteKindOf(item: MyResearchItem): DeleteKind | null {
 
 interface SubmissionRowProps {
   item: MyResearchItem;
-  /** The Overview's short list: no clearance strip, one action (and a draft's Delete). */
+  /** The Overview's short list: no clearance strip. */
   brief?: boolean;
   /** Offered on a draft or a paper in review: the row is gone once the server deleted it. */
   onDeleted?: (id: number) => void;
@@ -79,7 +54,6 @@ interface SubmissionRowProps {
 export function SubmissionRow({ item, brief = false, onDeleted }: SubmissionRowProps) {
   const publishHref = usePublishHref();
   const authors = item.authors.map((author) => author.name).join(", ");
-  const actions = rowActions(item, brief);
   const deleteKind = onDeleted ? deleteKindOf(item) : null;
 
   return (
@@ -134,7 +108,7 @@ export function SubmissionRow({ item, brief = false, onDeleted }: SubmissionRowP
         </div>
 
         {!brief && <ClearanceStrip entries={item.clearance_strip} className="mt-2" />}
-        {actions && <div className="relative z-10 mt-3 flex flex-wrap items-center gap-2">{actions}</div>}
+        {item.can_continue && <div className="relative z-10 mt-3 flex flex-wrap items-center gap-2"><ContinueProposal recordId={item.id} /></div>}
       </div>
 
       <i

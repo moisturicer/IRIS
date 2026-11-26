@@ -46,6 +46,20 @@ it("shows labelled workflow details and grouped filters with the API actor name"
   await expectNoBlockingA11yViolations(container);
 });
 
+// IR-1313: the Event type box is one width, before and after the types arrive.
+it("keeps the Event type filter one width and names the chosen type on hover", async () => {
+  renderScreen(<AuditLogPage />);
+  const select = screen.getByRole("combobox", { name: "Event type" });
+  const box = select.closest("[class~='sm:w-80']");
+  expect(box).toHaveClass("w-full");
+  expect(select).toHaveAttribute("title", "All events");
+
+  await screen.findByRole("option", { name: "Login" });
+  expect(select.closest("[class~='sm:w-80']")).toBe(box);
+  await userEvent.setup().selectOptions(select, "LOGIN");
+  expect(select).toHaveAttribute("title", "Login");
+});
+
 it("offers a type the frontend has never heard of, under Other, the moment the server lists it", async () => {
   respondWithTypes([...serverTypes, { type: "A_BRAND_NEW_EVENT", label: "A Brand New Event" }]);
   renderScreen(<AuditLogPage />);

@@ -237,7 +237,7 @@ class _Viewer:
             from apps.documents.models import RecordUpload
 
             self._newest_uploads = dict(
-                RecordUpload.objects.filter(record=self.record)
+                RecordUpload.objects.filter(record=self.record).sent()
                 .values("slot_id").annotate(newest=Max("version")).values_list("slot_id", "newest")
             )
         return self._newest_uploads
@@ -440,11 +440,11 @@ def _document(record, value):
     missing = CommentError("That is not one of this record's documents.")
     if not _is_int(value):
         raise missing
-    upload = RecordUpload.objects.select_related("slot").filter(record=record, pk=int(value)).first()
+    upload = RecordUpload.objects.sent().select_related("slot").filter(record=record, pk=int(value)).first()
     if upload is None:
         raise missing
     newest = (
-        RecordUpload.objects.filter(record=record, slot_id=upload.slot_id)
+        RecordUpload.objects.sent().filter(record=record, slot_id=upload.slot_id)
         .order_by("-version", "-pk").values_list("pk", flat=True).first()
     )
     if newest != upload.pk:

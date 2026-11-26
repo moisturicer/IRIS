@@ -178,15 +178,54 @@ describe("threads in the review workspace", () => {
     expect(footer.queryByRole("button", { name: "Open review" })).toBeNull();
   });
 
-  it("asks a seat not yet opened to open it, and offers no Finish review", async () => {
+  // IR-1336 replaces "asks a seat not yet opened to open it" (the footer's
+  // Open review): a review not yet started is covered by a grey layer whose
+  // one control is Start review, and nothing under it can be reached.
+  describe("a review not yet started", () => {
     const assigned = { ...record, my_seats: [{ ...record.my_seats[0], state: "assigned" }] } as RecordDetail;
-    renderScreen(
-      <ReviewWorkspaceLayout record={assigned} can={new Set<Capability>(["open_review", "finish_review", "office_review"])}
-        reader={<StandInReader />} timelineVersion={0} onChanged={() => {}} documents={null} />,
-    );
-    const footer = within(await screen.findByRole("contentinfo", { name: "Your part" }));
-    expect(footer.getByRole("button", { name: "Open review" })).toBeInTheDocument();
-    expect(footer.queryByRole("button", { name: "Finish review…" })).toBeNull();
+    const unopened = new Set<Capability>(["open_review", "comment_review", "finish_review", "office_review"]);
+
+    function startable(onOpenReview: () => Promise<void> = vi.fn(async () => {})) {
+      return renderScreen(
+        <ReviewWorkspaceLayout record={assigned} can={unopened} reader={<StandInReader />} timelineVersion={0}
+          onChanged={() => {}} documents={null} onOpenReview={onOpenReview} />,
+      );
+    }
+
+    it("covers the panel with Start review, and leaves nothing under it to reach", async () => {
+      const { container } = startable();
+
+      const cover = await screen.findByRole("group", { name: "Your review hasn't started" });
+      expect(within(cover).getByRole("button", { name: "Start review" })).toBeInTheDocument();
+      // The tabs, the comment box and the footer are hidden until it starts.
+      expect(screen.queryByRole("tab", { name: "Conversation" })).toBeNull();
+      expect(screen.queryByRole("contentinfo", { name: "Your part" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Open review" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Finish review…" })).toBeNull();
+      await expectNoBlockingA11yViolations(container);
+    });
+
+    it("starts the review from the cover", async () => {
+      const onOpenReview = vi.fn(async () => {});
+      startable(onOpenReview);
+
+      await userEvent.click(await screen.findByRole("button", { name: "Start review" }));
+      expect(onOpenReview).toHaveBeenCalledTimes(1);
+    });
+
+    it("says so and keeps the cover when the start could not be recorded", async () => {
+      startable(vi.fn(async () => { throw new Error("Network Error"); }));
+
+      await userEvent.click(await screen.findByRole("button", { name: "Start review" }));
+      expect(await screen.findByRole("alert")).toHaveTextContent("Your review could not be started. Try again.");
+      expect(screen.getByRole("button", { name: "Start review" })).toBeEnabled();
+    });
+
+    it("is not drawn over a review already started", async () => {
+      openWorkspace(["open_review", "comment_review", "finish_review", "office_review"]);
+      await screen.findByRole("contentinfo", { name: "Your part" });
+      expect(screen.queryByRole("button", { name: "Start review" })).toBeNull();
+    });
   });
 
   it("keeps the verdict buttons where finish_review is not granted", async () => {

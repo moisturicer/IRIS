@@ -181,8 +181,8 @@ export function verdictOptions(
     });
   }
   if (can.has("request_revision") || can.has("withdraw_revision")) add({
-    verdict: "request_revision", label: "Request revision",
-    description: "The authors revise and submit the next version.",
+    verdict: "request_revision", label: "Request changes",
+    description: "The authors revise, send documents you name, or both.",
     unavailable: can.has("request_revision")
       ? flags.revision.blocked
       : "Your revision request is already open. Withdraw it to ask again.",
