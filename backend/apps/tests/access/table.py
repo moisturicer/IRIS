@@ -724,6 +724,10 @@ ACCOUNTS = {
     # name, so nobody reaches another account's answer. An empty body is refused
     # as invalid, which is not an access denial.
     "user-me-ai-answer": Entry({"POST": _case(SIGNED_IN, data={})}),
+    # IR-1342: the signed-in person has been shown one student tour. No id to
+    # name: it marks `request.user` and nobody else. Every role may mark one;
+    # only a Student is ever shown a tour, which the client decides.
+    "user-me-tour-seen": Entry({"POST": _case(SIGNED_IN, kwargs={"key": "discover"})}),
     # IR-695: a person's optional profile. Both writes act on `request.user` and
     # name nobody else; the photo is read by any signed-in user, through Django
     # only (MEDIA_URL is not routed). `photo_user` is an account that has one --

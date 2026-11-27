@@ -27,6 +27,8 @@ import type { ForYouItem, RecordListItem } from "@/types/records";
 import type { User } from "@/types/auth";
 
 import DiscoverPage from "./DiscoverPage";
+import { accountsApi } from "@/api/accounts";
+import { useTourSession } from "@/features/onboarding/tourSession";
 
 function listItem(overrides: Partial<RecordListItem>): RecordListItem {
   return {
@@ -139,6 +141,7 @@ vi.mock("@/api/accounts", () => ({
   accountsApi: {
     colleges: vi.fn(() => page([{ id: 4, name: "College of Engineering" }])),
     departments: vi.fn(() => page([{ id: 8, name: "Computer Studies", college: 4, college_name: "College of Engineering" }])),
+    markTourSeen: vi.fn(() => Promise.resolve({ data: { tours_seen: ["discover"] } })),
   },
 }));
 
@@ -1772,5 +1775,60 @@ describe("a question is offered Ask IRIS (IR-1095)", () => {
     const marked = [...card.querySelectorAll("mark")].map((m) => m.textContent);
     // The title, then the abstract.
     expect(marked).toEqual(["Dengue", "Dengue", "weather"]);
+  });
+});
+
+describe("a new student's Discover tour (IR-1342)", () => {
+  function signInNewStudent(role = "Student") {
+    signInAs(role);
+    const user = useAuthStore.getState().user!;
+    useAuthStore.setState({ user: { ...user, tours_seen: [] } });
+  }
+
+  beforeEach(() => useTourSession.getState().reset());
+
+  it("opens on the first visit once the results are in, and Skip tour marks it seen once", async () => {
+    signInNewStudent();
+    renderDiscover();
+
+    const tour = await screen.findByRole("dialog", { name: "Discover tour" });
+    expect(tour).toHaveTextContent("Welcome to IRIS");
+    await expectNoBlockingA11yViolations(document.body);
+    await userEvent.click(within(tour).getByRole("button", { name: "Skip tour" }));
+    expect(screen.queryByRole("dialog", { name: "Discover tour" })).not.toBeInTheDocument();
+    expect(accountsApi.markTourSeen).toHaveBeenCalledTimes(1);
+    expect(accountsApi.markTourSeen).toHaveBeenCalledWith("discover");
+  });
+
+  it("waits while the first read is pending, and posts nothing", async () => {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    vi.mocked(recordsApi.list).mockImplementation(() => held.then(() => page(listed)) as never);
+    vi.mocked(recordsApi.forYou).mockImplementation(() => held.then(() => ({ data: recommended })) as never);
+    signInNewStudent();
+    renderDiscover();
+
+    await screen.findByRole("heading", { name: "Discover", level: 1 });
+    expect(screen.queryByRole("dialog", { name: "Discover tour" })).not.toBeInTheDocument();
+    expect(accountsApi.markTourSeen).not.toHaveBeenCalled();
+
+    release();
+    expect(await screen.findByRole("dialog", { name: "Discover tour" })).toBeInTheDocument();
+  });
+
+  it("does not open once seen", async () => {
+    signInAs("Student");
+    useAuthStore.setState({ user: { ...useAuthStore.getState().user!, tours_seen: ["discover"] } });
+    renderDiscover();
+    await screen.findByRole("heading", { name: publishedThesis.title });
+    expect(screen.queryByRole("dialog", { name: "Discover tour" })).not.toBeInTheDocument();
+  });
+
+  it.each(["Adviser", "RDCO", "KTTO"])("never opens for %s", async (role) => {
+    signInNewStudent(role);
+    renderDiscover();
+    await screen.findByRole("heading", { name: publishedThesis.title });
+    expect(screen.queryByRole("dialog", { name: "Discover tour" })).not.toBeInTheDocument();
+    expect(accountsApi.markTourSeen).not.toHaveBeenCalled();
   });
 });

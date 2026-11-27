@@ -498,6 +498,28 @@ class MeView(generics.RetrieveUpdateAPIView):
         return self.request.user
 
 
+class MeTourSeenView(APIView):
+    """`POST /users/me/tours/<key>/`: the signed-in person has been shown tour `key` (IR-1342).
+
+    There is no id in the address: it marks `request.user` and nobody else, and
+    writes `tours_seen` alone. An unknown key is a 400. Marking a tour again is
+    a no-op that answers the same way, so a retried request is harmless.
+    Taking a tour again from Settings needs nothing here: Settings starts a
+    tour whether or not it was seen.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, key):
+        from apps.accounts import tours
+
+        try:
+            seen = tours.mark_seen(request.user, key)
+        except tours.UnknownTour:
+            return Response({"detail": "There is no such tour."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"tours_seen": seen})
+
+
 class PersonalDataExportView(APIView):
     """One JSON file of the signed-in person's own data (ADR-051 decision 13, IR-786).
 

@@ -6,7 +6,10 @@ import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { useDialogFocus } from "@/hooks/useDialogFocus";
 import { cn } from "@/lib/utils";
 
-import type { TourStep } from "./tourSteps";
+import { reachable } from "./reachable";
+import type { TourStep } from "./types";
+
+export type { TourStep } from "./types";
 
 const MARGIN = 12;
 // Wide enough for a step's list of controls (IR-1309); a long step scrolls inside the card.
@@ -14,16 +17,6 @@ const CARD_WIDTH = 360;
 
 interface Box { top: number; left: number; width: number; height: number }
 
-/**
- * A target counts only while a reviewer could see it: in the page, and not
- * under an inert or hidden ancestor (the review pane is both while a narrow
- * window keeps it closed). Layout is not consulted, so the rule is the same
- * with or without it.
- */
-function reachable(id: string): HTMLElement | null {
-  const el = document.getElementById(id);
-  return el && !el.closest('[inert],[aria-hidden="true"]') ? el : null;
-}
 
 /** Below the target if the card fits, else above, else docked to the screen's foot. */
 function cardPosition(target: Box | null, card: { width: number; height: number }) {
@@ -40,13 +33,28 @@ function cardPosition(target: Box | null, card: { width: number; height: number 
 
 export interface GuidedTourProps {
   steps: readonly TourStep[];
+  /** The card's accessible name, such as "Review workspace tour". */
+  label: string;
   /** Where focus goes back to on close. */
   opener: HTMLElement | null;
   onClose: () => void;
+  /**
+   * Called once, when the first step is drawn (IR-1342). A tour that closes
+   * itself because no target was reachable never calls it, so a caller can
+   * tell a tour that was shown from one that never was.
+   */
+  onShown?: () => void;
+  /**
+   * Where the tour is drawn. `document.body` by default. A tour over a modal
+   * dialog is drawn inside the dialog's panel, so assistive technology that
+   * honours `aria-modal` still reaches it (IR-1342, Publish).
+   */
+  container?: Element | null;
 }
 
 /**
- * A walk through the workspace, one highlighted area at a time (IR-997).
+ * A walk through a page, one highlighted area at a time (IR-997; shared by the
+ * student tours since IR-1342).
  *
  * Deliberately **not modal**: the highlight is drawn, never a layer that takes
  * clicks, so a target that cannot be found or a tour left open can never trap
@@ -59,7 +67,7 @@ export interface GuidedTourProps {
  * drops or restores steps rather than pointing at nothing. With none left it
  * closes itself.
  */
-export function GuidedTour({ steps, opener, onClose }: GuidedTourProps) {
+export function GuidedTour({ steps, label, opener, onClose, onShown, container }: GuidedTourProps) {
   const panel = useRef<HTMLDivElement>(null);
   const primary = useRef<HTMLButtonElement>(null);
   // The step is remembered by id, not position: opening the pane or resizing
@@ -89,6 +97,13 @@ export function GuidedTour({ steps, opener, onClose }: GuidedTourProps) {
   useEffect(() => {
     if (!step) onClose();
   }, [step, onClose]);
+  const shownRef = useRef(false);
+  const hasStep = Boolean(step);
+  useEffect(() => {
+    if (!hasStep || shownRef.current) return;
+    shownRef.current = true;
+    onShown?.();
+  }, [hasStep, onShown]);
 
   const targetId = step?.target;
   useLayoutEffect(() => {
@@ -124,7 +139,7 @@ export function GuidedTour({ steps, opener, onClose }: GuidedTourProps) {
           style={{ top: box.top - 4, left: box.left - 4, width: box.width + 8, height: box.height + 8,
             boxShadow: "0 0 0 9999px rgb(41 37 36 / .4)" }} />
       )}
-      <div ref={panel} role="dialog" aria-label="Review workspace tour" tabIndex={-1}
+      <div ref={panel} role="dialog" aria-label={label} tabIndex={-1}
         className="fixed z-[61] rounded-card bg-white ring-1 ring-stone-200 shadow-card-md p-4 text-stone-700"
         style={{ top: place.top, left: place.left, width: place.width, maxHeight: `calc(100vh - ${MARGIN * 2}px)`, overflowY: "auto" }}>
         <div aria-live="polite">
@@ -156,6 +171,6 @@ export function GuidedTour({ steps, opener, onClose }: GuidedTourProps) {
         </div>
       </div>
     </>,
-    document.body,
+    container ?? document.body,
   );
 }

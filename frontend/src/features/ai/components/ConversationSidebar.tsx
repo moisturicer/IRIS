@@ -86,7 +86,9 @@ const ICON_BUTTON =
  * it and focus stays on it through the change. On a phone the same button sits in
  * the chat header and opens the pane as a dialog (`asDialog`).
  */
-export function ConversationsToggle({ open, onClick, controls, asDialog = false }: {
+export function ConversationsToggle({ id, open, onClick, controls, asDialog = false }: {
+  /** Where a guided tour points at it (IR-1342). */
+  id?: string;
   open: boolean;
   onClick: () => void;
   controls?: string;
@@ -94,7 +96,7 @@ export function ConversationsToggle({ open, onClick, controls, asDialog = false 
 }) {
   const label = open ? "Hide history" : "Show history";
   return <Tooltip label={label} className="shrink-0">
-    <button type="button" onClick={onClick} aria-label={label} aria-expanded={open}
+    <button id={id} type="button" onClick={onClick} aria-label={label} aria-expanded={open}
       aria-controls={controls} aria-haspopup={asDialog ? "dialog" : undefined}
       className={cn(ICON_BUTTON, asDialog && "size-11")}>
       {/* The pane sits on the left, so the panel glyph faces it. */}

@@ -27,7 +27,7 @@ import { isDiscussion } from "./threads/threadModel";
 import { useThreadsWorkspace } from "./threads/useThreadsWorkspace";
 import { ReviewPaneContext, type ReviewPane } from "./reviewPane";
 import { DRAWER_BELOW_PX, fitWidths, maxWidth, minWidth, SIDE_TAB_MIN_PX, type Widths } from "./reviewGeometry";
-import { GuidedTour } from "./tour/GuidedTour";
+import { GuidedTour } from "@/components/tour/GuidedTour";
 import { markTourSeen, tourSeen } from "./tour/tourStorage";
 import { reviewTourSteps, tourTargets, type TourTab } from "./tour/tourSteps";
 import { YourPartFooter } from "./YourPartFooter";
@@ -651,7 +651,7 @@ export function ReviewWorkspaceLayout({
           </div>
         )}
         {tour && (
-          <GuidedTour opener={tour.opener} onClose={closeTour}
+          <GuidedTour label="Review workspace tour" opener={tour.opener} onClose={closeTour}
             steps={reviewTourSteps({ ids, hasPaper: Boolean(reader), drawer, paneOpen: open,
               tabs: allTabs.filter((t): t is TourTab => t !== "readiness"), beside: roomy,
               sideTab: sideTab === "readiness" ? null : sideTab, canStart: can.has("start_thread"),

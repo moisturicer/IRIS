@@ -27,6 +27,8 @@ import { cn } from "@/lib/utils";
 import type { Notification } from "@/types/notifications";
 import { SELECTED_SEGMENT } from "@/components/ui/highlightRoles";
 import { GROUP_BAND, groupByDay, isUnread, ResolvedPill, UnreadDot, UnreadWord, when } from "./unread";
+import { notificationsTourSteps, TOUR_TARGETS } from "@/features/onboarding/studentTours";
+import { useStudentTour } from "@/features/onboarding/useStudentTour";
 
 // Inset, so the ring is not clipped by the list's rounded, overflow-hidden frame.
 const FOCUS_RING_INSET = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand";
@@ -97,6 +99,8 @@ export default function NotificationsPage() {
   };
 
   const unreadCount = notifications.filter(isUnread).length;
+  // The student's first-visit tour (IR-1342), once the feed has been read.
+  const tour = useStudentTour("notifications", { ready: !loading, steps: notificationsTourSteps() });
 
   const groups = useMemo(() => {
     const now = new Date();
@@ -129,12 +133,13 @@ export default function NotificationsPage() {
 
   return (
     <div>
+      {tour}
       <PageHeader
         title="Notifications"
         description="Updates on your records and reviews. Select one to go to its record."
         actions={
           // Always there, as in the prototype; nothing to do at zero unread.
-          <Button variant="outline" size="sm" onClick={handleMarkAllRead} disabled={unreadCount === 0}>
+          <Button id={TOUR_TARGETS.notifications.markAll} variant="outline" size="sm" onClick={handleMarkAllRead} disabled={unreadCount === 0}>
             <i className="fas fa-check-double mr-2" aria-hidden />
             Mark all as read
           </Button>
@@ -149,6 +154,7 @@ export default function NotificationsPage() {
 
       {!loading && !loadFailed && notifications.length > 0 && (
         <div
+          id={TOUR_TARGETS.notifications.show}
           role="group"
           aria-label="Show"
           className="inline-flex gap-0.5 p-0.5 mb-section-sm rounded-card bg-stone-100 border border-stone-200"
@@ -158,7 +164,7 @@ export default function NotificationsPage() {
         </div>
       )}
 
-      <div className="bg-surface rounded-card border border-stone-200 overflow-hidden">
+      <div id={TOUR_TARGETS.notifications.feed} className="bg-surface rounded-card border border-stone-200 overflow-hidden">
         {loading ? (
           <Skeleton onRetry={load} />
         ) : loadFailed ? (

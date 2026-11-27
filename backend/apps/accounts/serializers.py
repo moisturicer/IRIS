@@ -147,10 +147,15 @@ class MeSerializer(UserSerializer):
     research_interests = ResearchInterestsField(required=False)
     photo_url = serializers.SerializerMethodField()
 
+    # The student guided tours this person has been shown (IR-1342). Read-only:
+    # the one write is `POST /users/me/tours/<key>/`, which appends a single
+    # known key, so a PATCH of the whole list from two tabs can never drop one.
+    tours_seen = serializers.ListField(child=serializers.CharField(), read_only=True)
+
     class Meta(UserSerializer.Meta):
         fields = [
             *UserSerializer.Meta.fields, "review_access", "can_author", "role_request",
-            "bio", "research_interests", "photo_url",
+            "bio", "research_interests", "photo_url", "tours_seen",
         ]
 
     def get_photo_url(self, obj):

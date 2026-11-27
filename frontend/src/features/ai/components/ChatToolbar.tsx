@@ -12,7 +12,7 @@ interface ChatToolbarProps {
    * carries the way to it, opening it as a dialog over the answer. Absent on
    * wider pages, where the pane's own toggle is the only one.
    */
-  phoneHistory?:    { open: boolean; onOpen: () => void };
+  phoneHistory?:    { open: boolean; onOpen: () => void; id?: string };
   /**
    * On a phone while a conversation is open (IR-1234): the pane's own button is
    * out of sight, so the header carries the one New conversation icon. Absent
@@ -37,7 +37,7 @@ export function ChatToolbar({
   // naturally taller, and the divider visibly stepped down at the split.
   return (
     <header className="shrink-0 flex items-center gap-2 px-3 py-2.5 min-h-[56px] border-b border-stone-200/80">
-      {phoneHistory && <ConversationsToggle open={phoneHistory.open} onClick={phoneHistory.onOpen} asDialog />}
+      {phoneHistory && <ConversationsToggle id={phoneHistory.id} open={phoneHistory.open} onClick={phoneHistory.onOpen} asDialog />}
 
       {/* The tool's name in the pane's title face; an open conversation's own title follows it. */}
       <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 px-1">

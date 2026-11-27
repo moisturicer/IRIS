@@ -20,6 +20,7 @@ import { guidelinesHref } from "@/features/guidelines/sectionId";
 import { typeKey } from "./draft";
 import { usePublishHref } from "./publishLink";
 import { SELECTED } from "@/components/ui/highlightRoles";
+import { TOUR_TARGETS } from "@/features/onboarding/studentTours";
 
 /** The same limit `SubmitDocumentView` and the serializer enforce (50 MB). */
 export const MANUSCRIPT_MAX_BYTES = 50 * 1024 * 1024;
@@ -95,6 +96,7 @@ export function ManuscriptStep({ recordTypes, typeId, onTypeChange, upload, onFi
   return (
     <div className="flex flex-col gap-section-lg">
       <fieldset
+        id={TOUR_TARGETS.publish.type}
         role="radiogroup"
         aria-invalid={typeError ? true : undefined}
         aria-describedby={typeError ? "publish-type-error" : undefined}
@@ -144,7 +146,7 @@ export function ManuscriptStep({ recordTypes, typeId, onTypeChange, upload, onFi
         <GuidelinesLink typeName={recordTypes.find((type) => type.id === typeId)?.name ?? null} />
       </fieldset>
 
-      <section aria-labelledby="publish-manuscript-heading">
+      <section id={TOUR_TARGETS.publish.manuscript} aria-labelledby="publish-manuscript-heading">
         {exactMatches.length > 0 && (
           <div role="alert" className="rounded-card border border-stone-300 bg-surface p-4">
             <p className="font-semibold">This manuscript is already attached to a record you can read.</p>

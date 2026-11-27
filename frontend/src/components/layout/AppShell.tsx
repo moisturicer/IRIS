@@ -13,6 +13,8 @@ import { useSidebarMode } from "@/lib/layout";
 import { cn } from "@/lib/utils";
 import { ASK_PATH } from "@/lib/askHandoff";
 import { PublishDialog } from "@/features/publish/PublishDialog";
+// The Discover tour points at Open menu on a phone (IR-1342).
+import { MENU_BUTTON_ID } from "@/features/onboarding/studentTours";
 
 /** The id of `main`, the skip link's target (IR-1184). */
 const MAIN_ID = "main-content";
@@ -41,6 +43,7 @@ const PhoneBar = forwardRef<HTMLButtonElement>(function PhoneBar(_props, menuBut
         variant="outline"
         size="icon"
         onClick={toggleSidebar}
+        id={MENU_BUTTON_ID}
         aria-label="Open menu"
         aria-expanded={sidebarOpen}
         aria-controls="app-sidebar"

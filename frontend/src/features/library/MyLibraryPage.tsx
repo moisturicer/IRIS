@@ -26,6 +26,8 @@ import { SavedView } from "./SavedView";
 import { useLibrary, useReadingHistory } from "./useLibrary";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { PUBLISH_PARAM, usePublishHref } from "@/features/publish/publishLink";
+import { libraryTourSteps, TOUR_TARGETS } from "@/features/onboarding/studentTours";
+import { useStudentTour } from "@/features/onboarding/useStudentTour";
 
 type Tab = "overview" | "research" | "saved" | "calls" | "downloads";
 type SavedViewKind = Exclude<LibraryView, { kind: "research" }>;
@@ -41,6 +43,15 @@ const AUTHOR_TABS: { value: Tab; label: string; reader: boolean }[] = [
   { value: "downloads", label: "Download Requests", reader: true },
 ];
 const READER_TABS = AUTHOR_TABS.filter((t) => t.reader);
+
+/** What each tab holds, for the student tour (IR-1342). */
+const TAB_TOUR_TEXT: Record<Tab, string> = {
+  overview: "What is waiting on you, your latest submissions and the papers you opened.",
+  research: "Every record you started, drafts included.",
+  saved: "Papers you saved, in folders and by reading status.",
+  calls: "Calls for papers you saved.",
+  downloads: "Your requests to download a paper, and RDCO's answers.",
+};
 
 type StatusFilter = "all" | ReadingStatus;
 const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
@@ -157,6 +168,16 @@ export default function MyLibraryPage() {
     }
   };
 
+  // The student's first-visit tour (IR-1342), once their research has been read.
+  const tour = useStudentTour("library", {
+    ready: !loading,
+    steps: libraryTourSteps({
+      tabs: tabs.map((t) => ({ label: t.label, text: TAB_TOUR_TEXT[t.value] })),
+      canPublish: mayAuthor,
+      overview: mayAuthor && tab === "overview",
+    }),
+  });
+
   const statusFilter: StatusFilter | null = savedView.kind === "saved"
     ? "all"
     : savedView.kind === "status" ? savedView.status : null;
@@ -218,11 +239,12 @@ export default function MyLibraryPage() {
 
   return (
     <div>
+      {tour}
       <PageHeader
         title="My Library"
         description={mayAuthor ? "Keep your research moving, from submission to the shelf." : "Papers you saved and opened, and your download requests."}
         actions={mayAuthor && (
-          <Link to={publishHref("new")} className={cn(PILL_PRIMARY, FOCUS_RING)}>
+          <Link id={TOUR_TARGETS.library.publish} to={publishHref("new")} className={cn(PILL_PRIMARY, FOCUS_RING)}>
             <i className="fas fa-plus text-label" aria-hidden />
             Publish
           </Link>
@@ -231,7 +253,7 @@ export default function MyLibraryPage() {
 
       {/* A faint rule under the tabs keeps them apart from the page (IR-1325), like the cards' heading rules. */}
       <div className="mb-section-lg border-b border-stone-200 pb-2">
-      <div role="tablist" aria-label="My Library" className="-mx-1 flex gap-1 overflow-x-auto overflow-y-hidden p-1 scrollbar-none">
+      <div id={TOUR_TARGETS.library.tabs} role="tablist" aria-label="My Library" className="-mx-1 flex gap-1 overflow-x-auto overflow-y-hidden p-1 scrollbar-none">
         {tabs.map((t) => {
           const current = t.value === tab;
           return (

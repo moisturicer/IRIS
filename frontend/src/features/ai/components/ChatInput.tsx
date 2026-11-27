@@ -28,11 +28,13 @@ interface ChatInputProps {
   onStop?: () => void;
   /** The text box, for a page to move focus into it (IR-1162). */
   textareaRef?: Ref<HTMLTextAreaElement>;
+  /** The composer box's id, where a guided tour points at it (IR-1342). */
+  id?: string;
 }
 
 const ATTACH_CLOSED = "Attaching files is not available yet";
 
-export function ChatInput({ onSend, disabled, sendDisabled, children, beside, above, placeholder, label, draft, onDraftChange, maxLength, onStop, centered = false, textareaRef }: ChatInputProps) {
+export function ChatInput({ onSend, disabled, sendDisabled, children, beside, above, placeholder, label, draft, onDraftChange, maxLength, onStop, centered = false, textareaRef, id }: ChatInputProps) {
   const [ownText, setOwnText] = useState("");
   const text = draft ?? ownText;
   const setText = (next: string) => (onDraftChange ? onDraftChange(next) : setOwnText(next));
@@ -62,7 +64,7 @@ export function ChatInput({ onSend, disabled, sendDisabled, children, beside, ab
       className={`shrink-0 px-4 py-3 sm:px-6 ${centered ? "" : "border-t border-stone-200/80"}`}
     >
       {above && <div className={`mb-2 ${centered ? CHAT_OPENING_COLUMN : CHAT_COLUMN}`}>{above}</div>}
-      <div className={`grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 p-1.5 ${centered ? CHAT_OPENING_COLUMN : CHAT_COLUMN} ${CHAT_COMPOSER_SURFACE}`}>
+      <div id={id} className={`grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 p-1.5 ${centered ? CHAT_OPENING_COLUMN : CHAT_COLUMN} ${CHAT_COMPOSER_SURFACE}`}>
         <textarea
           ref={textareaRef}
           value={text}

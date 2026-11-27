@@ -8,6 +8,7 @@ import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_PRIMARY } from "@/components/ui/pillStyles";
 import { waitingHref } from "@/features/records/waitingOnYou";
 import { usePublishHref } from "@/features/publish/publishLink";
+import { TOUR_TARGETS } from "@/features/onboarding/studentTours";
 import { cn, formatDate } from "@/lib/utils";
 import type { HistoryItem } from "@/store/history.store";
 import type { MyResearchItem } from "@/types/records";
@@ -103,7 +104,7 @@ export function LibraryOverview({
         </SideCard>
       </div>
 
-      <section aria-labelledby="overview-recent" className="min-w-0 lg:col-start-1 lg:row-start-1">
+      <section id={TOUR_TARGETS.library.recent} aria-labelledby="overview-recent" className="min-w-0 lg:col-start-1 lg:row-start-1">
         <div className="mb-3 flex items-end justify-between gap-3">
           <div>
             <h2 id="overview-recent" className="font-display text-title font-semibold text-stone-900">Recent submissions</h2>
@@ -152,8 +153,10 @@ export function LibraryOverview({
  * pushes the next card down. The line under the heading belongs to the card,
  * not the list, so an empty, loading or failed card keeps it (IR-1328).
  */
-function SideCard({ id, title, height, accent = false, badge, footer, children }: {
+function SideCard({ id, cardId, title, height, accent = false, badge, footer, children }: {
   id: string;
+  /** The card's own id, where a tour points at it (IR-1342). */
+  cardId?: string;
   title: string;
   /** The card's fixed height, a Tailwind class. */
   height: string;
@@ -165,6 +168,7 @@ function SideCard({ id, title, height, accent = false, badge, footer, children }
 }) {
   return (
     <section
+      id={cardId}
       aria-labelledby={id}
       className={cn(
         "flex min-w-0 flex-col rounded-card border p-card-compact",
@@ -202,6 +206,7 @@ function WaitingOnYou({ waiting, loading, failed }: {
   return (
     <SideCard
       id="overview-waiting"
+      cardId={TOUR_TARGETS.library.waiting}
       title="Waiting on you"
       height={SIDE_CARD_HEIGHT}
       badge={any && (
