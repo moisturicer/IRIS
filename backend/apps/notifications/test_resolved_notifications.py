@@ -353,7 +353,8 @@ class RequestKindTests(ResolvedNotificationTestBase):
         DocumentRequest.objects.filter(pk=request.pk).update(
             state=DocumentRequestState.FULFILLED, closed_at=timezone.now(),
         )
-        # The reopening path settles first, as `documents.requests.reject_item` does.
+        # A reopening settles first, as `documents.requests.reject_item` did until
+        # IR-1338; nothing reopens a request now, but resolved is still final.
         settling.settle_record(record)
         DocumentRequest.objects.filter(pk=request.pk).update(
             state=DocumentRequestState.OPEN, closed_at=None,

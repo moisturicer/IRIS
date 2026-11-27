@@ -6,9 +6,11 @@ overwrites `rejection_reason`, so before IR-1201 a second rejection lost the
 first reason and nothing said which version had been rejected. Version history
 now lists every upload with the rejections it received.
 
-**Seam: the HTTP API.** The requesting party rejects through
-`PATCH /document-request-items/<id>/`, and the result is read from the record
-detail's `versions`. The owner's upload is made through the upload services
+**Seam: the HTTP API**, read from the record detail's `versions`. Nothing is
+rejected any more (ADR-022 Amendment 10, IR-1338), so the rejections these
+tests read are set up as they stay on file: a `DocumentRejection` row and the
+item back to `missing`, as `reject_item` left them. (Changed deliberately by
+IR-1338: they were made through `PATCH /document-request-items/<id>/`.) The owner's upload is made through the upload services
 rather than `documents/submit/`, because the PDF check only runs on Linux and
 this test is about the rejection, not the upload; `test_document_request_decisions`
 covers the upload route.
@@ -43,14 +45,21 @@ class RejectionHistoryTests(DecisionTestBase):
             send_held_uploads(record, self.owner)
         return upload
 
+    def rejected_on_file(self, item_id, upload, reason):
+        """A rejection made before IR-1338, as `reject_item` left it."""
+        from apps.documents.models import DocumentRejection
+
+        DocumentRejection.objects.create(item_id=item_id, upload=upload, rejected_by=self.ierc, reason=reason)
+        self.rejected_before(item_id, reason)
+
     def rejected_twice(self):
         record = self.at_parallel_review()
         data = self.requested(record, self.ierc, [{"label": "Consent form"}])
         [item] = data["items"]
         first = self.upload_directly(record, item["id"])
-        self.decided(item["id"], self.ierc, "reject", FIRST)
+        self.rejected_on_file(item["id"], first, FIRST)
         second = self.upload_directly(record, item["id"])
-        self.decided(item["id"], self.ierc, "reject", SECOND)
+        self.rejected_on_file(item["id"], second, SECOND)
         return record, first, second
 
     @staticmethod

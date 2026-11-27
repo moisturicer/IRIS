@@ -487,6 +487,18 @@ class ExportContentTests(APITestCase):
         self.assertEqual([(m["record_id"], m["version"], m["section"]) for m in marks],
                          [(paper.pk, 1, "methods")])
 
+    def test_supplied_documents_they_opened_are_their_own(self):
+        from apps.documents.models import RecordUpload, UploadSeen, UploadSlot
+
+        paper = _paper("Supplied", self.stranger, status=PipelineStatus.PUBLISHED)
+        slot = UploadSlot.objects.create(name="Ethics Clearance", record_type=paper.record_type)
+        upload = RecordUpload.objects.create(record=paper, slot=slot, file="x.pdf", version=2)
+        for who in (self.me, self.stranger):
+            UploadSeen.objects.create(upload=upload, user=who)
+        seen = self.export()["uploads_seen"]
+        self.assertEqual([(s["record_id"], s["document"], s["version"]) for s in seen],
+                         [(paper.pk, "Ethics Clearance", 2)])
+
     def test_mentions_they_were_told_of_are_theirs_and_a_draft_s_are_not(self):
         from django.utils import timezone
 

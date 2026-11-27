@@ -13,8 +13,9 @@
  * *Submit added documents* or *Submit new version* sends it (ADR-022
  * Amendment 8, IR-1322).
  *
- * **One vocabulary.** A requested document reads Requested → Uploaded ·
- * awaiting review → Accepted, or Replacement needed with the reviewer's reason.
+ * **One vocabulary.** A requested document reads Requested → Supplied. Nothing
+ * is accepted or rejected (ADR-022 Amendment 10, IR-1338); Replacement needed
+ * stays for a rejection made before then. Changed deliberately with it.
  *
  * Which items an upload answers is the server's rule, pinned by the API tests
  * in `apps/documents/tests/test_document_requests.py`. The fake server below
@@ -48,6 +49,7 @@ const uploadRecordFile = vi.fn();
 const uploadManuscript = vi.fn();
 const deleteFile = vi.fn();
 const deleteUpload = vi.fn();
+const uploadSeen = vi.fn();
 
 /** The server's answer to a send: every open missing item it answers. */
 function answer(match: (item: DocumentRequestItem) => boolean) {
@@ -117,6 +119,7 @@ vi.mock("@/api/documents", () => ({
     downloadUpload: () => Promise.resolve({ data: new Blob(["file"]) }),
     downloadFile: vi.fn(),
     deleteUpload: (uploadId: number) => deleteUpload(uploadId),
+    uploadSeen: (uploadId: number) => uploadSeen(uploadId),
   },
 }));
 
@@ -315,7 +318,7 @@ describe("the Documents tab, for the owner of a record in review", () => {
     fireEvent.click(within(bar).getByRole("button", { name: "Submit added documents" }));
 
     await waitFor(() => expect(sendDocuments).toHaveBeenCalledWith(RECORD_ID));
-    expect(await within(ethics).findByText("Uploaded · awaiting review")).toBeInTheDocument();
+    expect(await within(ethics).findByText("Supplied")).toBeInTheDocument();
     expect(within(ethics).queryByText("Added, not sent yet")).not.toBeInTheDocument();
     expect(await screen.findByText("1 document sent to IERC.")).toBeInTheDocument();
   });
@@ -335,7 +338,7 @@ describe("the Documents tab, for the owner of a record in review", () => {
 
     // The Other row, after the slot named for it, carries the request's state.
     await waitFor(() => expect(within(screen.getAllByRole("group", { name: "Consent form" }).at(-1)!)
-      .getByText("Uploaded · awaiting review")).toBeInTheDocument());
+      .getByText("Supplied")).toBeInTheDocument());
   });
 
   it("removes a held upload with its trash can, even one nobody asked for", async () => {
@@ -373,12 +376,12 @@ describe("the Documents tab, for the owner of a record in review", () => {
     expect(within(screen.getByRole("group", { name: "Ethics Clearance" })).getByText("Added, not sent yet")).toBeInTheDocument();
   });
 
-  it("shows an accepted document as Accepted, with nothing more to upload", async () => {
+  it("shows a document accepted before IR-1338 as Supplied, with nothing more to upload", async () => {
     requests = [{ ...openRequest([item({ state: "accepted", state_label: "Accepted", upload: 500 })]), state: "fulfilled", state_label: "Fulfilled" }];
     renderFiles();
 
     const ethics = await screen.findByRole("group", { name: "Ethics Clearance" });
-    expect(await within(ethics).findByText("Accepted")).toBeInTheDocument();
+    expect(await within(ethics).findByText("Supplied")).toBeInTheDocument();
     expect(within(ethics).queryByRole("button", { name: /^Upload/ })).not.toBeInTheDocument();
   });
 
@@ -842,6 +845,64 @@ describe("downloading a document version", () => {
     fireEvent.click(await screen.findByRole("button", { name: "1 version of Ethics Clearance" }));
     fireEvent.click(screen.getByRole("button", { name: "Download Ethics Clearance version 1" }));
     await waitFor(() => expect(downloadBlob).toHaveBeenCalledWith(expect.any(Blob), "Ethics Clearance v1.pdf"));
+  });
+});
+
+describe("a supplied document, New until opened (ADR-022 Amendment 10, IR-1338)", () => {
+  beforeEach(() => {
+    uploadSeen.mockResolvedValue({ data: undefined });
+    requests = [];
+    slots = [{ ...slot(PATENT, "Patent Draft"), uploads: [
+      { ...sentUpload(PATENT, 612, 2), is_new: true }, sentUpload(PATENT, 611, 1),
+    ] }];
+  });
+
+  it("shows New on the document and on the version not yet opened", async () => {
+    renderFiles({ owner: false, reviewing: true, onOpen: vi.fn() });
+
+    const patent = await screen.findByRole("group", { name: "Patent Draft" });
+    fireEvent.click(within(patent).getByRole("button", { name: "2 versions of Patent Draft" }));
+    const [newest, older] = within(within(patent).getByRole("list", { name: "Versions of Patent Draft" })).getAllByRole("listitem");
+    expect(newest).toHaveTextContent("New");
+    expect(older).not.toHaveTextContent("New");
+    expect(within(patent).getAllByText("New")).toHaveLength(2);
+  });
+
+  it("clears New once the version is opened in the reader, and says so to the server", async () => {
+    const onOpen = vi.fn();
+    renderFiles({ owner: false, reviewing: true, onOpen });
+
+    const patent = await screen.findByRole("group", { name: "Patent Draft" });
+    fireEvent.click(within(patent).getByRole("button", { name: "2 versions of Patent Draft" }));
+    fireEvent.click(within(patent).getByRole("button", { name: "Open Patent Draft version 2" }));
+
+    expect(onOpen).toHaveBeenCalled();
+    expect(uploadSeen).toHaveBeenCalledWith(612);
+    expect(within(patent).queryByText("New")).not.toBeInTheDocument();
+  });
+
+  it("keeps New after a download: only opening it counts", async () => {
+    renderFiles({ owner: false, reviewing: true, onOpen: vi.fn() });
+
+    const patent = await screen.findByRole("group", { name: "Patent Draft" });
+    fireEvent.click(within(patent).getByRole("button", { name: "2 versions of Patent Draft" }));
+    fireEvent.click(within(patent).getByRole("button", { name: "Download Patent Draft version 2" }));
+
+    await waitFor(() => expect(downloadBlob).toHaveBeenCalled());
+    expect(uploadSeen).not.toHaveBeenCalled();
+    expect(within(patent).getAllByText("New")).toHaveLength(2);
+  });
+
+  it("does not mark an already-opened version again", async () => {
+    slots = [{ ...slot(PATENT, "Patent Draft"), uploads: [sentUpload(PATENT, 612, 2)] }];
+    renderFiles({ owner: false, reviewing: true, onOpen: vi.fn() });
+
+    const patent = await screen.findByRole("group", { name: "Patent Draft" });
+    fireEvent.click(within(patent).getByRole("button", { name: "1 version of Patent Draft" }));
+    fireEvent.click(within(patent).getByRole("button", { name: "Open Patent Draft version 2" }));
+
+    expect(uploadSeen).not.toHaveBeenCalled();
+    expect(within(patent).queryByText("New")).not.toBeInTheDocument();
   });
 });
 

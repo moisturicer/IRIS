@@ -15,6 +15,8 @@
 
 > **Amended 2026-11-24 ([IR-1322](https://citiris.atlassian.net/browse/IR-1322); decided by Hermoine Zozobrado; accepted 2026-11-24 when PR #1006 merged, with Ashlee Sean's security review of point 4).** A reviewer's *Request revision* is shown as *Request changes* and may ask for documents in the same act. An owner's uploads to a submitted record are held, seen by its owners only, until *Submit new version* or *Submit added documents* sends them. See *Amendment 8*.
 
+> **Amended 2026-11-27 ([IR-1338](https://citiris.atlassian.net/browse/IR-1338); decided by Hermoine Zozobrado; Proposed until its PR merges).** A sent document is **Supplied**: there is no Accept or Reject. A reviewer sees **New** on a supplied version until they open it in the reader. If it is the wrong file, they ask again with a new request. See *Amendment 10*.
+
 > **Amended 2026-11-24 ([IR-1325](https://citiris.atlassian.net/browse/IR-1325); decided by Hermoine Zozobrado; accepted 2026-11-24 when PR #1010 merged, approved by Ashlee Sean as relayed by Hermoine Zozobrado).** Documents are asked for only in the Documents tab, where each request waits as the reviewer's draft until their *Finish review* sends it. *Request changes* always asks for a new version and no longer carries documents. The owner gets *Upload* only on what was asked for. See *Amendment 9*.
 
 > **Amended 2026-11-18 ([IR-1226](https://citiris.atlassian.net/browse/IR-1226); accepted 2026-11-18 with PR #895's merge; security review approved verbally by Ashlee Sean, relayed by Hermoine Zozobrado).** Creating, deciding and withdrawing a request takes a seat on the requesting party, not membership of it. See *Amendment 7*.
@@ -451,6 +453,34 @@ Decided by Hermoine Zozobrado on 2026-11-24 for [IR-1322](https://citiris.atlass
 - **Removed:** the screen's *Request changes* fields (`RequestChangesFields.tsx`).
 - **A draft that is never sent asks nobody anything.** If the reviewer's seat closes another way (a Decision, a withdrawal, being taken off the paper), it stays a draft that only they could see, as draft comments do.
 - **Research Impact is unchanged:** a documents-only request still makes no resubmission, and a revision still resets only its party's clearance.
+
+## Amendment 10 — 2026-11-27: a sent document is supplied, with no Accept or Reject
+
+**Status: Proposed** — becomes Accepted when IR-1338's PR merges after a person's review. Decided by Hermoine Zozobrado on 2026-11-27, in chat. Transcribed by an agent. It replaces §3.4 (accept and reject) and the parts of §4 and Amendment 7 that let the requesting party decide an item.
+
+**The problem.**
+- **A second step nobody needed.** Since IR-262 a request is already fulfilled once every item has a file; Accept closed nothing more. A reviewer still had to press Accept or Reject on each one.
+- **Reject did what a new request does.** A rejection sent the item back to `missing` with a reason, so the owner uploaded again. Asking again does the same with words the reviewer chooses.
+- **Nothing said what had just arrived.** A reviewer returning to the Documents tab could not tell which files were new to them.
+
+**The decision.**
+1. **A sent document is supplied.** An item answered by a sent upload is `uploaded` and stays so. `PATCH /document-request-items/<id>/` is removed (404), with `accept_item`, `reject_item`, `notify_document_rejected` and the `document_accepted`/`document_rejected` audit writers. The screens read **Supplied** for `uploaded`, and for `accepted` stored before this.
+2. **A wrong file is asked for again.** The reviewer makes a new request in the Documents tab (Amendment 9). Nothing else is added for it.
+3. **New, per reviewer, until they open it.** `UploadSeen` (`documents/0031`) marks one person having opened one upload. `RecordUpload.is_new` is true for a viewer who is not an owner, on a sent upload that answered a request item, until they have a mark. `POST /documents/uploads/<id>/seen/` stores the caller's mark (204, idempotent), behind the same access as the download: 404 for a paper they can't see, 403 without document access.
+   - Opening the version in the reader marks it. A download does not.
+   - Each reviewer's mark is their own; it decides nothing and nobody else reads it.
+   - It is personal data: exported as `uploads_seen` and deleted with the account.
+
+**History is kept.** `DocumentRejection` rows, `rejected` items, a `missing` item's `rejection_reason` and the `DOCUMENT_REQUEST_ACCEPTED`/`_REJECTED` audit types stay, and still read as before (*Replacement needed* with the reason).
+
+**Rejected alternatives.**
+- **Keep Reject, drop Accept.** Reject would still be a second way to ask again.
+- **New until the reviewer finishes their review, or for a fixed time.** It would say "new" about a file they had already read, or stop saying it about one they hadn't.
+- **A download counts as opening.** A saved copy is not proof it was read, and the reader is where a reviewer works.
+
+**Consequences.**
+- **Code:** one migration (`0031_upload_seen`), a new table; no stored row changes.
+- **Research Impact is unchanged:** a document request still makes no resubmission and resets no clearance.
 
 ## Alternatives Considered
 

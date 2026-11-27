@@ -188,26 +188,6 @@ class DocumentRequestCreateSerializer(serializers.Serializer):
         return specs
 
 
-class ItemDecisionSerializer(serializers.Serializer):
-    """`PATCH /document-request-items/<id>/` (§3.4)."""
-
-    action = serializers.ChoiceField(
-        choices=["accept", "reject"],
-        error_messages={"invalid_choice": "The action is accept or reject."},
-    )
-    reason = serializers.CharField(
-        required=False, allow_blank=True, default="", max_length=FREE_TEXT_MAX_LENGTH,
-        error_messages={"max_length": too_long_message("A reason")},
-    )
-
-    def validate(self, attrs):
-        if attrs["action"] == "reject" and not attrs["reason"]:
-            raise serializers.ValidationError(
-                "Tell the owner why the upload does not satisfy the request."
-            )
-        return attrs
-
-
 class WithdrawSerializer(serializers.Serializer):
     """`PATCH /document-requests/<id>/` (§4). No reason: IR-270 defines any."""
 

@@ -320,14 +320,6 @@ def document_request_fulfilled(request, actor):
     )
 
 
-def document_accepted(request, item, actor):
-    _document_request(AuditEvent.DOCUMENT_REQUEST_ACCEPTED, request, actor, [item])
-
-
-def document_rejected(request, item, actor, *, reason):
-    _document_request(AuditEvent.DOCUMENT_REQUEST_REJECTED, request, actor, [item], reason=reason)
-
-
 def document_request_withdrawn(request, actor, *, closed_by=BY_REQUESTING_PARTY):
     _document_request(
         AuditEvent.DOCUMENT_REQUEST_WITHDRAWN, request, actor, _every_item(request),

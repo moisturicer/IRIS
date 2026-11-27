@@ -2,8 +2,9 @@
  * The reviewer's side of document requests (IR-262, IR-263; ADR-022 §3.4, §4).
  *
  * One block, shared by the reviewer page and the paper view: the Request
- * documents control, and the requests the viewer's party made, with Accept
- * and Reject on each uploaded item and Withdraw on an open request. Whether
+ * documents control, and the open requests the viewer's party made, with
+ * Withdraw. A sent document is supplied, with no Accept or Reject (ADR-022
+ * Amendment 10, IR-1338; these tests changed deliberately with it). Whether
  * the viewer may manage a request is the server's `can_manage`; the controls
  * follow it. Every query goes through the accessible tree.
  */
@@ -18,13 +19,11 @@ import type { DocumentRequest, DocumentRequestItem, Party } from "@/types/record
 import { ReviewerDocumentRequests } from "./ReviewerDocumentRequests";
 
 const documentRequests = vi.fn();
-const decideDocumentRequestItem = vi.fn();
 const withdrawDocumentRequest = vi.fn();
 
 vi.mock("@/api/records", () => ({
   recordsApi: {
     documentRequests: (id: number) => documentRequests(id),
-    decideDocumentRequestItem: (id: number, body: unknown) => decideDocumentRequestItem(id, body),
     withdrawDocumentRequest: (id: number) => withdrawDocumentRequest(id),
     documentRequestSlots: () => Promise.resolve({ data: [{ id: 3, name: "Ethics Clearance" }] }),
     createDocumentRequest: () => Promise.resolve({ data: {} }),
@@ -43,10 +42,11 @@ function item(overrides: Partial<DocumentRequestItem> = {}): DocumentRequestItem
 
 function request(overrides: Partial<DocumentRequest> = {}): DocumentRequest {
   return {
-    id: 1, party: "ierc", label: "IERC", state: "fulfilled", state_label: "Fulfilled",
+    id: 1, party: "ierc", label: "IERC", state: "open", state_label: "Open",
     message: "The signed consent forms are missing.", requested_by: "Ivy Ethics",
-    created_at: "2026-09-20T02:00:00Z", closed_at: "2026-09-21T02:00:00Z",
-    can_manage: true, items: [item()],
+    created_at: "2026-09-20T02:00:00Z", closed_at: null,
+    can_manage: true,
+    items: [item(), item({ id: 12, label: "Protocol", state: "missing", state_label: "Missing", upload: null, uploaded_at: null })],
     ...overrides,
   };
 }
@@ -80,7 +80,6 @@ beforeEach(() => {
   vi.clearAllMocks();
   signInAs("IERC");
   documentRequests.mockResolvedValue({ data: [request()] });
-  decideDocumentRequestItem.mockResolvedValue({ data: request() });
   withdrawDocumentRequest.mockResolvedValue({ data: request({ state: "withdrawn" }) });
 });
 
@@ -110,58 +109,19 @@ describe("ReviewerDocumentRequests", () => {
     expect(onChanged).toHaveBeenCalled();
   });
 
-  it("lists what the viewer's party asked for, with each item's state", async () => {
+  it("lists what the viewer's party asked for, a sent document as Supplied", async () => {
     renderBlock();
 
     const region = await yourRequest();
     expect(within(region).getByText("The signed consent forms are missing.")).toBeInTheDocument();
-    const [row] = within(region).getAllByRole("listitem");
-    expect(row).toHaveTextContent("Consent form");
-    expect(row).toHaveTextContent("Uploaded");
+    const [consent, protocol] = within(region).getAllByRole("listitem");
+    expect(consent).toHaveTextContent("Consent form");
+    expect(consent).toHaveTextContent("Supplied");
+    expect(protocol).toHaveTextContent("Protocol");
+    expect(protocol).toHaveTextContent("Requested");
   });
 
-  it("accepts an uploaded item", async () => {
-    const user = userEvent.setup();
-    const onChanged = vi.fn();
-    renderBlock([], onChanged);
-
-    await user.click(await screen.findByRole("button", { name: "Accept Consent form" }));
-
-    await waitFor(() =>
-      expect(decideDocumentRequestItem).toHaveBeenCalledWith(11, { action: "accept" }),
-    );
-    await waitFor(() => expect(onChanged).toHaveBeenCalled());
-  });
-
-  it("rejects only with a reason, and sends it", async () => {
-    const user = userEvent.setup();
-    renderBlock();
-
-    await user.click(await screen.findByRole("button", { name: "Reject Consent form" }));
-    const reason = screen.getByRole("textbox", { name: /why is consent form not acceptable/i });
-    const send = screen.getByRole("button", { name: "Send rejection" });
-    expect(send).toBeDisabled();
-
-    await user.type(reason, "Unreadable scan.");
-    await user.click(send);
-
-    await waitFor(() =>
-      expect(decideDocumentRequestItem).toHaveBeenCalledWith(11, {
-        action: "reject", reason: "Unreadable scan.",
-      }),
-    );
-  });
-
-  it("offers no decision on an item that is not uploaded", async () => {
-    documentRequests.mockResolvedValue({
-      data: [request({
-        state: "open", state_label: "Open",
-        items: [
-          item({ state: "missing", state_label: "Missing", upload: null, uploaded_at: null }),
-          item({ id: 12, label: "Protocol", state: "accepted", state_label: "Accepted" }),
-        ],
-      })],
-    });
+  it("offers no Accept or Reject on a supplied document", async () => {
     renderBlock();
 
     await yourRequest();
@@ -203,23 +163,15 @@ describe("ReviewerDocumentRequests", () => {
     await waitFor(() => expect(withdrawDocumentRequest).toHaveBeenCalledWith(1));
   });
 
-  it("offers no withdrawal on a request that is already closed", async () => {
-    renderBlock();
-
-    await yourRequest();
-    expect(screen.queryByRole("button", { name: "Withdraw request" })).not.toBeInTheDocument();
-  });
-
-  it("says why a decision was refused", async () => {
-    const user = userEvent.setup();
-    decideDocumentRequestItem.mockRejectedValue({
-      response: { data: { detail: "That request was withdrawn." } },
+  it("lists no request whose documents were all supplied: it needs nothing more", async () => {
+    documentRequests.mockResolvedValue({
+      data: [request({ state: "fulfilled", state_label: "Fulfilled", items: [item()] })],
     });
-    renderBlock();
+    const { container } = renderBlock();
 
-    await user.click(await screen.findByRole("button", { name: "Accept Consent form" }));
-
-    expect(await screen.findByRole("alert")).toHaveTextContent("That request was withdrawn.");
+    await waitFor(() => expect(documentRequests).toHaveBeenCalled());
+    expect(screen.queryByRole("button", { name: "Withdraw request" })).not.toBeInTheDocument();
+    expect(container).toBeEmptyDOMElement();
   });
 
   it("shows no request the viewer's party did not make, and none that needs nothing", async () => {
@@ -227,7 +179,7 @@ describe("ReviewerDocumentRequests", () => {
       data: [
         request({ can_manage: false }),
         request({ id: 2, state: "withdrawn", state_label: "Withdrawn" }),
-        request({ id: 3, items: [item({ state: "accepted", state_label: "Accepted" })] }),
+        request({ id: 3, state: "fulfilled", state_label: "Fulfilled", items: [item({ state: "accepted", state_label: "Accepted" })] }),
       ],
     });
     const { container } = renderBlock();

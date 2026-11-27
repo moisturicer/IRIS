@@ -26,7 +26,7 @@ interface ActionRequiredPanelProps {
  *
  * One entry per **open** document request: who asked, why -- in their words,
  * rendered as text -- and each item in spec §4.10's one vocabulary
- * (`itemStatus`): Requested, Uploaded · awaiting review, Accepted,
+ * (`itemStatus`): Requested, Supplied (IR-1338),
  * Replacement needed, with the reviewer's reason for a refused upload. An
  * item for one of RDCO's requirements offers its Template (ADR-063 decision
  * 6, IR-973). Renders nothing while no request is open; a withdrawn request

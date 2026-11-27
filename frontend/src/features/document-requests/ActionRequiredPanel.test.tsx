@@ -95,7 +95,7 @@ describe("ActionRequiredPanel", () => {
     // Spec §4.10's vocabulary, not the stored state's name (IR-411).
     expect(missing).toHaveTextContent("Requested");
     expect(uploaded).toHaveTextContent("Consent form");
-    expect(uploaded).toHaveTextContent("Uploaded · awaiting review");
+    expect(uploaded).toHaveTextContent("Supplied");
   });
 
   it("offers the requested slot's Template, and none for an Other item, which has no slot", async () => {

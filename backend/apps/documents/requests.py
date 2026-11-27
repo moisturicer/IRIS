@@ -26,7 +26,7 @@ from django.utils import timezone
 from apps.audit import workflow as audit
 from core.enums import DocumentRequestItemState, DocumentRequestState
 
-from .models import DocumentRejection, DocumentRequest, DocumentRequestItem, UploadSlot
+from .models import DocumentRequest, DocumentRequestItem, UploadSlot
 
 
 class DocumentRequestError(Exception):
@@ -444,81 +444,6 @@ def request_on_visible_record(request_id, user) -> Optional[DocumentRequest]:
     # Someone else's draft reads as missing (Amendment 9): it is its asker's alone.
     if request.state == DocumentRequestState.DRAFT and request.requested_by_id != getattr(user, "pk", None):
         return None
-    return request
-
-
-def _lock_decidable(item: DocumentRequestItem) -> tuple[DocumentRequestItem, DocumentRequest]:
-    """
-    Lock the item, then its request -- the order the upload path locks them,
-    so a decision and an upload cannot interleave -- and confirm the item is
-    an upload awaiting the requesting party's verdict. Call in a transaction.
-    """
-    from apps.records.models import Record
-
-    Record.objects.select_for_update().get(pk=item.request.record_id)
-    item = DocumentRequestItem.objects.select_for_update().get(pk=item.pk)
-    request = DocumentRequest.objects.select_for_update().get(pk=item.request_id)
-    if request.state == DocumentRequestState.WITHDRAWN:
-        raise DocumentRequestError("That request was withdrawn.")
-    if item.state != DocumentRequestItemState.UPLOADED:
-        raise DocumentRequestError("Only an uploaded document can be accepted or rejected.")
-    return item, request
-
-
-def accept_item(item: DocumentRequestItem, user) -> DocumentRequest:
-    """
-    The upload satisfies the request (ADR-022 §3.4). A request whose items
-    were all uploaded is already fulfilled, so it stays closed. The caller has
-    checked `is_requester`; `user` is who accepted, for the audit log.
-    """
-    with transaction.atomic():
-        item, request = _lock_decidable(item)
-        item.state = DocumentRequestItemState.ACCEPTED
-        item.decided_at = timezone.now()
-        item.save(update_fields=["state", "decided_at"])
-        audit.document_accepted(request, item, user)
-    return request
-
-
-def reject_item(item: DocumentRequestItem, user, *, reason: str) -> DocumentRequest:
-    """
-    The upload does not satisfy the request (ADR-022 §3.4). The item goes
-    back to `missing` with `reason` and forgets the upload -- the file version
-    itself stays on the Record -- the request reopens, and the owners are told
-    once the transaction commits. The caller has checked `is_requester`.
-    """
-    with transaction.atomic():
-        item, request = _lock_decidable(item)
-        now = timezone.now()
-        # The history (IR-1201): the item forgets its upload below, so this
-        # row is what remembers which file was rejected and why. An uploaded
-        # item whose file a superuser removed in admin has nothing to name.
-        if item.upload_id is not None:
-            DocumentRejection.objects.create(
-                item=item, upload_id=item.upload_id, rejected_by=user, reason=reason,
-                created_at=now,
-            )
-        item.state = DocumentRequestItemState.MISSING
-        item.upload = None
-        item.rejection_reason = reason
-        item.decided_at = now
-        item.save(update_fields=["state", "upload", "rejection_reason", "decided_at"])
-        if request.state != DocumentRequestState.OPEN:
-            # Resolved is final (ADR-069, IR-1075): the request's notification
-            # is stamped as it stood, before this reopens it.
-            from apps.notifications.settling import settle_record
-
-            settle_record(request.record)
-            request.state = DocumentRequestState.OPEN
-            request.closed_at = None
-            request.save(update_fields=["state", "closed_at"])
-        audit.document_rejected(request, item, user, reason=reason)
-
-        from apps.notifications.services import notify_document_rejected
-
-        transaction.on_commit(
-            lambda: notify_document_rejected(request, item, rejected_by=user)
-        )
     return request
 
 

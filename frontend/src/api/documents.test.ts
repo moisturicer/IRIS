@@ -51,6 +51,14 @@ describe("reads", () => {
   });
 });
 
+describe("marks", () => {
+  it("uploadSeen tells the server this viewer opened a version", async () => {
+    await documentsApi.uploadSeen(3);
+
+    expect(stub.only()).toMatchObject({ method: "post", url: "/documents/uploads/3/seen/" });
+  });
+});
+
 describe("deletes", () => {
   it("deleteUpload removes one version", async () => {
     await documentsApi.deleteUpload(3);

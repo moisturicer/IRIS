@@ -750,48 +750,6 @@ def notify_document_request_fulfilled(document_request, *, uploaded_by):
         _log_failure("notify_document_request_fulfilled", request=document_request)
 
 
-def notify_document_rejected(document_request, item, *, rejected_by):
-    """
-    Tell every owner that the requesting party rejected an upload, and why
-    (ADR-022 §3.4, IR-263). The item is asked for again: the owner uploads a
-    replacement from the record page, as for the original request.
-    """
-    try:
-        from apps.reviews.tracker import party_label
-
-        record = document_request.record
-        asker = party_label(document_request.party, staff_viewer=False)
-        message = (
-            f'{asker} did not accept "{item.label}" for "{record.title}" and asked '
-            f"for it again: {item.rejection_reason}"
-        )
-        owners = list(record.owners.select_related("user").all())
-        notif_type = NotificationType.objects.get_or_create(name="Document Rejected")[0]
-        for ownership in owners:
-            Notification.objects.create(
-                sender=rejected_by,
-                recipient=ownership.user,
-                record=record,
-                notif_type=notif_type,
-                message=message,
-                **_task(TaskKind.DOCUMENT_REQUEST, document_request),
-            )
-        if owners:
-            primary = next((o.user for o in owners if o.is_primary), owners[0].user)
-            send_email_async(
-                subject=f"[IRIS] Requested document not accepted: {record.title[:60]}",
-                message=(
-                    f"Hello {primary.first_name},\n\n"
-                    f"{message}\n\n"
-                    f"{_record_url(record)}\n\n"
-                    f"-- The IRIS Team"
-                ),
-                recipient_list=[primary.email],
-            )
-    except Exception:
-        _log_failure("notify_document_rejected", request=document_request)
-
-
 def _notify_in_app(record, recipient, *, type_name, message, label, task=None):
     """
     One in-app notice from a scheduled batch, with no email. Returns whether it

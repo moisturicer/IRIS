@@ -30,7 +30,7 @@ interface ReviewerDocumentRequestsProps {
 function needsTheRequester(r: DocumentRequest): boolean {
   if (r.state === "draft") return true;
   if (!r.can_manage || r.state === "withdrawn") return false;
-  return r.state === "open" || r.items.some((i) => i.state === "uploaded");
+  return r.state === "open";
 }
 
 /**
@@ -42,8 +42,9 @@ function needsTheRequester(r: DocumentRequest): boolean {
  * which only they see, until their *Finish review* sends it with *Request
  * changes* or *Comment only* (ADR-022 Amendment 9, IR-1325); they can remove
  * it until then. And the requests the viewer's party made
- * that still need it: Accept or Reject on each uploaded item -- a rejection
- * needs a reason, which the owner reads -- and Withdraw on an open request.
+ * that are still open, with Withdraw. A sent document is supplied, with no
+ * Accept or Reject (ADR-022 Amendment 10, IR-1338): if it is the wrong file,
+ * the reviewer asks again with a new request.
  * Who may manage a request is the server's `can_manage`, never decided here.
  *
  * Requests are loaded only for a viewer the caller says is reviewing, which
@@ -162,7 +163,7 @@ function ManagedRequest({
       </p>
       <ul aria-labelledby={listId} className="mt-2 divide-y divide-stone-100">
         {request.items.map((item) => (
-          <ManagedItem key={item.id} item={item} onChanged={onChanged} />
+          <ManagedItem key={item.id} item={item} />
         ))}
       </ul>
       {request.state === "open" && <Withdraw request={request} onChanged={onChanged} />}
@@ -171,120 +172,20 @@ function ManagedRequest({
   );
 }
 
-function ManagedItem({
-  item,
-  onChanged,
-}: {
-  item: DocumentRequestItem;
-  onChanged: () => Promise<void>;
-}) {
-  const reasonId = useId();
-  const [rejecting, setRejecting] = useState(false);
-  const [reason, setReason] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const decide = async (body: Parameters<typeof recordsApi.decideDocumentRequestItem>[1]) => {
-    setError(null);
-    setBusy(true);
-    try {
-      await recordsApi.decideDocumentRequestItem(item.id, body);
-      setRejecting(false);
-      setReason("");
-      await onChanged();
-    } catch (err) {
-      setError(errorDetail(err, "That did not go through. Please try again."));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const decidable = item.state === "uploaded";
-
+function ManagedItem({ item }: { item: DocumentRequestItem }) {
   return (
     <li className="py-2 first:pt-0 last:pb-0">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <span className="text-sm font-semibold text-stone-800 min-w-0 break-words">
           {item.label}
         </span>
-        <span className="flex items-center gap-1.5 flex-wrap">
-          <ItemStatusChip item={item} />
-          {decidable && (
-            <>
-              <button
-                type="button"
-                disabled={busy}
-                aria-label={`Accept ${item.label}`}
-                onClick={() => void decide({ action: "accept" })}
-                className="px-2 py-1 rounded-control bg-stone-900 text-white text-xs font-bold hover:bg-stone-800 disabled:opacity-60"
-              >
-                Accept
-              </button>
-              <button
-                type="button"
-                disabled={busy}
-                aria-label={`Reject ${item.label}`}
-                aria-expanded={rejecting}
-                onClick={() => setRejecting((v) => !v)}
-                className="px-2 py-1 rounded-control border border-stone-300 text-xs font-bold text-brand hover:bg-stone-100 disabled:opacity-60"
-              >
-                Reject
-              </button>
-            </>
-          )}
-        </span>
+        <ItemStatusChip item={item} />
       </div>
 
+      {/* A rejection made before IR-1338 stays readable. */}
       {item.state === "missing" && item.rejection_reason && (
         <p className="text-xs text-stone-600 mt-1 break-words">
           You rejected the last upload: “{item.rejection_reason}”
-        </p>
-      )}
-
-      {rejecting && (
-        <form
-          className="mt-2 space-y-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (reason.trim()) void decide({ action: "reject", reason: reason.trim() });
-          }}
-        >
-          <label htmlFor={reasonId} className="block text-xs font-semibold text-stone-700">
-            Why is {item.label} not acceptable?{" "}
-            <span className="font-normal text-stone-500">The owner reads this.</span>
-          </label>
-          <textarea
-            id={reasonId}
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            rows={2}
-            className="w-full rounded-control border border-field p-2 text-sm focus:outline-none focus:border-brand"
-          />
-          <div className="flex gap-2">
-            <button
-              type="submit"
-              disabled={busy || !reason.trim()}
-              className="px-2.5 py-1 rounded-control bg-brand text-white text-xs font-bold hover:bg-brand-light disabled:opacity-60"
-            >
-              Send rejection
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setRejecting(false);
-                setReason("");
-              }}
-              className="px-2.5 py-1 rounded-control border border-stone-200 text-xs font-semibold text-stone-700 hover:bg-stone-50"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-      )}
-
-      {error && (
-        <p role="alert" className="text-xs text-brand mt-1">
-          {error}
         </p>
       )}
     </li>
