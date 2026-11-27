@@ -924,7 +924,7 @@ Decided by Hermoine Zozobrado while building IR-1226, and awaiting review on its
 - **Recording the start must succeed.** IR-1206 opened the review even when the recording failed. Behind the cover a failed start leaves the review unusable, so the cover stays, says the review could not be started, and offers *Start review* again.
 - **Once recorded, the cover is gone for good**, because the seat is no longer unopened. *Claim* is unchanged: an office review nobody holds is claimed first, and then the cover appears.
 
-**Amendment, 2026-11-27 (IR-1340; decided by Hermoine Zozobrado; Proposed until its pull request merges after review): every reviewer finishes with one *Finish review…*, and *Add a colleague* sits under the viewer's own office.** Transcribed by an agent.
+**Amendment, 2026-11-27 (IR-1340; decided by Hermoine Zozobrado; Accepted 2026-11-27 by Lee Jasmin Adolfo with PR #1025's merge, as relayed by Hermoine Zozobrado): every reviewer finishes with one *Finish review…*, and *Add a colleague* sits under the viewer's own office.** Transcribed by an agent.
 
 - **RDCO's footer has one *Finish review…*,** as every other office and the Adviser have. *Accept & publish…*, *Keep unlisted…*, *Request changes…* and *Reject…* are no longer footer buttons or menu items; RDCO chooses them in the *Finish review* dialog, which opens with no verdict chosen beyond its usual default. What each verdict does, and when the server holds it, is unchanged.
 - **An embargo that holds publishing is still said in the footer,** under *Finish review…*, with *Release embargo…* for a viewer allowed to release it. *Finish review…* itself is not held, because the other verdicts need no release.
