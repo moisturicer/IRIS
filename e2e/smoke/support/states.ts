@@ -154,7 +154,9 @@ export const STATES: UiState[] = [
   ...reads("paper-view", "GET", "/records/101/tracker/", {
     error: "Could not load the review tracker.",
   }, {
-    variant: "review tracker", also: asParticipant, interrupted: "The review tracker took too long to load.",
+    // A published paper shows its tracker only with its review open (IR-1339).
+    variant: "review tracker", path: "/records/101?review=open", also: asParticipant,
+    interrupted: "The review tracker took too long to load.",
     ok: TRACKER, recovered: text("See review history"),
     loading: announced("Loading the review tracker"),
   }),
@@ -305,7 +307,7 @@ export const AXE_STATES: AxeState[] = [
     shows: (page) => page.getByText("The sources IRIS read do not establish an answer to this question."),
   },
   {
-    id: "review tracker · empty", screen: "paper-view",
+    id: "review tracker · empty", screen: "paper-view", path: "/records/101?review=open",
     override: (api) => {
       asParticipant(api);
       api.on("GET", "/records/101/tracker/", { ...TRACKER, current_holders: [] });
