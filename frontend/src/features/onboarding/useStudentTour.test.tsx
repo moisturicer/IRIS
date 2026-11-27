@@ -15,6 +15,7 @@ import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { makeUser } from "@/test/authFixtures";
 import { act, renderScreen, screen, userEvent, waitFor } from "@/test/render";
 
+import { discoverTourSteps, MENU_BUTTON_ID, SIDEBAR_ID } from "./studentTours";
 import { TOUR_KEYS, TOUR_KEYS_JSON, type TourKey } from "./tourKeys";
 import { useTourSession } from "./tourSession";
 import { useStudentTour } from "./useStudentTour";
@@ -78,6 +79,23 @@ afterEach(() => {
 describe("the keys", () => {
   it("are the list the server checks", () => {
     expect([...TOUR_KEYS]).toEqual(TOUR_KEYS_JSON);
+  });
+});
+
+describe("Discover's steps", () => {
+  it("point at the sidebar on a wide screen and at Open menu on a phone", () => {
+    const targets = (phone: boolean) => discoverTourSteps({ canPublish: true, phone }).map((s) => s.target);
+    expect(targets(false)).toContain(SIDEBAR_ID);
+    expect(targets(false)).not.toContain(MENU_BUTTON_ID);
+    expect(targets(true)).toContain(MENU_BUTTON_ID);
+    expect(targets(true)).not.toContain(SIDEBAR_ID);
+  });
+
+  it("say where to take a tour again on the last step", () => {
+    for (const canPublish of [true, false]) {
+      const steps = discoverTourSteps({ canPublish, phone: false });
+      expect(steps[steps.length - 1].body).toMatch(/Settings › Help/);
+    }
   });
 });
 
