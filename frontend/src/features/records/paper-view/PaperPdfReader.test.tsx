@@ -1261,10 +1261,10 @@ describe("find in this paper (IR-353)", () => {
    * the current match is what Comment anchors to when nothing is selected.
    */
   describe("commenting on find's match", () => {
-    function openCommentable(onComment: (passage: Passage, version: number) => void) {
+    function openCommentable(onComment: (passage: Passage, version: number) => void, commentHeld: string | null = null) {
       paperText = PAPER;
       render(
-        <ReaderAnnotationsContext.Provider value={{ currentVersion: 2, marks: [], onComment, onCommentDocument: null, landing: null }}>
+        <ReaderAnnotationsContext.Provider value={{ currentVersion: 2, marks: [], onComment, onCommentDocument: null, landing: null, commentHeld }}>
           <PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />
         </ReaderAnnotationsContext.Provider>,
       );
@@ -1293,6 +1293,21 @@ describe("find in this paper (IR-353)", () => {
       screen.getByRole("button", { name: "Comment" }).focus();
       await userEvent.keyboard("{Enter}");
       expect(onComment).toHaveBeenCalledWith(expect.objectContaining({ page: 3, quote: "robot arm" }), 2);
+    });
+
+    // IR-1341: before the reviewer starts their review, Comment is greyed out and says why.
+    it("stays greyed out, saying why, while the review is not started, even on a passage", async () => {
+      const onComment = vi.fn();
+      await openCommentable(onComment, "Start your review to comment");
+      await userEvent.type(await openFind(), "robot arm");
+      await screen.findByText(/1 of/);
+
+      const comment = screen.getByRole("button", { name: "Comment" });
+      expect(comment).toBeDisabled();
+      expect(comment).toHaveAccessibleDescription("Start your review to comment");
+      await userEvent.keyboard("{Escape}");
+      await userEvent.keyboard("c");
+      expect(onComment).not.toHaveBeenCalled();
     });
   });
 

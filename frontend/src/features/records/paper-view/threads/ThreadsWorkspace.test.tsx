@@ -88,7 +88,8 @@ function StandInReader() {
         <button key={m.key} type="button" onClick={m.onActivate} aria-label={m.label}>{m.pin}</button>
       ))}
       {a?.onComment && (
-        <button type="button" onClick={() => a.onComment?.({
+        // Greyed out with its reason while held, as the PDF reader draws it (IR-1341).
+        <button type="button" disabled={a.commentHeld != null} title={a.commentHeld ?? undefined} onClick={() => a.onComment?.({
           page: 6, quote: "ultrasonic sensors", prefix: "", suffix: "", regions: [],
         }, 2)}>Comment</button>
       )}
@@ -219,6 +220,35 @@ describe("threads in the review workspace", () => {
       await userEvent.click(await screen.findByRole("button", { name: "Start review" }));
       expect(await screen.findByRole("alert")).toHaveTextContent("Your review could not be started. Try again.");
       expect(screen.getByRole("button", { name: "Start review" })).toBeEnabled();
+    });
+
+    // IR-1341: the reader stays readable beside the cover, but its Comment waits for the start.
+    it("greys out the reader's Comment until the review is started, saying why", async () => {
+      renderScreen(
+        <ReviewWorkspaceLayout record={assigned} can={new Set<Capability>([...unopened, "start_thread"])} reader={<StandInReader />}
+          timelineVersion={0} onChanged={() => {}} documents={null} onOpenReview={vi.fn(async () => {})} />,
+      );
+
+      const comment = await screen.findByRole("button", { name: "Comment" });
+      expect(comment).toBeDisabled();
+      expect(comment).toHaveAccessibleDescription("Start your review to comment");
+    });
+
+    it("greys out Comment on an office review nobody has claimed yet", async () => {
+      const unclaimed = { ...record, my_seats: [], review_claim: { assignment: 3, label: "Claim", party_label: "ITSO" } } as unknown as RecordDetail;
+      renderScreen(
+        <ReviewWorkspaceLayout record={unclaimed} can={new Set<Capability>(["comment_review", "start_thread"])} reader={<StandInReader />}
+          timelineVersion={0} onChanged={() => {}} documents={null} />,
+      );
+
+      expect(await screen.findByRole("button", { name: "Comment" })).toBeDisabled();
+    });
+
+    it("leaves Comment working once the review is started", async () => {
+      openWorkspace();
+      const comment = await screen.findByRole("button", { name: "Comment" });
+      expect(comment).toBeEnabled();
+      expect(comment).not.toHaveAccessibleDescription();
     });
 
     it("is not drawn over a review already started", async () => {

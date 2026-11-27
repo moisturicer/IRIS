@@ -43,6 +43,12 @@ export interface ReaderAnnotations {
    * upload and its name, "Consent form, v1". Null where the viewer may not.
    */
   onCommentDocument: ((upload: number, label: string) => void) | null;
+  /**
+   * Why Comment is greyed out though the viewer may comment, e.g. "Start your
+   * review to comment" until their review is started (IR-1341). Null or
+   * absent when it is not held.
+   */
+  commentHeld?:   string | null;
   /** A passage to show: outlined, centred and focused. A new key lands again. */
   landing:        ReaderLanding | null;
 }

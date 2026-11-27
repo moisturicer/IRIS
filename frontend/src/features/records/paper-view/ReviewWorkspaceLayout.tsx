@@ -222,8 +222,14 @@ export function ReviewWorkspaceLayout({
     try { localStorage.setItem(WIDTHS_KEY, JSON.stringify(next)); } catch { /* Defaults still render. */ }
   };
 
+  // The server offers `open_review` for every seat still being worked on, an
+  // opened one included, so only a seat not yet opened asks for it here: an
+  // opened one finishes instead (IR-875).
+  const unopened = can.has("open_review") && seatToOpen(record) !== null;
+  // Not claimed, or not started: the reader's Comment waits for both (IR-1341).
+  const notStarted = !authorView && (unopened || Boolean(record.review_claim));
   const tw = useThreadsWorkspace({
-    record, can, onChanged,
+    record, can, onChanged, notStarted,
     showThreads: () => { reveal("threads"); if (drawer) setOpen(true); },
     // Threads and Changes point into the manuscript, so a document steps aside for it (IR-1203).
     showPaper: () => { onShowManuscript?.(); if (drawer && open) closeDrawer(); },
@@ -231,10 +237,6 @@ export function ReviewWorkspaceLayout({
     announce: setRouted,
   });
   const finishing = can.has("finish_review");
-  // The server offers `open_review` for every seat still being worked on, an
-  // opened one included, so only a seat not yet opened asks for it here: an
-  // opened one finishes instead (IR-875).
-  const unopened = can.has("open_review") && seatToOpen(record) !== null;
   // A review not yet started is covered until Start review records it (IR-1336).
   // Claim comes first: an office review nobody holds is claimed, not started.
   const covered = unopened && !authorView && !record.review_claim;

@@ -29,7 +29,12 @@ interface Options {
   showDocument?: (document: ThreadDocument) => void;
   /** Announce an outcome. */
   announce?: (text: string) => void;
+  /** The viewer's own review is not yet claimed and started: Comment is held (IR-1341). */
+  notStarted?: boolean;
 }
+
+/** Why the reader's Comment is greyed out before the review starts (IR-1341). */
+export const COMMENT_HELD = "Start your review to comment";
 
 /**
  * Everything the Threads tab, the reader's pins and *Finish review* share in
@@ -37,7 +42,7 @@ interface Options {
  * pin or Readiness points at, where the reader lands, and the Finish and
  * routing dialogs. Both review workspaces hold one.
  */
-export function useThreadsWorkspace({ record, can, onChanged, showThreads, showPaper, showDocument, announce }: Options) {
+export function useThreadsWorkspace({ record, can, onChanged, showThreads, showPaper, showDocument, announce, notStarted = false }: Options) {
   const threads = useReviewThreads(record.id, record.readiness !== null);
   const letter = useNewestResponseLetter(record.id, record.readiness !== null);
   const userId = useAuthStore((s) => s.user?.id ?? null);
@@ -90,10 +95,12 @@ export function useThreadsWorkspace({ record, can, onChanged, showThreads, showP
         }
         : null,
       landing,
+      // Until the viewer's own review is claimed and started, Comment is shown greyed out (IR-1341).
+      commentHeld: notStarted ? COMMENT_HELD : null,
     };
     // `openThread` and `showThreads` only set state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [threads.sent, threads.drafts, can, currentVersion, landing, focus]);
+  }, [threads.sent, threads.drafts, can, currentVersion, landing, focus, notStarted]);
 
   const panel: ReviewThreadsProps = {
     recordId: record.id, can, threads,
