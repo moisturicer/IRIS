@@ -10,7 +10,7 @@
 // dialog-coverage.spec.ts, so a new dialog cannot ship without a decision.
 import type { Locator, Page, Route } from "@playwright/test";
 import type { MockApi } from "./mock-api";
-import { PAPER, PAPER_DETAIL, paginated, type SmokeRole } from "./fixtures";
+import { account, PAPER, PAPER_DETAIL, paginated, type SmokeRole } from "./fixtures";
 import { ADVISERS_TEMPLATES, GUIDELINES, OPPORTUNITY } from "./screens";
 
 export interface DialogCase {
@@ -30,6 +30,13 @@ export interface DialogCase {
   /** The dialog itself. */
   dialog: (page: Page) => Locator;
 }
+
+/** A student who has seen every tour but `key` (IR-1342), so only that one starts. */
+const newStudent = (key: string) => (api: MockApi) => {
+  const keys = ["discover", "library", "ask", "calls", "guidelines", "notifications", "publish"];
+  api.on("GET", "/users/me/", { ...account("Student"), tours_seen: keys.filter((k) => k !== key) });
+  api.on("POST", `/users/me/tours/${key}/`, { tours_seen: keys });
+};
 
 const anyDialog = (page: Page) => page.locator('[role="dialog"], [role="alertdialog"]').last();
 const press = (name: string | RegExp) => async (page: Page) => {
@@ -226,6 +233,20 @@ export const DIALOGS: DialogCase[] = [
     id: "publish", screen: "discover", sources: ["features/publish/PublishDialog.tsx"],
     override: (api) => api.on("GET", "/users/advisers/", paginated([])),
     open: press("Publish"), dialog: anyDialog,
+  },
+  // IR-1342: a new student's tours start by themselves, so `open` only waits for them.
+  {
+    id: "the discover tour", screen: "discover", sources: ["components/tour/GuidedTour.tsx"],
+    override: newStudent("discover"),
+    open: async () => {}, dialog: (page) => page.getByRole("dialog", { name: "Discover tour" }),
+  },
+  {
+    id: "the publish tour", screen: "discover", path: "/?publish=new", sources: ["components/tour/GuidedTour.tsx"],
+    override: (api) => {
+      newStudent("publish")(api);
+      api.on("GET", "/users/advisers/", paginated([]));
+    },
+    open: async () => {}, dialog: (page) => page.getByRole("dialog", { name: "Publish tour" }),
   },
   // IR-973: Publish's Documents step, as wide as a laptop and as narrow as 320 px.
   publishDocuments("publish documents step"),
@@ -538,7 +559,7 @@ export const DIALOGS: DialogCase[] = [
   // Finish review (IR-875): the footer's one way to finish where `finish_review` is granted.
   reviewAction("finish a review", "finish_review", "Finish review…", "features/records/paper-view/threads/FinishReviewDialog.tsx"),
   // The guided tour (IR-997): a non-modal dialog opened from the pane header's Take a tour.
-  reviewAction("take the review workspace tour", "comment_review", "Take a tour", "features/records/paper-view/tour/GuidedTour.tsx"),
+  reviewAction("take the review workspace tour", "comment_review", "Take a tour", "components/tour/GuidedTour.tsx"),
   reviewAction("request a revision", "request_revision", "Request Revision…", "features/records/paper-view/RequestRevisionDialog.tsx"),
   reviewAction("clear a paper at an office", "office_review", "Clear…", "features/records/paper-view/OfficeReviewDialog.tsx"),
   reviewAction("record an office finding", "office_review", "Record finding…", "features/records/paper-view/OfficeReviewDialog.tsx"),

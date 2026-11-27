@@ -288,6 +288,17 @@ class SeedDemoRecordTests(TestCase):
         self.assertTrue(emails)
         self.assertEqual([e for e in emails if not e.endswith("@iris.test")], [])
 
+    def test_no_seeded_account_starts_a_student_tour(self):
+        """Every account the seed makes has seen every tour (IR-1342).
+
+        Migration 0025 marks accounts that exist when it runs; this covers a
+        database seeded after it, so a demo login is never toured by surprise.
+        """
+        from apps.accounts.tours import TOUR_KEYS
+
+        unseen = [u.email for u in User.objects.all() if sorted(u.tours_seen) != sorted(TOUR_KEYS)]
+        self.assertEqual(unseen, [])
+
     def test_every_pipeline_state_has_a_record(self):
         present = set(Record.objects.values_list("pipeline_status", flat=True))
         missing = [s for s in self.EXPECTED_STATUSES if s not in present]
