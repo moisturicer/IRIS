@@ -48,6 +48,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | FR-M2-02/03 | Download and delete request queues | [details](traceability/FR-M2-02-03.md) | **PARTIAL** |
 | FR-M2-04 | Bulk import from a template | [details](traceability/FR-M2-04.md) | **IMPLEMENTED** |
 | FR-M3-01 | PDF text extraction | [details](traceability/FR-M3-01.md) | **IMPLEMENTED** |
+| **IR-1340** | RDCO's Review footer has one *Finish review…* (verdicts chosen in the dialog); *+ Add a colleague* moves from the footer menu to under the viewer's own office in Details → Reviewers — ADR-032 §10 Amendment 2026-11-27 (Proposed) | [details](traceability/IR-1340.md) | **IMPLEMENTED** |
 | **IR-1338** | A document sent in answer to a request is *Supplied* at once, with no Accept or Reject; a reviewer sees *New* on it until they open it in the reader — ADR-022 Amendment 10 (Proposed) | [details](traceability/IR-1338.md) | **IMPLEMENTED** |
 | **IR-1337** | Sidebar: My Reviews (and an Adviser's My Templates) sit in a group named for the user's role — Adviser, ITSO, IERC, KTTO, or first in RDCO; Student unchanged — no FR- id | [details](traceability/IR-1337.md) | **IMPLEMENTED** |
 | **IR-1336** | A review not yet started is covered by a grey layer over the Review tab's pane with *Start review* in its middle, which replaces *Open review*; a failed start keeps the cover — ADR-032 §10 Amendment 2026-11-25 | [details](traceability/IR-1336.md) | **IMPLEMENTED** |

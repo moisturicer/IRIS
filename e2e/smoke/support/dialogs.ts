@@ -542,8 +542,13 @@ export const DIALOGS: DialogCase[] = [
   reviewAction("request a revision", "request_revision", "Request Revision…", "features/records/paper-view/RequestRevisionDialog.tsx"),
   reviewAction("clear a paper at an office", "office_review", "Clear…", "features/records/paper-view/OfficeReviewDialog.tsx"),
   reviewAction("record an office finding", "office_review", "Record finding…", "features/records/paper-view/OfficeReviewDialog.tsx"),
-  reviewAction("add a reviewer", "add_reviewer", "Add a colleague…", "features/records/paper-view/AddReviewerDialog.tsx",
+  // IR-1340: a "+ Add a colleague" link under the viewer's own office in Details → Reviewers.
+  reviewAction("add a reviewer", "add_reviewer", "Add a colleague to ITSO", "features/records/paper-view/AddReviewerDialog.tsx",
     (api) => {
+      api.on("GET", `/records/${PAPER.id}/tracker/`, { ...TRACKER, parties: [{
+        party: "itso", label: "ITSO", state: "active", state_label: "Active", at: null, outcome: null, outcome_label: null,
+        in_pool: false, seats: [], carryover: null, changes_requested: false,
+      }] });
       api.on("GET", `/records/${PAPER.id}/`, {
         ...PAPER_DETAIL, is_participant: true, workflow_state: "under_review", workflow_state_label: "Under review",
         stage_label: "Under review", capabilities: ["cite", "add_reviewer"],
