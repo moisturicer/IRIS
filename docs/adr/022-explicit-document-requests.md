@@ -15,7 +15,7 @@
 
 > **Amended 2026-11-24 ([IR-1322](https://citiris.atlassian.net/browse/IR-1322); decided by Hermoine Zozobrado; accepted 2026-11-24 when PR #1006 merged, with Ashlee Sean's security review of point 4).** A reviewer's *Request revision* is shown as *Request changes* and may ask for documents in the same act. An owner's uploads to a submitted record are held, seen by its owners only, until *Submit new version* or *Submit added documents* sends them. See *Amendment 8*.
 
-> **Amended 2026-11-27 ([IR-1338](https://citiris.atlassian.net/browse/IR-1338); decided by Hermoine Zozobrado; Proposed until its PR merges).** A sent document is **Supplied**: there is no Accept or Reject. A reviewer sees **New** on a supplied version until they open it in the reader. If it is the wrong file, they ask again with a new request. See *Amendment 10*.
+> **Amended 2026-11-27 ([IR-1338](https://citiris.atlassian.net/browse/IR-1338); decided by Hermoine Zozobrado; accepted 2026-11-27 by Lee Jasmin Adolfo when PR #1024 merged, as relayed by Hermoine Zozobrado).** A sent document is **Supplied**: there is no Accept or Reject. A reviewer sees **New** on a supplied version until they open it in the reader. If it is the wrong file, they ask again with a new request. See *Amendment 10*.
 
 > **Amended 2026-11-24 ([IR-1325](https://citiris.atlassian.net/browse/IR-1325); decided by Hermoine Zozobrado; accepted 2026-11-24 when PR #1010 merged, approved by Ashlee Sean as relayed by Hermoine Zozobrado).** Documents are asked for only in the Documents tab, where each request waits as the reviewer's draft until their *Finish review* sends it. *Request changes* always asks for a new version and no longer carries documents. The owner gets *Upload* only on what was asked for. See *Amendment 9*.
 
@@ -456,7 +456,7 @@ Decided by Hermoine Zozobrado on 2026-11-24 for [IR-1322](https://citiris.atlass
 
 ## Amendment 10 — 2026-11-27: a sent document is supplied, with no Accept or Reject
 
-**Status: Proposed** — becomes Accepted when IR-1338's PR merges after a person's review. Decided by Hermoine Zozobrado on 2026-11-27, in chat. Transcribed by an agent. It replaces §3.4 (accept and reject) and the parts of §4 and Amendment 7 that let the requesting party decide an item.
+**Status: Accepted** — 2026-11-27, by Lee Jasmin Adolfo when IR-1338's PR (#1024) merged, as relayed by Hermoine Zozobrado. Decided by Hermoine Zozobrado on 2026-11-27, in chat. Transcribed by an agent. It replaces §3.4 (accept and reject) and the parts of §4 and Amendment 7 that let the requesting party decide an item.
 
 **The problem.**
 - **A second step nobody needed.** Since IR-262 a request is already fulfilled once every item has a file; Accept closed nothing more. A reviewer still had to press Accept or Reject on each one.
