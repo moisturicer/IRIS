@@ -137,10 +137,14 @@ const OFFICE_PARTIES: readonly Party[] = ["itso", "ierc", "ktto", "rdco"];
  * no `office_review` block, so the seat, not that block, names it.
  */
 export function addReviewerAssignment(record: Pick<RecordDetail, "my_seats">): number | null {
-  const seat = record.my_seats.find(
+  return addReviewerSeat(record)?.assignment ?? null;
+}
+
+/** That seat, whose party is the office a colleague joins (IR-1340 draws the link under it). */
+export function addReviewerSeat(record: Pick<RecordDetail, "my_seats">) {
+  return record.my_seats.find(
     (s) => OPEN_SEAT_STATES.includes(s.state) && OFFICE_PARTIES.includes(s.party),
-  );
-  return seat?.assignment ?? null;
+  ) ?? null;
 }
 
 /** A seat holder brings in a colleague from their own office (ADR-032 §4). */
@@ -325,14 +329,11 @@ export const ADD_COLLEAGUE: readonly ReviewAction[] = REVIEW_ACTIONS.filter((a) 
 /**
  * What a reviewer's footer may offer. With *Finish review* granted every
  * verdict goes through it, so the drafts go with it (ADR-032 §7, IR-875);
- * `ReviewFooterActions` turns those into buttons that open it. *Add a
- * colleague* is in the footer's menu too, as the prototype has it (IR-1139),
- * besides the Reviewers list in Details. Two acts are not here: *Request
- * review*, which is the Reviewers list's (IR-685), and *Request documents*,
- * which is the Documents tab's, beside the requests it makes (ADR-032 §7 as
- * amended 2026-11-21, IR-1254).
+ * `ReviewFooterActions` draws one *Finish review…* for them. Three acts are
+ * not here: *Request review* and *Add a colleague*, which are the Reviewers
+ * list's in Details (IR-685, IR-1340), and *Request documents*, which is the
+ * Documents tab's, beside the requests it makes (ADR-032 §7 as amended
+ * 2026-11-21, IR-1254).
  */
-export const REVIEWER_FOOTER_ACTIONS: readonly ReviewAction[] = [
-  ...REVIEW_ACTIONS.filter((a) => !["route", "add_reviewer", "request_document"].includes(a.capability)),
-  ...ADD_COLLEAGUE,
-];
+export const REVIEWER_FOOTER_ACTIONS: readonly ReviewAction[] =
+  REVIEW_ACTIONS.filter((a) => !["route", "add_reviewer", "request_document"].includes(a.capability));

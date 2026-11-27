@@ -57,7 +57,8 @@ export const detailsTarget = (ids: string, to: string) => `${ids}-details-${to}`
  * reads as the tracker says, an unclaimed Pool as the office itself. The host
  * passes `requestReview` (the gear on the heading, with the routing flags'
  * targets) and `addColleague` only when the viewer may take them; the two
- * stay separate controls.
+ * stay separate controls. *Add a colleague* sits under the viewer's own
+ * office, the party it adds to (IR-1340).
  */
 export function ReviewDetails({ record, tracker, ids, readiness, onReadinessAction, requestReview, addColleague }: {
   record: RecordDetail;
@@ -70,7 +71,8 @@ export function ReviewDetails({ record, tracker, ids, readiness, onReadinessActi
   readiness?: Readiness | null;
   onReadinessAction?: (action: NonNullable<ReadinessItem["action"]>) => void;
   requestReview?: { targets: string[]; onOpen: () => void };
-  addColleague?: ReactNode;
+  /** The control, and the party whose row it sits under: the viewer's own office. */
+  addColleague?: { party: string; control: (officeLabel: string) => ReactNode };
 }) {
   const requestNoteId = useId();
   const readable = tracker.reviews !== null;
@@ -107,11 +109,11 @@ export function ReviewDetails({ record, tracker, ids, readiness, onReadinessActi
           <ul className="space-y-3">
             {tracker.parties.map((row) => (
               <PartyReviewers key={row.party} row={row} ids={ids} readable={readable} people={participants ?? []}
-                due={dueFor(row.party)} revision={revisionFor(row.party)} />
+                due={dueFor(row.party)} revision={revisionFor(row.party)}
+                extra={addColleague?.party === row.party ? addColleague.control(row.label) : null} />
             ))}
           </ul>
         )}
-        {addColleague}
       </Section>
       <Section title="Researchers">
         {researchers.length ? <ul className="space-y-2">{researchers.map((p) => <li key={p.id}><Person person={p} /></li>)}</ul>
@@ -219,9 +221,11 @@ function affiliationText(values: string[] | null | undefined): string {
  * party with none (not asked, waiting, withheld, or an unclaimed Pool) says it
  * once on its own row. The row is never both.
  */
-function PartyReviewers({ row, ids, readable, people, due, revision }: {
+function PartyReviewers({ row, ids, readable, people, due, revision, extra }: {
   row: TrackerPartyRow; ids: string; readable: boolean; people: PaperPerson[];
   due?: PaperDueDate; revision?: TrackerResubmission;
+  /** Drawn under the party's rows: *Add a colleague*, on the viewer's own office (IR-1340). */
+  extra?: ReactNode;
 }) {
   // The tracker sends only the withdrawn seats a Decision cut short, labelled so.
   const seats = row.seats ?? [];
@@ -287,6 +291,7 @@ function PartyReviewers({ row, ids, readable, people, due, revision }: {
             [row.state_label, outcome, row.changes_requested ? "Changes requested" : null].filter(Boolean).join(" · ")))}
         </div>
       )}
+      {extra}
     </li>
   );
 }

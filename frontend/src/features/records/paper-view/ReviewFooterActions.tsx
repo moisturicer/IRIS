@@ -24,16 +24,18 @@ interface Choice {
 
 /**
  * The Review pane footer's actions (IR-1139), shaped like the prototype's merge
- * box: a "More review actions" menu, at most one secondary pill and one filled
- * primary, right-aligned beside "Your part".
+ * box: a "More review actions" menu, *Send N comments…* while drafts wait,
+ * and one filled primary, right-aligned beside "Your part".
  *
  * Nothing here grants anything: every control is a capability the server
  * offered, and a held one is disabled with the server's reason. Where *Finish
- * review* is granted, a verdict opens it with that verdict chosen, so drafts
- * still go with the verdict (ADR-032 §7, IR-875): RDCO's *Accept & publish*
- * and *Keep unlisted*, *Request changes* and *Reject* all do. Everyone else
- * finishes with one *Finish review…*. The other acts (Request documents, Add
- * a colleague, Withdraw revision request) are in the menu.
+ * review* is granted, every reviewer, RDCO included, finishes with one
+ * *Finish review…* and chooses the verdict in it, so drafts still go with the
+ * verdict (ADR-032 §7, IR-875; IR-1340 took RDCO's own verdict buttons away).
+ * An embargo that holds publishing is said under it, with the release when
+ * the viewer may lift it. *Add a colleague* is in Details → Reviewers, under
+ * the viewer's own office (IR-1340); other acts (Withdraw revision request)
+ * are in the menu.
  *
  * While the reviewer has drafts, **Send N comments…** opens *Finish review* on
  * *Comment only*, so sending them never waits on choosing a verdict
@@ -69,7 +71,6 @@ export function ReviewFooterActions({ record, can, actions, finishing, onFinish,
   const ordered = [...granted.filter((a) => a.kind !== "terminal"), ...granted.filter((a) => a.kind === "terminal")];
 
   let primary: Choice | null = null;
-  let secondary: Choice | null = null;
   let send: Choice | null = null;
   const menu: Choice[] = [];
   if (finishing) {
@@ -77,27 +78,7 @@ export function ReviewFooterActions({ record, can, actions, finishing, onFinish,
       send = { key: "send", label: `Send ${drafts} ${drafts === 1 ? "comment" : "comments"}…`, icon: "fa-paper-plane",
         blocked: null, onSelect: () => onFinish("comment_only") };
     }
-    const publishes = can.has("accept_publish");
-    const unlists = can.has("keep_unlisted");
-    if (publishes || unlists) {
-      const publish: Choice | null = publishes
-        ? { key: "publish", label: "Accept & publish…", icon: "fa-circle-check", blocked: held("publish"), onSelect: () => onFinish("publish") }
-        : null;
-      const unlisted: Choice | null = unlists
-        ? { key: "keep_unlisted", label: "Keep unlisted…", icon: "fa-eye-slash", blocked: held("keep_unlisted"), onSelect: () => onFinish("keep_unlisted") }
-        : null;
-      primary = publish ?? unlisted;
-      secondary = publish ? unlisted : null;
-      if (can.has("request_revision")) {
-        menu.push({ key: "request_revision", label: "Request changes…", icon: "fa-arrow-rotate-left",
-          blocked: record.revision?.blocked ?? null, onSelect: () => onFinish("request_revision") });
-      }
-      if (can.has("reject")) {
-        menu.push({ key: "reject", label: "Reject…", icon: "fa-xmark", blocked: held("reject"), onSelect: () => onFinish("reject") });
-      }
-    } else {
-      primary = { key: "finish", label: "Finish review…", blocked: null, onSelect: () => onFinish() };
-    }
+    primary = { key: "finish", label: "Finish review…", blocked: null, onSelect: () => onFinish() };
     menu.push(...ordered.filter((a) => !VERDICT_CAPABILITIES.includes(a.capability)).map(asChoice));
   } else {
     const choices = ordered.map(asChoice);
@@ -109,9 +90,12 @@ export function ReviewFooterActions({ record, can, actions, finishing, onFinish,
   // releases it here instead of finding the card on Overview.
   const embargoHeld = Boolean(decision?.blocked_outcomes?.publish) && can.has("release_embargo");
   const reasonId = `${ids}-held`;
-  const heldReason = primary?.blocked ?? secondary?.blocked ?? null;
+  // RDCO chooses Accept & publish in the dialog now (IR-1340), so the footer
+  // still says why it is held there, where the release is one click away.
+  const publishHeld = finishing && can.has("accept_publish") ? held("publish") : null;
+  const heldReason = primary?.blocked ?? publishHeld;
 
-  if (!lead && !primary && !secondary && !send && menu.length === 0) return runner.portal;
+  if (!lead && !primary && !send && menu.length === 0) return runner.portal;
 
   const pill = (c: Choice, filled: boolean) => (
     <button key={c.key} type="button" disabled={c.blocked != null} onClick={c.onSelect}
@@ -126,7 +110,6 @@ export function ReviewFooterActions({ record, can, actions, finishing, onFinish,
       <div role="toolbar" aria-label="Review actions" className="ml-auto flex flex-wrap items-center justify-end gap-2">
         {menu.length > 0 && <MoreMenu choices={menu} />}
         {send && pill(send, false)}
-        {secondary && pill(secondary, false)}
         {lead}
         {primary && pill(primary, !lead)}
       </div>
