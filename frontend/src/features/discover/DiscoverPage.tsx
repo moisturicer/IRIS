@@ -17,6 +17,8 @@ import { SELECTED_SEGMENT } from "@/components/ui/highlightRoles";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { PUBLISH_PARAM } from "@/features/publish/PublishDialog";
 import { canAuthor } from "@/lib/access";
+import { discoverTourSteps, TOUR_TARGETS } from "@/features/onboarding/studentTours";
+import { useStudentTour } from "@/features/onboarding/useStudentTour";
 import { ASK_PATH, askHandoffState } from "@/lib/askHandoff";
 import { useAuthStore } from "@/store/auth.store";
 import { cn } from "@/lib/utils";
@@ -576,6 +578,8 @@ export default function DiscoverPage() {
 
   /** Ask IRIS is offered for a question once its results are in, not while they load or if they failed. */
   const suggestAsk = !loading && !failed && looksLikeQuestion(activeQuery);
+  // The student's first-visit tour (IR-1342), once the first read has settled.
+  const tour = useStudentTour("discover", { ready: !loading, steps: discoverTourSteps({ canPublish }) });
 
   /* Papers / People, Sort, Filters, the column toggle and Publish are ONE row
      under search (IR-1190): it never wraps and never scrolls sideways. On a
@@ -599,7 +603,7 @@ export default function DiscoverPage() {
 
   const research = (
     <>
-      <div role="group" aria-label="Discover controls" className="mt-4 flex items-center gap-2">
+      <div id={TOUR_TARGETS.discover.controls} role="group" aria-label="Discover controls" className="mt-4 flex items-center gap-2">
         {resultsSwitch}
         {papersView && <DiscoverOrderSelect value={orderOf(query)} onChange={chooseOrder} />}
         <div className="ml-auto flex shrink-0 items-center gap-2">
@@ -641,7 +645,7 @@ export default function DiscoverPage() {
             />
           )}
           {canPublish && (
-            <button type="button" onClick={openPublish}
+            <button id={TOUR_TARGETS.discover.publish} type="button" onClick={openPublish}
               className={cn(PILL_PRIMARY, FOCUS_RING, "h-11 min-w-11 shrink-0 !px-0 sm:!px-5")}>
               <i className="fas fa-plus text-label" aria-hidden />
               <span className="sr-only sm:not-sr-only">Publish</span>
@@ -786,10 +790,12 @@ export default function DiscoverPage() {
           (menu button and bell) is gone: the bell is in the sidebar, and
           AppShell's phone bar carries both below `md` (IR-519). */}
       <div className={cn(PAGE_WIDTH.standard, "px-4 sm:px-7 pt-4 sm:pt-7 pb-12 flex-1")}>
-        <DiscoverSearchComposer value={searchInput} onChange={setSearchInput} />
+        <div id={TOUR_TARGETS.discover.search}>
+          <DiscoverSearchComposer value={searchInput} onChange={setSearchInput} />
+        </div>
 
         <div className="mt-4 flex flex-wrap items-baseline gap-x-4 gap-y-0.5">
-          <h1 className="font-display font-semibold text-title sm:text-display text-stone-900">Discover</h1>
+          <h1 id={TOUR_TARGETS.discover.heading} className="font-display font-semibold text-title sm:text-display text-stone-900">Discover</h1>
           <p className="text-body text-stone-600">Research, projects and reference papers in IRIS.</p>
         </div>
 
@@ -801,6 +807,7 @@ export default function DiscoverPage() {
       </div>
 
       <PaperCiteModal record={citeRecord} isOpen={Boolean(citeRecord)} onClose={() => setCiteRecord(null)} />
+      {tour}
     </div>
   );
 }

@@ -124,3 +124,31 @@ describe("Help", () => {
     expect(section("Coordinating your office")).not.toBeInTheDocument();
   });
 });
+
+describe("Guided tours (IR-1342, AC 5)", () => {
+  it("lists every student tour, each linking to its page with ?tour=", () => {
+    renderAs({ role_name: ROLES.STUDENT, can_author: true });
+    const tours = section("Guided tours");
+    expect(tours).toBeInTheDocument();
+    const links = within(tours!).getAllByRole("link", { name: /^Take the tour/ });
+    expect(links.map((l) => l.getAttribute("href"))).toEqual([
+      "/?tour=discover",
+      "/?publish=new&tour=publish",
+      "/records/mine?tour=library",
+      "/ai?tour=ask",
+      "/opportunities?tour=calls",
+      "/guidelines?tour=guidelines",
+      "/notifications?tour=notifications",
+    ]);
+    expect(within(tours!).getByRole("link", { name: "Take the tour: Publish" })).toBeInTheDocument();
+  });
+
+  it.each([
+    ["an Adviser", ROLES.ADVISER],
+    ["RDCO", ROLES.RDCO],
+    ["an office role", ROLES.ITSO],
+  ])("is not shown to %s", (_who, role) => {
+    renderAs({ role_name: role });
+    expect(section("Guided tours")).not.toBeInTheDocument();
+  });
+});

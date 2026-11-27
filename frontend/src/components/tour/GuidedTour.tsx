@@ -6,6 +6,7 @@ import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { useDialogFocus } from "@/hooks/useDialogFocus";
 import { cn } from "@/lib/utils";
 
+import { reachable } from "./reachable";
 import type { TourStep } from "./types";
 
 export type { TourStep } from "./types";
@@ -16,16 +17,6 @@ const CARD_WIDTH = 360;
 
 interface Box { top: number; left: number; width: number; height: number }
 
-/**
- * A target counts only while a reviewer could see it: in the page, and not
- * under an inert or hidden ancestor (the review pane is both while a narrow
- * window keeps it closed). Layout is not consulted, so the rule is the same
- * with or without it.
- */
-function reachable(id: string): HTMLElement | null {
-  const el = document.getElementById(id);
-  return el && !el.closest('[inert],[aria-hidden="true"]') ? el : null;
-}
 
 /** Below the target if the card fits, else above, else docked to the screen's foot. */
 function cardPosition(target: Box | null, card: { width: number; height: number }) {

@@ -115,11 +115,13 @@ interface Props {
   onSelectionChange?: (next: AskSelection | null) => void;
   /** Each time this changes to a number above zero the question box takes focus (IR-1234: New conversation). */
   focusRequest?: number;
+  /** The composer's id, where the Ask IRIS tour points (IR-1342). */
+  composerId?: string;
 }
 
 /** Both reader surfaces use the same persisted snapshot and transport (IR-730). */
 export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftChange, onConversation, dense = false,
-  selectedId = null, onSelectSources, onAnswered, onTitle, onProblem, scopeToggle, selection = null, onSelectionChange, focusRequest = 0 }: Props) {
+  selectedId = null, onSelectSources, onAnswered, onTitle, onProblem, scopeToggle, selection = null, onSelectionChange, focusRequest = 0, composerId }: Props) {
   // The research scope: this paper, or every paper once the reader widens. Read on each request, so
   // widening continues the same conversation instead of starting another.
   const scope = scopeToggle?.allPapers ? undefined : recordId;
@@ -520,7 +522,7 @@ export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftC
           Stop compaction</button>}
       </div>
     </div>
-    <ChatInput centered={centered} textareaRef={composerRef} onSend={text => void send(text)} draft={draft} onDraftChange={setDraft}
+    <ChatInput id={composerId} centered={centered} textareaRef={composerRef} onSend={text => void send(text)} draft={draft} onDraftChange={setDraft}
       above={selection && <SelectionChip selection={selection} onRemove={() => onSelectionChange?.(null)}
         note={selectionNote} />}
       beside={usage.latest && <TokenUsageMeter usage={usage.latest} />}

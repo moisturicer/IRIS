@@ -2,9 +2,10 @@ import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import { guidelinesHref } from "@/features/guidelines/sectionId";
+import { GuidedToursHelp } from "@/features/onboarding/GuidedToursHelp";
 
 import { canAccess, hasReviewWork } from "@/lib/access";
-import type { RoleName } from "@/lib/constants";
+import { ROLES, type RoleName } from "@/lib/constants";
 import type { ReviewAccess } from "@/types/auth";
 
 /** Who is reading Help: enough to know which screens they can open. */
@@ -38,6 +39,13 @@ const reviews = (r: HelpReader) => canAccess(r.role, "reviewQueue") && hasReview
  * screen. When a feature changes, its section here changes with it.
  */
 export const HELP_SECTIONS: HelpSection[] = [
+  {
+    // The student tours are taken again only from here (IR-1342, AC 5).
+    id: "guided-tours",
+    title: "Guided tours",
+    shownTo: (r) => r.role === ROLES.STUDENT,
+    body: <GuidedToursHelp />,
+  },
   {
     id: "discover",
     title: "Finding research",

@@ -33,6 +33,8 @@ import {
 } from "./opportunityUtils";
 import { SearchGlyph } from "@/components/brand/IrisBrand";
 import { SELECTED } from "@/components/ui/highlightRoles";
+import { callsTourSteps, TOUR_TARGETS } from "@/features/onboarding/studentTours";
+import { useStudentTour } from "@/features/onboarding/useStudentTour";
 
 /** A filter chip, as My Reviews draws them: soft maroon when on. */
 function chipClass(on: boolean) {
@@ -271,6 +273,8 @@ export function CallsAndConferencesPage() {
   );
 
   const ready = !loading && !loadFailed;
+  // The student's first-visit tour (IR-1342), once the board has been read.
+  const tour = useStudentTour("calls", { ready: !loading, steps: callsTourSteps() });
 
   // An empty board has nothing to search, filter or count (audit US-13):
   // its empty state says so instead.
@@ -288,6 +292,7 @@ export function CallsAndConferencesPage() {
 
   return (
     <div>
+      {tour}
       <PageHeader
         title="Calls & Conferences"
         description="Calls for papers from conferences, journals and other venues, posted by RDCO and advisers. Soonest deadline first."
@@ -300,7 +305,7 @@ export function CallsAndConferencesPage() {
           The row appears with the board itself, so its counts are never
           a number IRIS does not know yet. */}
       {hasBoard && (
-      <div className="space-y-3 mb-3">
+      <div id={TOUR_TARGETS.calls.filters} className="space-y-3 mb-3">
         <div className="flex flex-wrap items-center gap-2">
           <div className="basis-full sm:basis-auto flex-1 min-w-0 sm:max-w-md">
             <Input
@@ -334,6 +339,7 @@ export function CallsAndConferencesPage() {
             </Select>
           </div>
           <button
+            id={TOUR_TARGETS.calls.saved}
             type="button"
             aria-pressed={savedOnly}
             onClick={() => setSavedOnly((v) => !v)}
@@ -384,6 +390,7 @@ export function CallsAndConferencesPage() {
       </p>
 
       {/* ---- Board ------------------------------------------------------- */}
+      <div id={TOUR_TARGETS.calls.board}>
       {loading ? (
         <BoardSkeleton />
       ) : loadFailed ? (
@@ -459,6 +466,7 @@ export function CallsAndConferencesPage() {
           ))}
         </div>
       )}
+      </div>
 
       {formTarget !== null && (
         <OpportunityFormDialog

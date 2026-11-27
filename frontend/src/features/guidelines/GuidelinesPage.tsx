@@ -37,6 +37,8 @@ import { cn } from "@/lib/utils";
 import { isGuidelines, isSharedList } from "./requirementGuide";
 import { sectionId } from "./sectionId";
 import { TemplateDownload } from "./TemplateDownload";
+import { guidelinesTourSteps, TOUR_TARGETS } from "@/features/onboarding/studentTours";
+import { useStudentTour } from "@/features/onboarding/useStudentTour";
 
 /** The record type whose section lists Advisers' Templates (`RecordTypeName.PROPOSAL`). */
 const PROPOSAL = "Proposal";
@@ -45,9 +47,12 @@ const PROPOSAL = "Proposal";
 export default function GuidelinesPage() {
   const read = useApiRead((signal) => guidelinesApi.list({ signal }).then((r) => r.data), []);
   const types = read.status === "ready" && isGuidelines(read.data) ? read.data : null;
+  // The student's first-visit tour (IR-1342), once the types have been read.
+  const tour = useStudentTour("guidelines", { ready: read.status !== "loading", steps: guidelinesTourSteps() });
 
   return (
     <div>
+      {tour}
       <PageHeader
         title="Guidelines"
         description="Choose what you are submitting to see what it needs. Only the manuscript is needed to submit: the rest is what RDCO expects, and an office asks for anything it needs later."
@@ -104,6 +109,7 @@ function TypeChooser({ types }: { types: GuidelineRecordType[] }) {
   return (
     <>
       <div
+        id={TOUR_TARGETS.guidelines.types}
         role="tablist"
         aria-label="Record types"
         className="mb-8 flex max-w-full flex-wrap gap-0.5 rounded-control bg-stone-200 p-0.5 sm:inline-flex"
@@ -163,7 +169,7 @@ function RecordTypePanel({ recordType }: { recordType: GuidelineRecordType }) {
         title="What you submit"
         lead="The only thing you need to submit. Upload it in Publish."
       >
-        <div className="rounded-card bg-stone-100 px-5 py-4">
+        <div id={TOUR_TARGETS.guidelines.manuscript} className="rounded-card bg-stone-100 px-5 py-4">
           <Requirement
             name="Manuscript"
             description={manuscript.description}

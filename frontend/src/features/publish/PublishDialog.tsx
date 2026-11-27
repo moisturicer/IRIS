@@ -85,6 +85,8 @@ import { ReviewStep } from "./ReviewStep";
 import { IrisLoader } from "@/components/brand/IrisBrand";
 import { PublishDetailsPreview } from "./PublishDetailsPreview";
 import { PUBLISH_PARAM } from "./publishLink";
+import { publishTourSteps, TOUR_TARGETS } from "@/features/onboarding/studentTours";
+import { useStudentTour } from "@/features/onboarding/useStudentTour";
 
 export { PUBLISH_PARAM } from "./publishLink";
 
@@ -464,6 +466,15 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
   // step's first control instead. Not for the step the form first opens on
   // (a resumed draft sets it while loading): the dialog's open focus has that.
   const stepRef = useRef<HTMLDivElement>(null);
+  // The student's first Publish tour (IR-1342), drawn inside the dialog's panel
+  // so it is part of the aria-modal tree. It waits for the form, on whichever
+  // step the dialog opened, and never moves the dialog between steps.
+  const [tourHost, setTourHost] = useState<HTMLDivElement | null>(null);
+  const tour = useStudentTour("publish", {
+    ready: phase.kind === "form" && tourHost !== null,
+    steps: publishTourSteps({ step }),
+    container: tourHost,
+  });
   const shownStep = useRef<PublishStep | null>(null);
   useEffect(() => {
     if (phase.kind !== "form") return;
@@ -984,7 +995,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
   let footer: ReactNode = null;
   if (phase.kind === "form") {
     footer = (
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div id={TOUR_TARGETS.publish.footer} className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-small text-stone-600">
           {draftId == null ? " " : step === 2 ? SAVE_STATUS[autosave.status] : "Saved as a draft. You can close this and finish later."}
           {step === 2 && autosave.status === "failed" && (
@@ -1047,6 +1058,8 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
       <span role="status" className="sr-only">
         {announcement}
       </span>
+      <div ref={setTourHost} />
+      {tour}
 
       {phase.kind === "loading" && (
         <p className="flex items-center gap-2 py-section text-body text-stone-600" role="status">
@@ -1404,7 +1417,7 @@ function prefillAnnouncement(reading: Prefill, offers: Record<AutofillField, Fie
 /** Where the author is: done steps say so in words, the current one is marked. */
 function StepIndicator({ current }: { current: Exclude<PublishStep, 0> }) {
   return (
-    <div className="mb-section">
+    <div id={TOUR_TARGETS.publish.steps} className="mb-section">
       <p className="text-small text-stone-600 sm:hidden" aria-hidden>
         Step {current} of {STEPS.length} · {STEPS[current - 1].title}
       </p>
