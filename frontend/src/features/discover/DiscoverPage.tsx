@@ -17,6 +17,7 @@ import { SELECTED_SEGMENT } from "@/components/ui/highlightRoles";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { PUBLISH_PARAM } from "@/features/publish/PublishDialog";
 import { canAuthor } from "@/lib/access";
+import { useSidebarMode } from "@/lib/layout";
 import { discoverTourSteps, TOUR_TARGETS } from "@/features/onboarding/studentTours";
 import { useStudentTour } from "@/features/onboarding/useStudentTour";
 import { ASK_PATH, askHandoffState } from "@/lib/askHandoff";
@@ -130,6 +131,8 @@ export default function DiscoverPage() {
   latestSetSearchParams.current = setSearchParams;
   // The server says who authors (`can_author`, IR-1096), never the role name.
   const canPublish = useAuthStore((s) => canAuthor(s.user));
+  // A phone's sidebar is behind Open menu, which the tour points at instead (IR-1342).
+  const sidebarMode = useSidebarMode();
 
   const [records, setRecords] = useState<RecordListItem[]>([]);
   const [feedRecords, setFeedRecords] = useState<ForYouItem[]>([]);
@@ -579,7 +582,7 @@ export default function DiscoverPage() {
   /** Ask IRIS is offered for a question once its results are in, not while they load or if they failed. */
   const suggestAsk = !loading && !failed && looksLikeQuestion(activeQuery);
   // The student's first-visit tour (IR-1342), once the first read has settled.
-  const tour = useStudentTour("discover", { ready: !loading, steps: discoverTourSteps({ canPublish }) });
+  const tour = useStudentTour("discover", { ready: !loading, steps: discoverTourSteps({ canPublish, phone: sidebarMode === "drawer" }) });
 
   /* Papers / People, Sort, Filters, the column toggle and Publish are ONE row
      under search (IR-1190): it never wraps and never scrolls sideways. On a

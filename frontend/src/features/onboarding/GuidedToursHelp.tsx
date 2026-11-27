@@ -11,15 +11,15 @@ export function GuidedToursHelp() {
   return (
     <>
       <p>
-        Each page walks you through itself the first time you open it, and so does Publish. Take a
-        tour again here whenever you like.
+        The first time you open each of these, a short tour shows what it is for and how to use it.
+        Take any of them again here.
       </p>
       <ul>
         {TOUR_PAGES.map(({ key, page, href }) => (
           <li key={key}>
             <strong className="font-semibold text-stone-900">{page}</strong>{" "}
             <Link to={href} className="font-medium text-brand underline underline-offset-2">
-              Take the tour<span className="sr-only">: {page}</span>
+              Take the tour{" "}<span className="sr-only">of {page}</span>
             </Link>
           </li>
         ))}

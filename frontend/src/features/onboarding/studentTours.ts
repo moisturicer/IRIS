@@ -18,6 +18,8 @@ import { TOUR_PARAM, type TourKey } from "./tourKeys";
 import { PUBLISH_PARAM } from "@/features/publish/publishLink";
 
 export const SIDEBAR_ID = "app-sidebar";
+/** The phone bar's Open menu, which stands in for the sidebar below `md` (AppShell). */
+export const MENU_BUTTON_ID = "app-menu-button";
 
 export const TOUR_TARGETS = {
   discover: {
@@ -87,23 +89,29 @@ export const TOUR_PAGES: { key: TourKey; page: string; href: string }[] = [
 
 const AGAIN = "Settings › Help lists every tour, to take one again whenever you like.";
 
-export function discoverTourSteps({ canPublish }: { canPublish: boolean }): TourStep[] {
+const PAGES = [
+  { name: "My Library", text: "Your submissions, saved papers and saved calls." },
+  { name: "Ask IRIS", text: "Questions answered from the research you can read." },
+  { name: "Notifications", text: "Updates on your records and reviews." },
+  { name: "Calls & Conferences", text: "Calls for papers, with their deadlines." },
+  { name: "Guidelines", text: "What each type of record needs." },
+];
+
+/**
+ * `phone`: the shell is in its drawer mode, where the sidebar sits behind
+ * Open menu. Open menu is in the page at every width (hidden by CSS from
+ * `md`), so reachability alone cannot choose between the two.
+ */
+export function discoverTourSteps({ canPublish, phone }: { canPublish: boolean; phone: boolean }): TourStep[] {
   const at = TOUR_TARGETS.discover;
   const steps: TourStep[] = [
     {
       id: "welcome", target: at.heading, title: "Welcome to IRIS",
-      body: "IRIS is where CIT-U's research is published, reviewed and found. Discover is your home: research, projects and reference papers you can read. Each page gives you a short tour the first time you open it.",
+      body: "IRIS is where CIT-U's research is published, reviewed and found. Discover is your home: the research, projects and reference papers you can read. Each page shows you around like this the first time you open it.",
     },
-    {
-      id: "sidebar", target: SIDEBAR_ID, title: "Your pages",
-      body: "The sidebar takes you everywhere else.",
-      items: [
-        { name: "My Library", text: "Your submissions, saved papers and saved calls." },
-        { name: "Ask IRIS", text: "Questions answered from the research you can read." },
-        { name: "Calls & Conferences", text: "Calls for papers, with their deadlines." },
-        { name: "Guidelines", text: "What each type of record needs." },
-      ],
-    },
+    phone
+      ? { id: "menu", target: MENU_BUTTON_ID, title: "Your pages", body: "Open the menu to reach everywhere else.", items: PAGES }
+      : { id: "sidebar", target: SIDEBAR_ID, title: "Your pages", body: "The sidebar takes you everywhere else.", items: PAGES },
     {
       id: "search", target: at.search, title: "Search",
       body: "Search research, people and topics. Results update as you type.",
@@ -186,7 +194,7 @@ export function callsTourSteps(): TourStep[] {
   return [
     {
       id: "board", target: at.board, title: "The board",
-      body: "Calls for papers from conferences, journals and other venues, posted by RDCO and advisers, soonest deadline first.",
+      body: "Calls for papers from conferences, journals and other venues, posted by RDCO and advisers, soonest deadline first. Save a call with its bookmark to keep it in My Library.",
     },
     {
       id: "filters", target: at.filters, title: "Search and filters",
@@ -194,7 +202,7 @@ export function callsTourSteps(): TourStep[] {
     },
     {
       id: "saved", target: at.saved, title: "Saved",
-      body: "Use the bookmark on a call to save it. Saved shows only those, and My Library keeps them under Saved Calls.",
+      body: "Shows only the calls you saved. My Library keeps them too, under Saved Calls.",
     },
   ];
 }
@@ -254,7 +262,7 @@ export function publishTourSteps({ step }: { step: number }): TourStep[] {
       },
       {
         id: "manuscript", target: at.manuscript, title: "Manuscript file",
-        body: "Upload the full paper as a PDF. Choosing the file saves your draft, so from then on it is in My Library, and IRIS reads it to suggest Details.",
+        body: "Upload the full paper as a PDF. Choosing the file saves a draft, which waits in My Library until you submit, and IRIS reads the file to suggest your Details.",
       },
     );
   }

@@ -140,7 +140,7 @@ describe("Guided tours (IR-1342, AC 5)", () => {
       "/guidelines?tour=guidelines",
       "/notifications?tour=notifications",
     ]);
-    expect(within(tours!).getByRole("link", { name: "Take the tour: Publish" })).toBeInTheDocument();
+    expect(within(tours!).getByRole("link", { name: "Take the tour of Publish" })).toBeInTheDocument();
   });
 
   it.each([
