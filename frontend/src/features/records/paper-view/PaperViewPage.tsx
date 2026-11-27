@@ -19,6 +19,7 @@ import { PaperCiteModal } from "@/features/discover/PaperCiteModal";
 import { usePageTitle } from "@/hooks/useDocumentTitle";
 import { ContinueProposal } from "../ContinueProposal";
 import {
+  asksForReview,
   capabilitiesFor,
   hasPaper as recordHasPaper,
   isOwner,
@@ -26,6 +27,7 @@ import {
   isReviewing,
   seatToOpen,
   sectionsFor,
+  showsReview,
   type PaperSection,
   type Viewer,
 } from "@/features/records/capabilities";
@@ -126,7 +128,12 @@ export default function PaperViewPage() {
 
   // Before the early returns below, so the hooks that follow can use them.
   const viewer: Viewer | null = user ? { id: user.id, role_name: user.role_name } : null;
-  const sections = record ? sectionsFor(record, viewer) : [];
+  // A published paper shows its review only where the address opens it --
+  // My Library, My Reviews, the office console -- and reads like anyone's
+  // elsewhere, Discover included (IR-1339).
+  const reviewAsked = asksForReview(new URLSearchParams(location.search));
+  const reviewShown = record ? showsReview(record, viewer, reviewAsked) : false;
+  const sections = record ? sectionsFor(record, viewer, reviewAsked) : [];
   const {
     section,
     readerSection,
@@ -136,7 +143,11 @@ export default function PaperViewPage() {
     arrivalKey,
     setViewParams,
     setViewParam,
-  } = useViewLocation({ sections, openAtPage });
+  } = useViewLocation({
+    sections,
+    openAtPage,
+    keepReview: reviewShown && record?.pipeline_status === PIPELINE_STATUS.PUBLISHED,
+  });
   // Still on the record being left while the next one loads.
   const arriving = loadStatus === "loading" || !record || record.id !== Number(id);
   const onPaperTab = record != null && section === "paper";
@@ -216,7 +227,6 @@ export default function PaperViewPage() {
   // Review is one full-height workspace for everyone (IR-1206): the owners'
   // editorial header left it, so Back and the title are all above the reader.
   const reviewWorkspace = onReviewTab;
-  const participant = isParticipant(record, viewer);
   const reviewing = isReviewing(record, viewer);
 
   const editOpen = editRequested && can.has("edit_details") && !arriving;
@@ -225,7 +235,9 @@ export default function PaperViewPage() {
   // reader of a published paper has none, and `?version=` means nothing to
   // them. An earlier version is open only while it is asked for, exists and
   // has a manuscript; the newest is the current paper, read as it always was.
-  const versions = record.versions ?? [];
+  // Versions are review material, so a participant who opened their published
+  // paper as a reader's sees none, as its readers see none (IR-1339).
+  const versions = isParticipant(record, viewer) && !reviewShown ? [] : record.versions ?? [];
   const latestVersion = versions.length > 0 ? versions[versions.length - 1] : null;
   // While the owner's revised manuscript is unsubmitted (IR-273), the current
   // paper is that upload, so the newest version opens like an earlier one.
@@ -653,7 +665,7 @@ export default function PaperViewPage() {
             <RecordDetailsRail
               record={record}
               headingId={`${tabsId}-details`}
-              participant={participant}
+              participant={reviewShown}
               hidden={railHidden}
               trackerVersion={trackerVersion}
               onOpenHistory={() => setViewParam("section", "review")}

@@ -536,6 +536,20 @@ describe("My Library: what each paper waits on (IR-1084, IR-1306)", () => {
     expect(screen.queryByText(/Nothing to do yet|Nothing is waiting/)).not.toBeInTheDocument();
   });
 
+  // A plain link to a published paper reads as any reader's, so My Library is
+  // where its author finds the review (IR-1339).
+  it("opens a published paper's review, and one still in review at its Overview (IR-1339)", async () => {
+    mine([
+      inReview({ id: 24, title: "Already published", pipeline_status: "published", workflow_state: "published", holders: [], clearance_strip: [] }),
+      inReview({ id: 21, title: "Two offices", holders: [{ party: "ierc", label: "IERC" }], clearance_strip: [] }),
+    ]);
+    renderScreen(<MyLibraryPage />, SUBMISSIONS);
+
+    expect(await screen.findByRole("link", { name: "Already published" }))
+      .toHaveAttribute("href", "/records/24?section=review&review=open");
+    expect(screen.getByRole("link", { name: "Two offices" })).toHaveAttribute("href", "/records/21");
+  });
+
   it("opens a paper with an open request straight on its Documents tab, with no button of its own (IR-1321)", async () => {
     const revision = { kind: "revision", party: "ierc", label: "Changes requested by IERC", action_label: "Submit a new version" } as const;
     mine([inReview({ id: 14, title: "Asked to revise", workflow_state: "awaiting_resubmission",

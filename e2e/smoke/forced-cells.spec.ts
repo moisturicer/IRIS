@@ -191,7 +191,8 @@ test.describe("My Reviews", () => {
 
 test.describe("Paper View · review tracker", () => {
   test("a tracker nobody has acted on says no routing is recorded yet", async ({ page, api }) => {
-    await openScreen(page, api, screen("paper-view"), {
+    // A published paper shows its tracker only with its review open (IR-1339).
+    await openScreen(page, api, { ...screen("paper-view"), path: `/records/${PAPER.id}?review=open` }, {
       override: (a) => {
         a.on("GET", `/records/${PAPER.id}/`, { ...PAPER_DETAIL, is_participant: true });
         a.on("GET", `/records/${PAPER.id}/tracker/`, { ...TRACKER, current_holders: [] });
