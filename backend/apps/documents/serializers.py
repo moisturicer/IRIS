@@ -35,15 +35,22 @@ class RecordUploadSerializer(serializers.ModelSerializer):
     #: Held until its owner sends it (ADR-022 Amendment 8, IR-1322); only an
     #: owner is ever served a held upload.
     held             = serializers.BooleanField(read_only=True)
+    #: A supplied document this viewer has not opened yet (ADR-022 Amendment
+    #: 10, IR-1338): one that answered a request and was sent, to anyone but
+    #: an owner. The slot listing works it out for the whole listing at once.
+    is_new           = serializers.SerializerMethodField()
 
     class Meta:
         model  = RecordUpload
         fields = [
             "id", "record", "slot", "slot_name", "file", "version",
             "status", "status_name", "uploaded_by", "uploaded_by_name",
-            "created_at", "reviews", "delete_refused", "held", "sent_at",
+            "created_at", "reviews", "delete_refused", "held", "sent_at", "is_new",
         ]
         read_only_fields = ["version", "uploaded_by"]
+
+    def get_is_new(self, obj):
+        return obj.pk in self.context.get("new_upload_ids", ())
 
     def get_delete_refused(self, obj):
         from apps.records.versions import deletion_refused_reason
@@ -98,7 +105,31 @@ class SlotWithUploadsSerializer(serializers.ModelSerializer):
             # A held upload is its owners' alone (ADR-022 Amendment 8, IR-1322).
             uploads = uploads.sent()
         uploads = uploads.select_related("uploaded_by").order_by("-version")
-        return RecordUploadSerializer(uploads, many=True, context={"request": request}).data
+        return RecordUploadSerializer(
+            uploads, many=True,
+            context={"request": request, "new_upload_ids": self._new_upload_ids(record_id, request)},
+        ).data
+
+    def _new_upload_ids(self, record_id, request) -> frozenset[int]:
+        """
+        The supplied versions on this record the reader has not opened (ADR-022
+        Amendment 10, IR-1338), asked once per listing. Supplied: it answered a
+        document request and was sent. Never an owner's: they sent it.
+        """
+        if "_new_upload_ids" not in self.context:
+            new: frozenset[int] = frozenset()
+            if request is not None and not self._owner_reads(record_id, request):
+                from .models import DocumentRequestItem, UploadSeen
+
+                supplied = (
+                    DocumentRequestItem.objects
+                    .filter(request__record_id=record_id, upload__isnull=False, upload__sent_at__isnull=False)
+                    .values_list("upload_id", flat=True)
+                )
+                seen = UploadSeen.objects.filter(user=request.user, upload__record_id=record_id).values_list("upload_id", flat=True)
+                new = frozenset(supplied) - frozenset(seen)
+            self.context["_new_upload_ids"] = new
+        return self.context["_new_upload_ids"]
 
 
 class RecordFileSerializer(serializers.ModelSerializer):

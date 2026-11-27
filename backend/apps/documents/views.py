@@ -423,6 +423,29 @@ class RecordUploadCreateView(APIView):
         return Response(RecordUploadSerializer(upload).data, status=status.HTTP_201_CREATED)
 
 
+class RecordUploadSeenView(APIView):
+    """
+    POST /documents/uploads/<id>/seen/
+
+    The reader opened this document version, so it is no longer **New** to
+    them (ADR-022 Amendment 10, IR-1338). One mark per person and version,
+    their own; a second open changes nothing. Who may record it is who may
+    download it, with the same refusals (ADR-022 Amendment 4, IR-627).
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        from .models import UploadSeen
+
+        upload = _on_visible_record(request.user, RecordUpload.objects.select_related("record"), pk)
+        if upload is None:
+            return Response({"detail": "Upload not found."}, status=status.HTTP_404_NOT_FOUND)
+        if not may_read_record_documents(request.user, upload.record):
+            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+        UploadSeen.objects.get_or_create(upload=upload, user=request.user)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 class RecordUploadDownloadView(APIView):
     """
     GET /documents/uploads/<id>/download/
@@ -769,38 +792,4 @@ class DocumentRequestDecisionView(APIView):
         return _apply(
             document_request, request.user, WithdrawSerializer(data=request.data),
             lambda data: withdraw_request(document_request, request.user),
-        )
-
-
-class DocumentRequestItemDecisionView(APIView):
-    """
-    PATCH /api/v1/document-request-items/<id>/
-          {"action": "accept"} | {"action": "reject", "reason": str}
-
-    The requesting party's verdict on one upload (ADR-022 §3.4). Refusals as
-    `_managed_request` says. Answers with the whole request, since a
-    rejection reopens it.
-    """
-    permission_classes = [IsAuthenticated]
-
-    def patch(self, request, pk):
-        from .models import DocumentRequestItem
-        from .request_serializers import ItemDecisionSerializer
-        from .requests import accept_item, reject_item
-
-        item = DocumentRequestItem.objects.filter(pk=pk).first()
-        document_request, refused = _managed_request(
-            item.request_id if item else None, request.user
-        )
-        if refused:
-            return refused
-
-        def decide(data):
-            if data["action"] == "accept":
-                accept_item(item, request.user)
-            else:
-                reject_item(item, request.user, reason=data["reason"])
-
-        return _apply(
-            document_request, request.user, ItemDecisionSerializer(data=request.data), decide
         )

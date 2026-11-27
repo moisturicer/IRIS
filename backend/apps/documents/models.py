@@ -581,12 +581,31 @@ class DocumentRequestItem(models.Model):
         return f"Request {self.request_id} | {self.label} | {self.state}"
 
 
+class UploadSeen(models.Model):
+    """
+    A person opened a supplied document version (ADR-022 Amendment 10,
+    IR-1338). Until they do, it shows them as **New**; each reviewer's mark is
+    their own. Private: read only for its own `user`, and decides nothing.
+    """
+
+    upload  = models.ForeignKey(RecordUpload, on_delete=models.CASCADE, related_name="seen_by")
+    user    = models.ForeignKey("accounts.User", on_delete=models.CASCADE, related_name="uploads_seen")
+    seen_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["upload", "user"], name="one_seen_mark_per_upload_user"),
+        ]
+
+
 class DocumentRejection(models.Model):
     """
     One rejection of one upload, kept for good (IR-1201, ADR-022 §3.4).
+    Nothing is rejected any more (ADR-022 Amendment 10, IR-1338: a sent
+    document is supplied); these rows are the history of rejections before.
 
-    `reject_item` sends the item back to `missing`, forgets its upload and
-    overwrites `item.rejection_reason`, which the owner's panel reads as "why
+    `reject_item` sent the item back to `missing`, forgot its upload and
+    overwrote `item.rejection_reason`, which the owner's panel reads as "why
     it was sent back". This row is the history: which file was rejected, by
     whom, when and why, however many times the item goes round. Request data
     (ADR-022 §Amendment 5), so it is served only under `may_read_requests`.

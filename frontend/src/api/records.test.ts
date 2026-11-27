@@ -107,8 +107,6 @@ const rows: Row[] = [
   ["createDocumentRequest",
     () => recordsApi.createDocumentRequest(9, { message: "Please", items: [{ slot: 2 }, { label: "Other" }], party: "itso" }),
     "post", "/records/9/document-requests/", { message: "Please", items: [{ slot: 2 }, { label: "Other" }], party: "itso" }],
-  ["decideDocumentRequestItem", () => recordsApi.decideDocumentRequestItem(4, { action: "reject", reason: "Wrong file" }),
-    "patch", "/document-request-items/4/", { action: "reject", reason: "Wrong file" }],
   ["withdrawDocumentRequest", () => recordsApi.withdrawDocumentRequest(4),
     "patch", "/document-requests/4/", { action: "withdraw" }],
   ["documentRequestSlots", () => recordsApi.documentRequestSlots(9), "get", "/records/9/document-requests/slots/"],

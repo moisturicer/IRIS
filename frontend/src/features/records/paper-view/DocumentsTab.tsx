@@ -41,6 +41,7 @@ import { UploadDropzone } from "@/components/shared/UploadDropzone";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { Tooltip } from "@/components/ui/Tooltip";
+import { TONES } from "@/components/ui/statusTones";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { SMALL_ACTION_PILL, SMALL_ACTION_TARGET } from "@/components/ui/pillStyles";
 import { cn, downloadBlob, formatDate, joinLabels } from "@/lib/utils";
@@ -173,6 +174,8 @@ export function DocumentsTab({
   const [failed, setFailed] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  // Versions opened here since the last read, so New clears at once (IR-1338).
+  const [seen, setSeen] = useState<ReadonlySet<number>>(new Set());
   // Every removal asks first (IR-872): a removed file is gone from storage.
   const [removing, setRemoving] = useState<{ name: string; run: () => Promise<void> } | null>(null);
   const [removeBusy, setRemoveBusy] = useState(false);
@@ -292,8 +295,21 @@ export function DocumentsTab({
    */
   const openVersion = (name: string, u: RecordUpload, newest: boolean) =>
     onOpen && readerFormat(u.file) === "pdf"
-      ? (opener: HTMLElement) => open(slotUploadDocument(name, u, extensionOf(u.file), newest), opener)
+      ? (opener: HTMLElement) => {
+          open(slotUploadDocument(name, u, extensionOf(u.file), newest), opener);
+          if (isNew(u)) markSeen(u);
+        }
       : null;
+  /** Supplied and not yet opened by this viewer (ADR-022 Amendment 10, IR-1338). */
+  const isNew = (u: RecordUpload) => u.is_new === true && !seen.has(u.id);
+  /**
+   * Opening it in the reader is what clears New; downloading does not. The
+   * badge goes at once; if the mark is not stored, it is back on the next read.
+   */
+  const markSeen = (u: RecordUpload) => {
+    setSeen((prev) => new Set(prev).add(u.id));
+    void documentsApi.uploadSeen(u.id).catch(() => undefined);
+  };
 
   return (
     <div className="space-y-section">
@@ -352,7 +368,12 @@ export function DocumentsTab({
               required={requirement?.is_required}
               template={<RequirementTemplate requirement={requirement} />}
               latest={latest ? byline(latest.version, latest.uploaded_by_name, latest.created_at) : null}
-              status={asked && <ItemStatusChip item={asked.item} />}
+              status={(asked || slot.uploads.some(isNew)) && (
+                <span className="flex flex-wrap items-center gap-1.5">
+                  {slot.uploads.some(isNew) && <NewBadge />}
+                  {asked && <ItemStatusChip item={asked.item} />}
+                </span>
+              )}
               // Who asked, and whether the newest file is still the owner's
               // alone: added, not sent yet (ADR-022 Amendment 8, IR-1322).
               note={(asked || latest?.held) && (
@@ -384,6 +405,7 @@ export function DocumentsTab({
                     uploads={slot.uploads}
                     removable={(u) => owner && (editable || u.held === true)}
                     openable={(u) => openVersion(slot.name, u, u.id === latest?.id)}
+                    isNew={isNew}
                     onDownload={(u) => downloadVersion(slot.name, u)}
                     onRemove={(u) =>
                       askToRemove(`${slot.name} version ${u.version}`, async () => {
@@ -496,7 +518,19 @@ export function DocumentsTab({
   );
 }
 
-/** Who asked for a document, and why its last upload was not accepted. */
+/**
+ * A supplied document this viewer has not opened yet (ADR-022 Amendment 10,
+ * IR-1338). Active, because it waits on them; its word is the signal.
+ */
+function NewBadge() {
+  return (
+    <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-label font-semibold", TONES.active)}>
+      New
+    </span>
+  );
+}
+
+/** Who asked for a document, and why its last upload was asked for again (before IR-1338). */
 function AskedNote({ asked }: { asked: Asked }) {
   return (
     <p>
@@ -516,6 +550,7 @@ function Versions({
   uploads,
   removable,
   openable,
+  isNew,
   onDownload,
   onRemove,
 }: {
@@ -526,6 +561,8 @@ function Versions({
   removable: (upload: RecordUpload) => boolean;
   /** Opens a version in the reader (IR-1203), where it can be: its title is the control (IR-1325). */
   openable: (upload: RecordUpload) => ((opener: HTMLElement) => void) | null;
+  /** Supplied and not yet opened by this viewer (IR-1338). */
+  isNew: (upload: RecordUpload) => boolean;
   onDownload: (upload: RecordUpload) => void;
   onRemove: (upload: RecordUpload) => void;
 }) {
@@ -549,6 +586,7 @@ function Versions({
             ) : (
               <span className="font-semibold text-stone-900">Version {u.version}</span>
             )}
+            {isNew(u) && <> <NewBadge /></>}
             {" · "}
             {[u.uploaded_by_name, formatDate(u.created_at)].filter(Boolean).join(" · ")}
           </span>

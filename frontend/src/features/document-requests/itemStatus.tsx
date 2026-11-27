@@ -4,27 +4,26 @@
  * One vocabulary for the owner's banner, the Files section and the reviewer's
  * list, so "Requested" means one thing wherever a document request appears:
  *
- * | Stored item state                     | Shown as                       |
- * |---------------------------------------|--------------------------------|
- * | `missing`                             | Requested                      |
- * | `uploaded`                            | Uploaded · awaiting review     |
- * | `accepted`                            | Accepted                       |
- * | `rejected`, or `missing` with a reason | Replacement needed            |
+ * | Stored item state                      | Shown as           |
+ * |----------------------------------------|--------------------|
+ * | `missing`                              | Requested          |
+ * | `uploaded`, or `accepted` before IR-1338 | Supplied         |
+ * | `rejected`, or `missing` with a reason | Replacement needed |
  *
- * A rejected upload puts its item back to `missing` with the reviewer's reason
- * (ADR-022 §3.4), so the reason is what tells "asked again" from "asked".
+ * Nothing is accepted or rejected any more (ADR-022 Amendment 10, IR-1338): a
+ * sent document is supplied. "Replacement needed" is kept for items a reviewer
+ * rejected before then, which went back to `missing` with the reason.
  */
 import { TONES } from "@/components/ui/statusTones";
 import type { DocumentRequestItem } from "@/types/records";
 
-export type ItemStatus = "requested" | "awaiting_review" | "accepted" | "replacement_needed";
+export type ItemStatus = "requested" | "supplied" | "replacement_needed";
 
 export function itemStatus(item: Pick<DocumentRequestItem, "state" | "rejection_reason">): ItemStatus {
   switch (item.state) {
     case "uploaded":
-      return "awaiting_review";
     case "accepted":
-      return "accepted";
+      return "supplied";
     case "rejected":
       return "replacement_needed";
     case "missing":
@@ -34,21 +33,18 @@ export function itemStatus(item: Pick<DocumentRequestItem, "state" | "rejection_
 
 export const ITEM_STATUS_WORDS: Record<ItemStatus, string> = {
   requested:          "Requested",
-  awaiting_review:    "Uploaded · awaiting review",
-  accepted:           "Accepted",
+  supplied:           "Supplied",
   replacement_needed: "Replacement needed",
 };
 
 /**
- * By meaning (IR-358; 01-design-system §0). Requested is recoverable and
- * awaiting review is with a reviewer, so both are active and their words tell
- * them apart; a refused upload is attention, because the owner must act; an
- * accepted one is settled.
+ * By meaning (IR-358; 01-design-system §0). Requested is with the owner, so
+ * active; a supplied document is settled; one asked for again is attention,
+ * because the owner must act.
  */
 export const ITEM_STATUS_TONES: Record<ItemStatus, string> = {
   requested:          TONES.active,
-  awaiting_review:    TONES.active,
-  accepted:           TONES.settled,
+  supplied:           TONES.settled,
   replacement_needed: TONES.attention,
 };
 

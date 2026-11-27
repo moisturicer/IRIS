@@ -580,6 +580,13 @@ DOCUMENTS_APP: dict[str, Entry | Shadowed] = {
             kwargs=UPLOAD,
         ),
     }),
+    # Who may open a version may mark it seen, for themselves (IR-1338).
+    "record-upload-seen": Entry({
+        "POST": _case(
+            row(ANON, HIDE, OK, OK, OK, OK, OK, OK, HIDE, HIDE),
+            kwargs=UPLOAD,
+        ),
+    }),
     "record-upload-delete": Entry({
         "DELETE": _case(
             row(ANON, HIDE, OK, DENY, OK, OK, OK, OK, HIDE, HIDE),
@@ -623,12 +630,6 @@ DOCUMENTS_APP: dict[str, Entry | Shadowed] = {
         "PATCH": _case(
             row(ANON, HIDE, DENY, DENY, OK, DENY, DENY, DENY, HIDE, HIDE),
             kwargs={"pk": Ref("document_request")}, data={"action": "withdraw"},
-        ),
-    }),
-    "document-request-item-detail": Entry({
-        "PATCH": _case(
-            row(ANON, HIDE, DENY, DENY, OK, DENY, DENY, DENY, HIDE, HIDE),
-            kwargs={"pk": Ref("document_request_item")}, data={"action": "accept"},
         ),
     }),
 }

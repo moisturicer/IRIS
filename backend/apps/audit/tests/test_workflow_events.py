@@ -148,14 +148,6 @@ class AuditTestBase(NewVersionTestBase, DecisionTestBase):
             self.ok(self.client.post(f"/api/v1/records/{record.pk}/documents/send/", format="json"), status.HTTP_200_OK)
         return stored
 
-    def item_decision(self, item_id, user, body):
-        self.client.force_authenticate(user)
-        with self.captureOnCommitCallbacks(execute=True):
-            response = self.client.patch(
-                f"/api/v1/document-request-items/{item_id}/", body, format="json",
-            )
-        return self.ok(response, status.HTTP_200_OK)
-
     def withdraw_documents(self, request_id, user):
         self.client.force_authenticate(user)
         response = self.client.patch(
@@ -556,27 +548,22 @@ class DocumentRequestTests(AuditTestBase):
             fulfilled["metadata"], {"party": Party.IERC, "request": asked["id"], "items": items},
         )
 
-        self.item_decision(consent["id"], self.ierc, {"action": "accept"})
-        self.assertEqual(
-            self.one(record, AuditEvent.DOCUMENT_REQUEST_ACCEPTED)["metadata"],
-            {"party": Party.IERC, "request": asked["id"], "items": [items[0]]},
-        )
-
-        self.item_decision(ethics_item["id"], self.ierc, {"action": "reject", "reason": "Unsigned."})
-        rejected = self.one(record, AuditEvent.DOCUMENT_REQUEST_REJECTED)
-        self.assertEqual(rejected["user"], self.ierc.pk)
-        self.assertEqual(rejected["metadata"], {
-            "party": Party.IERC, "request": asked["id"], "items": [items[1]], "reason": "Unsigned.",
-        })
-
-        self.withdraw_documents(asked["id"], self.ierc)
+        # Nothing is accepted or rejected any more (ADR-022 Amendment 10,
+        # IR-1338): a sent document is supplied. Changed deliberately: this
+        # rejected an item to reopen the request before withdrawing it, so a
+        # second request, still open, is withdrawn instead.
+        again = self.ask_for_documents(record, self.ierc, [{"label": "Protocol"}])
+        self.withdraw_documents(again["id"], self.ierc)
         self.assertEqual(
             self.one(record, AuditEvent.DOCUMENT_REQUEST_WITHDRAWN)["metadata"],
             {
-                "party": Party.IERC, "request": asked["id"], "items": items,
+                "party": Party.IERC, "request": again["id"],
+                "items": [{"id": again["items"][0]["id"], "label": "Protocol"}],
                 "closed_by": "requesting_party", "closed_by_decision": False,
             },
         )
+        self.assertEqual(self.events(record, AuditEvent.DOCUMENT_REQUEST_ACCEPTED), [])
+        self.assertEqual(self.events(record, AuditEvent.DOCUMENT_REQUEST_REJECTED), [])
 
 
     def test_a_request_item_upload_that_answers_the_last_item_fulfils_the_request(self):

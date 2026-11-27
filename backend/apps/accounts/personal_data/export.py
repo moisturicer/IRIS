@@ -432,6 +432,18 @@ def viewed_marks(user) -> list[dict]:
     ]
 
 
+def uploads_seen(user) -> list[dict]:
+    """The supplied documents the person opened (IR-1338): which paper,
+    document and version, and when. Each mark only clears their own New badge."""
+    from apps.documents.models import UploadSeen
+
+    return [
+        {"record_id": row.upload.record_id, "document": row.upload.slot.name,
+         "version": row.upload.version, "seen_at": row.seen_at}
+        for row in UploadSeen.objects.filter(user=user).select_related("upload__slot").order_by("id")
+    ]
+
+
 def review_mentions(user) -> list[dict]:
     """Where the person was mentioned in a review discussion (IR-877): the paper
     and when they were told. A draft's mention is its writer's until it is sent,
@@ -850,6 +862,7 @@ SECTIONS: dict[str, Callable] = {
     "reading_highlights": reading_highlights,
     "saved_replies": saved_replies,
     "viewed_marks": viewed_marks,
+    "uploads_seen": uploads_seen,
     "review_mentions": review_mentions,
     "comments": comments,
     "comment_reports": comment_reports,
