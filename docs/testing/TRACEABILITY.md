@@ -48,6 +48,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | FR-M2-02/03 | Download and delete request queues | [details](traceability/FR-M2-02-03.md) | **PARTIAL** |
 | FR-M2-04 | Bulk import from a template | [details](traceability/FR-M2-04.md) | **IMPLEMENTED** |
 | FR-M3-01 | PDF text extraction | [details](traceability/FR-M3-01.md) | **IMPLEMENTED** |
+| **IR-1341** | The paper reader's *Comment* is greyed out ("Start your review to comment") until the reviewer's own review is claimed and started; C and *Comment on this document* do nothing until then — ADR-032 §10 Amendment 2026-11-27 (Proposed) | [details](traceability/IR-1341.md) | **IMPLEMENTED** |
 | **IR-1340** | RDCO's Review footer has one *Finish review…* (verdicts chosen in the dialog); *+ Add a colleague* moves from the footer menu to under the viewer's own office in Details → Reviewers — ADR-032 §10 Amendment 2026-11-27 (Accepted) | [details](traceability/IR-1340.md) | **IMPLEMENTED** |
 | **IR-1339** | A published paper opened from Discover or any plain link reads like anyone's, to its author and reviewers too; its review opens from My Library or My Reviews — ADR-032 §10 Amendment 2026-11-27 | [details](traceability/IR-1339.md) | **IMPLEMENTED** |
 | **IR-1338** | A document sent in answer to a request is *Supplied* at once, with no Accept or Reject; a reviewer sees *New* on it until they open it in the reader — ADR-022 Amendment 10 (Proposed) | [details](traceability/IR-1338.md) | **IMPLEMENTED** |

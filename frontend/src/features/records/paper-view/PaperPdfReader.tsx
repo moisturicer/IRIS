@@ -656,6 +656,8 @@ function PaperPdfReaderSource({
   currentRangeRef.current = currentRange;
   // Only a passage of a known Version can be anchored (ADR-032 §7).
   const commentOn = shownVersion !== null ? annotations?.onComment ?? null : null;
+  // Shown but greyed out until the review is started (IR-1341).
+  const commentHeld = annotations?.commentHeld ?? null;
   const commentOnRef = useRef(commentOn);
   commentOnRef.current = commentOn;
   const onComment = useMemo(
@@ -764,12 +766,12 @@ function PaperPdfReaderSource({
 
   const comment = () => {
     const passage = currentPassageRef.current();
-    if (passage && onComment) onComment(passage);
+    if (passage && onComment && !commentHeld) onComment(passage);
   };
   // C comments on the passage, as the prototype's reader does -- not while
   // typing, and not under a dialog.
   useEffect(() => {
-    if (!onComment) return;
+    if (!onComment || commentHeld) return;
     const onKey = (e: globalThis.KeyboardEvent) => {
       if (e.key.toLowerCase() !== "c" || e.metaKey || e.ctrlKey || e.altKey || e.defaultPrevented) return;
       const target = e.target instanceof HTMLElement ? e.target : null;
@@ -785,7 +787,7 @@ function PaperPdfReaderSource({
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [onComment]);
+  }, [onComment, commentHeld]);
 
   // A citation's page and find's are painted before the reader is moved
   // there (`liveWindow`'s pins), and loaded out of turn if the background
@@ -894,14 +896,14 @@ function PaperPdfReaderSource({
           )}
           {onComment && (
             <Button
-              variant={commentable ? "outline" : "ghost"}
+              variant={commentable && !commentHeld ? "outline" : "ghost"}
               size="sm"
               onClick={comment}
               // Pressing it must not drop the selection it comments on.
               onMouseDown={(e) => e.preventDefault()}
-              disabled={!ready || !commentable}
-              aria-keyshortcuts="C"
-              title={commentable ? "Comment on this passage (C)" : "Select a passage, or find one, to comment on it"}
+              disabled={!ready || !commentable || commentHeld !== null}
+              aria-keyshortcuts={commentHeld ? undefined : "C"}
+              title={commentHeld ?? (commentable ? "Comment on this passage (C)" : "Select a passage, or find one, to comment on it")}
             >
               <i className="fas fa-note-sticky" aria-hidden />
               Comment
