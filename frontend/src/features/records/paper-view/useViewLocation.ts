@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
 
-import { landingSection, type PaperSection } from "@/features/records/capabilities";
+import { landingSection, REVIEW_PARAM, type PaperSection } from "@/features/records/capabilities";
 
 export interface ViewLocation {
   /** The section shown: the one asked for, else the reader for a cited page, else Overview. */
@@ -28,13 +28,18 @@ export interface ViewLocation {
  *
  * `sections` are the ones this viewer may open (capabilities adapter), and
  * `openAtPage` the page a citation or `?page=` asks for (useCitationLanding).
+ * `keepReview` holds a published paper's review open (IR-1339): every view
+ * change then writes `?review=open`, so leaving Review for Overview or Paper
+ * keeps the Review tab.
  */
 export function useViewLocation({
   sections,
   openAtPage,
+  keepReview = false,
 }: {
   sections: PaperSection[];
   openAtPage: number | null;
+  keepReview?: boolean;
 }): ViewLocation {
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
@@ -57,6 +62,7 @@ export function useViewLocation({
 
   const setViewParams = (changes: Record<string, string | null>) => {
     const next = new URLSearchParams(searchParams);
+    if (keepReview) next.set(REVIEW_PARAM, "open");
     for (const [name, value] of Object.entries(changes)) {
       if (value == null) next.delete(name);
       else next.set(name, value);

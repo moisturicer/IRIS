@@ -15,7 +15,9 @@ import { describe, expect, it } from "vitest";
 import type { DecisionFlags, RecordDetail, ReviewerSeat, SeatState } from "@/types/records";
 
 import {
+  asksForReview,
   capabilitiesFor,
+  reviewHref,
   seatToOpen,
   landingSection,
   sectionsFor,
@@ -178,10 +180,12 @@ const ROWS: Row[] = [
     sections: ["overview", "review"],
   },
   {
+    // Changed on purpose by IR-1339: a published paper reached by a plain
+    // address reads as it does to anyone, its owner included.
     name: "a published record's details are not editable by its owner",
     record: record(),
     viewer: owner,
-    sections: ["overview", "review"],
+    sections: ["overview", "paper"],
   },
   {
     name: "an office that may only ask for documents is a participant, without a decision, and may attach files",
@@ -385,6 +389,41 @@ const ROWS: Row[] = [
     sections: ["overview"],
   },
 ];
+
+describe("a published paper's review opens only where it is asked for (IR-1339)", () => {
+  const inReview = record({ pipeline_status: "in_review", workflow_state: "in_review" });
+
+  it.each([
+    ["its owner, from Discover", record(), owner, false, ["overview", "paper"]],
+    ["its owner, from My Library", record(), owner, true, ["overview", "paper", "review"]],
+    ["a reviewer who took part, from Discover", record({ is_participant: true }), adviser, false, ["overview", "paper"]],
+    ["a reviewer who took part, from My Reviews", record({ is_participant: true }), adviser, true, ["overview", "paper", "review"]],
+    ["a reader, whatever the address asks", record(), stranger, true, ["overview", "paper"]],
+    ["its owner before publication, from anywhere", inReview, owner, false, ["overview", "review"]],
+    ["its owner before publication, asked for the review", inReview, owner, true, ["overview", "review"]],
+  ] as const)("%s", (_name, r, viewer, asked, sections) => {
+    expect(sectionsFor(r, viewer, asked)).toEqual(sections);
+  });
+
+  it.each([
+    ["", false],
+    ["section=overview", false],
+    ["section=paper&page=3", false],
+    ["review=open", true],
+    ["section=overview&review=open", true],
+    ["section=review", true],
+    ["section=files", true],
+    ["documents=open", true],
+  ])("?%s asks for the review: %s", (search, asked) => {
+    expect(asksForReview(new URLSearchParams(search))).toBe(asked);
+  });
+
+  it("links My Library and My Reviews to a section with the review open", () => {
+    expect(reviewHref(7)).toBe("/records/7?section=review&review=open");
+    expect(reviewHref(9, "overview")).toBe("/records/9?section=overview&review=open");
+    expect(asksForReview(new URL(reviewHref(9, "overview"), "http://x").searchParams)).toBe(true);
+  });
+});
 
 describe("where a section link lands (IR-879)", () => {
   const participant = ["overview", "review"] as const;

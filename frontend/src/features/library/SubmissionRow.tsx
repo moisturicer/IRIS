@@ -4,10 +4,12 @@ import { Link } from "react-router-dom";
 import { ClearanceStrip } from "@/components/shared/ClearanceStrip";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
+import { reviewHref } from "@/features/records/capabilities";
 import { ContinueProposal } from "@/features/records/ContinueProposal";
 import { waitingHref } from "@/features/records/waitingOnYou";
 import { usePublishHref } from "@/features/publish/publishLink";
 import { DeleteRecord, type DeleteKind } from "./DeleteRecord";
+import { PIPELINE_STATUS } from "@/lib/constants";
 import { cn, formatDate } from "@/lib/utils";
 import type { MyResearchItem } from "@/types/records";
 
@@ -15,13 +17,16 @@ import type { MyResearchItem } from "@/types/records";
  * Where the row itself leads: a draft opens Publish over this page, since a
  * draft has no paper page (IR-1227) and going through one would leave My
  * Library (IR-1258). A paper waiting on its author opens where the request is
- * answered (IR-1321), so the row carries no per-request button; anything else
- * opens Paper View. The whole row is that link (IR-1261).
+ * answered (IR-1321), so the row carries no per-request button. A published
+ * paper opens its review, which a plain link to it no longer shows its author
+ * (IR-1339); anything else opens Paper View. The whole row is that link
+ * (IR-1261).
  */
 function rowHref(item: MyResearchItem, publishHref: (target: number) => string) {
   if (item.pipeline_status === "draft") return publishHref(item.id);
   const [request] = item.submitter_status.waiting_on_you;
-  return request ? waitingHref(item.id, request) : `/records/${item.id}`;
+  if (request) return waitingHref(item.id, request);
+  return item.pipeline_status === PIPELINE_STATUS.PUBLISHED ? reviewHref(item.id) : `/records/${item.id}`;
 }
 
 /**
