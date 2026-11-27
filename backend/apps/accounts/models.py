@@ -132,6 +132,10 @@ class User(AbstractBaseUser, PermissionsMixin):
     research_interests = models.ManyToManyField(
         "ResearchInterest", through="UserInterest", related_name="users", blank=True,
     )
+    #: The student guided tours this person has been shown (IR-1342): keys
+    #: from `apps.accounts.tours.TOUR_KEYS`. Written only by
+    #: `POST /users/me/tours/<key>/`, read only on their own `/users/me/`.
+    tours_seen = models.JSONField(default=list, blank=True)
 
     objects = UserManager()
 

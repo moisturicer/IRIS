@@ -60,6 +60,10 @@ from django.utils import timezone
 
 from apps.accounts.models import College, Course, Role, StudentProfile, User
 from apps.accounts.notice import answer_notice, current_notice_number
+# Every seeded account has seen every student tour (IR-1342), so a demo login
+# is never walked through a page by surprise, on a database seeded after the
+# migration that marks existing accounts as well as before it.
+from apps.accounts.tours import TOUR_KEYS
 from apps.records.ai_answer import store_on_new_draft
 from apps.documents.models import RecordUpload, UploadSlot
 from apps.records import lifecycle
@@ -252,6 +256,7 @@ class Command(BaseCommand):
         admin.is_verified = True
         admin.is_active = True
         admin.set_password(self.password)
+        admin.tours_seen = list(TOUR_KEYS)
         admin.save()
         self._answer_notice_yes(admin)
         self._report(created, f"{ADMIN_EMAIL:26} System Admin, and a Django superuser")
@@ -272,6 +277,7 @@ class Command(BaseCommand):
         user.is_locked = False
         user.consent_given = True
         user.set_password(self.password)
+        user.tours_seen = list(TOUR_KEYS)
         user.save()
         self._answer_notice_yes(user)
         label = f"role={role_name}" + (" coordinator" if coordinator else "")
@@ -311,6 +317,7 @@ class Command(BaseCommand):
         user.is_verified = True
         user.consent_given = True
         user.set_password(self.password)
+        user.tours_seen = list(TOUR_KEYS)
         user.save()
         self._answer_notice_yes(user)
 

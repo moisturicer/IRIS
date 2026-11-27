@@ -83,6 +83,8 @@ def account(user) -> dict:
             row.interest.name
             for row in user.interest_links.select_related("interest").order_by("position")
         ],
+        # The student guided tours this person has been shown (IR-1342).
+        "tours_seen": list(user.tours_seen or []),
         "student_profile": None,
         "adviser_profile": None,
     }

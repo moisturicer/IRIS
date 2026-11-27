@@ -13,6 +13,8 @@ urlpatterns = [
          views.AccountDeletionDecisionView.as_view(action="confirm"), name="account-deletion-request-confirm"),
     path("deletion-requests/<int:pk>/reject/",
          views.AccountDeletionDecisionView.as_view(action="reject"), name="account-deletion-request-reject"),
+    # IR-1342: the signed-in person has been shown one student tour.
+    path("me/tours/<str:key>/", views.MeTourSeenView.as_view(), name="user-me-tour-seen"),
     path("me/data/",      views.PersonalDataExportView.as_view(), name="user-me-data"),
     path("me/photo/",     views.MePhotoView.as_view(),         name="user-me-photo"),
     path("interests/",    views.InterestSuggestionsView.as_view(), name="user-interest-suggestions"),
