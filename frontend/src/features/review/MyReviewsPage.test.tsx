@@ -147,7 +147,7 @@ describe("MyReviewsPage", () => {
     expect(within(tabs).getByRole("tab", { name: /Done 4/ })).toBeInTheDocument();
 
     expect(await screen.findByRole("link", { name: "Smart Campus Energy Monitor" }))
-      .toHaveAttribute("href", "/records/7?section=review");
+      .toHaveAttribute("href", "/records/7?section=review&review=open");
     expect(screen.getByText("ITSO · You")).toBeInTheDocument();
     expect(screen.getByText("ITSO · Unassigned")).toBeInTheDocument();
     expect(screen.getByText("Routed by Prof. Santos · “Potential IP concern”", { exact: false })).toBeInTheDocument();
@@ -160,7 +160,7 @@ describe("MyReviewsPage", () => {
     // IR-1211: "Examine review" here, so it isn't confused with the review
     // page's own Open review act, which records when the review starts.
     const open = await screen.findByRole("link", { name: "Examine review: Smart Campus Energy Monitor" });
-    expect(open).toHaveAttribute("href", "/records/7?section=review");
+    expect(open).toHaveAttribute("href", "/records/7?section=review&review=open");
     for (const link of screen.getAllByRole("link")) {
       expect(link.getAttribute("href")).not.toContain("/evaluate");
     }
@@ -334,9 +334,9 @@ describe("MyReviewsPage", () => {
 
     const card = await screen.findByRole("article", { name: "Smart Campus Energy Monitor" });
     expect(card).toHaveTextContent("Maria Clara Santos, Jose Rizal · College of Computer Studies · v2");
-    expect(screen.getByRole("link", { name: "Published Paper" })).toHaveAttribute("href", "/records/9?section=overview");
+    expect(screen.getByRole("link", { name: "Published Paper" })).toHaveAttribute("href", "/records/9?section=overview&review=open");
     expect(screen.getByRole("link", { name: "Smart Campus Energy Monitor" }))
-      .toHaveAttribute("href", "/records/7?section=review");
+      .toHaveAttribute("href", "/records/7?section=review&review=open");
   });
 
   it("gives each Done outcome chip the count of the rows it shows (IR-1135)", async () => {

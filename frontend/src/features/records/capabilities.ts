@@ -8,7 +8,7 @@
  * Nothing here is a permission. The server re-checks every action, so a
  * capability is only a decision about what to *offer*.
  */
-import type { RoleName } from "@/lib/constants";
+import { PIPELINE_STATUS, type RoleName } from "@/lib/constants";
 import type { Capability, RecordDetail, ReviewerSeat } from "@/types/records";
 
 /** ADR-032 §10's action keys; the union lives with the payload that carries it. */
@@ -17,7 +17,9 @@ export type { Capability } from "@/types/records";
 /**
  * Paper View's sections, in tab order (spec §4.6). Participants see Overview ·
  * Review; everyone else Overview · Paper (ADR-032 §10, 2026-11-04; IR-879).
- * Files lives in Review's Documents tab now (IR-1203; a drawer from IR-879),
+ * On a published paper a participant reads it like anyone else, unless the
+ * address opens its review: then Overview · Paper · Review (IR-1339). Files
+ * lives in Review's Documents tab now (IR-1203; a drawer from IR-879),
  * so it is no section: an old `?section=files` link is a participant's Review
  * on that tab.
  */
@@ -37,6 +39,7 @@ type CapabilityInputs = Pick<
   | "abstract_file"
   | "files"
   | "review_claim"
+  | "pipeline_status"
 >;
 
 /** Whether the viewer owns the record: the adapter's one client-side input. */
@@ -89,20 +92,52 @@ export function asSection(value: string | null): PaperSection | null {
   return (PAPER_SECTIONS as readonly string[]).includes(value ?? "") ? (value as PaperSection) : null;
 }
 
+/** The parameter that keeps a published paper open for its review (IR-1339). */
+export const REVIEW_PARAM = "review";
+
+/**
+ * Whether the address opens the paper for its review (IR-1339): My Library,
+ * My Reviews and the office console link a published paper this way, and any
+ * address that asks for Review or its Documents (`?section=review`,
+ * `?section=files`, `?documents=open`) does too, so older links keep working.
+ * `?review=open` is what keeps it while the reader moves between tabs.
+ */
+export function asksForReview(search: URLSearchParams): boolean {
+  const section = search.get("section");
+  return search.get(REVIEW_PARAM) === "open" || section === "review" || section === "files" || search.get("documents") === "open";
+}
+
+/** Where My Library and My Reviews open a published paper: its review (IR-1339). */
+export const reviewHref = (recordId: number, section: PaperSection = "review") =>
+  `/records/${recordId}?section=${section}&${REVIEW_PARAM}=open`;
+
+/**
+ * Whether the page shows this viewer the review: a participant's paper before
+ * it is published, and after only when the address opens its review
+ * (IR-1339). Anywhere else a published paper reads as it does to anyone, so
+ * an author who finds their paper in Discover sees what its readers see.
+ */
+export function showsReview(record: CapabilityInputs, viewer: Viewer | null, reviewAsked: boolean): boolean {
+  return isParticipant(record, viewer) && (reviewAsked || record.pipeline_status !== PIPELINE_STATUS.PUBLISHED);
+}
+
 /**
  * The sections this viewer may open, in tab order. A participant reads the
- * paper in Review, beside the review, so has no Paper section (IR-879).
+ * paper in Review, beside the review, so has no Paper section (IR-879) --
+ * except on a published paper, which keeps the reader's Paper tab beside
+ * Review when its review is open (IR-1339).
  */
-export function sectionsFor(record: CapabilityInputs, viewer: Viewer | null): PaperSection[] {
-  const participant = isParticipant(record, viewer);
+export function sectionsFor(record: CapabilityInputs, viewer: Viewer | null, reviewAsked = false): PaperSection[] {
+  const review = showsReview(record, viewer, reviewAsked);
+  const published = record.pipeline_status === PIPELINE_STATUS.PUBLISHED;
   return PAPER_SECTIONS.filter((section) => {
     switch (section) {
       case "overview":
         return true;
       case "paper":
-        return !participant && hasPaper(record);
+        return (!review || published) && hasPaper(record);
       case "review":
-        return participant;
+        return review;
     }
   });
 }

@@ -1617,6 +1617,71 @@ function renderWithProbe(route: string) {
 
 const tabNames = () => screen.getAllByRole("tab").map((tab) => tab.textContent);
 
+describe("a published paper reads like anyone's unless its review is asked for (IR-1339)", () => {
+  const firstVersion = {
+    number: 1, cause: "submission" as const, cause_label: "Submission", created_at: "2026-09-01T08:00:00Z",
+    created_by_name: "Rhea Owner", manuscript_url: `/api/v1/records/${RECORD_ID}/versions/1/manuscript/`,
+  };
+  const ownPublished: RecordDetail = { ...record, owners: inReview.owners, versions: [firstVersion] };
+
+  // The page's own sections; Review holds tabs of its own.
+  const sectionNames = () =>
+    within(screen.getByRole("tablist", { name: "Paper view" })).getAllByRole("tab").map((tab) => tab.textContent);
+
+  beforeEach(() => vi.clearAllMocks());
+
+  it("gives its owner, from Discover, what a reader sees: Overview and Paper, no review", async () => {
+    shownRecord = ownPublished;
+    signInAs(OWNER_ID, "Student");
+    renderPaperView();
+
+    await waitForRecord(record.title);
+    expect(sectionNames()).toEqual(["Overview", "Paper"]);
+    // Versions and where the review stands are review material (ADR-032 §10).
+    expect(screen.queryByRole("combobox", { name: "Version" })).not.toBeInTheDocument();
+    expect(vi.mocked(recordsApi.tracker)).not.toHaveBeenCalled();
+  });
+
+  it("opens its review from My Library, beside the reader's Paper tab", async () => {
+    shownRecord = ownPublished;
+    signInAs(OWNER_ID, "Student");
+    renderWithProbe(`/records/${RECORD_ID}?section=review&review=open`);
+
+    expect(await screen.findByRole("tab", { name: "Review", selected: true })).toBeInTheDocument();
+    expect(sectionNames()).toEqual(["Overview", "Paper", "Review"]);
+    expect(screen.getByRole("combobox", { name: "Version" })).toBeInTheDocument();
+  });
+
+  it("keeps the review open when an old Review link is left for Overview", async () => {
+    shownRecord = ownPublished;
+    signInAs(OWNER_ID, "Student");
+    renderWithProbe(`/records/${RECORD_ID}?section=review`);
+
+    await userEvent.click(await screen.findByRole("tab", { name: "Overview" }));
+    expect(screen.getByRole("tab", { name: "Overview", selected: true })).toBeInTheDocument();
+    expect(sectionNames()).toEqual(["Overview", "Paper", "Review"]);
+    expect(screen.getByRole("status", { name: "Location" })).toHaveTextContent("review=open");
+  });
+
+  it("opens a reviewer's published paper from My Reviews at its Overview, with Review there", async () => {
+    shownRecord = { ...record, is_participant: true };
+    signInAs(2, "ITSO");
+    renderPaper(`/records/${RECORD_ID}?section=overview&review=open`);
+
+    expect(await screen.findByRole("tab", { name: "Overview", selected: true })).toBeInTheDocument();
+    expect(sectionNames()).toEqual(["Overview", "Paper", "Review"]);
+  });
+
+  it("gives a reader no Review, whatever the address asks", async () => {
+    shownRecord = record;
+    signInAs(99, "Student");
+    renderPaper(`/records/${RECORD_ID}?section=review&review=open`);
+
+    await waitForRecord(record.title);
+    expect(sectionNames()).toEqual(["Overview", "Paper"]);
+  });
+});
+
 describe("the sections follow the capabilities (IR-411)", () => {
   beforeEach(() => vi.clearAllMocks());
 

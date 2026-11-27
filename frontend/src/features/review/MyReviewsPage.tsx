@@ -13,6 +13,7 @@ import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { usePageTitle } from "@/hooks/useDocumentTitle";
 import { errorDetail } from "@/lib/errorDetail";
 import { failureMessage, readFailureKind, type ReadFailureKind } from "@/lib/readFailure";
+import { reviewHref } from "@/features/records/capabilities";
 import { isCoordinator, pathFor } from "@/lib/access";
 import { cn, formatDate } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth.store";
@@ -485,8 +486,9 @@ interface ReviewRowProps {
 }
 
 function ReviewRow({ row, tab, busy, error, onClaim, onAssign }: ReviewRowProps) {
-  // Where the server says it opens: the Review section, or the Overview once published (IR-1135).
-  const href = `/records/${row.record}?section=${row.opens}`;
+  // Where the server says it opens: the Review section, or the Overview once published (IR-1135),
+  // with the review open, which a published paper shows only when asked (IR-1339).
+  const href = reviewHref(row.record, row.opens);
   const routing = routingLine(row);
   const waited = tab !== "done" && row.waiting_days != null ? `Waiting ${waitLabel(row.waiting_days)}` : null;
   const byline = [routing, waited].filter(Boolean).join(" · ");
