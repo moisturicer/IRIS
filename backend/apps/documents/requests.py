@@ -26,7 +26,7 @@ from django.utils import timezone
 from apps.audit import workflow as audit
 from core.enums import DocumentRequestItemState, DocumentRequestState
 
-from .models import DocumentRejection, DocumentRequest, DocumentRequestItem, UploadSlot
+from .models import DocumentRequest, DocumentRequestItem, UploadSlot
 
 
 class DocumentRequestError(Exception):
