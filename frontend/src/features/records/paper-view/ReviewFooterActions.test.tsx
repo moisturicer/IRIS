@@ -2,9 +2,11 @@
  * The Review pane footer's actions (IR-1139): the prototype's merge box -- a
  * "More review actions" menu, at most one secondary pill and one filled
  * primary. Every control is a granted capability; a held one is disabled with
- * the server's reason. Where *Finish review* is granted a verdict opens it on
- * that verdict, so drafts still go with it (ADR-032 §7, IR-875). Every query
- * goes through the accessible tree.
+ * the server's reason. Where *Finish review* is granted, every reviewer,
+ * RDCO included, finishes with one *Finish review…* and chooses the verdict
+ * in it (IR-1340, changed deliberately from RDCO's own verdict buttons). Add
+ * a colleague is in Details → Reviewers, not here. Every query goes through
+ * the accessible tree.
  */
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -64,31 +66,28 @@ const openMenu = async () => {
 };
 
 describe("ReviewFooterActions", () => {
-  it("gives RDCO Accept & publish, Keep unlisted beside it, and the rest in the menu", async () => {
+  // Changed deliberately by IR-1340: RDCO had Accept & publish, Keep unlisted,
+  // and Request changes and Reject in the menu. They are chosen in the dialog now.
+  it("gives RDCO one Finish review, which opens the dialog with no verdict chosen", async () => {
     const { onFinish } = renderFooter(RDCO);
 
     const bar = toolbar();
-    expect(bar.getAllByRole("button").map((b) => b.textContent)).toEqual(["", "Keep unlisted…", "Accept & publish…"]);
-    expect(bar.getByRole("button", { name: "Accept & publish…" })).toBeEnabled();
+    expect(bar.getAllByRole("button").map((b) => b.textContent)).toEqual(["Finish review…"]);
+    for (const name of [/Accept & publish/, /Keep unlisted/, /Request changes/, /^Reject/]) {
+      expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
+    }
+    expect(screen.queryByRole("button", { name: "More review actions" })).not.toBeInTheDocument();
 
-    const menu = await openMenu();
-    expect(menu.getAllByRole("menuitem").map((m) => m.textContent)).toEqual([
-      "Request changes…", "Reject…",
-    ]);
-    await userEvent.click(menu.getByRole("menuitem", { name: "Reject…" }));
-    expect(onFinish).toHaveBeenCalledWith("reject");
-
-    await userEvent.click(bar.getByRole("button", { name: "Accept & publish…" }));
-    expect(onFinish).toHaveBeenLastCalledWith("publish");
+    await userEvent.click(bar.getByRole("button", { name: "Finish review…" }));
+    expect(onFinish).toHaveBeenCalledWith();
   });
 
-  it("holds Accept & publish on an embargoed paper, says why, and offers the release", async () => {
+  it("says why publishing is held on an embargoed paper, and offers the release", async () => {
     renderFooter([...RDCO, "release_embargo"], { held: { publish: EMBARGO } });
 
-    const publish = screen.getByRole("button", { name: "Accept & publish…" });
-    expect(publish).toBeDisabled();
-    expect(publish).toHaveAccessibleDescription(`${EMBARGO} Release embargo…`);
-    expect(screen.getByRole("button", { name: "Keep unlisted…" })).toBeEnabled();
+    // Finishing is still open: Keep unlisted, Request changes or Reject need no release.
+    expect(screen.getByRole("button", { name: "Finish review…" })).toBeEnabled();
+    expect(screen.getByText(EMBARGO)).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Release embargo…" }));
     await userEvent.click(within(screen.getByRole("dialog", { name: "Release this embargo?" })).getByRole("button", { name: "Release" }));
@@ -103,16 +102,13 @@ describe("ReviewFooterActions", () => {
   });
 
   // Changed deliberately by IR-1254: Request documents left the menu for the Documents tab.
-  it("gives an office reviewer one Finish review, with a colleague in the menu", async () => {
+  // Changed deliberately by IR-1340: Add a colleague left the menu for Details → Reviewers.
+  it("gives an office reviewer one Finish review, and no colleague in a menu", async () => {
     const { onFinish } = renderFooter(OFFICE);
 
-    expect(toolbar().getAllByRole("button").map((b) => b.textContent)).toEqual(["", "Finish review…"]);
-    const menu = await openMenu();
-    expect(menu.getAllByRole("menuitem").map((m) => m.textContent)).toEqual(["Add a colleague…"]);
-
-    await userEvent.keyboard("{Escape}");
-    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "More review actions" })).toHaveFocus();
+    expect(toolbar().getAllByRole("button").map((b) => b.textContent)).toEqual(["Finish review…"]);
+    expect(screen.queryByRole("button", { name: "More review actions" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /colleague/i })).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Finish review…" }));
     expect(onFinish).toHaveBeenCalledWith();
@@ -122,7 +118,7 @@ describe("ReviewFooterActions", () => {
     const { onFinish } = renderFooter(RDCO, { drafts: 2 });
 
     expect(toolbar().getAllByRole("button").map((b) => b.textContent))
-      .toEqual(["", "Send 2 comments…", "Keep unlisted…", "Accept & publish…"]);
+      .toEqual(["Send 2 comments…", "Finish review…"]);
     await userEvent.click(screen.getByRole("button", { name: "Send 2 comments…" }));
     expect(onFinish).toHaveBeenCalledWith("comment_only");
   });
@@ -149,14 +145,18 @@ describe("ReviewFooterActions", () => {
     expect(toolbar().getAllByRole("button").map((b) => b.textContent)).toEqual(["", "Open review"]);
     const menu = await openMenu();
     expect(menu.getAllByRole("menuitem").map((m) => m.textContent)).toEqual(["Withdraw revision request"]);
+
+    // Moved here by IR-1340 from the office test, whose menu is gone.
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "More review actions" })).toHaveFocus();
   });
 
   // IR-1254 (ADR-032 §7 as amended 2026-11-21): a document request is the Documents
   // tab's, beside the requests it makes, so the footer never offers one.
   it("never offers Request documents, and draws nothing when that is all that was granted", async () => {
     const { unmount } = renderFooter(OFFICE);
-    const menu = await openMenu();
-    expect(menu.queryByRole("menuitem", { name: "Request documents" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Request documents" })).not.toBeInTheDocument();
     unmount();
 
     renderFooter(["request_document"], { finishing: false });
@@ -171,7 +171,8 @@ describe("ReviewFooterActions", () => {
   });
 
   it("has no blocking accessibility violations with its menu open", async () => {
-    const { container } = renderFooter([...RDCO, "release_embargo"], { held: { publish: EMBARGO } });
+    // The menu now holds only acts a footer offers before the review opens.
+    const { container } = renderFooter(["withdraw_revision"], { finishing: false, lead: <button type="button">Open review</button> });
     await openMenu();
 
     await expectNoBlockingA11yViolations(container);

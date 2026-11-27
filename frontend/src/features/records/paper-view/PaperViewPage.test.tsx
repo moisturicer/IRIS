@@ -281,7 +281,8 @@ vi.mock("@/api/accounts", () => ({
 
 vi.mock("@/api/reviews", () => ({
   reviewsApi: { resubmit: vi.fn() },
-  seatsApi: { open: vi.fn(() => Promise.resolve({ data: {} })), claim: vi.fn(() => Promise.resolve({ data: {} })) },
+  seatsApi: { open: vi.fn(() => Promise.resolve({ data: {} })), claim: vi.fn(() => Promise.resolve({ data: {} })),
+    addReviewerOptions: vi.fn(() => Promise.resolve({ data: { assignment: 5, party: "itso", party_label: "ITSO", members: [] } })) },
 }));
 
 // The AI overview reads its own cache; this screen is not what that
@@ -2589,9 +2590,12 @@ describe("the Review section (IR-412)", () => {
     await waitFor(() => expect(vi.mocked(recordsApi.tracker).mock.calls.length).toBeGreaterThan(reads));
   });
 
-  it("offers no Request review without targets, and Add a colleague only with add_reviewer (IR-685)", async () => {
+  // Changed deliberately by IR-1340: the control is a "+ Add a colleague" link
+  // under the viewer's own office, not a button under every party.
+  it("offers no Request review without targets, and Add a colleague only with add_reviewer, under the viewer's office (IR-685, IR-1340)", async () => {
     workspaceAt(1600);
-    vi.mocked(recordsApi.tracker).mockResolvedValue({ data: { ...trackerPayload, parties: [partyRow("itso", "ITSO")] } } as never);
+    vi.mocked(recordsApi.tracker).mockResolvedValue({ data: { ...trackerPayload,
+      parties: [partyRow("itso", "ITSO"), partyRow("ierc", "IERC", { in_pool: true })] } } as never);
     shownRecord = { ...inReview, ...reviewing, capabilities: ["route", "add_reviewer"],
       routing: { send_to_rdco: false, route_as: "itso", targets: [] } };
     signInAs(2, "ITSO");
@@ -2599,8 +2603,16 @@ describe("the Review section (IR-412)", () => {
     const side = await openDetails();
     await within(side).findByRole("heading", { name: "Reviewers" });
     expect(within(side).queryByRole("button", { name: "Request review" })).not.toBeInTheDocument();
-    // A separate control from Request review, under the parties.
-    expect(within(side).getByRole("button", { name: /Add a colleague/ })).toBeInTheDocument();
+    // A separate control from Request review, under the viewer's own office (ITSO) only.
+    const add = within(side).getByRole("button", { name: "Add a colleague to ITSO" });
+    expect(add).toHaveTextContent("Add a colleague");
+    const [itso, ierc] = within(side).getAllByRole("listitem").filter((li) => li.id.endsWith("-details-itso") || li.id.endsWith("-details-ierc"));
+    expect(itso).toContainElement(add);
+    expect(within(ierc).queryByRole("button", { name: /colleague/i })).not.toBeInTheDocument();
+    expect(within(side).getAllByRole("button", { name: /colleague/i })).toHaveLength(1);
+
+    await userEvent.click(add);
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
   });
 
   // Changed deliberately by IR-1202: Compare (the Changes tab's) and Copy link left Details,

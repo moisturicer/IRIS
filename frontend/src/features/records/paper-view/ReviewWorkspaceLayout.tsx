@@ -16,7 +16,8 @@ import { ReadinessPanel } from "./ReadinessPanel";
 import { ReviewActionBar } from "./ReviewActionBar";
 import { detailsTarget, ReviewDetails } from "./ReviewDetails";
 import { ReviewTimeline } from "./ReviewTimeline";
-import { ADD_COLLEAGUE, REVIEWER_FOOTER_ACTIONS, REVIEW_ACTIONS, type DialogReviewAction } from "./reviewActions";
+import { REVIEWER_FOOTER_ACTIONS, REVIEW_ACTIONS, addReviewerSeat, type DialogReviewAction } from "./reviewActions";
+import { AddColleagueLink } from "./AddColleagueLink";
 import { ReviewFooterActions } from "./ReviewFooterActions";
 import type { ShowPlace } from "./changes/ChangeItem";
 import { ChangesTab } from "./changes/ChangesTab";
@@ -435,14 +436,18 @@ export function ReviewWorkspaceLayout({
   // of our own, so a change to the party graph needs no change here.
   const targets = record.routing.targets;
   const mayRequest = can.has("route") && targets.length > 0 && ROUTE !== undefined;
+  // The office a colleague joins: the viewer's open office seat (IR-1340).
+  const colleagueSeat = addReviewerSeat(record);
   const renderDetails = (tracker: RecordTracker) => (
     <div className="space-y-5">
     {authorView && authorDetails}
     <ReviewDetails record={record} tracker={tracker} ids={ids}
       readiness={authorView ? null : record.readiness} onReadinessAction={authorView ? undefined : onReadinessAction}
       requestReview={mayRequest ? { targets: targets.map((t) => t.label), onOpen: () => { setRouted(""); setRequesting(true); } } : undefined}
-      addColleague={<ReviewActionBar record={record} can={can} actions={ADD_COLLEAGUE} label="Reviewer actions"
-        primary={false} onChanged={onChanged} className="pt-1" />} />
+      addColleague={colleagueSeat && can.has("add_reviewer") ? {
+        party: colleagueSeat.party,
+        control: (office) => <AddColleagueLink record={record} office={office} onChanged={onChanged} />,
+      } : undefined} />
     </div>
   );
   const RouteDialog = ROUTE?.Dialog;
