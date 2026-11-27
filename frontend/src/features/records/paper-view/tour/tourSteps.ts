@@ -12,6 +12,8 @@
  * window keeps the pane behind its launcher -- so the tour never describes
  * something that is not there.
  */
+import type { TourStep } from "@/components/tour/types";
+
 export type TourTab = "documents" | "conversation" | "threads" | "changes" | "details";
 
 /**
@@ -32,15 +34,8 @@ export const tourTargets = (ids: string) => ({
   foot: `${ids}-foot`,
 });
 
-export interface TourStep {
-  id: string;
-  /** The DOM id of the control or area this step highlights. */
-  target: string;
-  title: string;
-  body: string;
-  /** A short list under the body, one entry per name. */
-  items?: { name: string; text: string }[];
-}
+/** Shared with every tour since IR-1342; re-exported so this module's callers are unchanged. */
+export type { TourStep } from "@/components/tour/types";
 
 type Item = { name: string; text: string };
 
