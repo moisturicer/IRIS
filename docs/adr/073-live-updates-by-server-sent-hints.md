@@ -172,6 +172,37 @@ All three were left open in the first draft and decided by Ashlee Sean on 2026-1
 - **Drafts.** An unsubmitted draft's readers are its creator alone (`hides_draft`, IR-1227), never a co-owner it names.
 - **Public comments get no hint.** Anyone signed in may read a published paper, so there is no list of readers to tell. That panel catches up on focus and reconnect, and on any hint the viewer gets as a review reader.
 
+## Amendment 2026-11-28: the remaining pages (IR-1350, IR-1351)
+
+**Status: Proposed.** Drafted by an AI agent at Lee Jasmin Adolfo's request. Lee settled the questions below in a design session on 2026-11-28. It stays a proposal until a person accepts it here.
+
+**Why.** The team asked for every remaining page to update without a reload. Wiring every page would add hints for data that rarely changes, and focus reads for pages nobody watches. So this amendment adds a rule for which pages are live, and applies it to every page decision 8 and the amendments above left out.
+
+**The rule (changes decision 8).**
+- **Live by hint:** a page where several people act on the same items, so that stale data leads to a wrong or repeated act.
+- **Refetch on focus only:** a page showing data other people change, where nobody acts on it together, or where it changes on almost every act.
+- **Neither:** a page that shows only the viewer's own data, or settings that rarely change.
+- **Forms never refetch while open,** whichever page they are on, so typed input is never replaced. A "this changed since you opened it" notice is a possible later idea, not part of this amendment.
+
+**Live by hint (IR-1350).** Two staff queues, both on the existing `queues` topic:
+- **Reported comments** (`/moderation/comments`). The queue is shared by RDCO and the System Admin (IR-693), so a new `CommentReport` publishes `queues` to both role channels: `role_channel(RoleName.RDCO)` and `role_channel(RoleName.SYSTEM_ADMIN)`. Reports are closed through `close_reports`, a queryset `update()` that sends no signal, so `close_reports` publishes itself, the way *Finish review* calls `review_changed`. Nobody else is told, which keeps the queue for those two roles only (ADR-032 §7).
+- **Account deletions** (`/admin/account-deletion-requests`). A saved `AccountDeletionRequest` (asked, cancelled, confirmed or rejected) publishes `queues` to the System Admin role channel only. Every write goes through `.save()` in `apps/accounts/deletion/service.py`, so `post_save` hears them all.
+- **The sidebar's Reported comments count** already refetches on `queues` for both roles. Until now nothing published `queues` when a comment was reported, so that count went stale. This fixes it. Account deletions has no sidebar count, and none is added.
+
+**Refetch on focus only (IR-1351).**
+- A new `useFocusRefresh(reload)` hook refetches when the tab is shown again, with the same coalescing as decision 8. `useLiveRefresh` uses it for its own focus handling, so the two can't drift apart.
+- **Discover** reruns its current search, keeping query, filters, tab and scroll position. It skips the read while a search is running or the search box has focus. Decision 8 already said Discover "refetches on focus", but no code did; this builds it.
+- **Audit log** and **Workflow analytics** change on almost every act, so a hint would make every open tab read constantly. They keep their filters and page number.
+- **Users** (RDCO and System Admin) and **people/:id** rarely change while someone is looking at them. Two staff editing one account at once is caught when the second one saves.
+
+**Neither.** Profile, Settings, My Templates, Guidelines, Setup, Retention and Import records. A viewer's own role change already reaches them through `account` (Amendment 2026-11-23 (b)). Import records is one upload, check and result, with no job left running to watch.
+
+**Not changed.**
+- **No channel to everyone.** A broadcast on every publish would make every open Discover tab rerun its search within the same half second. Decision 3's server-assigned channels stay the only ones.
+- **The paper page** keeps hints for review readers only. Other readers already refetch on focus, because its panels use `useLiveRefresh`.
+
+**Capacity is not measured again.** The 2026-11-19 measurement (§Consequences) covered open streams, and this opens none. It adds two low-volume publishes and focus reads that happen only when someone switches back to a tab.
+
 ## Related Requirements
 
 NFR labels only: none. Relates to IR-1033 (refetch on focus), IR-1138 (queue counts), IR-1208 (My Reviews count), IR-166 and ADR-072 (sessions), ADR-017 (ASGI), and IR-504 and IR-634 (streaming).
@@ -181,4 +212,6 @@ NFR labels only: none. Relates to IR-1033 (refetch on focus), IR-1138 (queue cou
 - IR-1213: the spec, which builds this after acceptance.
 - IR-1284: the review discussion (Amendment 2026-11-23).
 - IR-1287: the rest of the paper page (same amendment).
+- IR-1350: the two staff queues (Amendment 2026-11-28).
+- IR-1351: refetch on focus for the remaining pages (same amendment).
 - IR-1033.
