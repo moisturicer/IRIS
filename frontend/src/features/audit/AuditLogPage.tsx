@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { auditApi, type AuditListParams } from "@/api/audit";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DataTable } from "@/components/shared/DataTable";
 import { LoadFailedAlert } from "@/components/shared/LoadFailedAlert";
+import { useFocusRefresh } from "@/hooks/useFocusRefresh";
 import { failureMessage } from "@/lib/readFailure";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
@@ -73,6 +74,15 @@ export default function AuditLogPage() {
   /** The list read failed (not an export or a form check): the banner offers Try again. */
   const [loadFailed, setLoadFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  // Read again quietly when the tab is shown (ADR-073 amendment 2026-11-28,
+  // IR-1351): the same filters and page, no spinner, and a failed read keeps
+  // the rows shown. Never on a hint: nearly every act writes a row.
+  const quiet = useRef(false);
+  useFocusRefresh(() => {
+    if (loading || loadFailed) return;
+    quiet.current = true;
+    setAttempt((n) => n + 1);
+  });
 
   useEffect(() => {
     let active = true;
@@ -96,14 +106,18 @@ export default function AuditLogPage() {
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
-    setError("");
-    setLoadFailed(false);
+    const isQuiet = quiet.current;
+    quiet.current = false;
+    if (!isQuiet) {
+      setLoading(true);
+      setError("");
+      setLoadFailed(false);
+    }
     auditApi.list({ ...filters, page, page_size: 20 }).then(({ data }) => {
       if (active) { setEvents(data.results); setTotal(data.count); }
     }).catch((err: unknown) => {
-      if (active) { setEvents([]); setTotal(0); setLoadFailed(true); setError(failureMessage(err, { lead: "The audit log didn't load." })); }
-    }).finally(() => { if (active) setLoading(false); });
+      if (active && !isQuiet) { setEvents([]); setTotal(0); setLoadFailed(true); setError(failureMessage(err, { lead: "The audit log didn't load." })); }
+    }).finally(() => { if (active && !isQuiet) setLoading(false); });
     return () => { active = false; };
   }, [filters, page, attempt]);
 

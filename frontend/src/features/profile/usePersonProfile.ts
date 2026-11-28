@@ -48,6 +48,15 @@ function firstPage<T>(result: PromiseSettledResult<AxiosResponse<ProfilePage<T>>
   };
 }
 
+/**
+ * A list after a quiet read (IR-1351): its fresh first page, unless the reader
+ * has shown more of it, is loading more, or the read failed. Then it stays.
+ */
+function quietlyRead<T>(list: ListState<T>, fresh: PromiseSettledResult<AxiosResponse<ProfilePage<T>>>): ListState<T> {
+  if (list.page > 1 || list.loadingMore || fresh.status === "rejected") return list;
+  return firstPage(fresh);
+}
+
 type IdList = ListState<{ id: number }>;
 type ListPatch = (change: (list: IdList) => IdList) => void;
 
@@ -120,6 +129,38 @@ export function usePersonProfile(id: number) {
 
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
 
+  /**
+   * Read the person again quietly (ADR-073 amendment 2026-11-28, IR-1351): no
+   * loading state, and a list the reader has shown more of keeps its place. A
+   * failed read keeps what is shown; a person who is gone reads as not found,
+   * as a reload would show.
+   */
+  const refresh = useCallback(() => {
+    if (latest.current.kind !== "ready") return;
+    const current = generation.current;
+    Promise.allSettled([
+      peopleApi.get(id),
+      peopleApi.research(id, 1),
+      peopleApi.advised(id, 1),
+      peopleApi.collaborators(id, 1),
+    ]).then(([person, research, advised, collaborators]) => {
+      if (current !== generation.current) return;
+      if (person.status === "rejected") {
+        if (isNotFound(person.reason)) setState({ kind: "not_found" });
+        return;
+      }
+      setState((s) => (s.kind !== "ready" ? s : {
+        kind: "ready",
+        model: {
+          profile: person.value.data,
+          research: quietlyRead(s.model.research, research),
+          advised: quietlyRead(s.model.advised, advised),
+          collaborators: quietlyRead(s.model.collaborators, collaborators),
+        },
+      }));
+    });
+  }, [id]);
+
   /** The next page of one list, or its first when that one failed. */
   const more = useCallback((key: ListKey) => {
     const now = latest.current;
@@ -135,7 +176,7 @@ export function usePersonProfile(id: number) {
     loadMoreProfileList(id, key, list, patch);
   }, [id]);
 
-  return { state, retry, more };
+  return { state, retry, more, refresh };
 }
 
 /** The signed-in person's three lists, without requesting their public-profile header again. */

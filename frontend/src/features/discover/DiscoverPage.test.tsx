@@ -16,7 +16,7 @@ import { Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { importedReference } from "@/test/fixtures/importedReference";
 import { pretendLaidOut } from "@/test/layout";
-import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
+import { act, renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
 import { recordsApi } from "@/api/records";
 import { peopleApi } from "@/api/people";
 import { RequestTimeoutError } from "@/api/requestPolicy";
@@ -1830,5 +1830,61 @@ describe("a new student's Discover tour (IR-1342)", () => {
     await screen.findByRole("heading", { name: publishedThesis.title });
     expect(screen.queryByRole("dialog", { name: "Discover tour" })).not.toBeInTheDocument();
     expect(accountsApi.markTourSeen).not.toHaveBeenCalled();
+  });
+});
+
+describe("read again when the tab is shown (ADR-073 amendment 2026-11-28, IR-1351)", () => {
+  const solarDryers = listItem({ id: 2, title: "Solar Dryers for Rural Farms" });
+  const shown = () => act(() => { window.dispatchEvent(new Event("focus")); });
+  const listCalls = () => vi.mocked(recordsApi.list).mock.calls.length;
+  const settle = () => act(async () => { await new Promise((resolve) => setTimeout(resolve, 700)); });
+
+  it("shows a paper published meanwhile, keeping the search and filters", async () => {
+    renderDiscover("/?q=humidity&type=1");
+    await screen.findByText(publishedThesis.title);
+
+    listed = [solarDryers, publishedThesis];
+    shown();
+
+    expect(await screen.findByText(solarDryers.title)).toBeInTheDocument();
+    expect(screen.getByText(publishedThesis.title)).toBeInTheDocument();
+    expect(lastListParams()).toMatchObject({ search: "humidity", record_type: "1", page: 1 });
+    expect(screen.getByRole("textbox", { name: "Search records" })).toHaveValue("humidity");
+  });
+
+  it("keeps the results when the read fails, with no error shown", async () => {
+    renderDiscover();
+    await screen.findByText(publishedThesis.title);
+    const before = listCalls();
+
+    vi.mocked(recordsApi.list).mockImplementationOnce(() => Promise.reject(new Error("offline")));
+    shown();
+
+    await waitFor(() => expect(listCalls()).toBe(before + 1));
+    expect(screen.getByText(publishedThesis.title)).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("waits while the reader is in the search box", async () => {
+    renderDiscover();
+    await screen.findByText(publishedThesis.title);
+    await userEvent.click(screen.getByRole("textbox", { name: "Search records" }));
+    const before = listCalls();
+
+    shown();
+    await settle();
+    expect(listCalls()).toBe(before);
+  });
+
+  it("leaves Best's recommendations alone", async () => {
+    renderDiscover("/?feed=for_you");
+    await screen.findByText(publishedThesis.title);
+    const feedCalls = vi.mocked(recordsApi.forYou).mock.calls.length;
+    const before = listCalls();
+
+    shown();
+    await settle();
+    expect(vi.mocked(recordsApi.forYou).mock.calls.length).toBe(feedCalls);
+    expect(listCalls()).toBe(before);
   });
 });

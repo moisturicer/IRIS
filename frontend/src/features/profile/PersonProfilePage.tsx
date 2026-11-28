@@ -8,6 +8,7 @@ import { SkeletonBlock } from "@/components/ui/Skeleton";
 import { PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { NotFoundScreen } from "@/features/errors/NotFoundScreen";
 import { useAuth } from "@/hooks/useAuth";
+import { useFocusRefresh } from "@/hooks/useFocusRefresh";
 import { pathFor } from "@/lib/access";
 import { cn } from "@/lib/utils";
 
@@ -34,7 +35,9 @@ export default function PersonProfilePage() {
 }
 
 function PersonProfile({ id }: { id: number }) {
-  const { state, retry, more } = usePersonProfile(id);
+  const { state, retry, more, refresh } = usePersonProfile(id);
+  // Read again when the tab is shown, never on a hint (ADR-073 amendment 2026-11-28, IR-1351).
+  useFocusRefresh(refresh);
 
   switch (state.kind) {
     case "loading":

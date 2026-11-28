@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAuthStore } from "@/store/auth.store";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
-import { renderScreen, screen, waitFor, within } from "@/test/render";
+import { act, renderScreen, screen, waitFor, within } from "@/test/render";
 import type { UserListItem } from "@/types/auth";
 
 import UserListPage from "./UserListPage";
@@ -476,5 +476,41 @@ describe("row actions in a menu (IR-1077)", () => {
     await expectNoBlockingA11yViolations(document.body);
     await userEvent.click(screen.getByRole("menuitem", { name: "Lock" }));
     await expectNoBlockingA11yViolations(document.body);
+  });
+});
+
+describe("read again when the tab is shown (ADR-073 amendment 2026-11-28, IR-1351)", () => {
+  const shown = () => act(() => { window.dispatchEvent(new Event("focus")); });
+
+  it("reads the search the table shows, never text typed and not yet filtered", async () => {
+    renderScreen(<UserListPage />);
+    await rowFor("itso@cit.edu");
+    const box = screen.getByRole("textbox", { name: "Search users" });
+    await userEvent.type(box, "ida");
+    await userEvent.click(screen.getByRole("button", { name: "Filter" }));
+    await waitFor(() => expect(userList).toHaveBeenLastCalledWith({ page: 1, search: "ida" }));
+    await userEvent.type(box, "zzz");
+    act(() => { box.blur(); });
+
+    userList.mockResolvedValue(listing([MEMBER, STUDENT]));
+    const before = userList.mock.calls.length;
+    shown();
+
+    await waitFor(() => expect(userList.mock.calls.length).toBe(before + 1));
+    expect(userList).toHaveBeenLastCalledWith({ page: 1, search: "ida" });
+    await waitFor(() => expect(screen.queryByRole("row", { name: /ierc\.coordinator@cit\.edu/ })).not.toBeInTheDocument());
+    expect(box).toHaveValue("idazzz");
+  });
+
+  it("keeps the rows when reading again fails", async () => {
+    renderScreen(<UserListPage />);
+    await rowFor("itso@cit.edu");
+
+    userList.mockRejectedValueOnce(new Error("offline"));
+    shown();
+
+    await waitFor(() => expect(userList).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole("row", { name: /itso@cit\.edu/ })).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });

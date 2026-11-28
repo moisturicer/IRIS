@@ -6,7 +6,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
-import { renderScreen, screen, waitFor, within } from "@/test/render";
+import { act, renderScreen, screen, waitFor, within } from "@/test/render";
 import type { WorkflowAnalytics } from "@/types/reviews";
 
 import ReviewAnalyticsPage from "./ReviewAnalyticsPage";
@@ -223,5 +223,35 @@ describe("ReviewAnalyticsPage", () => {
     await screen.findByRole("table", { name: /open now/i });
 
     await expectNoBlockingA11yViolations(container);
+  });
+});
+
+describe("ReviewAnalyticsPage, read again when the tab is shown (ADR-073 amendment 2026-11-28, IR-1351)", () => {
+  beforeEach(() => analytics.mockResolvedValue(payload()));
+  afterEach(() => analytics.mockReset());
+  const shown = () => act(() => { window.dispatchEvent(new Event("focus")); });
+
+  it("reads the same figures again, keeping them on screen", async () => {
+    renderScreen(<ReviewAnalyticsPage />);
+    await screen.findByRole("table", { name: /open now/i });
+
+    shown();
+
+    await waitFor(() => expect(analytics).toHaveBeenCalledTimes(2));
+    expect(analytics).toHaveBeenLastCalledWith({ office: "", from: "", to: "" });
+    expect(screen.getByRole("table", { name: /open now/i })).toBeInTheDocument();
+    expect(screen.queryByRole("status", { name: "Loading workflow analytics" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the figures when reading again fails", async () => {
+    renderScreen(<ReviewAnalyticsPage />);
+    await screen.findByRole("table", { name: /open now/i });
+
+    analytics.mockRejectedValueOnce(new Error("offline"));
+    shown();
+
+    await waitFor(() => expect(analytics).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole("table", { name: /open now/i })).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });
