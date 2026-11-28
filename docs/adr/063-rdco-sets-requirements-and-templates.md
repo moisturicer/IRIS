@@ -87,7 +87,7 @@ One list, the slot, is what people upload into, what offices request and what Gu
 - **Not decided here, each a follow-up story under IR-671:**
   - configurable record types (IR-976, post-MVP);
   - a TBI (Technology Business Incubator) office (IR-977). IPAMS put TBI in KTTO's step, but IRIS will make it its own specialist office;
-  - a KTTO-owned IP application flow, For Application → Reviewed → Filed → Approved / Disapproved (IR-978). IPAMS had only a status dropdown on every document;
+  - a KTTO-owned IP application flow, For Application → Reviewed → Filed → Approved / Disapproved (IR-978). *Superseded 2026-11-28 (IR-1355): there is no separate application; ITSO sets each IP document's status in the main paper flow (IR-1356), and the slots stay on the submission.* IPAMS had only a status dropdown on every document;
   - a TBI-owned commercialization review with recommendations (IR-979).
 
 ## MVP Impact

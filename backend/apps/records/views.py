@@ -1721,7 +1721,7 @@ class RecordViewSet(viewsets.ModelViewSet):
                 updates[field] = value
 
         # Only ITSO's release opens the disclosure check for a marked paper
-        # (ADR-052 §12, IR-813), so no office clears the mark, KTTO included.
+        # (ADR-052 §12, IR-813), so no office clears the mark, ITSO included.
         if updates.get("is_ip") is False and record.is_ip:
             return Response(
                 {"is_ip": [ip_release.MARK_CANNOT_BE_CLEARED]},

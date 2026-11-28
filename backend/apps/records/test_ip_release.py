@@ -115,7 +115,7 @@ class WhoReleasesTests(ReleaseBase):
         self.assertIsNotNone(record.ip_released_at)
         self.assertTrue(decision_for_record(record).allowed)
 
-    def test_no_one_else_can_not_ktto_rdco_the_adviser_nor_an_owner(self):
+    def test_no_other_role_can_release_it(self):
         for user in (self.ktto, self.rdco, self.ierc, self.adviser, self.owner):
             with self.subTest(user=user.email):
                 record = self._paper()

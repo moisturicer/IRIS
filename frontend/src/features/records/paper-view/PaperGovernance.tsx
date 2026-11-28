@@ -63,7 +63,7 @@ export function PaperGovernance({ record, full = false, showStatus = false }: {
     ...(record.ip_release
       ? [{
           label: "IP Release",
-          value: record.ip_release.released ? "Released for the AI by ITSO" : "Not released for the AI",
+          value: record.ip_release.released ? "Released for the AI" : "Not released for the AI",
         }]
       : []),
     {
