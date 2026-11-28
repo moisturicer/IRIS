@@ -136,6 +136,10 @@ class User(AbstractBaseUser, PermissionsMixin):
     #: from `apps.accounts.tours.TOUR_KEYS`. Written only by
     #: `POST /users/me/tours/<key>/`, read only on their own `/users/me/`.
     tours_seen = models.JSONField(default=list, blank=True)
+    #: "Don't show tours again" (IR-1349): no student tour starts by itself
+    #: while it is set; Settings › Help still starts one. Written only by
+    #: `PUT /users/me/tours-off/`, read only on their own `/users/me/`.
+    tours_off = models.BooleanField(default=False)
 
     objects = UserManager()
 

@@ -520,6 +520,26 @@ class MeTourSeenView(APIView):
         return Response({"tours_seen": seen})
 
 
+class MeToursOffView(APIView):
+    """`PUT /users/me/tours-off/` with `{"off": true|false}` (IR-1349).
+
+    "Don't show tours again", from a tour's card or Settings › Help. Like
+    `MeTourSeenView` it acts on `request.user` alone and writes `tours_off`
+    alone. Anything but a JSON boolean is a 400, so `"false"` can never be
+    read as set.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request):
+        from apps.accounts import tours
+
+        off = request.data.get("off") if isinstance(request.data, dict) else None
+        if not isinstance(off, bool):
+            return Response({"detail": "Send off as true or false."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"tours_off": tours.set_off(request.user, off)})
+
+
 class PersonalDataExportView(APIView):
     """One JSON file of the signed-in person's own data (ADR-051 decision 13, IR-786).
 

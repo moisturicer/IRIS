@@ -85,6 +85,8 @@ def account(user) -> dict:
         ],
         # The student guided tours this person has been shown (IR-1342).
         "tours_seen": list(user.tours_seen or []),
+        # "Don't show tours again" (IR-1349).
+        "tours_off": user.tours_off,
         "student_profile": None,
         "adviser_profile": None,
     }

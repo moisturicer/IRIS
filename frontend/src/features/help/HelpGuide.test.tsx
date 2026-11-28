@@ -143,6 +143,12 @@ describe("Guided tours (IR-1342, AC 5)", () => {
     expect(within(tours!).getByRole("link", { name: "Take the tour of Publish" })).toBeInTheDocument();
   });
 
+  it("shows Don't show tours again as the account has it (IR-1349, AC 4)", () => {
+    renderAs({ role_name: ROLES.STUDENT, can_author: true, tours_off: true });
+    const tours = section("Guided tours")!;
+    expect(within(tours).getByRole("checkbox", { name: "Don't show tours again" })).toBeChecked();
+  });
+
   it.each([
     ["an Adviser", ROLES.ADVISER],
     ["RDCO", ROLES.RDCO],
