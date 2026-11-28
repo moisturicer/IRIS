@@ -39,7 +39,7 @@ system**, and the request is therefore invisible to the record. That is delibera
 behaviour a missing form needs), but it means nothing distinguishes "you forgot a form" from a
 substantive revision — which matters to IR-144's audit events. Tracked on IR-118.
 
-> **Amended 2026-11-28 ([IR-1355](https://citiris.atlassian.net/browse/IR-1355); decided by Hermoine Zozobrado; Proposed until its pull request merges after review).** This ADR's office table stands again for ITSO: it reviews IP and patents, and the `is_ip` flag hints at ITSO (ADR-066 and ADR-068 had moved IP to KTTO). Commercial potential is KTTO's, shared with TBI once built. See [ADR-068](068-tbi-is-a-specialist-office.md)'s amendment.
+> **Amended 2026-11-28 ([IR-1355](https://citiris.atlassian.net/browse/IR-1355); decided by Hermoine Zozobrado; accepted by Ashlee Sean with PR #1041's merge on 2026-11-28, as relayed by Hermoine Zozobrado).** This ADR's office table stands again for ITSO: it reviews IP and patents, and the `is_ip` flag hints at ITSO (ADR-066 and ADR-068 had moved IP to KTTO). Commercial potential is KTTO's, shared with TBI once built. See [ADR-068](068-tbi-is-a-specialist-office.md)'s amendment.
 
 ## Context
 
