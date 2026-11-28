@@ -172,6 +172,8 @@ How a flagged question is then answered:
 - **Deleting a Conversation deletes its feedback**, shared exchanges included. A deletion the reader believes is complete must be complete.
 - **Feedback is never a ranking input.** It changes no retrieval score and no ordering. It is evidence for [ADR-023](023-retrieval-quality-evaluation.md)'s measurement, read by people. Letting a handful of votes on a small institutional corpus steer ranking would make retrieval quality drift in a way no measurement could attribute, and would make gaming it trivial.
 
+> **Cross-reference 2026-11-28 (IR-1346).** A reader's **Vote** on a published paper ([ADR-075](075-votes-on-published-papers.md)) is not this section's feedback, which is about an Ask IRIS answer. It follows the same rule for the same reason: never a retrieval or ranking input.
+
 
 ## Amendment — 2026-10-02 (IR-444): resolution runs on every follow-up, and a Turn's answer is embedded too
 
