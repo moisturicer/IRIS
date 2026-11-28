@@ -727,6 +727,18 @@ describe("the account menu", () => {
     expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
   });
 
+  // IR-1307: a long address stays on one line, cut short, with the whole of it on hover.
+  it("keeps the email on one line, cut short, with the full address as its title", async () => {
+    const user = userEvent.setup();
+    signIn(ROLES.STUDENT);
+    renderAt("/records/mine");
+
+    await user.click(await screen.findByRole("button", { name: /account menu/ }));
+    const email = screen.getByText("adviser@cit.edu");
+    expect(email).toHaveAttribute("title", "adviser@cit.edu");
+    expect(email).toHaveClass("truncate");
+  });
+
   it("opens Profile and Settings, each closing the menu behind it", async () => {
     const user = userEvent.setup();
     signIn(ROLES.STUDENT);
