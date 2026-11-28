@@ -356,6 +356,10 @@ _Avoid_: Access (the audit log's word for one opening), hit, read, reader count.
 Published papers ordered by the [[View]]s they gained in the last 30 days, then by all-time views, then newest first. Distinct from Most Viewed, which orders by all-time views alone.
 _Avoid_: Popular, hot, most viewed.
 
+**Vote**:
+A reader marking a published paper **Useful** or **Not useful**: whether it was useful to them, not whether they agree with it. Each account has at most one vote per paper and can switch or clear it. A paper shows both counts, never who voted. Its owners, its Adviser and the System Admin don't vote on it. Votes never change any ordering or anything Ask IRIS finds ([ADR-075](docs/adr/075-votes-on-published-papers.md)).
+_Avoid_: Upvote, downvote, like, rating, score, feedback (that is an Ask IRIS answer's).
+
 ### Calls & Conferences
 
 **Call**:
