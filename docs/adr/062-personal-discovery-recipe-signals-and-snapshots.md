@@ -8,6 +8,10 @@
 
 **Proposed**, awaiting a reviewer's approval. Discover's For you / Latest / Trending tabs and the separate Sort select become one Sort control with four options: **Best**, Newest, Most viewed and Trending. **Best is this ADR's For you feed under a reader-facing label**: the same endpoint (`/records/for_you/`), recipe, reasons, cursor and snapshot, and the same Latest fallback with its notice when there is no usable signal (decision 3). Nothing in decisions 1 to 10 changes behaviour. The only wording this ADR fixes, decision 7's reset confirmation, now reads "the papers you saved still shape Best until you unsave them". "For you" stays the name of the feed in code and in this ADR; the URL keeps `feed=for_you`, so existing links open Best.
 
+### Amendment 2026-11-28 (IR-1346): Votes are never a signal
+
+**Proposed** with [ADR-075](075-votes-on-published-papers.md), awaiting a reviewer's approval. Decision 5's list of things that are never signals gains **Votes** (CONTEXT.md **Vote**): neither a reader's own votes nor a paper's Useful and Not useful counts are read by the recipe, and they change no ordering. The recipe's inputs stay exactly the four models decision 5 names, so `RECIPE_VERSION` doesn't change.
+
 ## Context
 
 Discover's catalogue orders by added date or lifetime access count. IR-557 adds a **For you** feed that learns from what a reader has told IRIS, with a reason on every item, reversible feedback and stable pagination. Three tickets built it in slices:

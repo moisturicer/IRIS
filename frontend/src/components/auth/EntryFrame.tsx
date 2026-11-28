@@ -1,5 +1,4 @@
 import { useState, type ReactNode } from "react";
-import { Link } from "react-router-dom";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { DataNotice } from "@/features/auth/DataNotice";
@@ -14,8 +13,6 @@ interface EntryLede {
 }
 
 interface EntryFrameProps {
-  /** Account help on register, without leaving the form (sign in has none since IR-1281). */
-  help?: boolean;
   /** Headline and plain sentence, on sign in and register only (IR-704). */
   lede?: EntryLede;
   /** The folder's index tabs, sitting on the sheet's top edge. */
@@ -51,11 +48,14 @@ interface EntryFrameProps {
  * text, so the visual order and the reading order differing loses nothing a
  * keyboard user moves through.
  *
+ * No screen offers Help in the masthead: sign in dropped it in IR-1281 and
+ * register followed, so the footer's privacy and terms are its only dialogs.
+ *
  * Policy dialogs identify interim material; approval remains with IR-214.
  */
-export function EntryFrame({ help, lede, tabs, before, wide, children }: EntryFrameProps) {
-  const [information, setInformation] = useState<"Help" | "Data privacy" | "Terms" | null>(null);
-  const informationLink = (label: "Help" | "Data privacy" | "Terms", fragment: string) => (
+export function EntryFrame({ lede, tabs, before, wide, children }: EntryFrameProps) {
+  const [information, setInformation] = useState<"Data privacy" | "Terms" | null>(null);
+  const informationLink = (label: "Data privacy" | "Terms", fragment: string) => (
     <a
       href={`#${fragment}`}
       aria-haspopup="dialog"
@@ -89,16 +89,6 @@ export function EntryFrame({ help, lede, tabs, before, wide, children }: EntryFr
             uses your details.
           </p>
         )}
-        {information === "Help" && (
-          <div className="space-y-3 text-small text-stone-700">
-            <p>Sign in with your registered email address and password.</p>
-            <p>To join IRIS, choose Create an account, complete your details, and verify your email.
-              An administrator reviews your role request before you can access the workspace.</p>
-            <Link to="/password/forgot" className={cn("inline-flex min-h-11 items-center rounded-control font-semibold text-brand underline", FOCUS_RING)}>
-              Reset your password
-            </Link>
-          </div>
-        )}
       </Modal>
       <header className="border-b border-stone-200 bg-white">
         <div className="mx-auto flex max-w-page items-center justify-between gap-3 px-4 py-2 sm:px-8 lg:px-12">
@@ -122,7 +112,6 @@ export function EntryFrame({ help, lede, tabs, before, wide, children }: EntryFr
               />
             </picture>
           </Masthead>
-          {help && <div className="shrink-0 text-small">{informationLink("Help", "entry-help")}</div>}
         </div>
       </header>
 
