@@ -7,8 +7,10 @@
  * that scrolls with the page holds only the menu button and the bell.
  * Reverses spec §4.2's "one app header on every screen" (amended here).
  *
- * The shell also picks each page's width from its route (IR-521): standard
- * unless the route's handle asks for "full".
+ * The shell draws one frame around every page, for every role (IR-521,
+ * IR-1353): the same gutter and the same 1440px cap, including the admin
+ * tables that used to run edge to edge and Discover, which drew its own. Ask
+ * IRIS and a record lay out their own page and get none.
  *
  * A page starts with its own title, with no breadcrumb above it (IR-1255).
  *
@@ -20,12 +22,12 @@ import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 
 import { makeUser } from "@/test/authFixtures";
-import { ROLES } from "@/lib/constants";
+import { ROLES, type RoleName } from "@/lib/constants";
 import { useAuthStore } from "@/store/auth.store";
 
 import { AppShell } from "./AppShell";
 import { NotificationBell } from "./NotificationBell";
-import { PAGE_WIDTH } from "./PageContainer";
+import { PAGE_GUTTER, PAGE_WIDTH } from "./PageContainer";
 
 vi.mock("@/api/client", () => ({ apiClient: { get: vi.fn() } }));
 vi.mock("@/api/notifications", () => ({ notificationsApi: { list: vi.fn() } }));
@@ -39,8 +41,12 @@ function renderAt(path: string) {
       {
         element: <AppShell />,
         children: [
+          { path: "/", element: <h1>Discover</h1>, handle: { title: "Discover" } },
           { path: "/records/mine", element: <h1>My Library</h1>, handle: { title: "My Library" } },
-          { path: "/admin/audit", element: <h1>Audit Log</h1>, handle: { title: "Audit Log", width: "full" } },
+          { path: "/rdco/role-requests", element: <h1>Role requests</h1>, handle: { title: "Role requests" } },
+          { path: "/admin/audit", element: <h1>Audit Log</h1>, handle: { title: "Audit Log" } },
+          { path: "/ai", element: <h1>Ask IRIS</h1>, handle: { title: "Ask IRIS" } },
+          { path: "/records/:id", element: <h1>A paper</h1>, handle: { title: "Paper" } },
           // Stands in for Ask IRIS, whose toolbar mounts a third bell.
           {
             path: "/with-bell",
@@ -152,18 +158,40 @@ describe("the app shell", () => {
     expect(within(nav).queryByRole("link", { name: /Settings/ })).not.toBeInTheDocument();
   });
 
-  it("gives a page the standard width unless its route asks for full", async () => {
-    renderAt("/records/mine");
+  describe("one page frame for every role (IR-1353)", () => {
+    // A sample of each role's pages: an ordinary page, Discover, and the admin
+    // tables that used to run edge to edge.
+    const framed: [RoleName, string, string][] = [
+      [ROLES.STUDENT, "/", "Discover"],
+      [ROLES.STUDENT, "/records/mine", "My Library"],
+      [ROLES.ADVISER, "/records/mine", "My Library"],
+      [ROLES.ITSO, "/", "Discover"],
+      [ROLES.RDCO, "/rdco/role-requests", "Role requests"],
+      [ROLES.SYSTEM_ADMIN, "/admin/audit", "Audit Log"],
+    ];
 
-    const page = await screen.findByRole("heading", { name: "My Library" });
-    expect(page.parentElement!.className).toContain(PAGE_WIDTH.standard);
-  });
+    it.each(framed)("frames a %s's %s page with the gutter outside the cap", async (role, path, title) => {
+      useAuthStore.setState({ user: makeUser({ role_name: role }) });
+      renderAt(path);
 
-  it("gives a full-width route the whole width", async () => {
-    renderAt("/admin/audit");
+      const heading = await screen.findByRole("heading", { name: title });
+      const main = screen.getByRole("main");
+      const cap = heading.parentElement!;
+      expect(cap.className).toContain(PAGE_WIDTH.standard);
+      expect(cap.parentElement!.className).toBe(PAGE_GUTTER);
+      expect(cap.parentElement!.parentElement).toBe(main);
+      // main itself adds nothing, so the gutter is the whole margin.
+      expect(main.className).not.toMatch(/(^|\s|:)p[xytblr]?-\d/);
+    });
 
-    const page = await screen.findByRole("heading", { name: "Audit Log" });
-    expect(page.parentElement!.className).not.toContain(PAGE_WIDTH.standard);
+    it.each([["/ai", "Ask IRIS"], ["/records/12", "A paper"]])(
+      "draws no frame around %s, which lays out its own page", async (path, title) => {
+        renderAt(path);
+
+        const heading = await screen.findByRole("heading", { name: title });
+        expect(heading.parentElement).toBe(screen.getByRole("main"));
+      },
+    );
   });
 
   it("fetches unread notifications once however many bells are mounted (IR-370)", async () => {
