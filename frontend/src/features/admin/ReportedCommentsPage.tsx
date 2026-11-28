@@ -10,7 +10,7 @@
  * reports and leaves the comment. If someone else acted first, the server says
  * so, and the queue is read again either way.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { moderationApi } from "@/api/moderation";
@@ -18,6 +18,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { LoadFailedAlert } from "@/components/shared/LoadFailedAlert";
 import { errorDetail } from "@/lib/errorDetail";
 import { queueCountsChanged } from "@/lib/queueCounts";
@@ -51,9 +52,20 @@ export default function ReportedCommentsPage() {
   const [dismissing, setDismissing] = useState<number | null>(null);
 
   const reload = useCallback(() => setAttempt((n) => n + 1), []);
+  // Live updates (ADR-073, IR-1350): the queue RDCO and the System Admin share,
+  // read again quietly when either acts elsewhere. A failed quiet read keeps
+  // the list already shown.
+  const quiet = useRef(false);
+  const reloadQuietly = useCallback(() => {
+    quiet.current = true;
+    setAttempt((n) => n + 1);
+  }, []);
+  useLiveRefresh(["queues"], reloadQuietly);
 
   useEffect(() => {
     const controller = new AbortController();
+    const isQuiet = quiet.current;
+    quiet.current = false;
     moderationApi
       .reportedComments({ signal: controller.signal })
       .then(({ data }) => {
@@ -63,7 +75,8 @@ export default function ReportedCommentsPage() {
         setRead({ status: "ready", comments: data.comments });
       })
       .catch((error) => {
-        if (!controller.signal.aborted) setRead({ status: "failed", error });
+        if (controller.signal.aborted) return;
+        setRead((shown) => (isQuiet && shown.status === "ready" ? shown : { status: "failed", error }));
       });
     return () => controller.abort();
   }, [attempt]);
