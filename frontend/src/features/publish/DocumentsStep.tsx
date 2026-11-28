@@ -12,23 +12,26 @@
  * too). For a Proposal, the chosen Adviser's own Templates are pointed out
  * (decision 8): Advisers share them for Proposals.
  */
-import { useId } from "react";
+import { useId, useState } from "react";
 
 import { guidelinesApi, type SharedTemplate } from "@/api/guidelines";
 import { documentsApi } from "@/api/documents";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { PlainTextWithLinks } from "@/components/shared/PlainTextWithLinks";
 import { useApiRead, type ApiRead } from "@/hooks/useApiRead";
 import { LOAD_ERROR } from "@/components/ui/fieldClasses";
 import { cn } from "@/lib/utils";
+import { errorDetail } from "@/lib/errorDetail";
 import { DocumentRow, byline } from "@/features/records/paper-view/DocumentRow";
+import { RemoveButton } from "@/features/records/paper-view/DocumentsTab";
 import { useRowUploads } from "@/features/records/paper-view/rowUploads";
 import {
   GuideUnavailable, ManuscriptTemplate, RequirementTemplate, isSharedList, useRequirementGuide,
 } from "@/features/guidelines/requirementGuide";
 import { TemplateDownload } from "@/features/guidelines/TemplateDownload";
-import type { SlotWithUploads } from "@/types/documents";
+import type { RecordUpload, SlotWithUploads } from "@/types/documents";
 
 import { GuidelinesLink } from "./ManuscriptStep";
 
@@ -57,6 +60,23 @@ export function DocumentsStep({ recordId, typeId, typeName, manuscriptName, slot
   const guide = guideRead.guide;
   const { pdfUpload } = useRowUploads(async () => slots.refresh());
   const list = slots.status === "ready" && isSlotList(slots.data) ? slots.data : null;
+  // A wrong upload is removed here, asking first (IR-1317); a kept one shows why.
+  const [removing, setRemoving] = useState<{ name: string; upload: RecordUpload } | null>(null);
+  const [removeBusy, setRemoveBusy] = useState(false);
+  const [removeError, setRemoveError] = useState<string | null>(null);
+  const confirmRemove = async () => {
+    if (!removing) return;
+    setRemoveBusy(true);
+    try {
+      await documentsApi.deleteUpload(removing.upload.id);
+      setRemoving(null);
+      await slots.refresh();
+    } catch (err) {
+      setRemoveError(errorDetail(err, `Could not remove ${removing.name}. Please try again.`));
+    } finally {
+      setRemoveBusy(false);
+    }
+  };
 
   return (
     <div className="flex flex-col gap-section">
@@ -100,14 +120,52 @@ export function DocumentsStep({ recordId, typeId, typeName, manuscriptName, slot
                 required={requirement?.is_required}
                 template={<RequirementTemplate requirement={requirement} />}
                 latest={latest ? byline(latest.version, latest.uploaded_by_name, latest.created_at) : null}
-                actions={!slot.hidden && pdfUpload(`slot:${slot.id}`, `Upload ${slot.name}`,
-                  (file, onProgress) => documentsApi.upload(recordId, slot.id, file, { onProgress }))}
+                actions={(
+                  <>
+                    {latest && !latest.delete_refused && (
+                      <RemoveButton
+                        name={`${slot.name} version ${latest.version}`}
+                        onClick={() => {
+                          setRemoveError(null);
+                          setRemoving({ name: `${slot.name} version ${latest.version}`, upload: latest });
+                        }}
+                      />
+                    )}
+                    {latest?.delete_refused && <KeptNote reason={latest.delete_refused} />}
+                    {!slot.hidden && pdfUpload(`slot:${slot.id}`, `Upload ${slot.name}`,
+                      (file, onProgress) => documentsApi.upload(recordId, slot.id, file, { onProgress }))}
+                  </>
+                )}
               />
             );
           })}
         </ul>
       )}
+
+      <ConfirmDialog
+        open={removing !== null}
+        title={removing ? `Remove ${removing.name}?` : "Remove this file?"}
+        message="The file is deleted from IRIS and can't be restored."
+        confirmLabel="Remove"
+        danger
+        focusCancel
+        confirming={removeBusy}
+        error={removeError}
+        onConfirm={() => void confirmRemove()}
+        onCancel={() => setRemoving(null)}
+      />
     </div>
+  );
+}
+
+/** A file the review relied on stays; the server says why (ADR-058 §2). */
+function KeptNote({ reason }: { reason: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 text-small text-stone-600">
+      <i className="fas fa-lock text-2xs" aria-hidden />
+      Kept
+      <span className="sr-only">: {reason}</span>
+    </span>
   );
 }
 

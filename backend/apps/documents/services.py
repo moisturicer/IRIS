@@ -44,33 +44,19 @@ def create_upload(record, slot: UploadSlot, file, uploaded_by) -> RecordUpload:
     )
 
 
-def delete_upload(upload: RecordUpload, deleted_by, force: bool = False) -> None:
+def delete_upload(upload: RecordUpload, deleted_by) -> None:
     """
-    Delete a specific upload version.
+    Delete one version of a supporting document, any version, the first
+    included (ADR-058 §2, IR-1317). Refuses, for everyone, a file the review
+    relied on. The physical file is removed with the row.
 
-    Rules:
-    - Any authenticated user who is the record owner or staff may delete.
-    - Version 1 uploads can only be deleted by staff (force=True) because
-      removing the only version of a required slot could corrupt the record.
-    - The physical file is removed from storage together with the DB row.
-
-    Raises ValueError with a human-readable message on rule violations.
+    Raises ValueError with a human-readable message when it refuses.
     """
-    # Review history first, for everyone (ADR-058 §2, IR-872): `force` is an
-    # office's override of the slot rule below, never of this one.
     from apps.records.versions import deletion_refused_reason
 
     refused = deletion_refused_reason(upload)
     if refused:
         raise ValueError(refused)
-
-    # A held upload is the owner's to take back, whatever its number: no
-    # Version names it and it answers nothing (ADR-022 Amendment 8, point 7).
-    if upload.version == 1 and not force and not upload.held:
-        raise ValueError(
-            "The first version of an upload cannot be deleted without staff override. "
-            "Upload a corrected version instead."
-        )
 
     # Remove physical file from storage — best-effort, does not raise
     try:

@@ -648,7 +648,7 @@ function DownloadButton({ name, onClick }: { name: string; onClick: () => void }
  * tooltip, and named for what it removes. Its target is the row actions' own,
  * 44px on touch and 36px beside a pointer, so the row does not grow.
  */
-function RemoveButton({ name, onClick }: { name: string; onClick: () => void }) {
+export function RemoveButton({ name, onClick }: { name: string; onClick: () => void }) {
   return (
     <Tooltip label="Remove">
       <button
