@@ -6,7 +6,7 @@
 
 It amends [ADR-018](018-conditional-parallel-office-routing.md) (KTTO, not ITSO, owns IP), [ADR-063](063-rdco-sets-requirements-and-templates.md) (the IP and commercialization upload slots move into applications) and [ADR-052](052-each-paper-states-its-embargo-and-a-person-ends-it.md) (starting an application sets the IP mark). It sets the shape that IR-979's commercialization application follows.
 
-> **Superseded 2026-11-28 ([IR-1355](https://citiris.atlassian.net/browse/IR-1355); decided by Hermoine Zozobrado; Proposed until its pull request merges after review).**
+> **Superseded 2026-11-28 ([IR-1355](https://citiris.atlassian.net/browse/IR-1355); decided by Hermoine Zozobrado; accepted by Ashlee Sean with PR #1041's merge on 2026-11-28, as relayed by Hermoine Zozobrado).**
 > There are no separate IP or commercialization applications, and KTTO does not own IP. IP stays in
 > the main paper flow: `is_ip` marks it as in application, and **ITSO** moves each IP document through
 > For Application → Reviewed → Filed → Approved / Disapproved, with RDCO warned before publishing a

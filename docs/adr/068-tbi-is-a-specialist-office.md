@@ -6,7 +6,7 @@
 
 It amends [ADR-018](018-conditional-parallel-office-routing.md) (KTTO's review question is IP; commercial potential is TBI's, and `for_commercialization` hints at TBI) and [ADR-066](066-ip-applications-beside-publishing.md) (a publishing-gate override notifies the office that owns the application). It follows [ADR-032](032-adviser-first-review-and-office-reviewer-pools.md) for TBI's pool, seats and coordinators, and [ADR-051](051-system-admin-account-deletion-and-consent.md) §4 for who grants its role.
 
-> **Amended 2026-11-28 ([IR-1355](https://citiris.atlassian.net/browse/IR-1355); decided by Hermoine Zozobrado; Proposed until its pull request merges after review).** ITSO handles IP and patents. KTTO and TBI handle commercialization as **one shared step with the same papers**, as in IPAMS. Decisions 1–4, 8 and 9 change. See *Amendment, 2026-11-28* below.
+> **Amended 2026-11-28 ([IR-1355](https://citiris.atlassian.net/browse/IR-1355); decided by Hermoine Zozobrado; accepted by Ashlee Sean with PR #1041's merge on 2026-11-28, as relayed by Hermoine Zozobrado).** ITSO handles IP and patents. KTTO and TBI handle commercialization as **one shared step with the same papers**, as in IPAMS. Decisions 1–4, 8 and 9 change. See *Amendment, 2026-11-28* below.
 
 ## Context
 
@@ -52,7 +52,7 @@ Observed on `main`, 2026-11-13:
 
 ### Amendment, 2026-11-28 (IR-1355)
 
-Decided by Hermoine Zozobrado on 2026-11-28, in chat; transcribed by an agent. **Proposed** until IR-1355's pull request merges after review.
+Decided by Hermoine Zozobrado on 2026-11-28, in chat; transcribed by an agent. **Accepted** by Ashlee Sean with PR #1041's merge on 2026-11-28, as relayed by Hermoine Zozobrado.
 
 - **ITSO's question is IP and patents**: whether the paper holds something to protect (patent, utility model, industrial design, trademark, copyright), prior art, and whether to file. This restores ADR-018's office table.
   - The author's `is_ip` flag hints at **ITSO**.
