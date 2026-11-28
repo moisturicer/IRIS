@@ -35,7 +35,7 @@ export default {
   ],
 
   theme: {
-    // Three corner radii (IR-1043; 01-design-system.md "Radius, shadow, spacing").
+    // Three corner radii, plus the tours' spotlight (IR-1043, IR-1344; 01-design-system.md "Radius, shadow, spacing").
     // Named for what the shape is, so a reviewer can say a card has the wrong
     // one. This REPLACES Tailwind's scale rather than extending it, so `rounded`,
     // `rounded-lg` and the rest emit no CSS at all; `src/test/radius.test.ts`
@@ -48,6 +48,9 @@ export default {
       card:    "1rem",
       // Modals, sheets and the dialogs' bottom sheet.
       dialog:  "1.25rem",
+      // The guided tours' highlight around a step's target (IR-1344): a white
+      // cut-out on a dark overlay reads much rounder than a row at 12 px.
+      spotlight: "0.375rem",
       full:    "9999px",
     },
 

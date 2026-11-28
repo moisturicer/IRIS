@@ -135,7 +135,9 @@ export function GuidedTour({ steps, label, opener, onClose, onShown, container }
   return createPortal(
     <>
       {box && (
-        <div aria-hidden className="fixed z-[60] pointer-events-none rounded-control ring-2 ring-brand"
+        // The maroon edge is an outline, not a ring: Tailwind draws a ring with
+        // box-shadow, which the overlay's own box-shadow below replaced (IR-1344).
+        <div aria-hidden className="fixed z-[60] pointer-events-none rounded-spotlight outline outline-2 outline-brand"
           style={{ top: box.top - 4, left: box.left - 4, width: box.width + 8, height: box.height + 8,
             boxShadow: "0 0 0 9999px rgb(41 37 36 / .4)" }} />
       )}

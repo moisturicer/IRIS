@@ -4,7 +4,8 @@
  *
  * There are three corner radii, named for what the shape is: `rounded-control`
  * (inputs, buttons that are not pills, chips and rows), `rounded-card` (cards
- * and panels) and `rounded-dialog` (modals and sheets). `rounded-full` is for
+ * and panels) and `rounded-dialog` (modals and sheets), plus `rounded-spotlight`
+ * for the guided tours' highlight only (IR-1344). `rounded-full` is for
  * pills and avatars and `rounded-none` squares a corner off; both pass. A
  * corner utility (`rounded-t-`, `rounded-bl-`) takes the same names.
  *
