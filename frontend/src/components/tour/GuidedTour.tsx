@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
+import { CHECKBOX } from "@/components/ui/fieldClasses";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { useDialogFocus } from "@/hooks/useDialogFocus";
@@ -50,6 +51,12 @@ export interface GuidedTourProps {
    * honours `aria-modal` still reaches it (IR-1342, Publish).
    */
   container?: Element | null;
+  /**
+   * A tickbox above the buttons, such as the student tours' "Don't show tours
+   * again" (IR-1349). The caller owns its state and decides when to save it;
+   * a tour that passes none, such as the Review tour, has no tickbox.
+   */
+  optOut?: { label: string; checked: boolean; onChange: (checked: boolean) => void };
 }
 
 /**
@@ -67,7 +74,7 @@ export interface GuidedTourProps {
  * drops or restores steps rather than pointing at nothing. With none left it
  * closes itself.
  */
-export function GuidedTour({ steps, label, opener, onClose, onShown, container }: GuidedTourProps) {
+export function GuidedTour({ steps, label, opener, onClose, onShown, container, optOut }: GuidedTourProps) {
   const panel = useRef<HTMLDivElement>(null);
   const primary = useRef<HTMLButtonElement>(null);
   // The step is remembered by id, not position: opening the pane or resizing
@@ -156,6 +163,14 @@ export function GuidedTour({ steps, label, opener, onClose, onShown, container }
             </ul>
           )}
         </div>
+        {optOut && (
+          <label className="mt-3 flex min-h-11 cursor-pointer items-center gap-2.5 border-t border-stone-200 pt-1 text-small text-stone-700">
+            <input type="checkbox" checked={optOut.checked}
+              onChange={(event) => optOut.onChange(event.target.checked)}
+              className={cn(CHECKBOX, "shrink-0", FOCUS_RING)} />
+            {optOut.label}
+          </label>
+        )}
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button type="button" onClick={onClose}
             className={cn("inline-flex items-center min-h-11 px-2 rounded-full text-sm font-semibold text-stone-700 hover:text-stone-900 underline underline-offset-2", FOCUS_RING)}>

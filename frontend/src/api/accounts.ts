@@ -135,6 +135,10 @@ export const accountsApi = {
   markTourSeen: (key: string) =>
     apiClient.post<{ tours_seen: string[] }>(`/users/me/tours/${encodeURIComponent(key)}/`, {}),
 
+  /** The caller's "Don't show tours again" (IR-1349). */
+  setToursOff: (off: boolean) =>
+    apiClient.put<{ tours_off: boolean }>("/users/me/tours-off/", { off }),
+
   /** One JSON file of the caller's own data (ADR-051 decision 13, IR-786). */
   downloadMyData: () => apiClient.get<Blob>("/users/me/data/", { responseType: "blob" }),
 

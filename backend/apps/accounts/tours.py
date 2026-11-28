@@ -55,3 +55,17 @@ def mark_seen(user, key: str) -> list[str]:
             User.objects.filter(pk=user.pk).update(tours_seen=seen)
     user.tours_seen = seen
     return seen
+
+
+def set_off(user, off: bool) -> bool:
+    """Set `user`'s "Don't show tours again" (IR-1349), and return it.
+
+    Writes `tours_off` alone. While it is set no tour starts by itself; a tour
+    taken again from Settings › Help still starts, and `tours_seen` is kept,
+    so unsetting it brings back only the tours not yet seen.
+    """
+    from apps.accounts.models import User
+
+    User.objects.filter(pk=user.pk).update(tours_off=off)
+    user.tours_off = off
+    return off

@@ -72,6 +72,12 @@ export interface User {
    * `accountsApi.markTourSeen`. Absent means "not known": no tour starts.
    */
   tours_seen?:         string[];
+  /**
+   * "Don't show tours again" (IR-1349): while true no student tour starts by
+   * itself. Own payload only, written only through `accountsApi.setToursOff`.
+   * Absent reads as false.
+   */
+  tours_off?:          boolean;
 }
 
 export interface OwnRoleRequest {

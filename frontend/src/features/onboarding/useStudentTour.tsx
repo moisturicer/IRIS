@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { accountsApi } from "@/api/accounts";
 import { GuidedTour } from "@/components/tour/GuidedTour";
@@ -8,9 +8,11 @@ import type { TourStep } from "@/components/tour/types";
 import { PUBLISH_PARAM } from "@/features/publish/publishLink";
 import { ROLES } from "@/lib/constants";
 import { useAuthStore } from "@/store/auth.store";
+import { useUIStore } from "@/store/ui.store";
 
 import { TOUR_LABELS } from "./studentTours";
 import { TOUR_PARAM, type TourKey } from "./tourKeys";
+import { saveToursOff, TOURS_OFF_LABEL, TOURS_SETTINGS_HREF } from "./toursOff";
 import { useTourSession } from "./tourSession";
 
 /** The app shell's `main`, where focus goes when a tour that started by itself closes. */
@@ -45,6 +47,12 @@ interface Options {
  * One tour at a time: a page's tour waits while Publish is open, and Publish
  * opening over it closes it without marking it, so it comes back on the
  * page's next visit.
+ *
+ * "Don't show tours again" (IR-1349): while the account has it set, no tour
+ * starts by itself; Help's `?tour=` still starts one. The card shows it as a
+ * tickbox, and whatever it holds is saved when a tour that showed a step
+ * closes, as `tours_seen` is. Ticking it says so in a toast that opens
+ * Settings › Help, where it is turned back on.
  */
 export function useStudentTour(key: TourKey, { ready, steps, container }: Options): ReactNode {
   const user = useAuthStore((s) => s.user);
@@ -57,6 +65,8 @@ export function useStudentTour(key: TourKey, { ready, steps, container }: Option
   const isStudent = user?.role_name === ROLES.STUDENT;
   // A payload without the field is not "seen nothing": start no tour on it.
   const seen = markedHere || !user?.tours_seen || user.tours_seen.includes(key);
+  const off = user?.tours_off === true;
+  const navigate = useNavigate();
   const asked = params.get(TOUR_PARAM) === key;
   const publishOpen = key !== "publish" && params.has(PUBLISH_PARAM);
   const running = active === key;
@@ -65,6 +75,10 @@ export function useStudentTour(key: TourKey, { ready, steps, container }: Option
   // Publish opened over this tour: it waits for the page's next visit.
   const [interrupted, setInterrupted] = useState(false);
   const shown = useRef(false);
+  // The card's "Don't show tours again", as the student left it.
+  const [ticked, setTicked] = useState(false);
+  const tickedRef = useRef(false);
+  tickedRef.current = ticked;
   const opener = useRef<HTMLElement | null>(null);
   const stepsRef = useRef(steps);
   stepsRef.current = steps;
@@ -80,7 +94,7 @@ export function useStudentTour(key: TourKey, { ready, steps, container }: Option
     }, { replace: true });
   }, [asked, setParams]);
 
-  const wanted = isStudent && ready && !publishOpen && !interrupted && active === null && (forced || !seen);
+  const wanted = isStudent && ready && !publishOpen && !interrupted && active === null && (forced || (!seen && !off));
 
   useEffect(() => {
     if (!wanted) return;
@@ -93,7 +107,10 @@ export function useStudentTour(key: TourKey, { ready, steps, container }: Option
           ? container.closest<HTMLElement>('[role="dialog"]')
           : document.getElementById(MAIN_ID);
       shown.current = false;
-      if (start(key)) setForced(false);
+      if (start(key)) {
+        setForced(false);
+        setTicked(useAuthStore.getState().user?.tours_off === true);
+      }
       return true;
     };
     if (tryStart()) return;
@@ -122,10 +139,31 @@ export function useStudentTour(key: TourKey, { ready, steps, container }: Option
     });
   }, [key]);
 
+  // Saved as the tour closes, and only when it changed.
+  const saveTicked = useCallback(() => {
+    const value = tickedRef.current;
+    if (value === (useAuthStore.getState().user?.tours_off === true)) return;
+    const { addToast } = useUIStore.getState();
+    void saveToursOff(value).then((saved) => {
+      if (!saved) {
+        addToast({ type: "error", message: `Could not save ${TOURS_OFF_LABEL}. Try again in Settings › Help.` });
+      } else if (value) {
+        addToast({
+          type: "info",
+          message: "Tours won't start by themselves. Turn them back on in Settings › Help.",
+          action: { label: "Open Settings", onClick: () => navigate(TOURS_SETTINGS_HREF) },
+        });
+      }
+    });
+  }, [navigate]);
+
   const close = useCallback(() => {
     stop(key);
-    if (shown.current) markSeen();
-  }, [key, stop, markSeen]);
+    if (shown.current) {
+      markSeen();
+      saveTicked();
+    }
+  }, [key, stop, markSeen, saveTicked]);
   const onShown = useCallback(() => { shown.current = true; }, []);
 
   // Publish opened over the page: close this tour unmarked (one tour at a time).
@@ -139,11 +177,16 @@ export function useStudentTour(key: TourKey, { ready, steps, container }: Option
   // Leaving the page with the tour open counts, if a step was shown.
   const markRef = useRef(markSeen);
   markRef.current = markSeen;
+  const saveRef = useRef(saveTicked);
+  saveRef.current = saveTicked;
   useEffect(() => () => {
     const session = useTourSession.getState();
     if (session.active !== key) return;
     session.stop(key);
-    if (shown.current) markRef.current();
+    if (shown.current) {
+      markRef.current();
+      saveRef.current();
+    }
   }, [key]);
 
   // Hidden in the same render Publish opens, so this tour hands focus back
@@ -157,6 +200,7 @@ export function useStudentTour(key: TourKey, { ready, steps, container }: Option
       onClose={close}
       onShown={onShown}
       container={container}
+      optOut={{ label: TOURS_OFF_LABEL, checked: ticked, onChange: setTicked }}
     />
   );
 }

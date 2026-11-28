@@ -728,6 +728,9 @@ ACCOUNTS = {
     # name: it marks `request.user` and nobody else. Every role may mark one;
     # only a Student is ever shown a tour, which the client decides.
     "user-me-tour-seen": Entry({"POST": _case(SIGNED_IN, kwargs={"key": "discover"})}),
+    # IR-1349: the signed-in person's "Don't show tours again". No id to name:
+    # it writes `request.user.tours_off` and nothing else, for every role.
+    "user-me-tours-off": Entry({"PUT": _case(SIGNED_IN, data={"off": True})}),
     # IR-695: a person's optional profile. Both writes act on `request.user` and
     # name nobody else; the photo is read by any signed-in user, through Django
     # only (MEDIA_URL is not routed). `photo_user` is an account that has one --

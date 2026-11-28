@@ -11,6 +11,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import type { TourStep } from "@/components/tour/types";
 import { ROLES, type RoleName } from "@/lib/constants";
 import { useAuthStore } from "@/store/auth.store";
+import { useUIStore } from "@/store/ui.store";
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { makeUser } from "@/test/authFixtures";
 import { act, renderScreen, screen, userEvent, waitFor } from "@/test/render";
@@ -21,7 +22,7 @@ import { useTourSession } from "./tourSession";
 import { useStudentTour } from "./useStudentTour";
 
 vi.mock("@/api/accounts", () => ({
-  accountsApi: { markTourSeen: vi.fn() },
+  accountsApi: { markTourSeen: vi.fn(), setToursOff: vi.fn() },
 }));
 const { accountsApi } = await import("@/api/accounts");
 
@@ -56,8 +57,8 @@ function StandIn({ ready = true, drawn = true, tourKey = "discover" as TourKey }
   );
 }
 
-function signIn(role: RoleName | null, toursSeen: string[] | "absent" = []) {
-  const user = makeUser({ role_name: role });
+function signIn(role: RoleName | null, toursSeen: string[] | "absent" = [], toursOff = false) {
+  const user = { ...makeUser({ role_name: role }), tours_off: toursOff };
   useAuthStore.setState({ user: toursSeen === "absent" ? user : { ...user, tours_seen: toursSeen } });
 }
 
@@ -69,11 +70,13 @@ beforeEach(() => {
   vi.mocked(accountsApi.markTourSeen).mockImplementation(async (key: string) => ({
     data: { tours_seen: [...new Set([...(useAuthStore.getState().user?.tours_seen ?? []), key])] },
   }) as never);
+  vi.mocked(accountsApi.setToursOff).mockImplementation(async (off: boolean) => ({ data: { tours_off: off } }) as never);
 });
 
 afterEach(() => {
   vi.clearAllMocks();
   useAuthStore.setState({ user: null });
+  useUIStore.setState({ toasts: [] });
 });
 
 describe("the keys", () => {
@@ -246,6 +249,87 @@ describe("a failed request", () => {
     renderScreen(<StandIn />);
     await act(async () => {});
     expect(tour()).not.toBeInTheDocument();
+  });
+});
+
+describe("Don't show tours again (IR-1349)", () => {
+  const tickbox = () => screen.getByRole("checkbox", { name: "Don't show tours again" });
+
+  it("is on the card, unticked, and closing without touching it saves nothing (AC 1)", async () => {
+    signIn(ROLES.STUDENT);
+    renderScreen(<StandIn />);
+    await screen.findByRole("dialog", { name: "Discover tour" });
+    expect(tickbox()).not.toBeChecked();
+    await userEvent.click(screen.getByRole("button", { name: "Skip tour" }));
+    expect(accountsApi.setToursOff).not.toHaveBeenCalled();
+    expect(useUIStore.getState().toasts).toEqual([]);
+  });
+
+  it("ticked, closing saves it and a toast offers Settings (AC 2)", async () => {
+    signIn(ROLES.STUDENT);
+    renderScreen(<StandIn />);
+    await screen.findByRole("dialog", { name: "Discover tour" });
+    await userEvent.click(tickbox());
+    // Moving between steps keeps it.
+    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(tickbox()).toBeChecked();
+    await userEvent.click(screen.getByRole("button", { name: "Done" }));
+
+    expect(accountsApi.setToursOff).toHaveBeenCalledTimes(1);
+    expect(accountsApi.setToursOff).toHaveBeenCalledWith(true);
+    expect(accountsApi.markTourSeen).toHaveBeenCalledWith("discover");
+    expect(useAuthStore.getState().user?.tours_off).toBe(true);
+    await waitFor(() => expect(useUIStore.getState().toasts).toHaveLength(1));
+    const [toast] = useUIStore.getState().toasts;
+    expect(toast.message).toMatch(/won't start by themselves.*Settings › Help/);
+    expect(toast.action?.label).toBe("Open Settings");
+
+    act(() => toast.action!.onClick());
+    expect(screen.getByRole("status", { name: "Address" })).toHaveTextContent("/settings?tab=help");
+  });
+
+  it("leaving the page with it ticked saves it too", async () => {
+    signIn(ROLES.STUDENT);
+    const { unmount } = renderScreen(<StandIn />);
+    await screen.findByRole("dialog", { name: "Discover tour" });
+    await userEvent.click(tickbox());
+    unmount();
+    expect(accountsApi.setToursOff).toHaveBeenCalledWith(true);
+  });
+
+  it("while set, no tour starts by itself on a page not yet toured (AC 3)", async () => {
+    signIn(ROLES.STUDENT, [], true);
+    renderScreen(<StandIn tourKey="library" />);
+    await act(async () => {});
+    expect(screen.queryByRole("dialog", { name: "My Library tour" })).not.toBeInTheDocument();
+    expect(accountsApi.markTourSeen).not.toHaveBeenCalled();
+  });
+
+  it("while set, Help's link still starts a tour, ticked, and unticking it turns tours back on", async () => {
+    signIn(ROLES.STUDENT, [...TOUR_KEYS], true);
+    renderScreen(<StandIn />, { route: "/?tour=discover" });
+    await screen.findByRole("dialog", { name: "Discover tour" });
+    expect(tickbox()).toBeChecked();
+    await userEvent.click(tickbox());
+    await userEvent.click(screen.getByRole("button", { name: "Skip tour" }));
+
+    expect(accountsApi.setToursOff).toHaveBeenCalledWith(false);
+    await waitFor(() => expect(useAuthStore.getState().user?.tours_off).toBe(false));
+    // Turning tours back on needs no toast.
+    expect(useUIStore.getState().toasts).toEqual([]);
+  });
+
+  it("a failed save puts it back and says so", async () => {
+    vi.mocked(accountsApi.setToursOff).mockRejectedValue(new Error("offline"));
+    signIn(ROLES.STUDENT);
+    renderScreen(<StandIn />);
+    await screen.findByRole("dialog", { name: "Discover tour" });
+    await userEvent.click(tickbox());
+    await userEvent.click(screen.getByRole("button", { name: "Skip tour" }));
+
+    await waitFor(() => expect(useUIStore.getState().toasts).toHaveLength(1));
+    expect(useUIStore.getState().toasts[0]).toMatchObject({ type: "error" });
+    expect(useAuthStore.getState().user?.tours_off).toBe(false);
   });
 });
 
