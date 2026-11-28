@@ -1,0 +1,81 @@
+{
+ "kind": "sequence",
+ "format": "portrait",
+ "title": "Q-2.4  Sequence: compare two Versions",
+ "caption": "SDD v2 §3.2.4. From RecordViewSet versions_compare, apps/reviews/version_comparison.py at 2d8d4e4a (IR-1275).",
+ "participants": [
+  {
+   "id": "rv",
+   "label": "Reviewer",
+   "tone": "plain"
+  },
+  {
+   "id": "spa",
+   "label": "React",
+   "sub": "VersionPicker"
+  },
+  {
+   "id": "dj",
+   "label": "Django",
+   "sub": "RecordViewSet"
+  },
+  {
+   "id": "cmp",
+   "label": "version_comparison"
+  },
+  {
+   "id": "db",
+   "label": "PostgreSQL"
+  }
+ ],
+ "steps": [
+  {
+   "from": "spa",
+   "to": "dj",
+   "label": "GET /records/<id>/versions/<n>/manuscript/"
+  },
+  {
+   "from": "dj",
+   "to": "spa",
+   "label": "that Version's PDF",
+   "dash": true
+  },
+  {
+   "from": "spa",
+   "to": "dj",
+   "label": "GET /records/<id>/versions/compare/?a=1&b=2"
+  },
+  {
+   "from": "dj",
+   "to": "cmp",
+   "label": "compare(a, b)"
+  },
+  {
+   "from": "cmp",
+   "to": "db",
+   "label": "read both ReviewTexts and sections"
+  },
+  {
+   "from": "cmp",
+   "to": "dj",
+   "label": "sections: unchanged, changed, added, removed",
+   "dash": true
+  },
+  {
+   "from": "dj",
+   "to": "spa",
+   "label": "the Changes tab",
+   "dash": true
+  }
+ ],
+ "legend": [
+  {
+   "line": "arrow",
+   "text": "request or write"
+  },
+  {
+   "line": "dash arrow",
+   "text": "response or notice"
+  }
+ ]
+}

@@ -1,0 +1,155 @@
+{
+ "format": "portrait",
+ "direction": "DOWN",
+ "title": "A-1.4  Activity: reset a forgotten password",
+ "caption": "SRS v2 §3.2.1.4. From apps/accounts/recovery, ADR-045 at 2d8d4e4a (IR-1275).",
+ "elk": {
+  "elk.layered.spacing.nodeNodeBetweenLayers": "16",
+  "elk.spacing.nodeNode": "22",
+  "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
+  "elk.layered.nodePlacement.bk.fixedAlignment": "BALANCED",
+  "elk.aspectRatio": "0.7"
+ },
+ "nodes": [
+  {
+   "id": "start",
+   "shape": "start"
+  },
+  {
+   "id": "a1",
+   "shape": "box",
+   "tag": "Person",
+   "label": "Enter the email on Forgot password",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "a2",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Answer 'If an account exists, we sent a link'",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "q3",
+   "shape": "diamond",
+   "wrap": 150,
+   "label": "Eligible account and under the limits?"
+  },
+  {
+   "id": "a4",
+   "shape": "box",
+   "tag": "Email service",
+   "label": "Deliver the single-use link (30 minutes)",
+   "plain": true,
+   "tone": "ext",
+   "wrap": 150
+  },
+  {
+   "id": "a5",
+   "shape": "box",
+   "tag": "Person",
+   "label": "Open the link; enter a new password",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "a6",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Check the policy; save; spend the link",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "a7",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Bump credential_version: every session ends",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "a8",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Suppress silently; audit it",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "end9",
+   "shape": "end"
+  },
+  {
+   "id": "stop",
+   "shape": "end"
+  }
+ ],
+ "edges": [
+  {
+   "from": "start",
+   "to": "a1"
+  },
+  {
+   "from": "a1",
+   "to": "a2"
+  },
+  {
+   "from": "a2",
+   "to": "q3"
+  },
+  {
+   "from": "q3",
+   "to": "a4",
+   "label": "yes"
+  },
+  {
+   "from": "a4",
+   "to": "a5"
+  },
+  {
+   "from": "a5",
+   "to": "a6"
+  },
+  {
+   "from": "a6",
+   "to": "a7"
+  },
+  {
+   "from": "q3",
+   "to": "a8",
+   "label": "no"
+  },
+  {
+   "from": "a8",
+   "to": "end9"
+  },
+  {
+   "from": "a7",
+   "to": "stop"
+  }
+ ],
+ "legend": [
+  "first line of an action: who does it",
+  {
+   "tone": "plain",
+   "text": "person"
+  },
+  {
+   "tone": "core",
+   "text": "IRIS"
+  },
+  {
+   "tone": "ext",
+   "text": "external service"
+  }
+ ]
+}

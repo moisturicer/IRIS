@@ -3,7 +3,7 @@ import { A, X, U, AI, GEN_LEGEND } from '../tools/dsl.mjs';
 export default {
   kind: 'usecase',
   title: 'D-1  Use case overview: actors and subsystems',
-  caption: 'Roles from frontend/src/lib/access.ts and core/permissions.py on main (IR-1021). Each subsystem is drawn in full on D-2 to D-7. The System Admin does not use the research screens (Ask IRIS, My Library).',
+  caption: 'Roles from frontend/src/lib/access.ts and core/permissions.py on main (IR-1021; AI providers corrected for ADR-067 in IR-1275). Each subsystem is drawn in full on D-2 to D-7. The System Admin does not use the research screens (Ask IRIS, My Library).',
   system: 'IRIS',
   gap: 16,
   left: [
@@ -18,7 +18,7 @@ export default {
   ],
   right: [
     X('Mail', 'Email service'),
-    X('AIP', 'AI providers\n(LlamaParse, Voyage,\nlanguage model)'),
+    X('AIP', 'AI providers\n(Unstructured, Voyage,\nlanguage model)'),
   ],
   cases: [
     U('S1', 'Accounts and access (D-2)', 130),

@@ -1,0 +1,163 @@
+{
+ "format": "portrait",
+ "direction": "DOWN",
+ "title": "A-3.3  Activity: an office's review",
+ "caption": "SRS v2 §3.2.3.3. From apps/reviews/seats.py, office_review.py at 2d8d4e4a (IR-1275).",
+ "elk": {
+  "elk.layered.spacing.nodeNodeBetweenLayers": "16",
+  "elk.spacing.nodeNode": "22",
+  "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
+  "elk.layered.nodePlacement.bk.fixedAlignment": "BALANCED",
+  "elk.aspectRatio": "0.7"
+ },
+ "nodes": [
+  {
+   "id": "start",
+   "shape": "start"
+  },
+  {
+   "id": "a1",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Assignment lands in the office's Pool",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "q2",
+   "shape": "diamond",
+   "wrap": 150,
+   "label": "Coordinator assigns?"
+  },
+  {
+   "id": "a3",
+   "shape": "box",
+   "tag": "Coordinator",
+   "label": "Assign a reviewer",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "a4",
+   "shape": "box",
+   "tag": "Office member",
+   "label": "Claim it",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "a5",
+   "shape": "box",
+   "tag": "Office member",
+   "label": "Review; maybe add a colleague or request another office",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "q6",
+   "shape": "diamond",
+   "wrap": 150,
+   "label": "Outcome?"
+  },
+  {
+   "id": "a7",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Clearance: cleared",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "a8",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Clearance: not cleared (finding)",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "a9",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Complete the office's assignment; notify RDCO",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "stop",
+   "shape": "end"
+  }
+ ],
+ "edges": [
+  {
+   "from": "start",
+   "to": "a1"
+  },
+  {
+   "from": "a1",
+   "to": "q2"
+  },
+  {
+   "from": "q2",
+   "to": "a3",
+   "label": "yes"
+  },
+  {
+   "from": "q2",
+   "to": "a4",
+   "label": "no"
+  },
+  {
+   "from": "a3",
+   "to": "a5"
+  },
+  {
+   "from": "a4",
+   "to": "a5"
+  },
+  {
+   "from": "a5",
+   "to": "q6"
+  },
+  {
+   "from": "q6",
+   "to": "a7",
+   "label": "clear"
+  },
+  {
+   "from": "q6",
+   "to": "a8",
+   "label": "finding"
+  },
+  {
+   "from": "a7",
+   "to": "a9"
+  },
+  {
+   "from": "a8",
+   "to": "a9"
+  },
+  {
+   "from": "a9",
+   "to": "stop"
+  }
+ ],
+ "legend": [
+  "first line of an action: who does it",
+  {
+   "tone": "plain",
+   "text": "person"
+  },
+  {
+   "tone": "core",
+   "text": "IRIS"
+  }
+ ]
+}

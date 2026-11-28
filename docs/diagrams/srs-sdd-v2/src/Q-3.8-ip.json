@@ -1,0 +1,59 @@
+{
+ "kind": "sequence",
+ "format": "portrait",
+ "title": "Q-3.8  Sequence: tag and release IP",
+ "caption": "SDD v2 §3.3.8. From RecordViewSet.tags, ip_release.py at 2d8d4e4a (IR-1275).",
+ "participants": [
+  {
+   "id": "s",
+   "label": "Office staff",
+   "tone": "plain"
+  },
+  {
+   "id": "k",
+   "label": "KTTO",
+   "tone": "plain"
+  },
+  {
+   "id": "dj",
+   "label": "Django",
+   "sub": "RecordViewSet"
+  },
+  {
+   "id": "db",
+   "label": "PostgreSQL"
+  }
+ ],
+ "steps": [
+  {
+   "from": "s",
+   "to": "dj",
+   "label": "PATCH /records/<id>/tags/ (ip_type)"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "is_ip, ip_type; audit"
+  },
+  {
+   "from": "k",
+   "to": "dj",
+   "label": "POST /records/<id>/ip-release/"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "ip_released_at/by; audit; queue indexing if published"
+  }
+ ],
+ "legend": [
+  {
+   "line": "arrow",
+   "text": "request or write"
+  },
+  {
+   "line": "dash arrow",
+   "text": "response or notice"
+  }
+ ]
+}

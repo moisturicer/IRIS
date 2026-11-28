@@ -1,0 +1,121 @@
+{
+ "kind": "columns",
+ "format": "portrait",
+ "title": "C-5.1  Classes: extraction",
+ "caption": "SDD v2 §3.5.1. From apps/ai/extraction (ports, selection.py, unstructured_client.py, shaping_unstructured.py), apps/documents/models.py, ADR-067 at 2d8d4e4a (IR-1275).",
+ "gutter": 60,
+ "vgap": 30,
+ "nodes": [
+  {
+   "id": "StructuredExtractor",
+   "shape": "class",
+   "label": "StructuredExtractor",
+   "sections": [
+    [
+     "«port»"
+    ],
+    [
+     "extract(pdf_bytes, filename) → ExtractedDocument"
+    ]
+   ]
+  },
+  {
+   "id": "UnstructuredExtractor",
+   "shape": "class",
+   "label": "UnstructuredExtractor",
+   "sections": [
+    [
+     "UNSTRUCTURED_PLATFORM_API_KEY",
+     "strategy: hi_res"
+    ],
+    [
+     "extract()"
+    ]
+   ]
+  },
+  {
+   "id": "disclosure",
+   "shape": "class",
+   "label": "disclosure",
+   "sections": [
+    [],
+    [
+     "may_disclose()"
+    ]
+   ],
+   "stereotype": "module"
+  },
+  {
+   "id": "PdfExtraction",
+   "shape": "class",
+   "label": "PdfExtraction",
+   "sections": [
+    [
+     "record → Record",
+     "status",
+     "extractor",
+     "structure",
+     "raw_result",
+     "pages_read"
+    ]
+   ]
+  },
+  {
+   "id": "ExtractionFigure",
+   "shape": "class",
+   "label": "ExtractionFigure",
+   "sections": [
+    [
+     "extraction → PdfExtraction",
+     "page",
+     "bbox",
+     "caption",
+     "image"
+    ]
+   ]
+  }
+ ],
+ "columns": [
+  [
+   "StructuredExtractor",
+   "UnstructuredExtractor"
+  ],
+  [
+   "disclosure"
+  ],
+  [
+   "PdfExtraction",
+   "ExtractionFigure"
+  ]
+ ],
+ "edges": [
+  {
+   "from": "UnstructuredExtractor",
+   "to": "StructuredExtractor",
+   "head": "tri",
+   "dash": true
+  },
+  {
+   "from": "PdfExtraction",
+   "to": "ExtractionFigure",
+   "tail": "diamond",
+   "head": "none",
+   "mFrom": "1",
+   "mTo": "0..*"
+  }
+ ],
+ "legend": [
+  {
+   "line": "diamond",
+   "text": "composition (owner at the diamond)"
+  },
+  {
+   "line": "arrow",
+   "text": "association"
+  },
+  {
+   "line": "dash arrow",
+   "text": "uses / calls"
+  }
+ ]
+}

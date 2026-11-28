@@ -1,0 +1,151 @@
+{
+ "format": "portrait",
+ "direction": "DOWN",
+ "title": "A-1.1a  Activity: register",
+ "caption": "SRS v2 §3.2.1.1. From apps/accounts/views.py RegisterView, serializers.py at 2d8d4e4a (IR-1275).",
+ "elk": {
+  "elk.layered.spacing.nodeNodeBetweenLayers": "16",
+  "elk.spacing.nodeNode": "22",
+  "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
+  "elk.layered.nodePlacement.bk.fixedAlignment": "BALANCED",
+  "elk.aspectRatio": "0.7"
+ },
+ "nodes": [
+  {
+   "id": "start",
+   "shape": "start"
+  },
+  {
+   "id": "a1",
+   "shape": "box",
+   "tag": "Guest",
+   "label": "Fill in name, institutional email, password, role and college",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "a2",
+   "shape": "box",
+   "tag": "Guest",
+   "label": "Read the data notice; answer Yes or No to AI use",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "a3",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Validate fields, email domain and password policy",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "q4",
+   "shape": "diamond",
+   "wrap": 150,
+   "label": "Valid?"
+  },
+  {
+   "id": "a5",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Create the unverified account; record notice version, AI answer and time",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "a6",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Queue the verification email",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "a7",
+   "shape": "box",
+   "tag": "Guest",
+   "label": "See 'Check your email'",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "a8",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Show field errors; create nothing",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "end9",
+   "shape": "end"
+  },
+  {
+   "id": "stop",
+   "shape": "end"
+  }
+ ],
+ "edges": [
+  {
+   "from": "start",
+   "to": "a1"
+  },
+  {
+   "from": "a1",
+   "to": "a2"
+  },
+  {
+   "from": "a2",
+   "to": "a3"
+  },
+  {
+   "from": "a3",
+   "to": "q4"
+  },
+  {
+   "from": "q4",
+   "to": "a5",
+   "label": "yes"
+  },
+  {
+   "from": "a5",
+   "to": "a6"
+  },
+  {
+   "from": "a6",
+   "to": "a7"
+  },
+  {
+   "from": "q4",
+   "to": "a8",
+   "label": "no"
+  },
+  {
+   "from": "a8",
+   "to": "end9"
+  },
+  {
+   "from": "a7",
+   "to": "stop"
+  }
+ ],
+ "legend": [
+  "first line of an action: who does it",
+  {
+   "tone": "plain",
+   "text": "person"
+  },
+  {
+   "tone": "core",
+   "text": "IRIS"
+  }
+ ]
+}

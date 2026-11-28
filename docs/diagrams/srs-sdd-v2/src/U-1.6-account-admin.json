@@ -1,0 +1,81 @@
+{
+ "kind": "usecase",
+ "format": "portrait",
+ "title": "U-1.6  Use cases: account administration (FR-1.6)",
+ "caption": "SRS v2 §3.2.1.6. From apps/accounts/views.py (LockUserView, ActiveSessionsView, RevokeSessionView, UserListView) at 2d8d4e4a (IR-1275).",
+ "system": "Account administration",
+ "left": [
+  {
+   "id": "RDCO",
+   "label": "RDCO"
+  },
+  {
+   "id": "Admin",
+   "label": "System Admin"
+  }
+ ],
+ "right": [],
+ "cases": [
+  {
+   "id": "UC1",
+   "label": "Browse and search users",
+   "wrap": 160
+  },
+  {
+   "id": "UC2",
+   "label": "Lock or unlock an account",
+   "wrap": 160
+  },
+  {
+   "id": "UC3",
+   "label": "View active sessions",
+   "wrap": 160
+  },
+  {
+   "id": "UC4",
+   "label": "Revoke a session",
+   "wrap": 160
+  },
+  {
+   "id": "UC5",
+   "label": "Record the act in the audit log",
+   "wrap": 160
+  }
+ ],
+ "links": [
+  [
+   "RDCO",
+   "UC1",
+   "UC2",
+   "UC3",
+   "UC4"
+  ],
+  [
+   "Admin",
+   "UC1"
+  ]
+ ],
+ "deps": [
+  {
+   "from": "UC2",
+   "to": "UC5",
+   "label": "«include»"
+  },
+  {
+   "from": "UC4",
+   "to": "UC5",
+   "label": "«include»"
+  }
+ ],
+ "notes": [],
+ "legend": [
+  {
+   "line": "solid",
+   "text": "actor takes part"
+  },
+  {
+   "line": "dash arrow",
+   "text": "dependency between use cases"
+  }
+ ]
+}

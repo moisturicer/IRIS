@@ -1,0 +1,94 @@
+{
+ "kind": "usecase",
+ "format": "portrait",
+ "title": "U-3.7  Use cases: turnaround, reminders and escalation (FR-3.7)",
+ "caption": "SRS v2 §3.2.3.7. From apps/reviews/deadlines.py, reminders.py, tasks.py, ADR-043 at 2d8d4e4a (IR-1275).",
+ "system": "Turnaround",
+ "left": [
+  {
+   "id": "Reviewer",
+   "label": "Reviewer"
+  },
+  {
+   "id": "Coord",
+   "label": "Office coordinator"
+  },
+  {
+   "id": "RDCO",
+   "label": "RDCO"
+  }
+ ],
+ "right": [],
+ "cases": [
+  {
+   "id": "UC1",
+   "label": "See the due date on My Reviews",
+   "wrap": 160
+  },
+  {
+   "id": "UC2",
+   "label": "Filter Overdue only",
+   "wrap": 160
+  },
+  {
+   "id": "UC3",
+   "label": "Receive a reminder (2 days before, due date)",
+   "wrap": 160
+  },
+  {
+   "id": "UC4",
+   "label": "Receive an escalation when overdue",
+   "wrap": 160
+  },
+  {
+   "id": "UC5",
+   "label": "Extend a due date, with a reason",
+   "wrap": 160
+  },
+  {
+   "id": "UC6",
+   "label": "Read workflow analytics",
+   "wrap": 160
+  }
+ ],
+ "links": [
+  [
+   "Reviewer",
+   "UC1",
+   "UC3"
+  ],
+  [
+   "Coord",
+   "UC4",
+   "UC5"
+  ],
+  [
+   "RDCO",
+   "UC6"
+  ]
+ ],
+ "deps": [
+  {
+   "from": "UC1",
+   "to": "UC2",
+   "label": "«extend»"
+  }
+ ],
+ "notes": [
+  {
+   "on": "UC4",
+   "text": "a due date never decides anything",
+   "wrap": 130
+  }
+ ],
+ "legend": [
+  {
+   "line": "solid",
+   "text": "actor takes part"
+  },
+  {
+   "line": "dash arrow",
+   "text": "dependency between use cases"
+  }
+ ]
+}

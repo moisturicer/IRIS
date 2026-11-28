@@ -1,0 +1,66 @@
+{
+ "kind": "usecase",
+ "format": "portrait",
+ "title": "U-3.8  Use cases: IP type and IP release (FR-3.8)",
+ "caption": "SRS v2 §3.2.3.8. From RecordViewSet.tags, records/ip_release.py, ADR-052 decisions 11-12 at 2d8d4e4a (IR-1275).",
+ "system": "IP type",
+ "left": [
+  {
+   "id": "Staff",
+   "label": "Office staff"
+  },
+  {
+   "id": "KTTO",
+   "label": "KTTO"
+  },
+  {
+   "id": "Reader",
+   "label": "Reader"
+  }
+ ],
+ "right": [],
+ "cases": [
+  {
+   "id": "UC1",
+   "label": "Tag the IP type (Patent, Copyright, Trade Secret, Utility Model)",
+   "wrap": 160
+  },
+  {
+   "id": "UC2",
+   "label": "Release an IP mark so the paper may reach AI",
+   "wrap": 160
+  },
+  {
+   "id": "UC3",
+   "label": "Filter Discover by IP type",
+   "wrap": 160
+  }
+ ],
+ "links": [
+  [
+   "Staff",
+   "UC1"
+  ],
+  [
+   "KTTO",
+   "UC1",
+   "UC2"
+  ],
+  [
+   "Reader",
+   "UC3"
+  ]
+ ],
+ "deps": [],
+ "notes": [],
+ "legend": [
+  {
+   "line": "solid",
+   "text": "actor takes part"
+  },
+  {
+   "line": "dash arrow",
+   "text": "dependency between use cases"
+  }
+ ]
+}

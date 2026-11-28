@@ -1,0 +1,138 @@
+{
+ "format": "portrait",
+ "direction": "DOWN",
+ "title": "A-5.6  Activity: the AI Overview",
+ "caption": "SRS v2 §3.2.5.6. From apps/ai/overview, tasks.generate_record_overview at 2d8d4e4a (IR-1275).",
+ "elk": {
+  "elk.layered.spacing.nodeNodeBetweenLayers": "16",
+  "elk.spacing.nodeNode": "22",
+  "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
+  "elk.layered.nodePlacement.bk.fixedAlignment": "BALANCED",
+  "elk.aspectRatio": "0.7"
+ },
+ "nodes": [
+  {
+   "id": "start",
+   "shape": "start"
+  },
+  {
+   "id": "a1",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Indexing finishes",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "a2",
+   "shape": "box",
+   "tag": "Language model",
+   "label": "Write a cited summary from the passages",
+   "plain": true,
+   "tone": "ext",
+   "wrap": 150
+  },
+  {
+   "id": "a3",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Store RecordOverview with its citations",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "a4",
+   "shape": "box",
+   "tag": "Reader",
+   "label": "Open the paper",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "q5",
+   "shape": "diamond",
+   "wrap": 150,
+   "label": "Overview stored and the gate passes?"
+  },
+  {
+   "id": "a6",
+   "shape": "box",
+   "tag": "Reader",
+   "label": "Read the overview",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "a7",
+   "shape": "box",
+   "tag": "Reader",
+   "label": "See why none is available",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "stop",
+   "shape": "end"
+  }
+ ],
+ "edges": [
+  {
+   "from": "start",
+   "to": "a1"
+  },
+  {
+   "from": "a1",
+   "to": "a2"
+  },
+  {
+   "from": "a2",
+   "to": "a3"
+  },
+  {
+   "from": "a3",
+   "to": "a4"
+  },
+  {
+   "from": "a4",
+   "to": "q5"
+  },
+  {
+   "from": "q5",
+   "to": "a6",
+   "label": "yes"
+  },
+  {
+   "from": "q5",
+   "to": "a7",
+   "label": "no"
+  },
+  {
+   "from": "a6",
+   "to": "stop"
+  },
+  {
+   "from": "a7",
+   "to": "stop"
+  }
+ ],
+ "legend": [
+  "first line of an action: who does it",
+  {
+   "tone": "plain",
+   "text": "person"
+  },
+  {
+   "tone": "core",
+   "text": "IRIS"
+  },
+  {
+   "tone": "ext",
+   "text": "external service"
+  }
+ ]
+}

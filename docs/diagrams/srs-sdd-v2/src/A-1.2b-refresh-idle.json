@@ -1,0 +1,184 @@
+{
+ "format": "portrait",
+ "direction": "DOWN",
+ "title": "A-1.2b  Activity: stay signed in and the inactivity limit",
+ "caption": "SRS v2 §3.2.1.2. From apps/accounts/views.py RefreshView, sessions.py, NFR-S2 at 2d8d4e4a (IR-1275).",
+ "elk": {
+  "elk.layered.spacing.nodeNodeBetweenLayers": "16",
+  "elk.spacing.nodeNode": "22",
+  "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
+  "elk.layered.nodePlacement.bk.fixedAlignment": "BALANCED",
+  "elk.aspectRatio": "0.7"
+ },
+ "nodes": [
+  {
+   "id": "start",
+   "shape": "start"
+  },
+  {
+   "id": "a1",
+   "shape": "box",
+   "tag": "Person",
+   "label": "Open a tab, or a request answers 401",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "a2",
+   "shape": "box",
+   "tag": "Browser",
+   "label": "POST token/refresh; the browser sends the cookie",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "q3",
+   "shape": "diamond",
+   "wrap": 150,
+   "label": "Cookie present?"
+  },
+  {
+   "id": "a4",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Check Origin and the session",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "q5",
+   "shape": "diamond",
+   "wrap": 150,
+   "label": "Idle under 30 min, or remembered and unexpired?"
+  },
+  {
+   "id": "a6",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Rotate: blacklist the old token, set the new cookie",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "a7",
+   "shape": "box",
+   "tag": "Browser",
+   "label": "Retry the original request",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "a8",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "End the session (idle or expired)",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "a9",
+   "shape": "box",
+   "tag": "Person",
+   "label": "See 'Your session ended'",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "end10",
+   "shape": "end"
+  },
+  {
+   "id": "a11",
+   "shape": "box",
+   "tag": "Person",
+   "label": "Shown as signed out, with no message",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "end12",
+   "shape": "end"
+  },
+  {
+   "id": "stop",
+   "shape": "end"
+  }
+ ],
+ "edges": [
+  {
+   "from": "start",
+   "to": "a1"
+  },
+  {
+   "from": "a1",
+   "to": "a2"
+  },
+  {
+   "from": "a2",
+   "to": "q3"
+  },
+  {
+   "from": "q3",
+   "to": "a4",
+   "label": "yes"
+  },
+  {
+   "from": "a4",
+   "to": "q5"
+  },
+  {
+   "from": "q5",
+   "to": "a6",
+   "label": "yes"
+  },
+  {
+   "from": "a6",
+   "to": "a7"
+  },
+  {
+   "from": "q5",
+   "to": "a8",
+   "label": "no"
+  },
+  {
+   "from": "a8",
+   "to": "a9"
+  },
+  {
+   "from": "a9",
+   "to": "end10"
+  },
+  {
+   "from": "q3",
+   "to": "a11",
+   "label": "no"
+  },
+  {
+   "from": "a11",
+   "to": "end12"
+  },
+  {
+   "from": "a7",
+   "to": "stop"
+  }
+ ],
+ "legend": [
+  "first line of an action: who does it",
+  {
+   "tone": "plain",
+   "text": "person"
+  },
+  {
+   "tone": "core",
+   "text": "IRIS"
+  }
+ ]
+}

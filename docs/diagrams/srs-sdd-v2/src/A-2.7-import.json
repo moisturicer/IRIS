@@ -1,0 +1,167 @@
+{
+ "format": "portrait",
+ "direction": "DOWN",
+ "title": "A-2.7  Activity: import records from Excel",
+ "caption": "SRS v2 §3.2.2.7. From RecordViewSet.import_excel, apps/records/services.py at 2d8d4e4a (IR-1275).",
+ "elk": {
+  "elk.layered.spacing.nodeNodeBetweenLayers": "16",
+  "elk.spacing.nodeNode": "22",
+  "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
+  "elk.layered.nodePlacement.bk.fixedAlignment": "BALANCED",
+  "elk.aspectRatio": "0.7"
+ },
+ "nodes": [
+  {
+   "id": "start",
+   "shape": "start"
+  },
+  {
+   "id": "a1",
+   "shape": "box",
+   "tag": "Staff",
+   "label": "Upload a .xls or .xlsx",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "a2",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Parse the workbook",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "q3",
+   "shape": "diamond",
+   "wrap": 150,
+   "label": "Readable?"
+  },
+  {
+   "id": "a4",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "For each row: validate with the single-record rules",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "q5",
+   "shape": "diamond",
+   "wrap": 150,
+   "label": "Row valid?"
+  },
+  {
+   "id": "a6",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Save its record, owner and authors together",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "a7",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Skip the row, saying why",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "a8",
+   "shape": "box",
+   "tag": "Staff",
+   "label": "Read the import log",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "a9",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Refuse the file",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "end10",
+   "shape": "end"
+  },
+  {
+   "id": "stop",
+   "shape": "end"
+  }
+ ],
+ "edges": [
+  {
+   "from": "start",
+   "to": "a1"
+  },
+  {
+   "from": "a1",
+   "to": "a2"
+  },
+  {
+   "from": "a2",
+   "to": "q3"
+  },
+  {
+   "from": "q3",
+   "to": "a4",
+   "label": "yes"
+  },
+  {
+   "from": "a4",
+   "to": "q5"
+  },
+  {
+   "from": "q5",
+   "to": "a6",
+   "label": "yes"
+  },
+  {
+   "from": "q5",
+   "to": "a7",
+   "label": "no"
+  },
+  {
+   "from": "a6",
+   "to": "a8"
+  },
+  {
+   "from": "a7",
+   "to": "a8"
+  },
+  {
+   "from": "q3",
+   "to": "a9",
+   "label": "no"
+  },
+  {
+   "from": "a9",
+   "to": "end10"
+  },
+  {
+   "from": "a8",
+   "to": "stop"
+  }
+ ],
+ "legend": [
+  "first line of an action: who does it",
+  {
+   "tone": "plain",
+   "text": "person"
+  },
+  {
+   "tone": "core",
+   "text": "IRIS"
+  }
+ ]
+}

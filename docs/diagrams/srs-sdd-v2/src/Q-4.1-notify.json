@@ -1,0 +1,78 @@
+{
+ "kind": "sequence",
+ "format": "portrait",
+ "title": "Q-4.1  Sequence: notify and settle",
+ "caption": "SDD v2 §3.4.1. From apps/notifications/services.py, settling.py at 2d8d4e4a (IR-1275).",
+ "participants": [
+  {
+   "id": "act",
+   "label": "Workflow act"
+  },
+  {
+   "id": "ns",
+   "label": "notifications",
+   "sub": "services"
+  },
+  {
+   "id": "db",
+   "label": "PostgreSQL"
+  },
+  {
+   "id": "mail",
+   "label": "Email service",
+   "tone": "ext"
+  },
+  {
+   "id": "p",
+   "label": "Recipient",
+   "tone": "plain"
+  }
+ ],
+ "steps": [
+  {
+   "from": "act",
+   "to": "ns",
+   "label": "on_commit: notify(kind, record)"
+  },
+  {
+   "from": "ns",
+   "to": "db",
+   "label": "recipients ∩ visible_to; Notification rows"
+  },
+  {
+   "from": "ns",
+   "to": "mail",
+   "label": "email, for some kinds"
+  },
+  {
+   "from": "act",
+   "to": "ns",
+   "label": "task ended: settle_record()"
+  },
+  {
+   "from": "ns",
+   "to": "db",
+   "label": "resolved_at, resolved_label"
+  },
+  {
+   "from": "ns",
+   "to": "p",
+   "label": "shown as settled; not unread",
+   "dash": true
+  }
+ ],
+ "legend": [
+  {
+   "line": "arrow",
+   "text": "request or write"
+  },
+  {
+   "line": "dash arrow",
+   "text": "response or notice"
+  },
+  {
+   "tone": "ext",
+   "text": "external service"
+  }
+ ]
+}

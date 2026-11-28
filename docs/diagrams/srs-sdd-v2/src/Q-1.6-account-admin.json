@@ -1,0 +1,81 @@
+{
+ "kind": "sequence",
+ "format": "portrait",
+ "title": "Q-1.6  Sequence: lock an account and revoke a session",
+ "caption": "SDD v2 §3.1.6. From LockUserView, ActiveSessionsView, RevokeSessionView at 2d8d4e4a (IR-1275).",
+ "participants": [
+  {
+   "id": "rdco",
+   "label": "RDCO",
+   "tone": "plain"
+  },
+  {
+   "id": "dj",
+   "label": "Django",
+   "sub": "IsAdmin views"
+  },
+  {
+   "id": "db",
+   "label": "PostgreSQL"
+  },
+  {
+   "id": "t",
+   "label": "Target person",
+   "tone": "plain"
+  }
+ ],
+ "steps": [
+  {
+   "from": "rdco",
+   "to": "dj",
+   "label": "POST /users/<id>/lock/"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "refuse a System Admin; lock; end sessions (locked); audit"
+  },
+  {
+   "from": "rdco",
+   "to": "dj",
+   "label": "GET /users/sessions/"
+  },
+  {
+   "from": "dj",
+   "to": "rdco",
+   "label": "active UserSessions",
+   "dash": true
+  },
+  {
+   "from": "rdco",
+   "to": "dj",
+   "label": "DELETE /users/sessions/<jti>/"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "blacklist; end (revoked); audit"
+  },
+  {
+   "from": "t",
+   "to": "dj",
+   "label": "next request"
+  },
+  {
+   "from": "dj",
+   "to": "t",
+   "label": "401 session_ended_revoked",
+   "dash": true
+  }
+ ],
+ "legend": [
+  {
+   "line": "arrow",
+   "text": "request or write"
+  },
+  {
+   "line": "dash arrow",
+   "text": "response or notice"
+  }
+ ]
+}

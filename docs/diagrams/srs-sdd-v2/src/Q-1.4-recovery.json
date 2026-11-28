@@ -1,0 +1,85 @@
+{
+ "kind": "sequence",
+ "format": "portrait",
+ "title": "Q-1.4  Sequence: reset a forgotten password",
+ "caption": "SDD v2 §3.1.4. From apps/accounts/recovery, ADR-045 at 2d8d4e4a (IR-1275).",
+ "participants": [
+  {
+   "id": "p",
+   "label": "Person",
+   "tone": "plain"
+  },
+  {
+   "id": "spa",
+   "label": "React",
+   "sub": "ForgotPasswordPage"
+  },
+  {
+   "id": "dj",
+   "label": "Django",
+   "sub": "recovery"
+  },
+  {
+   "id": "db",
+   "label": "PostgreSQL"
+  },
+  {
+   "id": "mail",
+   "label": "Email service",
+   "tone": "ext"
+  }
+ ],
+ "steps": [
+  {
+   "from": "spa",
+   "to": "dj",
+   "label": "POST /auth/password/reset/request/"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "check limits; write a RecoveryIntent if eligible"
+  },
+  {
+   "from": "dj",
+   "to": "spa",
+   "label": "202: the same answer either way",
+   "dash": true
+  },
+  {
+   "from": "dj",
+   "to": "mail",
+   "label": "send the single-use link (30 min)"
+  },
+  {
+   "from": "spa",
+   "to": "dj",
+   "label": "POST /auth/password/reset/confirm/"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "spend the token; set the password; bump credential_version"
+  },
+  {
+   "from": "dj",
+   "to": "spa",
+   "label": "200: every earlier session has ended",
+   "dash": true
+  }
+ ],
+ "legend": [
+  {
+   "line": "arrow",
+   "text": "request or write"
+  },
+  {
+   "line": "dash arrow",
+   "text": "response or notice"
+  },
+  {
+   "tone": "ext",
+   "text": "external service"
+  }
+ ]
+}

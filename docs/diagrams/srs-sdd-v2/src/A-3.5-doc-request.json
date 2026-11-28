@@ -1,0 +1,186 @@
+{
+ "format": "portrait",
+ "direction": "DOWN",
+ "title": "A-3.5  Activity: a document request",
+ "caption": "SRS v2 §3.2.3.5. From apps/documents/requests.py, reviews/finish_review.py, ADR-022 Amendments 8-9 at 2d8d4e4a (IR-1275).",
+ "elk": {
+  "elk.layered.spacing.nodeNodeBetweenLayers": "16",
+  "elk.spacing.nodeNode": "22",
+  "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
+  "elk.layered.nodePlacement.bk.fixedAlignment": "BALANCED",
+  "elk.aspectRatio": "0.7"
+ },
+ "nodes": [
+  {
+   "id": "start",
+   "shape": "start"
+  },
+  {
+   "id": "a1",
+   "shape": "box",
+   "tag": "Reviewer",
+   "label": "Request documents on the Documents tab: a draft only they see",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "a2",
+   "shape": "box",
+   "tag": "Reviewer",
+   "label": "Finish review: Request changes or Comment only",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "a3",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Send the drafts: open each request; awaiting_document; pause this party's clock; notify the owners",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "a4",
+   "shape": "box",
+   "tag": "Owner",
+   "label": "Upload each item asked for: held, seen by the owners only",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "a5",
+   "shape": "box",
+   "tag": "Owner",
+   "label": "Submit added documents",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "a6",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Send the held uploads; answer the items; fulfil the request; notify the party once",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "a7",
+   "shape": "box",
+   "tag": "Reviewer",
+   "label": "Accept or reject each upload, with a reason",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "q8",
+   "shape": "diamond",
+   "wrap": 150,
+   "label": "Any rejected?"
+  },
+  {
+   "id": "a9",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Reopen the request: the item is missing again",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "a10",
+   "shape": "box",
+   "tag": "Owner",
+   "label": "Upload again and send",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "a11",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Request stays fulfilled",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "stop",
+   "shape": "end"
+  }
+ ],
+ "edges": [
+  {
+   "from": "start",
+   "to": "a1"
+  },
+  {
+   "from": "a1",
+   "to": "a2"
+  },
+  {
+   "from": "a2",
+   "to": "a3"
+  },
+  {
+   "from": "a3",
+   "to": "a4"
+  },
+  {
+   "from": "a4",
+   "to": "a5"
+  },
+  {
+   "from": "a5",
+   "to": "a6"
+  },
+  {
+   "from": "a6",
+   "to": "a7"
+  },
+  {
+   "from": "a7",
+   "to": "q8"
+  },
+  {
+   "from": "q8",
+   "to": "a9",
+   "label": "yes"
+  },
+  {
+   "from": "a9",
+   "to": "a10"
+  },
+  {
+   "from": "q8",
+   "to": "a11",
+   "label": "no"
+  },
+  {
+   "from": "a10",
+   "to": "stop"
+  },
+  {
+   "from": "a11",
+   "to": "stop"
+  }
+ ],
+ "legend": [
+  "first line of an action: who does it",
+  {
+   "tone": "plain",
+   "text": "person"
+  },
+  {
+   "tone": "core",
+   "text": "IRIS"
+  }
+ ]
+}

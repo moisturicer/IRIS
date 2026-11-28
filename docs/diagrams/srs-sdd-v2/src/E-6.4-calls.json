@@ -1,0 +1,93 @@
+{
+ "title": "E-6.4  Schema: Calls & Conferences",
+ "caption": "SDD v2 §3.6.4. Generated from backend/apps/*/models*.py at 2d8d4e4a; all keys and up to four other fields per table; the full schema is D-8 to D-15.",
+ "kind": "erd",
+ "format": "portrait",
+ "nodes": [
+  {
+   "id": "opportunities_Opportunity",
+   "shape": "table",
+   "label": "Opportunity",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "areas",
+      "v": "M2M → Classification (D-10)"
+     },
+     {
+      "k": "posted_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "opportunity_type",
+      "v": "Char"
+     },
+     {
+      "k": "title",
+      "v": "Char"
+     },
+     {
+      "k": "description",
+      "v": "Text"
+     },
+     {
+      "k": "external_url",
+      "v": "URL"
+     },
+     "… 11 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "opportunities_SavedCall",
+   "shape": "table",
+   "label": "SavedCall",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "owner",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "call",
+      "v": "FK → Opportunity"
+     },
+     {
+      "k": "saved_at",
+      "v": "DateTime"
+     }
+    ]
+   ]
+  }
+ ],
+ "edges": [
+  {
+   "from": "opportunities_SavedCall",
+   "to": "opportunities_Opportunity",
+   "field": "call",
+   "tail": "zero-many",
+   "head": "one"
+  }
+ ],
+ "legend": [
+  {
+   "line": "many",
+   "text": "many (zero or more) to exactly one"
+  },
+  "circle at an end: zero allowed",
+  "bold: primary key",
+  "FK → Name (D-n): drawn in full on figure D-n"
+ ]
+}

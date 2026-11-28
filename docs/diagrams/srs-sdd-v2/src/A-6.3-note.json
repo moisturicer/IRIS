@@ -1,0 +1,154 @@
+{
+ "format": "portrait",
+ "direction": "DOWN",
+ "title": "A-6.3  Activity: a private note",
+ "caption": "SRS v2 §3.2.6.3. From apps/library notes, ADR-064 (proposed; amended for IR-1326) at 2d8d4e4a (IR-1275).",
+ "elk": {
+  "elk.layered.spacing.nodeNodeBetweenLayers": "16",
+  "elk.spacing.nodeNode": "22",
+  "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
+  "elk.layered.nodePlacement.bk.fixedAlignment": "BALANCED",
+  "elk.aspectRatio": "0.7"
+ },
+ "nodes": [
+  {
+   "id": "start",
+   "shape": "start"
+  },
+  {
+   "id": "a1",
+   "shape": "box",
+   "tag": "Reader",
+   "label": "Open a paper outside Review",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "q2",
+   "shape": "diamond",
+   "wrap": 150,
+   "label": "Paper published?"
+  },
+  {
+   "id": "a3",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "No notes: 404, as for a missing record",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "end4",
+   "shape": "end"
+  },
+  {
+   "id": "a5",
+   "shape": "box",
+   "tag": "Reader",
+   "label": "Type a note",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "a6",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Autosave with the note's revision",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "q7",
+   "shape": "diamond",
+   "wrap": 150,
+   "label": "Saved from another tab meanwhile?"
+  },
+  {
+   "id": "a8",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Keep both texts; ask the reader to merge",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "a9",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Save",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "stop",
+   "shape": "end"
+  }
+ ],
+ "edges": [
+  {
+   "from": "start",
+   "to": "a1"
+  },
+  {
+   "from": "a1",
+   "to": "q2"
+  },
+  {
+   "from": "q2",
+   "to": "a3",
+   "label": "no"
+  },
+  {
+   "from": "a3",
+   "to": "end4"
+  },
+  {
+   "from": "q2",
+   "to": "a5",
+   "label": "yes"
+  },
+  {
+   "from": "a5",
+   "to": "a6"
+  },
+  {
+   "from": "a6",
+   "to": "q7"
+  },
+  {
+   "from": "q7",
+   "to": "a8",
+   "label": "yes"
+  },
+  {
+   "from": "q7",
+   "to": "a9",
+   "label": "no"
+  },
+  {
+   "from": "a8",
+   "to": "stop"
+  },
+  {
+   "from": "a9",
+   "to": "stop"
+  }
+ ],
+ "legend": [
+  "first line of an action: who does it",
+  {
+   "tone": "plain",
+   "text": "person"
+  },
+  {
+   "tone": "core",
+   "text": "IRIS"
+  }
+ ]
+}

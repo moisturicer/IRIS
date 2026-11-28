@@ -1,0 +1,84 @@
+{
+ "kind": "usecase",
+ "format": "portrait",
+ "title": "U-1.5  Use cases: roles, role requests and coordinators (FR-1.5)",
+ "caption": "SRS v2 §3.2.1.5. From core/permissions.py (role_change_refusal), apps/accounts/views.py, ADR-051 decision 4 at 2d8d4e4a (IR-1275).",
+ "system": "Roles",
+ "left": [
+  {
+   "id": "Person",
+   "label": "Signed-in person"
+  },
+  {
+   "id": "RDCO",
+   "label": "RDCO"
+  },
+  {
+   "id": "Admin",
+   "label": "System Admin"
+  }
+ ],
+ "right": [],
+ "cases": [
+  {
+   "id": "UC1",
+   "label": "Request the Student or Adviser role",
+   "wrap": 160
+  },
+  {
+   "id": "UC2",
+   "label": "Approve or decline a role request",
+   "wrap": 160
+  },
+  {
+   "id": "UC3",
+   "label": "Give Student or Adviser to someone outside the offices",
+   "wrap": 160
+  },
+  {
+   "id": "UC4",
+   "label": "Give an office role (RDCO, KTTO, ITSO, IERC)",
+   "wrap": 160
+  },
+  {
+   "id": "UC5",
+   "label": "Grant or remove the office coordinator flag",
+   "wrap": 160
+  }
+ ],
+ "links": [
+  [
+   "Person",
+   "UC1"
+  ],
+  [
+   "RDCO",
+   "UC2",
+   "UC3"
+  ],
+  [
+   "Admin",
+   "UC3",
+   "UC4",
+   "UC5"
+  ]
+ ],
+ "deps": [],
+ "notes": [
+  {
+   "on": "UC4",
+   "text": "nobody can be given System Admin through IRIS",
+   "wrap": 130
+  }
+ ],
+ "legend": [
+  {
+   "line": "solid",
+   "text": "actor takes part"
+  },
+  {
+   "line": "dash arrow",
+   "text": "dependency between use cases"
+  }
+ ]
+}

@@ -1,0 +1,131 @@
+{
+ "title": "E-4.1  Schema: notifications",
+ "caption": "SDD v2 §3.4.1. Generated from backend/apps/*/models*.py at 2d8d4e4a; all keys and up to four other fields per table; the full schema is D-8 to D-15.",
+ "kind": "erd",
+ "format": "portrait",
+ "nodes": [
+  {
+   "id": "notifications_Notification",
+   "shape": "table",
+   "label": "Notification",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "sender",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "recipient",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "broadcast_to_role",
+      "v": "FK → Role (D-9)"
+     },
+     {
+      "k": "record",
+      "v": "FK → Record (D-10)"
+     },
+     {
+      "k": "notif_type",
+      "v": "FK → NotificationType"
+     },
+     {
+      "k": "message",
+      "v": "Text"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     },
+     {
+      "k": "task_kind",
+      "v": "Char"
+     },
+     {
+      "k": "task_id",
+      "v": "PositiveBigInteger"
+     },
+     "… 2 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "notifications_NotificationRead",
+   "shape": "table",
+   "label": "NotificationRead",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "notification",
+      "v": "FK → Notification"
+     },
+     {
+      "k": "user",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "read_at",
+      "v": "DateTime"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "notifications_NotificationType",
+   "shape": "table",
+   "label": "NotificationType",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "name",
+      "v": "Char"
+     }
+    ]
+   ]
+  }
+ ],
+ "edges": [
+  {
+   "from": "notifications_Notification",
+   "to": "notifications_NotificationType",
+   "field": "notif_type",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "notifications_NotificationRead",
+   "to": "notifications_Notification",
+   "field": "notification",
+   "tail": "zero-many",
+   "head": "one"
+  }
+ ],
+ "legend": [
+  {
+   "line": "many",
+   "text": "many (zero or more) to exactly one"
+  },
+  "circle at an end: zero allowed",
+  "bold: primary key",
+  "FK → Name (D-n): drawn in full on figure D-n"
+ ]
+}

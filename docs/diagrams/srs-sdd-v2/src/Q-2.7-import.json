@@ -1,0 +1,82 @@
+{
+ "kind": "sequence",
+ "format": "portrait",
+ "title": "Q-2.7  Sequence: import records from Excel",
+ "caption": "SDD v2 §3.2.7. From RecordViewSet.import_excel, apps/records/services.py at 2d8d4e4a (IR-1275).",
+ "participants": [
+  {
+   "id": "s",
+   "label": "Office staff",
+   "tone": "plain"
+  },
+  {
+   "id": "dj",
+   "label": "Django",
+   "sub": "RecordViewSet"
+  },
+  {
+   "id": "svc",
+   "label": "services",
+   "sub": "parse_excel_import"
+  },
+  {
+   "id": "db",
+   "label": "PostgreSQL"
+  }
+ ],
+ "steps": [
+  {
+   "from": "s",
+   "to": "dj",
+   "label": "GET /records/download_template/"
+  },
+  {
+   "from": "dj",
+   "to": "s",
+   "label": "styled .xlsx (openpyxl)",
+   "dash": true
+  },
+  {
+   "from": "s",
+   "to": "dj",
+   "label": "POST /records/import_excel/"
+  },
+  {
+   "from": "dj",
+   "to": "svc",
+   "label": "parse the workbook"
+  },
+  {
+   "from": "svc",
+   "to": "dj",
+   "label": "rows, parse errors",
+   "dash": true
+  },
+  {
+   "loop": "each row",
+   "steps": [
+    {
+     "from": "dj",
+     "to": "db",
+     "label": "check_import_row; save Record, owner, authors in one transaction"
+    }
+   ]
+  },
+  {
+   "from": "dj",
+   "to": "s",
+   "label": "log: created, skipped with reasons",
+   "dash": true
+  }
+ ],
+ "legend": [
+  {
+   "line": "arrow",
+   "text": "request or write"
+  },
+  {
+   "line": "dash arrow",
+   "text": "response or notice"
+  }
+ ]
+}

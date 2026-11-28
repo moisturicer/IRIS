@@ -1,0 +1,81 @@
+{
+ "kind": "usecase",
+ "format": "portrait",
+ "title": "U-3.3  Use cases: parallel office clearance (FR-3.3)",
+ "caption": "SRS v2 §3.2.3.3. From apps/reviews/seats.py, office_review.py, finish_review.py, ADR-032 §4 at 2d8d4e4a (IR-1275).",
+ "system": "Office review",
+ "left": [
+  {
+   "id": "Officer",
+   "label": "Office member\n(ITSO, IERC, KTTO)"
+  },
+  {
+   "id": "Coord",
+   "label": "Office coordinator"
+  }
+ ],
+ "right": [],
+ "cases": [
+  {
+   "id": "UC1",
+   "label": "Claim a record from the office Pool",
+   "wrap": 160
+  },
+  {
+   "id": "UC2",
+   "label": "Assign or reassign a reviewer",
+   "wrap": 160
+  },
+  {
+   "id": "UC3",
+   "label": "Add a colleague from the office",
+   "wrap": 160
+  },
+  {
+   "id": "UC4",
+   "label": "Clear, or record a finding",
+   "wrap": 160
+  },
+  {
+   "id": "UC5",
+   "label": "Request another office",
+   "wrap": 160
+  },
+  {
+   "id": "UC6",
+   "label": "Record the clearance per office",
+   "wrap": 160
+  }
+ ],
+ "links": [
+  [
+   "Officer",
+   "UC1",
+   "UC3",
+   "UC4",
+   "UC5"
+  ],
+  [
+   "Coord",
+   "UC2"
+  ]
+ ],
+ "deps": [
+  {
+   "from": "UC4",
+   "to": "UC6",
+   "label": "«include»"
+  }
+ ],
+ "notes": [],
+ "legend": [
+  {
+   "line": "solid",
+   "text": "actor takes part"
+  },
+  {
+   "line": "dash arrow",
+   "text": "dependency between use cases"
+  }
+ ]
+}

@@ -1,0 +1,101 @@
+{
+ "kind": "columns",
+ "format": "portrait",
+ "title": "C-2.6  Classes: delete requests and Excel import",
+ "caption": "SDD v2 §3.2.6, 3.2.7. From apps/records (models.py, views.py, services.py) at 2d8d4e4a (IR-1275).",
+ "gutter": 60,
+ "vgap": 30,
+ "nodes": [
+  {
+   "id": "DeleteRequestViewSet",
+   "shape": "class",
+   "label": "DeleteRequestViewSet",
+   "sections": [
+    [],
+    [
+     "create()",
+     "approve()",
+     "decline()"
+    ]
+   ],
+   "stereotype": "view"
+  },
+  {
+   "id": "DeleteRequest",
+   "shape": "class",
+   "label": "DeleteRequest",
+   "sections": [
+    [
+     "record → Record",
+     "requested_by",
+     "status",
+     "previous_pipeline_status",
+     "rdco_note"
+    ]
+   ]
+  },
+  {
+   "id": "RecordViewSet",
+   "shape": "class",
+   "label": "RecordViewSet",
+   "sections": [
+    [],
+    [
+     "download_template()",
+     "import_excel()"
+    ]
+   ],
+   "stereotype": "view"
+  },
+  {
+   "id": "services",
+   "shape": "class",
+   "label": "services",
+   "sections": [
+    [],
+    [
+     "parse_excel_import()",
+     "check_import_row()",
+     "check_import_pdf()"
+    ]
+   ],
+   "stereotype": "module"
+  }
+ ],
+ "columns": [
+  [
+   "DeleteRequestViewSet",
+   "RecordViewSet"
+  ],
+  [
+   "DeleteRequest",
+   "services"
+  ]
+ ],
+ "edges": [
+  {
+   "from": "DeleteRequestViewSet",
+   "to": "DeleteRequest",
+   "dash": true
+  },
+  {
+   "from": "RecordViewSet",
+   "to": "services",
+   "dash": true
+  }
+ ],
+ "legend": [
+  {
+   "line": "diamond",
+   "text": "composition (owner at the diamond)"
+  },
+  {
+   "line": "arrow",
+   "text": "association"
+  },
+  {
+   "line": "dash arrow",
+   "text": "uses / calls"
+  }
+ ]
+}

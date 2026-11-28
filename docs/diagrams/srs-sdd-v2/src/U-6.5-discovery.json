@@ -1,0 +1,57 @@
+{
+ "kind": "usecase",
+ "format": "portrait",
+ "title": "U-6.5  Use cases: personal discovery (FR-6.5)",
+ "caption": "SRS v2 §3.2.6.5. From apps/records/discovery.py, apps/library/feeds.py, ADR-062 at 2d8d4e4a (IR-1275).",
+ "system": "Personal discovery",
+ "left": [
+  {
+   "id": "Reader",
+   "label": "Reader"
+  }
+ ],
+ "right": [],
+ "cases": [
+  {
+   "id": "UC1",
+   "label": "Choose my Areas of interest",
+   "wrap": 160
+  },
+  {
+   "id": "UC2",
+   "label": "See For you, with why each is suggested",
+   "wrap": 160
+  },
+  {
+   "id": "UC3",
+   "label": "Mark Not interested (with Undo)",
+   "wrap": 160
+  },
+  {
+   "id": "UC4",
+   "label": "Reset my interests",
+   "wrap": 160
+  }
+ ],
+ "links": [
+  [
+   "Reader",
+   "UC1",
+   "UC2",
+   "UC3",
+   "UC4"
+  ]
+ ],
+ "deps": [],
+ "notes": [],
+ "legend": [
+  {
+   "line": "solid",
+   "text": "actor takes part"
+  },
+  {
+   "line": "dash arrow",
+   "text": "dependency between use cases"
+  }
+ ]
+}

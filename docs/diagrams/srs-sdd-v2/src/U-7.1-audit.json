@@ -1,0 +1,64 @@
+{
+ "kind": "usecase",
+ "format": "portrait",
+ "title": "U-7.1  Use cases: audit log (FR-7.1)",
+ "caption": "SRS v2 §3.2.7.1. From apps/audit (workflow.py, views.py), NFR-S5 at 2d8d4e4a (IR-1275).",
+ "system": "Audit log",
+ "left": [
+  {
+   "id": "Act",
+   "label": "Any act\n(person or job)"
+  },
+  {
+   "id": "Admin",
+   "label": "System Admin"
+  }
+ ],
+ "right": [],
+ "cases": [
+  {
+   "id": "UC1",
+   "label": "Write an AuditEvent in the act's transaction",
+   "wrap": 160
+  },
+  {
+   "id": "UC2",
+   "label": "Browse and filter events",
+   "wrap": 160
+  },
+  {
+   "id": "UC3",
+   "label": "Export events",
+   "wrap": 160
+  }
+ ],
+ "links": [
+  [
+   "Act",
+   "UC1"
+  ],
+  [
+   "Admin",
+   "UC2",
+   "UC3"
+  ]
+ ],
+ "deps": [],
+ "notes": [
+  {
+   "on": "UC2",
+   "text": "read-only to every role",
+   "wrap": 130
+  }
+ ],
+ "legend": [
+  {
+   "line": "solid",
+   "text": "actor takes part"
+  },
+  {
+   "line": "dash arrow",
+   "text": "dependency between use cases"
+  }
+ ]
+}

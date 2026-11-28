@@ -1,0 +1,151 @@
+{
+ "format": "portrait",
+ "direction": "DOWN",
+ "title": "A-1.1b  Activity: verify the email address",
+ "caption": "SRS v2 §3.2.1.1. From apps/accounts/recovery, ADR-045 at 2d8d4e4a (IR-1275).",
+ "elk": {
+  "elk.layered.spacing.nodeNodeBetweenLayers": "16",
+  "elk.spacing.nodeNode": "22",
+  "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
+  "elk.layered.nodePlacement.bk.fixedAlignment": "BALANCED",
+  "elk.aspectRatio": "0.7"
+ },
+ "nodes": [
+  {
+   "id": "start",
+   "shape": "start"
+  },
+  {
+   "id": "a1",
+   "shape": "box",
+   "tag": "Person",
+   "label": "Open the link from the email",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "a2",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Check the token is authentic, unused and under 24 hours old",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "q3",
+   "shape": "diamond",
+   "wrap": 150,
+   "label": "Valid?"
+  },
+  {
+   "id": "a4",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Mark the account verified; spend the token",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "a5",
+   "shape": "box",
+   "tag": "Person",
+   "label": "Sign in",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "a6",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Say the link no longer works",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "a7",
+   "shape": "box",
+   "tag": "Person",
+   "label": "Ask for a new link",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "a8",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Send one, unless the rate limit stops it",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "end9",
+   "shape": "end"
+  },
+  {
+   "id": "stop",
+   "shape": "end"
+  }
+ ],
+ "edges": [
+  {
+   "from": "start",
+   "to": "a1"
+  },
+  {
+   "from": "a1",
+   "to": "a2"
+  },
+  {
+   "from": "a2",
+   "to": "q3"
+  },
+  {
+   "from": "q3",
+   "to": "a4",
+   "label": "yes"
+  },
+  {
+   "from": "a4",
+   "to": "a5"
+  },
+  {
+   "from": "q3",
+   "to": "a6",
+   "label": "no"
+  },
+  {
+   "from": "a6",
+   "to": "a7"
+  },
+  {
+   "from": "a7",
+   "to": "a8"
+  },
+  {
+   "from": "a8",
+   "to": "end9"
+  },
+  {
+   "from": "a5",
+   "to": "stop"
+  }
+ ],
+ "legend": [
+  "first line of an action: who does it",
+  {
+   "tone": "plain",
+   "text": "person"
+  },
+  {
+   "tone": "core",
+   "text": "IRIS"
+  }
+ ]
+}

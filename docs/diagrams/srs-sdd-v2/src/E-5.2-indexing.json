@@ -1,0 +1,225 @@
+{
+ "title": "E-5.2  Schema: chunks and vectors",
+ "caption": "SDD v2 §3.5.2. Generated from backend/apps/*/models*.py at 2d8d4e4a; all keys and up to four other fields per table; the full schema is D-8 to D-15.",
+ "kind": "erd",
+ "format": "portrait",
+ "nodes": [
+  {
+   "id": "ai_ChunkEmbedding",
+   "shape": "table",
+   "label": "ChunkEmbedding",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "chunk",
+      "v": "FK → DocumentChunk"
+     },
+     {
+      "k": "space",
+      "v": "FK → EmbeddingSpace"
+     },
+     {
+      "k": "embedding",
+      "v": "Vector"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "ai_ChunkSet",
+   "shape": "table",
+   "label": "ChunkSet",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record",
+      "v": "FK → Record (D-10)"
+     },
+     {
+      "k": "extraction_hash",
+      "v": "Char"
+     },
+     {
+      "k": "source_revision",
+      "v": "UUID"
+     },
+     {
+      "k": "strategy_id",
+      "v": "Char"
+     },
+     {
+      "k": "options",
+      "v": "JSON"
+     },
+     "… 6 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "ai_DocumentChunk",
+   "shape": "table",
+   "label": "DocumentChunk",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "chunk_set",
+      "v": "FK → ChunkSet"
+     },
+     {
+      "k": "record",
+      "v": "FK → Record (D-10)"
+     },
+     {
+      "k": "sequence",
+      "v": "PositiveInteger"
+     },
+     {
+      "k": "max_sequence",
+      "v": "PositiveInteger"
+     },
+     {
+      "k": "text",
+      "v": "Text"
+     },
+     {
+      "k": "content",
+      "v": "Text"
+     },
+     "… 11 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "ai_EmbeddingSpace",
+   "shape": "table",
+   "label": "EmbeddingSpace",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "model_id",
+      "v": "Char"
+     },
+     {
+      "k": "dimensions",
+      "v": "PositiveInteger"
+     },
+     {
+      "k": "metric",
+      "v": "Char"
+     },
+     {
+      "k": "state",
+      "v": "Char"
+     },
+     "… 1 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "ai_RecordSpaceEmbedding",
+   "shape": "table",
+   "label": "RecordSpaceEmbedding",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record",
+      "v": "FK → Record (D-10)"
+     },
+     {
+      "k": "space",
+      "v": "FK → EmbeddingSpace"
+     },
+     {
+      "k": "embedding",
+      "v": "Vector"
+     },
+     {
+      "k": "source_hash",
+      "v": "Char"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     },
+     {
+      "k": "updated_at",
+      "v": "DateTime"
+     }
+    ]
+   ]
+  }
+ ],
+ "edges": [
+  {
+   "from": "ai_ChunkEmbedding",
+   "to": "ai_DocumentChunk",
+   "field": "chunk",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "ai_ChunkEmbedding",
+   "to": "ai_EmbeddingSpace",
+   "field": "space",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "ai_DocumentChunk",
+   "to": "ai_ChunkSet",
+   "field": "chunk_set",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "ai_RecordSpaceEmbedding",
+   "to": "ai_EmbeddingSpace",
+   "field": "space",
+   "tail": "zero-many",
+   "head": "one"
+  }
+ ],
+ "legend": [
+  {
+   "line": "many",
+   "text": "many (zero or more) to exactly one"
+  },
+  "circle at an end: zero allowed",
+  "bold: primary key",
+  "FK → Name (D-n): drawn in full on figure D-n"
+ ]
+}

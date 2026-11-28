@@ -1,0 +1,86 @@
+{
+ "kind": "usecase",
+ "format": "portrait",
+ "title": "U-2.1  Use cases: publish a record (FR-2.1)",
+ "caption": "SRS v2 §3.2.2.1. From RecordViewSet (create, submit), features/publish, ADR-032, ADR-046 at 2d8d4e4a (IR-1275).",
+ "system": "Publish",
+ "left": [
+  {
+   "id": "Author",
+   "label": "Author\n(Student or Adviser)"
+  }
+ ],
+ "right": [],
+ "cases": [
+  {
+   "id": "UC1",
+   "label": "Choose the record type",
+   "wrap": 160
+  },
+  {
+   "id": "UC2",
+   "label": "Upload the manuscript",
+   "wrap": 160
+  },
+  {
+   "id": "UC3",
+   "label": "Enter metadata, authors, co-owners and research origin",
+   "wrap": 160
+  },
+  {
+   "id": "UC4",
+   "label": "Name the Adviser (not an owner)",
+   "wrap": 160
+  },
+  {
+   "id": "UC5",
+   "label": "Upload the type's documents",
+   "wrap": 160
+  },
+  {
+   "id": "UC6",
+   "label": "Acknowledge a possible duplicate",
+   "wrap": 160
+  },
+  {
+   "id": "UC7",
+   "label": "Submit to the Adviser",
+   "wrap": 160
+  }
+ ],
+ "links": [
+  [
+   "Author",
+   "UC1",
+   "UC2",
+   "UC3",
+   "UC4",
+   "UC5",
+   "UC7"
+  ]
+ ],
+ "deps": [
+  {
+   "from": "UC2",
+   "to": "UC6",
+   "label": "«extend»"
+  }
+ ],
+ "notes": [
+  {
+   "on": "UC7",
+   "text": "every paper starts embargoed (IR-882)",
+   "wrap": 130
+  }
+ ],
+ "legend": [
+  {
+   "line": "solid",
+   "text": "actor takes part"
+  },
+  {
+   "line": "dash arrow",
+   "text": "dependency between use cases"
+  }
+ ]
+}

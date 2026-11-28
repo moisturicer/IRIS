@@ -1,0 +1,84 @@
+{
+ "title": "E-7.1  Schema: audit and settings",
+ "caption": "SDD v2 §3.7.1–3.7.3. Generated from backend/apps/*/models*.py at 2d8d4e4a; all keys and up to four other fields per table; the full schema is D-8 to D-15.",
+ "kind": "erd",
+ "format": "portrait",
+ "nodes": [
+  {
+   "id": "accounts_SystemSetting",
+   "shape": "table",
+   "label": "SystemSetting",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "updated_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "key",
+      "v": "Char"
+     },
+     {
+      "k": "value",
+      "v": "Text"
+     },
+     {
+      "k": "updated_at",
+      "v": "DateTime"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "audit_AuditEvent",
+   "shape": "table",
+   "label": "AuditEvent",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "user",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "record",
+      "v": "FK → Record (D-10)"
+     },
+     {
+      "k": "event_type",
+      "v": "Char"
+     },
+     {
+      "k": "metadata",
+      "v": "JSON"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     }
+    ]
+   ]
+  }
+ ],
+ "edges": [],
+ "legend": [
+  {
+   "line": "many",
+   "text": "many (zero or more) to exactly one"
+  },
+  "circle at an end: zero allowed",
+  "bold: primary key",
+  "FK → Name (D-n): drawn in full on figure D-n"
+ ]
+}

@@ -1,0 +1,96 @@
+{
+ "kind": "sequence",
+ "format": "portrait",
+ "title": "Q-3.5  Sequence: a document request",
+ "caption": "SDD v2 §3.3.5. From apps/documents/requests.py, reviews/finish_review.py, records/views.py send_documents, ADR-022 Amendments 8-9 at 2d8d4e4a (IR-1275).",
+ "participants": [
+  {
+   "id": "rv",
+   "label": "Reviewer",
+   "tone": "plain"
+  },
+  {
+   "id": "dj",
+   "label": "Django",
+   "sub": "document requests"
+  },
+  {
+   "id": "db",
+   "label": "PostgreSQL"
+  },
+  {
+   "id": "o",
+   "label": "Owner",
+   "tone": "plain"
+  }
+ ],
+ "steps": [
+  {
+   "from": "rv",
+   "to": "dj",
+   "label": "POST /records/<id>/document-requests/ (items)"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "DocumentRequest (draft): only the reviewer sees it; no notice"
+  },
+  {
+   "from": "rv",
+   "to": "dj",
+   "label": "POST /records/<id>/finish-review/ (request_revision or comment_only)"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "send_drafts: open, dated now; pause the party's clock"
+  },
+  {
+   "from": "dj",
+   "to": "o",
+   "label": "after commit: notification",
+   "dash": true
+  },
+  {
+   "from": "o",
+   "to": "dj",
+   "label": "upload each item: RecordUpload, sent_at null (held, owners only)"
+  },
+  {
+   "from": "o",
+   "to": "dj",
+   "label": "POST /records/<id>/documents/send/ (409 if a revision is open)"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "send_held_uploads: set sent_at; answer missing items; fulfil; restart the clock"
+  },
+  {
+   "from": "dj",
+   "to": "rv",
+   "label": "after commit: one notification per party",
+   "dash": true
+  },
+  {
+   "from": "rv",
+   "to": "dj",
+   "label": "PATCH /document-request-items/<id>/ (accept / reject + reason)"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "reject: item missing again; the request reopens"
+  }
+ ],
+ "legend": [
+  {
+   "line": "arrow",
+   "text": "request or write"
+  },
+  {
+   "line": "dash arrow",
+   "text": "response or notice"
+  }
+ ]
+}

@@ -1,0 +1,82 @@
+{
+ "kind": "usecase",
+ "format": "portrait",
+ "title": "U-1.7  Use cases: personal data rights (FR-1.7)",
+ "caption": "SRS v2 §3.2.1.7. From apps/accounts/personal_data, apps/accounts/deletion, apps/audit/tasks.py, ADR-051 at 2d8d4e4a (IR-1275).",
+ "system": "Personal data",
+ "left": [
+  {
+   "id": "Person",
+   "label": "Signed-in person"
+  },
+  {
+   "id": "Admin",
+   "label": "System Admin"
+  }
+ ],
+ "right": [],
+ "cases": [
+  {
+   "id": "UC1",
+   "label": "Download my data",
+   "wrap": 160
+  },
+  {
+   "id": "UC2",
+   "label": "Request account deletion",
+   "wrap": 160
+  },
+  {
+   "id": "UC3",
+   "label": "Change my AI-use answer",
+   "wrap": 160
+  },
+  {
+   "id": "UC4",
+   "label": "See what blocks a deletion",
+   "wrap": 160
+  },
+  {
+   "id": "UC5",
+   "label": "Confirm or reject a deletion (with a reason)",
+   "wrap": 160
+  },
+  {
+   "id": "UC6",
+   "label": "Set retention periods",
+   "wrap": 160
+  }
+ ],
+ "links": [
+  [
+   "Person",
+   "UC1",
+   "UC2",
+   "UC3"
+  ],
+  [
+   "Admin",
+   "UC4",
+   "UC5",
+   "UC6"
+  ]
+ ],
+ "deps": [
+  {
+   "from": "UC5",
+   "to": "UC4",
+   "label": "«include»"
+  }
+ ],
+ "notes": [],
+ "legend": [
+  {
+   "line": "solid",
+   "text": "actor takes part"
+  },
+  {
+   "line": "dash arrow",
+   "text": "dependency between use cases"
+  }
+ ]
+}

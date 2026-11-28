@@ -1,0 +1,181 @@
+{
+ "kind": "columns",
+ "format": "portrait",
+ "title": "C-1.2  Classes: sessions and the refresh cookie",
+ "caption": "SDD v2 §3.1.2. From apps/accounts (views.py, sessions.py, refresh_cookie.py, authentication.py), simplejwt at 2d8d4e4a (IR-1275).",
+ "gutter": 60,
+ "vgap": 30,
+ "nodes": [
+  {
+   "id": "LoginView",
+   "shape": "class",
+   "label": "LoginView",
+   "sections": [
+    [],
+    [
+     "post(request)"
+    ]
+   ],
+   "stereotype": "view"
+  },
+  {
+   "id": "RefreshView",
+   "shape": "class",
+   "label": "RefreshView",
+   "sections": [
+    [],
+    [
+     "post(request)"
+    ]
+   ],
+   "stereotype": "view"
+  },
+  {
+   "id": "LogoutView",
+   "shape": "class",
+   "label": "LogoutView",
+   "sections": [
+    [],
+    [
+     "post(request)"
+    ]
+   ],
+   "stereotype": "view"
+  },
+  {
+   "id": "refresh_cookie",
+   "shape": "class",
+   "label": "refresh_cookie",
+   "sections": [
+    [],
+    [
+     "require_first_party()",
+     "read()",
+     "set_cookie()",
+     "clear_cookie()"
+    ]
+   ],
+   "stereotype": "module"
+  },
+  {
+   "id": "sessions",
+   "shape": "class",
+   "label": "sessions",
+   "sections": [
+    [],
+    [
+     "start_session()",
+     "touch()",
+     "check_open()",
+     "end_session()",
+     "end_all_sessions()"
+    ]
+   ],
+   "stereotype": "module"
+  },
+  {
+   "id": "UserSession",
+   "shape": "class",
+   "label": "UserSession",
+   "sections": [
+    [
+     "id (sid)",
+     "user → User",
+     "last_activity_at",
+     "remembered",
+     "expires_at",
+     "ended_reason"
+    ]
+   ]
+  },
+  {
+   "id": "OutstandingToken",
+   "shape": "class",
+   "label": "OutstandingToken",
+   "sections": [
+    [
+     "jti",
+     "user → User",
+     "expires_at"
+    ]
+   ]
+  },
+  {
+   "id": "BlacklistedToken",
+   "shape": "class",
+   "label": "BlacklistedToken",
+   "sections": [
+    [
+     "token → OutstandingToken",
+     "blacklisted_at"
+    ]
+   ]
+  }
+ ],
+ "columns": [
+  [
+   "LoginView",
+   "RefreshView",
+   "LogoutView"
+  ],
+  [
+   "refresh_cookie",
+   "sessions"
+  ],
+  [
+   "UserSession",
+   "OutstandingToken",
+   "BlacklistedToken"
+  ]
+ ],
+ "edges": [
+  {
+   "from": "LoginView",
+   "to": "sessions",
+   "dash": true
+  },
+  {
+   "from": "RefreshView",
+   "to": "sessions",
+   "dash": true
+  },
+  {
+   "from": "LogoutView",
+   "to": "sessions",
+   "dash": true
+  },
+  {
+   "from": "RefreshView",
+   "to": "refresh_cookie",
+   "dash": true
+  },
+  {
+   "from": "LoginView",
+   "to": "refresh_cookie",
+   "dash": true
+  },
+  {
+   "from": "sessions",
+   "to": "UserSession",
+   "dash": true
+  },
+  {
+   "from": "BlacklistedToken",
+   "to": "OutstandingToken"
+  }
+ ],
+ "legend": [
+  {
+   "line": "diamond",
+   "text": "composition (owner at the diamond)"
+  },
+  {
+   "line": "arrow",
+   "text": "association"
+  },
+  {
+   "line": "dash arrow",
+   "text": "uses / calls"
+  }
+ ]
+}

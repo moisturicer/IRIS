@@ -1,0 +1,134 @@
+{
+ "format": "portrait",
+ "direction": "DOWN",
+ "title": "A-1.5  Activity: request and grant a role",
+ "caption": "SRS v2 §3.2.1.5. From apps/accounts/views.py RoleRequestDetailView, core/permissions.py at 2d8d4e4a (IR-1275).",
+ "elk": {
+  "elk.layered.spacing.nodeNodeBetweenLayers": "16",
+  "elk.spacing.nodeNode": "22",
+  "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
+  "elk.layered.nodePlacement.bk.fixedAlignment": "BALANCED",
+  "elk.aspectRatio": "0.7"
+ },
+ "nodes": [
+  {
+   "id": "start",
+   "shape": "start"
+  },
+  {
+   "id": "a1",
+   "shape": "box",
+   "tag": "Person",
+   "label": "Request the Student or Adviser role",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "a2",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Hold the request as pending; hint RDCO's queue",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "a3",
+   "shape": "box",
+   "tag": "RDCO",
+   "label": "Open the request",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "q4",
+   "shape": "diamond",
+   "wrap": 150,
+   "label": "Approve?"
+  },
+  {
+   "id": "a5",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Set the role; notify the person; audit it",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "a6",
+   "shape": "box",
+   "tag": "RDCO",
+   "label": "Give a reason",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "a7",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Decline; notify the person with the reason",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "stop",
+   "shape": "end"
+  }
+ ],
+ "edges": [
+  {
+   "from": "start",
+   "to": "a1"
+  },
+  {
+   "from": "a1",
+   "to": "a2"
+  },
+  {
+   "from": "a2",
+   "to": "a3"
+  },
+  {
+   "from": "a3",
+   "to": "q4"
+  },
+  {
+   "from": "q4",
+   "to": "a5",
+   "label": "yes"
+  },
+  {
+   "from": "q4",
+   "to": "a6",
+   "label": "no"
+  },
+  {
+   "from": "a6",
+   "to": "a7"
+  },
+  {
+   "from": "a5",
+   "to": "stop"
+  },
+  {
+   "from": "a7",
+   "to": "stop"
+  }
+ ],
+ "legend": [
+  "first line of an action: who does it",
+  {
+   "tone": "plain",
+   "text": "person"
+  },
+  {
+   "tone": "core",
+   "text": "IRIS"
+  }
+ ]
+}

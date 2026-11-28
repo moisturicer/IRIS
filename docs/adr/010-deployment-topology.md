@@ -4,6 +4,8 @@
 
 Accepted — 2026-09-01. **Amended by [ADR-014](014-ai-gateway-as-a-service.md)** — 2026-09-02: the topology is six services, adding `ai-gateway`. Every other reduction below stands.
 
+**Amendment proposed 2026-11-23 (IR-1275), awaiting approval by Ashlee Sean: production is one AWS EC2 instance running the Compose stack.** See *Amendment — 2026-11-23* at the end. Until it is approved, the Decision below still reads "interim VPS, then CIT-U hardware".
+
 ## Context
 
 `docker-compose.yml` and `docker-compose.prod.yml` declare **ten services**. Audited against the working tree:
@@ -100,3 +102,32 @@ NFR-S1 (encryption at rest) · NFR-S3 (HTTPS, 301 redirect) · NFR-R1 (uptime) �
 ## Related Tasks
 
 `D-01`…`D-05`, `S-01`, `S-04`, `B-03` (Celery routing). See [`08-deployment.md`](../architecture-tasks/08-deployment.md).
+
+## Amendment — 2026-11-23 (IR-1275): production is one AWS EC2 instance
+
+**Status: Proposed**, 2026-11-23. Drafted by an AI agent while writing SRS v2 (IR-1275). **Approver: Ashlee Sean.** Not accepted until she records approval here.
+
+### Context
+
+The Decision above sends production first to an interim VPS, then to CIT-U hardware "if and when confirmed". Neither happened. Production runs on **one AWS EC2 instance**, made by CloudFormation (`deploy/aws/iris-demo.yaml`), with guards in `deploy/aws/iris-guards.yaml` and updates through `scripts/deploy.sh`. No ADR records that choice, so the SRS's constraints had nothing to cite. The topology also grew past six services: `docker-compose.prod.yml` now runs `db`, `redis`, `clamav` (ADR-074), `migrate` (ADR-039), `backend` (ASGI, ADR-017), `ai-gateway` and `ai-runs-worker` (ADR-014, ADR-049), `celery-default`, `celery-extraction`, `celery-embedding`, `celery-beat`, `frontend` and `caddy` (ADR-057), and since IR-1320 (2026-11-24) a one-shot `ai-migrate` that updates the `iris_ai` schema before the AI services start, on a `private` network with no outside access and an `egress` network for the containers that call vendors.
+
+### Decision
+
+1. **Production is one AWS EC2 instance running the same Docker Compose stack as development.** Ubuntu 24.04, `m7i-flex.large` (8 GB, with `t3.large` as the fallback where it is not offered) plus a 4 GB swap file, an **encrypted** gp3 EBS volume (64 GiB by default), an Elastic IP, and a security group that opens only 80 and 443 (22 only when asked for, from one address). The shell is AWS Systems Manager Session Manager, not SSH keys.
+2. **Guards:** an account budget alert, automatic recovery onto healthy hardware, and an optional daily stop and start schedule.
+3. **The server is kept off when it is not in use**, to save cost (approved by the adviser, 2026-11-15). Availability during the pilot is by schedule.
+4. **This is still the single-box decision above, on rented hardware.** It uses no AWS managed services (ECS, RDS, ElastiCache, ALB), which the Alternatives above reject on cost. Moving to CIT-U hardware stays `pg_dump` plus `docker compose up`.
+5. **The interim VPS stage is retired**, and "CIT-U hardware" becomes a possible later move, not a planned one.
+
+### Consequences
+
+- **Data residency changes.** v1 SRS §456's on-premise requirement is not met. Everything IRIS stores is on the EC2 instance in one AWS region, and paper content reaches Unstructured, Voyage and a language model through OpenRouter, behind the disclosure gate (ADR-052, ADR-054). SRS v2 states this.
+- **NFR-S1 (encryption at rest)** is met by EBS encryption, not LUKS.
+- **NFR-R4 (backup) is not met:** nothing in `deploy/` sets up a backup, and v1's separate backup drive does not exist. A follow-up should add daily EBS snapshots (AWS Data Lifecycle Manager) or `pg_dump` to S3.
+- **NFR-R1 (uptime)** cannot be met while the server is switched off between sessions. It stays the target for an always-on deployment.
+- **A deployment wipes container logs**, so collect logs before deploying.
+
+### Open
+
+- The production region is to be confirmed by the person who created the stack (the deploy README's example is Singapore, `ap-southeast-1`).
+

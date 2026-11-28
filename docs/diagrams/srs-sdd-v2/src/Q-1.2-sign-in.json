@@ -1,0 +1,87 @@
+{
+ "kind": "sequence",
+ "format": "portrait",
+ "title": "Q-1.2  Sequence: sign in, refresh and sign out",
+ "caption": "SDD v2 §3.1.2. From LoginView, RefreshView, LogoutView, refresh_cookie.py, sessions.py, ADR-072 at 2d8d4e4a (IR-1275).",
+ "participants": [
+  {
+   "id": "p",
+   "label": "Person",
+   "tone": "plain"
+  },
+  {
+   "id": "spa",
+   "label": "React",
+   "sub": "access token in memory"
+  },
+  {
+   "id": "dj",
+   "label": "Django",
+   "sub": "simplejwt + UserSession"
+  },
+  {
+   "id": "db",
+   "label": "PostgreSQL"
+  }
+ ],
+ "steps": [
+  {
+   "from": "spa",
+   "to": "dj",
+   "label": "POST /auth/login/"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "axes and throttles; credentials; create UserSession; audit"
+  },
+  {
+   "from": "dj",
+   "to": "spa",
+   "label": "access token + Set-Cookie iris_refresh (HttpOnly)",
+   "dash": true
+  },
+  {
+   "from": "spa",
+   "to": "dj",
+   "label": "POST /auth/token/refresh/ (cookie, X-IRIS-Auth)"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "Origin; idle < 30 min or remembered; rotate + blacklist"
+  },
+  {
+   "from": "dj",
+   "to": "spa",
+   "label": "new access token + rotated cookie",
+   "dash": true
+  },
+  {
+   "from": "spa",
+   "to": "dj",
+   "label": "POST /auth/logout/"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "blacklist; end session; audit"
+  },
+  {
+   "from": "dj",
+   "to": "spa",
+   "label": "clear the cookie",
+   "dash": true
+  }
+ ],
+ "legend": [
+  {
+   "line": "arrow",
+   "text": "request or write"
+  },
+  {
+   "line": "dash arrow",
+   "text": "response or notice"
+  }
+ ]
+}

@@ -1,0 +1,113 @@
+{
+ "kind": "columns",
+ "format": "portrait",
+ "title": "C-2.3  Classes: upload checks",
+ "caption": "SDD v2 §3.2.3. From apps/documents (validators.py, scanning.py, models.py) at 2d8d4e4a (IR-1275).",
+ "gutter": 60,
+ "vgap": 30,
+ "nodes": [
+  {
+   "id": "validators",
+   "shape": "class",
+   "label": "validators",
+   "sections": [
+    [],
+    [
+     "pdf_upload_problem()",
+     "supplementary_file_problem()"
+    ]
+   ],
+   "stereotype": "module"
+  },
+  {
+   "id": "scanning",
+   "shape": "class",
+   "label": "scanning",
+   "sections": [
+    [],
+    [
+     "current_scanner()",
+     "scan_verdict()",
+     "upload_problem()"
+    ]
+   ],
+   "stereotype": "module"
+  },
+  {
+   "id": "ClamdScanner",
+   "shape": "class",
+   "label": "ClamdScanner",
+   "sections": [
+    [
+     "MALWARE_SCAN_HOST",
+     "TCP 3310"
+    ],
+    [
+     "scan(stream) → Verdict  (zINSTREAM)"
+    ]
+   ]
+  },
+  {
+   "id": "RecordUpload",
+   "shape": "class",
+   "label": "RecordUpload",
+   "sections": [
+    [
+     "record → Record",
+     "slot → UploadSlot",
+     "file",
+     "version",
+     "uploaded_by",
+     "sent_at (null: held)"
+    ]
+   ]
+  },
+  {
+   "id": "RecordFile",
+   "shape": "class",
+   "label": "RecordFile",
+   "sections": [
+    [
+     "record → Record",
+     "file",
+     "party",
+     "uploaded_by"
+    ]
+   ]
+  }
+ ],
+ "columns": [
+  [
+   "validators",
+   "scanning"
+  ],
+  [
+   "ClamdScanner"
+  ],
+  [
+   "RecordUpload",
+   "RecordFile"
+  ]
+ ],
+ "edges": [
+  {
+   "from": "scanning",
+   "to": "ClamdScanner",
+   "dash": true
+  }
+ ],
+ "legend": [
+  {
+   "line": "diamond",
+   "text": "composition (owner at the diamond)"
+  },
+  {
+   "line": "arrow",
+   "text": "association"
+  },
+  {
+   "line": "dash arrow",
+   "text": "uses / calls"
+  }
+ ]
+}

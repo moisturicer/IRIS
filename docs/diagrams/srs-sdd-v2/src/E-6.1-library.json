@@ -1,0 +1,272 @@
+{
+ "title": "E-6.1  Schema: the reader's library",
+ "caption": "SDD v2 §3.6.1–3.6.3. Generated from backend/apps/*/models*.py at 2d8d4e4a; all keys and up to four other fields per table; the full schema is D-8 to D-15.",
+ "kind": "erd",
+ "format": "landscape",
+ "nodes": [
+  {
+   "id": "library_FolderMembership",
+   "shape": "table",
+   "label": "FolderMembership",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "folder",
+      "v": "FK → LibraryFolder"
+     },
+     {
+      "k": "saved_record",
+      "v": "FK → SavedRecord"
+     },
+     {
+      "k": "added_at",
+      "v": "DateTime"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "library_LibraryFolder",
+   "shape": "table",
+   "label": "LibraryFolder",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "owner",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "name",
+      "v": "Char"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     },
+     {
+      "k": "updated_at",
+      "v": "DateTime"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "library_ReadingHighlight",
+   "shape": "table",
+   "label": "ReadingHighlight",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "owner",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "record",
+      "v": "FK → Record (D-10)"
+     },
+     {
+      "k": "manuscript_revision",
+      "v": "UUID"
+     },
+     {
+      "k": "manuscript_sha256",
+      "v": "Char"
+     },
+     {
+      "k": "page",
+      "v": "PositiveInteger"
+     },
+     {
+      "k": "quote",
+      "v": "Text"
+     },
+     "… 4 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "library_ReadingNote",
+   "shape": "table",
+   "label": "ReadingNote",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "owner",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "record",
+      "v": "FK → Record (D-10)"
+     },
+     {
+      "k": "body",
+      "v": "Text"
+     },
+     {
+      "k": "revision",
+      "v": "PositiveInteger"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     },
+     {
+      "k": "updated_at",
+      "v": "DateTime"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "library_ReadingPosition",
+   "shape": "table",
+   "label": "ReadingPosition",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "owner",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "record",
+      "v": "FK → Record (D-10)"
+     },
+     {
+      "k": "manuscript_revision",
+      "v": "UUID"
+     },
+     {
+      "k": "manuscript_sha256",
+      "v": "Char"
+     },
+     {
+      "k": "page",
+      "v": "PositiveInteger"
+     },
+     {
+      "k": "fraction",
+      "v": "Float"
+     },
+     "… 1 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "library_ReadingVisit",
+   "shape": "table",
+   "label": "ReadingVisit",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "owner",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "record",
+      "v": "FK → Record (D-10)"
+     },
+     {
+      "k": "viewed_at",
+      "v": "DateTime"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "library_SavedRecord",
+   "shape": "table",
+   "label": "SavedRecord",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "owner",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "record",
+      "v": "FK → Record (D-10)"
+     },
+     {
+      "k": "reading_status",
+      "v": "Char"
+     },
+     {
+      "k": "saved_at",
+      "v": "DateTime"
+     },
+     {
+      "k": "updated_at",
+      "v": "DateTime"
+     }
+    ]
+   ]
+  }
+ ],
+ "edges": [
+  {
+   "from": "library_FolderMembership",
+   "to": "library_LibraryFolder",
+   "field": "folder",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "library_FolderMembership",
+   "to": "library_SavedRecord",
+   "field": "saved_record",
+   "tail": "zero-many",
+   "head": "one"
+  }
+ ],
+ "legend": [
+  {
+   "line": "many",
+   "text": "many (zero or more) to exactly one"
+  },
+  "circle at an end: zero allowed",
+  "bold: primary key",
+  "FK → Name (D-n): drawn in full on figure D-n"
+ ]
+}

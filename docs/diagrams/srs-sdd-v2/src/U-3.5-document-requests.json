@@ -1,0 +1,92 @@
+{
+ "kind": "usecase",
+ "format": "portrait",
+ "title": "U-3.5  Use cases: explicit document requests (FR-3.5)",
+ "caption": "SRS v2 §3.2.3.5. From apps/documents/requests.py, reviews/finish_review.py, records/views.py send_documents, ADR-022 Amendments 8-9 at 2d8d4e4a (IR-1275).",
+ "system": "Document requests",
+ "left": [
+  {
+   "id": "Reviewer",
+   "label": "Reviewer"
+  },
+  {
+   "id": "Owner",
+   "label": "Record owner"
+  }
+ ],
+ "right": [],
+ "cases": [
+  {
+   "id": "UC1",
+   "label": "Draft a request (Documents tab)",
+   "wrap": 160
+  },
+  {
+   "id": "UC2",
+   "label": "Finish review: send the drafts",
+   "wrap": 160
+  },
+  {
+   "id": "UC3",
+   "label": "Upload what was asked; held, seen by the owners only",
+   "wrap": 160
+  },
+  {
+   "id": "UC4",
+   "label": "Submit added documents",
+   "wrap": 160
+  },
+  {
+   "id": "UC5",
+   "label": "Accept or reject each upload",
+   "wrap": 160
+  },
+  {
+   "id": "UC6",
+   "label": "Pause the requesting party's clock",
+   "wrap": 160
+  }
+ ],
+ "links": [
+  [
+   "Reviewer",
+   "UC1",
+   "UC2",
+   "UC5"
+  ],
+  [
+   "Owner",
+   "UC3",
+   "UC4"
+  ]
+ ],
+ "deps": [
+  {
+   "from": "UC2",
+   "to": "UC6",
+   "label": "«include»"
+  }
+ ],
+ "notes": [
+  {
+   "on": "UC2",
+   "text": "only with Request changes or Comment only",
+   "wrap": 130
+  },
+  {
+   "on": "UC4",
+   "text": "refused (409) while a revision is open",
+   "wrap": 130
+  }
+ ],
+ "legend": [
+  {
+   "line": "solid",
+   "text": "actor takes part"
+  },
+  {
+   "line": "dash arrow",
+   "text": "dependency between use cases"
+  }
+ ]
+}

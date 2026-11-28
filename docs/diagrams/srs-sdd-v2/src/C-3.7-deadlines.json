@@ -1,0 +1,165 @@
+{
+ "kind": "columns",
+ "format": "portrait",
+ "title": "C-3.7  Classes: turnaround and reminders",
+ "caption": "SDD v2 §3.3.7. From apps/reviews (models.py, deadlines.py, reminders.py), ADR-043 at 2d8d4e4a (IR-1275).",
+ "gutter": 60,
+ "vgap": 30,
+ "nodes": [
+  {
+   "id": "deadlines",
+   "shape": "class",
+   "label": "deadlines",
+   "sections": [
+    [],
+    [
+     "start_clock()",
+     "working_days_after()",
+     "extend()",
+     "is_overdue()"
+    ]
+   ],
+   "stereotype": "module"
+  },
+  {
+   "id": "reminders",
+   "shape": "class",
+   "label": "reminders",
+   "sections": [
+    [],
+    [
+     "run_deadline_notifications()"
+    ]
+   ],
+   "stereotype": "module"
+  },
+  {
+   "id": "RecordAssignment",
+   "shape": "class",
+   "label": "RecordAssignment",
+   "sections": [
+    [
+     "party",
+     "due_at",
+     "original_due_at",
+     "document_pause_started_at"
+    ]
+   ]
+  },
+  {
+   "id": "Turnaround",
+   "shape": "class",
+   "label": "Turnaround",
+   "sections": [
+    [
+     "party",
+     "working_days"
+    ]
+   ]
+  },
+  {
+   "id": "Holiday",
+   "shape": "class",
+   "label": "Holiday",
+   "sections": [
+    [
+     "date",
+     "name"
+    ]
+   ]
+  },
+  {
+   "id": "Extension",
+   "shape": "class",
+   "label": "Extension",
+   "sections": [
+    [
+     "assignment → RecordAssignment",
+     "due_at",
+     "reason",
+     "actor"
+    ]
+   ]
+  },
+  {
+   "id": "DeadlineMoment",
+   "shape": "class",
+   "label": "DeadlineMoment",
+   "sections": [
+    [
+     "assignment → RecordAssignment",
+     "kind",
+     "step",
+     "sent_at"
+    ]
+   ]
+  }
+ ],
+ "columns": [
+  [
+   "deadlines",
+   "reminders"
+  ],
+  [
+   "RecordAssignment",
+   "Turnaround",
+   "Holiday"
+  ],
+  [
+   "Extension",
+   "DeadlineMoment"
+  ]
+ ],
+ "edges": [
+  {
+   "from": "deadlines",
+   "to": "RecordAssignment",
+   "dash": true
+  },
+  {
+   "from": "deadlines",
+   "to": "Turnaround",
+   "dash": true
+  },
+  {
+   "from": "deadlines",
+   "to": "Holiday",
+   "dash": true
+  },
+  {
+   "from": "RecordAssignment",
+   "to": "Extension",
+   "tail": "diamond",
+   "head": "none",
+   "mFrom": "1",
+   "mTo": "0..*"
+  },
+  {
+   "from": "RecordAssignment",
+   "to": "DeadlineMoment",
+   "tail": "diamond",
+   "head": "none",
+   "mFrom": "1",
+   "mTo": "0..*"
+  },
+  {
+   "from": "reminders",
+   "to": "DeadlineMoment",
+   "dash": true
+  }
+ ],
+ "legend": [
+  {
+   "line": "diamond",
+   "text": "composition (owner at the diamond)"
+  },
+  {
+   "line": "arrow",
+   "text": "association"
+  },
+  {
+   "line": "dash arrow",
+   "text": "uses / calls"
+  }
+ ]
+}

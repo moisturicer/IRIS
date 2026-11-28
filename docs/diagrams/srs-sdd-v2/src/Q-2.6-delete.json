@@ -1,0 +1,65 @@
+{
+ "kind": "sequence",
+ "format": "portrait",
+ "title": "Q-2.6  Sequence: a delete request",
+ "caption": "SDD v2 §3.2.6. From DeleteRequestViewSet at 2d8d4e4a (IR-1275).",
+ "participants": [
+  {
+   "id": "o",
+   "label": "Owner",
+   "tone": "plain"
+  },
+  {
+   "id": "dj",
+   "label": "Django",
+   "sub": "DeleteRequestViewSet"
+  },
+  {
+   "id": "db",
+   "label": "PostgreSQL"
+  },
+  {
+   "id": "rdco",
+   "label": "RDCO",
+   "tone": "plain"
+  }
+ ],
+ "steps": [
+  {
+   "from": "o",
+   "to": "dj",
+   "label": "POST /records/delete-requests/"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "keep previous_pipeline_status; set pending_delete"
+  },
+  {
+   "from": "rdco",
+   "to": "dj",
+   "label": "POST .../<id>/approve/ or /decline/"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "delete (keep audit) or restore the previous status"
+  },
+  {
+   "from": "dj",
+   "to": "o",
+   "label": "notification",
+   "dash": true
+  }
+ ],
+ "legend": [
+  {
+   "line": "arrow",
+   "text": "request or write"
+  },
+  {
+   "line": "dash arrow",
+   "text": "response or notice"
+  }
+ ]
+}

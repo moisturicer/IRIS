@@ -1,0 +1,116 @@
+{
+ "kind": "usecase",
+ "format": "portrait",
+ "title": "U-5.4  Use cases: Ask IRIS (FR-5.4)",
+ "caption": "SRS v2 §3.2.5.4. From features/ai (RuntimeReader), ai/ (runs, agent, research), ADR-049 at 2d8d4e4a (IR-1275).",
+ "system": "Ask IRIS",
+ "left": [
+  {
+   "id": "Person",
+   "label": "Signed-in person"
+  }
+ ],
+ "right": [
+  {
+   "id": "LLM",
+   "label": "Language model",
+   "tone": "ext"
+  },
+  {
+   "id": "Voy",
+   "label": "Voyage AI",
+   "tone": "ext"
+  }
+ ],
+ "cases": [
+  {
+   "id": "UC1",
+   "label": "Ask a question",
+   "wrap": 160
+  },
+  {
+   "id": "UC2",
+   "label": "Read the streamed, cited answer",
+   "wrap": 160,
+   "tone": "ai"
+  },
+  {
+   "id": "UC3",
+   "label": "Open a citation at its page",
+   "wrap": 160
+  },
+  {
+   "id": "UC4",
+   "label": "Retry a failed or stopped run",
+   "wrap": 160
+  },
+  {
+   "id": "UC5",
+   "label": "Pin, rename or delete a conversation",
+   "wrap": 160
+  },
+  {
+   "id": "UC6",
+   "label": "Resume after reconnecting",
+   "wrap": 160
+  }
+ ],
+ "links": [
+  [
+   "Person",
+   "UC1",
+   "UC3",
+   "UC5"
+  ],
+  [
+   "LLM",
+   "UC2"
+  ],
+  [
+   "Voy",
+   "UC2"
+  ]
+ ],
+ "deps": [
+  {
+   "from": "UC1",
+   "to": "UC2",
+   "label": "«include»"
+  },
+  {
+   "from": "UC2",
+   "to": "UC4",
+   "label": "«extend»"
+  },
+  {
+   "from": "UC2",
+   "to": "UC6",
+   "label": "«extend»"
+  }
+ ],
+ "notes": [
+  {
+   "on": "UC2",
+   "text": "cites only passages the reader may read",
+   "wrap": 130
+  }
+ ],
+ "legend": [
+  {
+   "line": "solid",
+   "text": "actor takes part"
+  },
+  {
+   "line": "dash arrow",
+   "text": "dependency between use cases"
+  },
+  {
+   "tone": "ai",
+   "text": "AI-assisted"
+  },
+  {
+   "tone": "ext",
+   "text": "external system"
+  }
+ ]
+}

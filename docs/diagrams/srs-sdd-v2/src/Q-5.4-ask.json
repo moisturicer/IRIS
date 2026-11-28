@@ -1,0 +1,124 @@
+{
+ "kind": "sequence",
+ "format": "portrait",
+ "title": "Q-5.4  Sequence: an Ask IRIS run",
+ "caption": "SDD v2 §3.5.4. From frontend/runtime-edge.conf, apps/ai/grants, ai/api/runs.py, ai/runs, ai/agent at 2d8d4e4a (IR-1275).",
+ "participants": [
+  {
+   "id": "spa",
+   "label": "React",
+   "sub": "RuntimeReader"
+  },
+  {
+   "id": "edge",
+   "label": "nginx",
+   "sub": "edge"
+  },
+  {
+   "id": "dj",
+   "label": "Django",
+   "sub": "edge-grant"
+  },
+  {
+   "id": "gw",
+   "label": "ai-gateway",
+   "tone": "ai"
+  },
+  {
+   "id": "w",
+   "label": "ai-runs-worker",
+   "tone": "ai"
+  },
+  {
+   "id": "db",
+   "label": "PostgreSQL"
+  },
+  {
+   "id": "llm",
+   "label": "Language model",
+   "tone": "ext"
+  }
+ ],
+ "steps": [
+  {
+   "from": "spa",
+   "to": "edge",
+   "label": "POST /api/v1/ai/runtime/runs"
+  },
+  {
+   "from": "edge",
+   "to": "dj",
+   "label": "auth_request (JWT)"
+  },
+  {
+   "from": "dj",
+   "to": "edge",
+   "label": "reader grant",
+   "dash": true
+  },
+  {
+   "from": "edge",
+   "to": "gw",
+   "label": "run + grant + service secret"
+  },
+  {
+   "from": "gw",
+   "to": "db",
+   "label": "verify grant; ask_run queued"
+  },
+  {
+   "from": "w",
+   "to": "db",
+   "label": "claim (lease, fence)"
+  },
+  {
+   "loop": "research steps within Bounds",
+   "steps": [
+    {
+     "from": "w",
+     "to": "db",
+     "label": "search / read / count / list / paper_details under the row policy"
+    },
+    {
+     "from": "w",
+     "to": "llm",
+     "label": "admitted model call"
+    }
+   ]
+  },
+  {
+   "from": "w",
+   "to": "db",
+   "label": "check citations; commit Turn + citations"
+  },
+  {
+   "from": "spa",
+   "to": "gw",
+   "label": "GET /runs/<id>?after=N"
+  },
+  {
+   "from": "gw",
+   "to": "spa",
+   "label": "streamed events and the answer",
+   "dash": true
+  }
+ ],
+ "legend": [
+  {
+   "line": "arrow",
+   "text": "request or write"
+  },
+  {
+   "line": "dash arrow",
+   "text": "response or notice"
+  },
+  {
+   "tone": "ai",
+   "text": "AI runtime"
+  },
+  {
+   "tone": "ext",
+   "text": "external service"
+  }
+ ]
+}

@@ -1,0 +1,150 @@
+{
+ "kind": "columns",
+ "format": "portrait",
+ "title": "C-3.6  Classes: review threads",
+ "caption": "SDD v2 §3.3.6. From apps/reviews (models.py, threads.py, mentions.py, saved_replies.py), ADR-032 §7 at 2d8d4e4a (IR-1275).",
+ "gutter": 60,
+ "vgap": 30,
+ "nodes": [
+  {
+   "id": "threads",
+   "shape": "class",
+   "label": "threads",
+   "sections": [
+    [],
+    [
+     "open_must_fix()",
+     "new_version_blocked_reason()",
+     "resolve()",
+     "reopen()"
+    ]
+   ],
+   "stereotype": "module"
+  },
+  {
+   "id": "ReviewComment",
+   "shape": "class",
+   "label": "ReviewComment",
+   "sections": [
+    [
+     "record → Record",
+     "author",
+     "kind",
+     "severity",
+     "state",
+     "answer",
+     "anchor_version"
+    ]
+   ]
+  },
+  {
+   "id": "ThreadPlace",
+   "shape": "class",
+   "label": "ThreadPlace",
+   "sections": [
+    [
+     "thread → ReviewComment",
+     "version",
+     "outcome",
+     "page"
+    ]
+   ]
+  },
+  {
+   "id": "ReviewThreadEvent",
+   "shape": "class",
+   "label": "ReviewThreadEvent",
+   "sections": [
+    [
+     "thread → ReviewComment",
+     "kind",
+     "old_value",
+     "new_value"
+    ]
+   ]
+  },
+  {
+   "id": "ReviewMention",
+   "shape": "class",
+   "label": "ReviewMention",
+   "sections": [
+    [
+     "comment → ReviewComment",
+     "user",
+     "notified_at"
+    ]
+   ]
+  },
+  {
+   "id": "SavedReply",
+   "shape": "class",
+   "label": "SavedReply",
+   "sections": [
+    [
+     "owner → User",
+     "title",
+     "body"
+    ]
+   ]
+  }
+ ],
+ "columns": [
+  [
+   "threads",
+   "SavedReply"
+  ],
+  [
+   "ReviewComment"
+  ],
+  [
+   "ThreadPlace",
+   "ReviewThreadEvent",
+   "ReviewMention"
+  ]
+ ],
+ "edges": [
+  {
+   "from": "threads",
+   "to": "ReviewComment",
+   "dash": true
+  },
+  {
+   "from": "ReviewComment",
+   "to": "ThreadPlace",
+   "tail": "diamond",
+   "head": "none",
+   "mFrom": "1",
+   "mTo": "0..*"
+  },
+  {
+   "from": "ReviewComment",
+   "to": "ReviewThreadEvent",
+   "tail": "diamond",
+   "head": "none",
+   "mFrom": "1",
+   "mTo": "0..*"
+  },
+  {
+   "from": "ReviewComment",
+   "to": "ReviewMention",
+   "tail": "diamond",
+   "head": "none",
+   "mFrom": "1",
+   "mTo": "0..*"
+  }
+ ],
+ "legend": [
+  {
+   "line": "diamond",
+   "text": "composition (owner at the diamond)"
+  },
+  {
+   "line": "arrow",
+   "text": "association"
+  },
+  {
+   "line": "dash arrow",
+   "text": "uses / calls"
+  }
+ ]
+}

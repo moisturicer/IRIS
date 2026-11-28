@@ -1,0 +1,124 @@
+{
+ "kind": "columns",
+ "format": "portrait",
+ "title": "C-1.5  Classes: roles, requests and account administration",
+ "caption": "SDD v2 §3.1.5, 3.1.6. From core/enums.py RoleName, core/permissions.py, apps/accounts/views.py at 2d8d4e4a (IR-1275).",
+ "gutter": 60,
+ "vgap": 30,
+ "nodes": [
+  {
+   "id": "User",
+   "shape": "class",
+   "label": "User",
+   "sections": [
+    [
+     "role → Role",
+     "is_locked",
+     "is_office_coordinator"
+    ]
+   ]
+  },
+  {
+   "id": "Role",
+   "shape": "class",
+   "label": "Role",
+   "sections": [
+    [
+     "name (7 RoleName values)"
+    ]
+   ]
+  },
+  {
+   "id": "RoleRequest",
+   "shape": "class",
+   "label": "RoleRequest",
+   "sections": [
+    [
+     "user → User",
+     "requested_role → Role",
+     "status",
+     "reviewed_by"
+    ]
+   ]
+  },
+  {
+   "id": "permissions",
+   "shape": "class",
+   "label": "permissions",
+   "sections": [
+    [],
+    [
+     "IsStaff / IsAdmin / IsAccountAdmin",
+     "IsSystemAdmin",
+     "role_change_refusal()"
+    ]
+   ],
+   "stereotype": "module"
+  },
+  {
+   "id": "UserSession",
+   "shape": "class",
+   "label": "UserSession",
+   "sections": [
+    [
+     "user → User",
+     "ended_reason"
+    ]
+   ]
+  }
+ ],
+ "columns": [
+  [
+   "permissions"
+  ],
+  [
+   "User",
+   "UserSession"
+  ],
+  [
+   "Role",
+   "RoleRequest"
+  ]
+ ],
+ "edges": [
+  {
+   "from": "User",
+   "to": "Role"
+  },
+  {
+   "from": "RoleRequest",
+   "to": "User"
+  },
+  {
+   "from": "RoleRequest",
+   "to": "Role"
+  },
+  {
+   "from": "User",
+   "to": "UserSession",
+   "tail": "diamond",
+   "head": "none",
+   "mFrom": "1",
+   "mTo": "0..*"
+  },
+  {
+   "from": "permissions",
+   "to": "User",
+   "dash": true
+  }
+ ],
+ "legend": [
+  {
+   "line": "diamond",
+   "text": "composition (owner at the diamond)"
+  },
+  {
+   "line": "arrow",
+   "text": "association"
+  },
+  {
+   "line": "dash arrow",
+   "text": "uses / calls"
+  }
+ ]
+}

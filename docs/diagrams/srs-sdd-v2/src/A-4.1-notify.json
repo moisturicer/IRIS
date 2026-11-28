@@ -1,0 +1,157 @@
+{
+ "format": "portrait",
+ "direction": "DOWN",
+ "title": "A-4.1  Activity: notify and resolve",
+ "caption": "SRS v2 §3.2.4.1. From apps/notifications/services.py, settling.py, ADR-069 at 2d8d4e4a (IR-1275).",
+ "elk": {
+  "elk.layered.spacing.nodeNodeBetweenLayers": "16",
+  "elk.spacing.nodeNode": "22",
+  "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
+  "elk.layered.nodePlacement.bk.fixedAlignment": "BALANCED",
+  "elk.aspectRatio": "0.7"
+ },
+ "nodes": [
+  {
+   "id": "start",
+   "shape": "start"
+  },
+  {
+   "id": "a1",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "A workflow act commits",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "a2",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Pick recipients the visibility rule admits",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "bar3",
+   "shape": "bar",
+   "barW": 180
+  },
+  {
+   "id": "a4",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Create the in-app Notification",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "a5",
+   "shape": "box",
+   "tag": "Email service",
+   "label": "Send email, for some events",
+   "plain": true,
+   "tone": "ext",
+   "wrap": 150
+  },
+  {
+   "id": "bar6",
+   "shape": "bar",
+   "barW": 180
+  },
+  {
+   "id": "a7",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Publish a live hint",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "q8",
+   "shape": "diamond",
+   "wrap": 150,
+   "label": "Did the notice ask for action, and has that task ended?"
+  },
+  {
+   "id": "a9",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Set resolved_at and resolved_label; drop it from unread",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "stop",
+   "shape": "end"
+  }
+ ],
+ "edges": [
+  {
+   "from": "start",
+   "to": "a1"
+  },
+  {
+   "from": "a1",
+   "to": "a2"
+  },
+  {
+   "from": "a2",
+   "to": "bar3"
+  },
+  {
+   "from": "bar3",
+   "to": "a4"
+  },
+  {
+   "from": "bar3",
+   "to": "a5"
+  },
+  {
+   "from": "a4",
+   "to": "bar6"
+  },
+  {
+   "from": "a5",
+   "to": "bar6"
+  },
+  {
+   "from": "bar6",
+   "to": "a7"
+  },
+  {
+   "from": "a7",
+   "to": "q8"
+  },
+  {
+   "from": "q8",
+   "to": "a9",
+   "label": "yes"
+  },
+  {
+   "from": "a9",
+   "to": "stop"
+  },
+  {
+   "from": "q8",
+   "to": "stop",
+   "label": "no"
+  }
+ ],
+ "legend": [
+  "first line of an action: who does it",
+  {
+   "tone": "core",
+   "text": "IRIS"
+  },
+  {
+   "tone": "ext",
+   "text": "external service"
+  },
+  "bar: work that continues in parallel"
+ ]
+}

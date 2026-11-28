@@ -1,0 +1,121 @@
+{
+ "format": "portrait",
+ "direction": "DOWN",
+ "title": "A-3.8  Activity: tag and release IP",
+ "caption": "SRS v2 §3.2.3.8. From RecordViewSet.tags, records/ip_release.py at 2d8d4e4a (IR-1275).",
+ "elk": {
+  "elk.layered.spacing.nodeNodeBetweenLayers": "16",
+  "elk.spacing.nodeNode": "22",
+  "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
+  "elk.layered.nodePlacement.bk.fixedAlignment": "BALANCED",
+  "elk.aspectRatio": "0.7"
+ },
+ "nodes": [
+  {
+   "id": "start",
+   "shape": "start"
+  },
+  {
+   "id": "a1",
+   "shape": "box",
+   "tag": "Staff",
+   "label": "Tag the IP type on the paper",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "a2",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Mark it IP; keep it from AI",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "a3",
+   "shape": "box",
+   "tag": "KTTO",
+   "label": "Release the IP mark (audited)",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "q4",
+   "shape": "diamond",
+   "wrap": 150,
+   "label": "Embargo released and consent given?"
+  },
+  {
+   "id": "a5",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Paper may reach AI once published",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "a6",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Still kept from AI",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "stop",
+   "shape": "end"
+  }
+ ],
+ "edges": [
+  {
+   "from": "start",
+   "to": "a1"
+  },
+  {
+   "from": "a1",
+   "to": "a2"
+  },
+  {
+   "from": "a2",
+   "to": "a3"
+  },
+  {
+   "from": "a3",
+   "to": "q4"
+  },
+  {
+   "from": "q4",
+   "to": "a5",
+   "label": "yes"
+  },
+  {
+   "from": "q4",
+   "to": "a6",
+   "label": "no"
+  },
+  {
+   "from": "a5",
+   "to": "stop"
+  },
+  {
+   "from": "a6",
+   "to": "stop"
+  }
+ ],
+ "legend": [
+  "first line of an action: who does it",
+  {
+   "tone": "plain",
+   "text": "person"
+  },
+  {
+   "tone": "core",
+   "text": "IRIS"
+  }
+ ]
+}

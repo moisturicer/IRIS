@@ -1,0 +1,71 @@
+{
+ "kind": "sequence",
+ "format": "portrait",
+ "title": "Q-2.8  Sequence: search Discover",
+ "caption": "SDD v2 §3.2.8. From RecordViewSet.list, filters.py, signals.py at 2d8d4e4a (IR-1275).",
+ "participants": [
+  {
+   "id": "rd",
+   "label": "Reader",
+   "tone": "plain"
+  },
+  {
+   "id": "spa",
+   "label": "React",
+   "sub": "DiscoverPage"
+  },
+  {
+   "id": "dj",
+   "label": "Django",
+   "sub": "RecordViewSet"
+  },
+  {
+   "id": "db",
+   "label": "PostgreSQL"
+  }
+ ],
+ "steps": [
+  {
+   "from": "spa",
+   "to": "dj",
+   "label": "GET /records/?search=…&year=…&sort=…"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "visible_to(user) ∩ published"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "search_vector @@ query (title A, abstract B, GIN)"
+  },
+  {
+   "from": "dj",
+   "to": "spa",
+   "label": "ranked page + counts (GET /records/facets/)",
+   "dash": true
+  },
+  {
+   "from": "spa",
+   "to": "dj",
+   "label": "GET /records/<id>/"
+  },
+  {
+   "from": "dj",
+   "to": "spa",
+   "label": "Paper View, or 404 if not visible",
+   "dash": true
+  }
+ ],
+ "legend": [
+  {
+   "line": "arrow",
+   "text": "request or write"
+  },
+  {
+   "line": "dash arrow",
+   "text": "response or notice"
+  }
+ ]
+}

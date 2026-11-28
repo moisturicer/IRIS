@@ -1,0 +1,100 @@
+{
+ "kind": "usecase",
+ "format": "portrait",
+ "title": "U-3.2  Use cases: RDCO routes and decides (FR-3.2)",
+ "caption": "SRS v2 §3.2.3.2. From apps/reviews/routing.py, decisions.py, records/unlisted.py, ADR-047 at 2d8d4e4a (IR-1275).",
+ "system": "RDCO",
+ "left": [
+  {
+   "id": "RDCO",
+   "label": "RDCO"
+  }
+ ],
+ "right": [],
+ "cases": [
+  {
+   "id": "UC1",
+   "label": "Route to ITSO, IERC or KTTO, with a reason",
+   "wrap": 160
+  },
+  {
+   "id": "UC2",
+   "label": "Name specific officers",
+   "wrap": 160
+  },
+  {
+   "id": "UC3",
+   "label": "Publish",
+   "wrap": 160
+  },
+  {
+   "id": "UC4",
+   "label": "Keep unlisted",
+   "wrap": 160
+  },
+  {
+   "id": "UC5",
+   "label": "Reject",
+   "wrap": 160
+  },
+  {
+   "id": "UC6",
+   "label": "Withdraw open work with the Decision as the reason",
+   "wrap": 160
+  },
+  {
+   "id": "UC7",
+   "label": "Publish an Unlisted paper later",
+   "wrap": 160
+  }
+ ],
+ "links": [
+  [
+   "RDCO",
+   "UC1",
+   "UC3",
+   "UC4",
+   "UC5",
+   "UC7"
+  ]
+ ],
+ "deps": [
+  {
+   "from": "UC1",
+   "to": "UC2",
+   "label": "«extend»"
+  },
+  {
+   "from": "UC3",
+   "to": "UC6",
+   "label": "«include»"
+  },
+  {
+   "from": "UC4",
+   "to": "UC6",
+   "label": "«include»"
+  },
+  {
+   "from": "UC5",
+   "to": "UC6",
+   "label": "«include»"
+  }
+ ],
+ "notes": [
+  {
+   "on": "UC3",
+   "text": "only after the embargo is released",
+   "wrap": 130
+  }
+ ],
+ "legend": [
+  {
+   "line": "solid",
+   "text": "actor takes part"
+  },
+  {
+   "line": "dash arrow",
+   "text": "dependency between use cases"
+  }
+ ]
+}

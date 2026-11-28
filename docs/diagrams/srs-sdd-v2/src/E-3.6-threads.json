@@ -1,0 +1,268 @@
+{
+ "title": "E-3.6  Schema: review threads",
+ "caption": "SDD v2 §3.3.6. Generated from backend/apps/*/models*.py at 2d8d4e4a; all keys and up to four other fields per table; the full schema is D-8 to D-15.",
+ "kind": "erd",
+ "format": "portrait",
+ "nodes": [
+  {
+   "id": "reviews_ReviewComment",
+   "shape": "table",
+   "label": "ReviewComment",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "record",
+      "v": "FK → Record (D-10)"
+     },
+     {
+      "k": "author",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "version",
+      "v": "FK → RecordVersion (D-10)"
+     },
+     {
+      "k": "reply_to",
+      "v": "FK → ReviewComment"
+     },
+     {
+      "k": "round",
+      "v": "FK → ReviewRound (D-11)"
+     },
+     {
+      "k": "anchor_version",
+      "v": "FK → RecordVersion (D-10)"
+     },
+     {
+      "k": "anchor_upload",
+      "v": "FK → RecordUpload (D-12)"
+     },
+     {
+      "k": "resolved_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "closed_by_decision",
+      "v": "FK → Review (D-11)"
+     },
+     {
+      "k": "answered_by",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "body",
+      "v": "Text"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     },
+     {
+      "k": "edited_at",
+      "v": "DateTime"
+     },
+     {
+      "k": "kind",
+      "v": "Char"
+     },
+     "… 15 more fields"
+    ]
+   ]
+  },
+  {
+   "id": "reviews_ReviewMention",
+   "shape": "table",
+   "label": "ReviewMention",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "comment",
+      "v": "FK → ReviewComment"
+     },
+     {
+      "k": "user",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "active",
+      "v": "Boolean"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     },
+     {
+      "k": "notified_at",
+      "v": "DateTime"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "reviews_ReviewThreadEvent",
+   "shape": "table",
+   "label": "ReviewThreadEvent",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "thread",
+      "v": "FK → ReviewComment"
+     },
+     {
+      "k": "actor",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "kind",
+      "v": "Char"
+     },
+     {
+      "k": "old_value",
+      "v": "Char"
+     },
+     {
+      "k": "new_value",
+      "v": "Char"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "reviews_SavedReply",
+   "shape": "table",
+   "label": "SavedReply",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "owner",
+      "v": "FK → User (D-9)"
+     },
+     {
+      "k": "title",
+      "v": "Char"
+     },
+     {
+      "k": "body",
+      "v": "Text"
+     },
+     {
+      "k": "created_at",
+      "v": "DateTime"
+     },
+     {
+      "k": "updated_at",
+      "v": "DateTime"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "reviews_ThreadPlace",
+   "shape": "table",
+   "label": "ThreadPlace",
+   "tone": "core",
+   "sections": [
+    [
+     {
+      "k": "id",
+      "v": "PK",
+      "pk": true
+     },
+     {
+      "k": "thread",
+      "v": "FK → ReviewComment"
+     },
+     {
+      "k": "version",
+      "v": "FK → RecordVersion (D-10)"
+     },
+     {
+      "k": "outcome",
+      "v": "Char"
+     },
+     {
+      "k": "page",
+      "v": "PositiveInteger"
+     },
+     {
+      "k": "text",
+      "v": "Text"
+     },
+     {
+      "k": "regions",
+      "v": "JSON"
+     },
+     "… 2 more fields"
+    ]
+   ]
+  }
+ ],
+ "edges": [
+  {
+   "from": "reviews_ReviewComment",
+   "to": "reviews_ReviewComment",
+   "field": "reply_to",
+   "tail": "zero-many",
+   "head": "zero-one"
+  },
+  {
+   "from": "reviews_ReviewMention",
+   "to": "reviews_ReviewComment",
+   "field": "comment",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "reviews_ReviewThreadEvent",
+   "to": "reviews_ReviewComment",
+   "field": "thread",
+   "tail": "zero-many",
+   "head": "one"
+  },
+  {
+   "from": "reviews_ThreadPlace",
+   "to": "reviews_ReviewComment",
+   "field": "thread",
+   "tail": "zero-many",
+   "head": "one"
+  }
+ ],
+ "legend": [
+  {
+   "line": "many",
+   "text": "many (zero or more) to exactly one"
+  },
+  "circle at an end: zero allowed",
+  "bold: primary key",
+  "FK → Name (D-n): drawn in full on figure D-n"
+ ]
+}

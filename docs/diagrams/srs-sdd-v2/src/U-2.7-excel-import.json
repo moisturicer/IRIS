@@ -1,0 +1,72 @@
+{
+ "kind": "usecase",
+ "format": "portrait",
+ "title": "U-2.7  Use cases: bulk import from Excel (FR-2.7)",
+ "caption": "SRS v2 §3.2.2.7. From RecordViewSet.download_template / import_excel, apps/records/services.py at 2d8d4e4a (IR-1275).",
+ "system": "Excel import",
+ "left": [
+  {
+   "id": "Staff",
+   "label": "Office staff"
+  }
+ ],
+ "right": [],
+ "cases": [
+  {
+   "id": "UC1",
+   "label": "Download the styled template",
+   "wrap": 160
+  },
+  {
+   "id": "UC2",
+   "label": "Upload a filled .xls or .xlsx",
+   "wrap": 160
+  },
+  {
+   "id": "UC3",
+   "label": "Validate each row with the record rules",
+   "wrap": 160
+  },
+  {
+   "id": "UC4",
+   "label": "Save each valid row all-or-nothing",
+   "wrap": 160
+  },
+  {
+   "id": "UC5",
+   "label": "Read why a row was skipped",
+   "wrap": 160
+  }
+ ],
+ "links": [
+  [
+   "Staff",
+   "UC1",
+   "UC2",
+   "UC5"
+  ]
+ ],
+ "deps": [
+  {
+   "from": "UC2",
+   "to": "UC3",
+   "label": "«include»"
+  },
+  {
+   "from": "UC3",
+   "to": "UC4",
+   "label": "«include»"
+  }
+ ],
+ "notes": [],
+ "legend": [
+  {
+   "line": "solid",
+   "text": "actor takes part"
+  },
+  {
+   "line": "dash arrow",
+   "text": "dependency between use cases"
+  }
+ ]
+}

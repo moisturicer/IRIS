@@ -1,0 +1,62 @@
+{
+ "kind": "usecase",
+ "format": "portrait",
+ "title": "U-5.7  Use cases: degradation when AI is unavailable (FR-5.7)",
+ "caption": "SRS v2 §3.2.5.7. From GET /ai/status/, apps/ai/resilience, ADR-008 at 2d8d4e4a (IR-1275).",
+ "system": "Degradation",
+ "left": [
+  {
+   "id": "Person",
+   "label": "Signed-in person"
+  }
+ ],
+ "right": [],
+ "cases": [
+  {
+   "id": "UC1",
+   "label": "Search by keyword without AI",
+   "wrap": 160
+  },
+  {
+   "id": "UC2",
+   "label": "Upload while indexing waits",
+   "wrap": 160
+  },
+  {
+   "id": "UC3",
+   "label": "See that AI is unavailable",
+   "wrap": 160
+  },
+  {
+   "id": "UC4",
+   "label": "Never get a made-up answer",
+   "wrap": 160
+  }
+ ],
+ "links": [
+  [
+   "Person",
+   "UC1",
+   "UC2",
+   "UC3"
+  ]
+ ],
+ "deps": [
+  {
+   "from": "UC3",
+   "to": "UC4",
+   "label": "«include»"
+  }
+ ],
+ "notes": [],
+ "legend": [
+  {
+   "line": "solid",
+   "text": "actor takes part"
+  },
+  {
+   "line": "dash arrow",
+   "text": "dependency between use cases"
+  }
+ ]
+}

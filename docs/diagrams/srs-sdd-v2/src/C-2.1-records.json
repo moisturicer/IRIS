@@ -1,0 +1,169 @@
+{
+ "kind": "columns",
+ "format": "portrait",
+ "title": "C-2.1  Classes: records and submission",
+ "caption": "SDD v2 §3.2.1. From apps/records (models.py, views.py, versions.py, duplicates.py, embargo.py) at 2d8d4e4a (IR-1275).",
+ "gutter": 60,
+ "vgap": 30,
+ "nodes": [
+  {
+   "id": "RecordViewSet",
+   "shape": "class",
+   "label": "RecordViewSet",
+   "sections": [
+    [],
+    [
+     "create()",
+     "submit()",
+     "partial_update()",
+     "duplicate_matches()"
+    ]
+   ],
+   "stereotype": "view"
+  },
+  {
+   "id": "Record",
+   "shape": "class",
+   "label": "Record",
+   "sections": [
+    [
+     "title",
+     "record_type → RecordType",
+     "adviser → User",
+     "pipeline_status",
+     "is_embargoed",
+     "ai_consent"
+    ]
+   ]
+  },
+  {
+   "id": "RecordOwner",
+   "shape": "class",
+   "label": "RecordOwner",
+   "sections": [
+    [
+     "record → Record",
+     "user → User",
+     "is_primary"
+    ]
+   ]
+  },
+  {
+   "id": "RecordType",
+   "shape": "class",
+   "label": "RecordType",
+   "sections": [
+    [
+     "name",
+     "manuscript_template"
+    ]
+   ]
+  },
+  {
+   "id": "RecordVersion",
+   "shape": "class",
+   "label": "RecordVersion",
+   "sections": [
+    [
+     "number",
+     "manuscript",
+     "manuscript_sha256",
+     "cause"
+    ]
+   ]
+  },
+  {
+   "id": "versions",
+   "shape": "class",
+   "label": "versions",
+   "sections": [
+    [],
+    [
+     "write_version()",
+     "latest_version()",
+     "served_manuscript()"
+    ]
+   ],
+   "stereotype": "module"
+  },
+  {
+   "id": "duplicates",
+   "shape": "class",
+   "label": "duplicates",
+   "sections": [
+    [],
+    [
+     "exact_matches()",
+     "enforce_exact()"
+    ]
+   ],
+   "stereotype": "module"
+  }
+ ],
+ "columns": [
+  [
+   "RecordViewSet",
+   "versions",
+   "duplicates"
+  ],
+  [
+   "Record",
+   "RecordOwner"
+  ],
+  [
+   "RecordType",
+   "RecordVersion"
+  ]
+ ],
+ "edges": [
+  {
+   "from": "RecordViewSet",
+   "to": "Record",
+   "dash": true
+  },
+  {
+   "from": "RecordViewSet",
+   "to": "versions",
+   "dash": true
+  },
+  {
+   "from": "RecordViewSet",
+   "to": "duplicates",
+   "dash": true
+  },
+  {
+   "from": "Record",
+   "to": "RecordOwner",
+   "tail": "diamond",
+   "head": "none",
+   "mFrom": "1",
+   "mTo": "1..*"
+  },
+  {
+   "from": "Record",
+   "to": "RecordVersion",
+   "tail": "diamond",
+   "head": "none",
+   "mFrom": "1",
+   "mTo": "1..*"
+  },
+  {
+   "from": "Record",
+   "to": "RecordType"
+  }
+ ],
+ "legend": [
+  {
+   "line": "diamond",
+   "text": "composition (owner at the diamond)"
+  },
+  {
+   "line": "arrow",
+   "text": "association"
+  },
+  {
+   "line": "dash arrow",
+   "text": "uses / calls"
+  }
+ ]
+}

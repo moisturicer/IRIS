@@ -1,0 +1,102 @@
+{
+ "kind": "usecase",
+ "format": "portrait",
+ "title": "U-3.4  Use cases: clearance-aware resubmission (FR-3.4)",
+ "caption": "SRS v2 §3.2.3.4. From apps/reviews/finish_review.py, revisions.py, new_version.py, ADR-003, ADR-004, ADR-022 Amendments 8-9 at 2d8d4e4a (IR-1275).",
+ "system": "Resubmission",
+ "left": [
+  {
+   "id": "Reviewer",
+   "label": "Reviewer\n(any party)"
+  },
+  {
+   "id": "Owner",
+   "label": "Record owner"
+  }
+ ],
+ "right": [],
+ "cases": [
+  {
+   "id": "UC1",
+   "label": "Finish review: Request changes (a new version)",
+   "wrap": 160
+  },
+  {
+   "id": "UC2",
+   "label": "Answer each Must fix thread",
+   "wrap": 160
+  },
+  {
+   "id": "UC3",
+   "label": "Upload in the Documents tab (held until sent)",
+   "wrap": 160
+  },
+  {
+   "id": "UC4",
+   "label": "Submit new version",
+   "wrap": 160
+  },
+  {
+   "id": "UC5",
+   "label": "Reset only the asking parties' clearances",
+   "wrap": 160
+  },
+  {
+   "id": "UC6",
+   "label": "Keep every other clearance",
+   "wrap": 160
+  },
+  {
+   "id": "UC7",
+   "label": "Reviewers who asked look again",
+   "wrap": 160
+  }
+ ],
+ "links": [
+  [
+   "Reviewer",
+   "UC1",
+   "UC7"
+  ],
+  [
+   "Owner",
+   "UC2",
+   "UC3",
+   "UC4"
+  ]
+ ],
+ "deps": [
+  {
+   "from": "UC4",
+   "to": "UC5",
+   "label": "«include»"
+  },
+  {
+   "from": "UC4",
+   "to": "UC6",
+   "label": "«include»"
+  }
+ ],
+ "notes": [
+  {
+   "on": "UC4",
+   "text": "sends every held upload with the Version",
+   "wrap": 130
+  },
+  {
+   "on": "UC5",
+   "text": "restart-all resets every office (comparison arm)",
+   "wrap": 130
+  }
+ ],
+ "legend": [
+  {
+   "line": "solid",
+   "text": "actor takes part"
+  },
+  {
+   "line": "dash arrow",
+   "text": "dependency between use cases"
+  }
+ ]
+}

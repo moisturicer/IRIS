@@ -1,0 +1,181 @@
+{
+ "format": "portrait",
+ "direction": "DOWN",
+ "title": "A-5.4  Activity: answer an Ask IRIS question",
+ "caption": "SRS v2 §3.2.5.4. From ai/runs, ai/agent, ai/research, ADR-049 at 2d8d4e4a (IR-1275).",
+ "elk": {
+  "elk.layered.spacing.nodeNodeBetweenLayers": "16",
+  "elk.spacing.nodeNode": "22",
+  "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
+  "elk.layered.nodePlacement.bk.fixedAlignment": "BALANCED",
+  "elk.aspectRatio": "0.7"
+ },
+ "nodes": [
+  {
+   "id": "start",
+   "shape": "start"
+  },
+  {
+   "id": "a1",
+   "shape": "box",
+   "tag": "Person",
+   "label": "Ask a question",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "a2",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "nginx edge: Django issues a reader grant",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "a3",
+   "shape": "box",
+   "tag": "ai-gateway",
+   "label": "Store the run as queued; wake a worker",
+   "plain": true,
+   "tone": "ai",
+   "wrap": 150
+  },
+  {
+   "id": "a4",
+   "shape": "box",
+   "tag": "ai-runs-worker",
+   "label": "Claim the run (lease)",
+   "plain": true,
+   "tone": "ai",
+   "wrap": 150
+  },
+  {
+   "id": "a5",
+   "shape": "box",
+   "tag": "ai-runs-worker",
+   "label": "Search, read passages and recorded details the reader may read",
+   "plain": true,
+   "tone": "ai",
+   "wrap": 150
+  },
+  {
+   "id": "a6",
+   "shape": "box",
+   "tag": "Language model",
+   "label": "Draft the answer",
+   "plain": true,
+   "tone": "ext",
+   "wrap": 150
+  },
+  {
+   "id": "q7",
+   "shape": "diamond",
+   "wrap": 150,
+   "label": "Every cited sentence supported?"
+  },
+  {
+   "id": "a8",
+   "shape": "box",
+   "tag": "ai-runs-worker",
+   "label": "Repair once",
+   "plain": true,
+   "tone": "ai",
+   "wrap": 150
+  },
+  {
+   "id": "a9",
+   "shape": "box",
+   "tag": "ai-runs-worker",
+   "label": "Recheck sources; commit the Turn and citations",
+   "plain": true,
+   "tone": "ai",
+   "wrap": 150
+  },
+  {
+   "id": "a10",
+   "shape": "box",
+   "tag": "Person",
+   "label": "Read the streamed answer; open a citation",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "stop",
+   "shape": "end"
+  }
+ ],
+ "edges": [
+  {
+   "from": "start",
+   "to": "a1"
+  },
+  {
+   "from": "a1",
+   "to": "a2"
+  },
+  {
+   "from": "a2",
+   "to": "a3"
+  },
+  {
+   "from": "a3",
+   "to": "a4"
+  },
+  {
+   "from": "a4",
+   "to": "a5"
+  },
+  {
+   "from": "a5",
+   "to": "a6"
+  },
+  {
+   "from": "a6",
+   "to": "q7"
+  },
+  {
+   "from": "q7",
+   "to": "a8",
+   "label": "no"
+  },
+  {
+   "from": "q7",
+   "to": "a9",
+   "label": "yes"
+  },
+  {
+   "from": "a8",
+   "to": "a9"
+  },
+  {
+   "from": "a9",
+   "to": "a10"
+  },
+  {
+   "from": "a10",
+   "to": "stop"
+  }
+ ],
+ "legend": [
+  "first line of an action: who does it",
+  {
+   "tone": "plain",
+   "text": "person"
+  },
+  {
+   "tone": "core",
+   "text": "IRIS"
+  },
+  {
+   "tone": "ai",
+   "text": "AI runtime"
+  },
+  {
+   "tone": "ext",
+   "text": "external service"
+  }
+ ]
+}

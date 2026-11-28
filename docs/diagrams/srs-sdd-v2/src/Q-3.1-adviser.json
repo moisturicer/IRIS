@@ -1,0 +1,79 @@
+{
+ "kind": "sequence",
+ "format": "portrait",
+ "title": "Q-3.1  Sequence: the Adviser accepts and sends to RDCO",
+ "caption": "SDD v2 §3.3.1. From apps/reviews/routing.py accept_and_route, decisions.py at 2d8d4e4a (IR-1275).",
+ "participants": [
+  {
+   "id": "adv",
+   "label": "Adviser",
+   "tone": "plain"
+  },
+  {
+   "id": "dj",
+   "label": "Django",
+   "sub": "RecordViewSet"
+  },
+  {
+   "id": "rt",
+   "label": "routing"
+  },
+  {
+   "id": "db",
+   "label": "PostgreSQL"
+  },
+  {
+   "id": "rdco",
+   "label": "RDCO",
+   "tone": "plain"
+  }
+ ],
+ "steps": [
+  {
+   "from": "adv",
+   "to": "dj",
+   "label": "POST /records/<id>/accept-and-route/ (reason, nominees, suggestions)"
+  },
+  {
+   "from": "dj",
+   "to": "rt",
+   "label": "accept_and_route()"
+  },
+  {
+   "from": "rt",
+   "to": "db",
+   "label": "lock; refuse if a revision is open"
+  },
+  {
+   "from": "rt",
+   "to": "db",
+   "label": "complete the Adviser's assignment and Seat"
+  },
+  {
+   "from": "rt",
+   "to": "db",
+   "label": "open RDCO's assignment (Pool or nominated Seats); RoutingEvent"
+  },
+  {
+   "from": "rt",
+   "to": "db",
+   "label": "audit"
+  },
+  {
+   "from": "dj",
+   "to": "rdco",
+   "label": "after commit: notification + live hint",
+   "dash": true
+  }
+ ],
+ "legend": [
+  {
+   "line": "arrow",
+   "text": "request or write"
+  },
+  {
+   "line": "dash arrow",
+   "text": "response or notice"
+  }
+ ]
+}

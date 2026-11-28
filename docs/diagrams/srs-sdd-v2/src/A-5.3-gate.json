@@ -1,0 +1,194 @@
+{
+ "format": "portrait",
+ "direction": "DOWN",
+ "title": "A-5.3  Activity: the disclosure gate",
+ "caption": "SRS v2 §3.2.5.3. From apps/ai/policy/disclosure.py, ADR-052, ADR-054 at 2d8d4e4a (IR-1275).",
+ "elk": {
+  "elk.layered.spacing.nodeNodeBetweenLayers": "16",
+  "elk.spacing.nodeNode": "22",
+  "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
+  "elk.layered.nodePlacement.bk.fixedAlignment": "BALANCED",
+  "elk.aspectRatio": "0.7"
+ },
+ "nodes": [
+  {
+   "id": "start",
+   "shape": "start"
+  },
+  {
+   "id": "a1",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "An AI path asks to send a paper",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "q2",
+   "shape": "diamond",
+   "wrap": 150,
+   "label": "Published and not deleted?"
+  },
+  {
+   "id": "q3",
+   "shape": "diamond",
+   "wrap": 150,
+   "label": "Embargo released?"
+  },
+  {
+   "id": "q4",
+   "shape": "diamond",
+   "wrap": 150,
+   "label": "IP mark absent or released by KTTO?"
+  },
+  {
+   "id": "q5",
+   "shape": "diamond",
+   "wrap": 150,
+   "label": "Contact person said Yes?"
+  },
+  {
+   "id": "a6",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Allow",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "a7",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Refuse: no_consent (may be shown)",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "end8",
+   "shape": "end"
+  },
+  {
+   "id": "a9",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Refuse: unreleased_ip",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "end10",
+   "shape": "end"
+  },
+  {
+   "id": "a11",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Refuse: embargoed",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "end12",
+   "shape": "end"
+  },
+  {
+   "id": "a13",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Refuse: unpublished",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "end14",
+   "shape": "end"
+  },
+  {
+   "id": "stop",
+   "shape": "end"
+  }
+ ],
+ "edges": [
+  {
+   "from": "start",
+   "to": "a1"
+  },
+  {
+   "from": "a1",
+   "to": "q2"
+  },
+  {
+   "from": "q2",
+   "to": "q3",
+   "label": "yes"
+  },
+  {
+   "from": "q3",
+   "to": "q4",
+   "label": "yes"
+  },
+  {
+   "from": "q4",
+   "to": "q5",
+   "label": "yes"
+  },
+  {
+   "from": "q5",
+   "to": "a6",
+   "label": "yes"
+  },
+  {
+   "from": "q5",
+   "to": "a7",
+   "label": "no"
+  },
+  {
+   "from": "a7",
+   "to": "end8"
+  },
+  {
+   "from": "q4",
+   "to": "a9",
+   "label": "no"
+  },
+  {
+   "from": "a9",
+   "to": "end10"
+  },
+  {
+   "from": "q3",
+   "to": "a11",
+   "label": "no"
+  },
+  {
+   "from": "a11",
+   "to": "end12"
+  },
+  {
+   "from": "q2",
+   "to": "a13",
+   "label": "no"
+  },
+  {
+   "from": "a13",
+   "to": "end14"
+  },
+  {
+   "from": "a6",
+   "to": "stop"
+  }
+ ],
+ "legend": [
+  "first line of an action: who does it",
+  {
+   "tone": "core",
+   "text": "IRIS"
+  }
+ ]
+}

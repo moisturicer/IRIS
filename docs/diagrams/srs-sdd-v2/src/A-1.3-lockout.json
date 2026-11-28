@@ -1,0 +1,187 @@
+{
+ "format": "portrait",
+ "direction": "DOWN",
+ "title": "A-1.3  Activity: lockout and throttling",
+ "caption": "SRS v2 §3.2.1.3. From config/settings/base.py, apps/accounts/lockout.py at 2d8d4e4a (IR-1275).",
+ "elk": {
+  "elk.layered.spacing.nodeNodeBetweenLayers": "16",
+  "elk.spacing.nodeNode": "22",
+  "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
+  "elk.layered.nodePlacement.bk.fixedAlignment": "BALANCED",
+  "elk.aspectRatio": "0.7"
+ },
+ "nodes": [
+  {
+   "id": "start",
+   "shape": "start"
+  },
+  {
+   "id": "a1",
+   "shape": "box",
+   "tag": "Person",
+   "label": "Send a request or a sign-in",
+   "plain": true,
+   "tone": "plain",
+   "wrap": 150
+  },
+  {
+   "id": "a2",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Check the per-user / per-address rate limit",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "q3",
+   "shape": "diamond",
+   "wrap": 150,
+   "label": "Under the limit?"
+  },
+  {
+   "id": "q4",
+   "shape": "diamond",
+   "wrap": 150,
+   "label": "A failed sign-in?"
+  },
+  {
+   "id": "a5",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Count the failure for this account and address",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "q6",
+   "shape": "diamond",
+   "wrap": 150,
+   "label": "Failures reach AXES_FAILURE_LIMIT?"
+  },
+  {
+   "id": "a7",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Lock for the cool-off; answer 429",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "end8",
+   "shape": "end"
+  },
+  {
+   "id": "a9",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Answer 'Invalid email or password'",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "a10",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Process the request",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "a11",
+   "shape": "box",
+   "tag": "IRIS",
+   "label": "Answer 429 Too Many Requests",
+   "plain": true,
+   "tone": "core",
+   "wrap": 150
+  },
+  {
+   "id": "end12",
+   "shape": "end"
+  },
+  {
+   "id": "stop",
+   "shape": "end"
+  }
+ ],
+ "edges": [
+  {
+   "from": "start",
+   "to": "a1"
+  },
+  {
+   "from": "a1",
+   "to": "a2"
+  },
+  {
+   "from": "a2",
+   "to": "q3"
+  },
+  {
+   "from": "q3",
+   "to": "q4",
+   "label": "yes"
+  },
+  {
+   "from": "q4",
+   "to": "a5",
+   "label": "yes"
+  },
+  {
+   "from": "a5",
+   "to": "q6"
+  },
+  {
+   "from": "q6",
+   "to": "a7",
+   "label": "yes"
+  },
+  {
+   "from": "a7",
+   "to": "end8"
+  },
+  {
+   "from": "q6",
+   "to": "a9",
+   "label": "no"
+  },
+  {
+   "from": "q4",
+   "to": "a10",
+   "label": "no"
+  },
+  {
+   "from": "q3",
+   "to": "a11",
+   "label": "no"
+  },
+  {
+   "from": "a11",
+   "to": "end12"
+  },
+  {
+   "from": "a9",
+   "to": "stop"
+  },
+  {
+   "from": "a10",
+   "to": "stop"
+  }
+ ],
+ "legend": [
+  "first line of an action: who does it",
+  {
+   "tone": "plain",
+   "text": "person"
+  },
+  {
+   "tone": "core",
+   "text": "IRIS"
+  }
+ ]
+}

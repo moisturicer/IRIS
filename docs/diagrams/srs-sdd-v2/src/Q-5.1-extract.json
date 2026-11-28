@@ -1,0 +1,84 @@
+{
+ "kind": "sequence",
+ "format": "portrait",
+ "title": "Q-5.1  Sequence: extract a published manuscript",
+ "caption": "SDD v2 §3.5.1. From apps/documents/tasks.py, apps/ai/extraction, policy/disclosure.py at 2d8d4e4a (IR-1275).",
+ "participants": [
+  {
+   "id": "dec",
+   "label": "decisions",
+   "sub": "publish"
+  },
+  {
+   "id": "cx",
+   "label": "celery-extraction"
+  },
+  {
+   "id": "gate",
+   "label": "disclosure"
+  },
+  {
+   "id": "uns",
+   "label": "Unstructured",
+   "sub": "hi_res",
+   "tone": "ext"
+  },
+  {
+   "id": "db",
+   "label": "PostgreSQL"
+  }
+ ],
+ "steps": [
+  {
+   "from": "dec",
+   "to": "cx",
+   "label": "on_commit: extract_manuscript_text"
+  },
+  {
+   "from": "cx",
+   "to": "gate",
+   "label": "may this paper leave IRIS?"
+  },
+  {
+   "from": "gate",
+   "to": "cx",
+   "label": "allow, or a reason",
+   "dash": true
+  },
+  {
+   "from": "cx",
+   "to": "uns",
+   "label": "admitted read (per page)"
+  },
+  {
+   "from": "uns",
+   "to": "cx",
+   "label": "elements, tables, image_base64",
+   "dash": true
+  },
+  {
+   "from": "cx",
+   "to": "db",
+   "label": "PdfExtraction, ExtractionFigure"
+  },
+  {
+   "from": "cx",
+   "to": "cx",
+   "label": "queue chunk_extraction"
+  }
+ ],
+ "legend": [
+  {
+   "line": "arrow",
+   "text": "request or write"
+  },
+  {
+   "line": "dash arrow",
+   "text": "response or notice"
+  },
+  {
+   "tone": "ext",
+   "text": "external service"
+  }
+ ]
+}

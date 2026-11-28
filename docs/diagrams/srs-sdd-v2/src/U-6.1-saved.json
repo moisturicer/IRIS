@@ -1,0 +1,63 @@
+{
+ "kind": "usecase",
+ "format": "portrait",
+ "title": "U-6.1  Use cases: saved records and reading status (FR-6.1)",
+ "caption": "SRS v2 §3.2.6.1. From apps/library, features/library, ADR-044 (amended for IR-1331) at 2d8d4e4a (IR-1275).",
+ "system": "My Library",
+ "left": [
+  {
+   "id": "Reader",
+   "label": "Reader"
+  }
+ ],
+ "right": [],
+ "cases": [
+  {
+   "id": "UC1",
+   "label": "Save a record",
+   "wrap": 160
+  },
+  {
+   "id": "UC2",
+   "label": "Set reading status",
+   "wrap": 160
+  },
+  {
+   "id": "UC3",
+   "label": "Resume where I left off",
+   "wrap": 160
+  },
+  {
+   "id": "UC4",
+   "label": "Clear chosen papers from reading history",
+   "wrap": 160
+  }
+ ],
+ "links": [
+  [
+   "Reader",
+   "UC1",
+   "UC2",
+   "UC3",
+   "UC4"
+  ]
+ ],
+ "deps": [],
+ "notes": [
+  {
+   "on": "UC4",
+   "text": "a pop-up; ticked papers only, asked twice",
+   "wrap": 130
+  }
+ ],
+ "legend": [
+  {
+   "line": "solid",
+   "text": "actor takes part"
+  },
+  {
+   "line": "dash arrow",
+   "text": "dependency between use cases"
+  }
+ ]
+}

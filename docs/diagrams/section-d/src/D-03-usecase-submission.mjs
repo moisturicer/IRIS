@@ -3,12 +3,11 @@ import { A, X, U, AI, UC_LEGEND } from '../tools/dsl.mjs';
 export default {
   kind: 'usecase',
   title: 'D-3  Use cases: submission and versions',
-  caption: 'From RecordViewSet actions and apps/documents on main (IR-1021). Authors are Students and Advisers (access.ts AUTHORS).',
+  caption: 'From RecordViewSet actions and apps/documents on main (IR-1021; corrected for ADR-067 and the ADR-052 2026-11-21 amendment in IR-1275). Authors are Students and Advisers (access.ts AUTHORS).',
   system: 'Submission and versions',
   left: [A('Author', 'Author\n(Student or Adviser)'), A('RDCO', 'RDCO')],
-  right: [X('LP', 'Manuscript reader\n(LlamaParse)')],
+  right: [X('LP', 'Manuscript reader\n(Unstructured)')],
   cases: [
-    U('UC2', 'Accept title and abstract suggestions read from the PDF', 170),
     U('UC1', 'Publish a record: metadata, authors, Adviser, IP type, manuscript PDF', 180),
     AI('UC11', "Extract the manuscript's text and structure", 150),
     U('UC5', 'Submit a new Version after a revision request', 150),
@@ -26,10 +25,9 @@ export default {
     ['LP', 'UC11'],
   ],
   deps: [
-    { from: 'UC1', to: 'UC2', label: '«extend»' },
-    { from: 'UC1', to: 'UC11', label: '«include»' },
+    { from: 'UC1', to: 'UC11', label: '«include» once published' },
     { from: 'UC5', to: 'UC11', label: '«include»' },
   ],
-  notes: [{ on: 'UC11', side: 'left', wrap: 120, text: 'Runs in a background worker; only papers the consent and embargo gate permits leave the campus (ADR-056)' }],
+  notes: [{ on: 'UC11', side: 'left', wrap: 120, text: 'Runs in a background worker, only once the paper is published, its embargo released and AI use consented (ADR-052, ADR-054, ADR-067)' }],
   legend: [...UC_LEGEND, { tone: 'ai', text: 'AI-assisted' }, { tone: 'ext', text: 'external system' }],
 };

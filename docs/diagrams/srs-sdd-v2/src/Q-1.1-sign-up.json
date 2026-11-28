@@ -1,0 +1,105 @@
+{
+ "kind": "sequence",
+ "format": "portrait",
+ "title": "Q-1.1  Sequence: register and verify",
+ "caption": "SDD v2 §3.1.1. From apps/accounts/views.py, serializers.py, recovery/ at 2d8d4e4a (IR-1275).",
+ "participants": [
+  {
+   "id": "g",
+   "label": "Guest",
+   "tone": "plain"
+  },
+  {
+   "id": "spa",
+   "label": "React",
+   "sub": "SignupPage"
+  },
+  {
+   "id": "dj",
+   "label": "Django",
+   "sub": "RegisterView"
+  },
+  {
+   "id": "db",
+   "label": "PostgreSQL"
+  },
+  {
+   "id": "mail",
+   "label": "Email service",
+   "tone": "ext"
+  }
+ ],
+ "steps": [
+  {
+   "from": "spa",
+   "to": "dj",
+   "label": "GET /auth/notice/ (current data notice)"
+  },
+  {
+   "from": "g",
+   "to": "spa",
+   "label": "fill the form; answer the notice and AI question"
+  },
+  {
+   "from": "spa",
+   "to": "dj",
+   "label": "POST /auth/register/"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "one transaction: User, profile, NoticeAnswer, AI consent"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "write a verification RecoveryIntent"
+  },
+  {
+   "from": "dj",
+   "to": "spa",
+   "label": "201: check your email",
+   "dash": true
+  },
+  {
+   "from": "dj",
+   "to": "mail",
+   "label": "dispatch_recovery_intents: send the link"
+  },
+  {
+   "from": "g",
+   "to": "spa",
+   "label": "open the link"
+  },
+  {
+   "from": "spa",
+   "to": "dj",
+   "label": "POST /auth/verification/confirm/"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "check token (24 h, single use); mark verified"
+  },
+  {
+   "from": "dj",
+   "to": "spa",
+   "label": "200: verified",
+   "dash": true
+  }
+ ],
+ "legend": [
+  {
+   "line": "arrow",
+   "text": "request or write"
+  },
+  {
+   "line": "dash arrow",
+   "text": "response or notice"
+  },
+  {
+   "tone": "ext",
+   "text": "external service"
+  }
+ ]
+}

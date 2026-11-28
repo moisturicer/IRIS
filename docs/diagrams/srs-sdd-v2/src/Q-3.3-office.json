@@ -1,0 +1,80 @@
+{
+ "kind": "sequence",
+ "format": "portrait",
+ "title": "Q-3.3  Sequence: an office claims and clears",
+ "caption": "SDD v2 §3.3.3. From apps/reviews/seats.py, office_review.py, finish_review.py at 2d8d4e4a (IR-1275).",
+ "participants": [
+  {
+   "id": "m",
+   "label": "Office member",
+   "tone": "plain"
+  },
+  {
+   "id": "dj",
+   "label": "Django",
+   "sub": "seat and record views"
+  },
+  {
+   "id": "db",
+   "label": "PostgreSQL"
+  },
+  {
+   "id": "rdco",
+   "label": "RDCO",
+   "tone": "plain"
+  }
+ ],
+ "steps": [
+  {
+   "from": "m",
+   "to": "dj",
+   "label": "POST /assignments/<id>/claim/"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "ReviewerSeat (claimed)"
+  },
+  {
+   "from": "m",
+   "to": "dj",
+   "label": "POST /seats/<id>/open/"
+  },
+  {
+   "from": "m",
+   "to": "dj",
+   "label": "POST /records/<id>/office-review/ (cleared or finding)"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "Review; RecordClearance(record, office) = cleared / not_cleared"
+  },
+  {
+   "from": "m",
+   "to": "dj",
+   "label": "POST /records/<id>/finish-review/"
+  },
+  {
+   "from": "dj",
+   "to": "db",
+   "label": "complete the assignment; audit"
+  },
+  {
+   "from": "dj",
+   "to": "rdco",
+   "label": "the office is done",
+   "dash": true
+  }
+ ],
+ "legend": [
+  {
+   "line": "arrow",
+   "text": "request or write"
+  },
+  {
+   "line": "dash arrow",
+   "text": "response or notice"
+  }
+ ]
+}

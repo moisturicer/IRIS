@@ -1,0 +1,87 @@
+{
+ "kind": "usecase",
+ "format": "portrait",
+ "title": "U-5.3  Use cases: disclosure gate (FR-5.3)",
+ "caption": "SRS v2 §3.2.5.3. From apps/ai/policy/disclosure.py, records/embargo.py, ADR-052 (2026-11-21), ADR-054 at 2d8d4e4a (IR-1275).",
+ "system": "Disclosure gate",
+ "left": [
+  {
+   "id": "Adviser",
+   "label": "Adviser or RDCO"
+  },
+  {
+   "id": "KTTO",
+   "label": "KTTO"
+  },
+  {
+   "id": "Person",
+   "label": "Contact person"
+  }
+ ],
+ "right": [],
+ "cases": [
+  {
+   "id": "UC1",
+   "label": "Release an embargo",
+   "wrap": 160
+  },
+  {
+   "id": "UC2",
+   "label": "Release an IP mark",
+   "wrap": 160
+  },
+  {
+   "id": "UC3",
+   "label": "Answer Yes or No to AI use",
+   "wrap": 160
+  },
+  {
+   "id": "UC4",
+   "label": "Check: published, released, consented",
+   "wrap": 160
+  },
+  {
+   "id": "UC5",
+   "label": "Send the paper to AI vendors",
+   "wrap": 160
+  }
+ ],
+ "links": [
+  [
+   "Adviser",
+   "UC1"
+  ],
+  [
+   "KTTO",
+   "UC2"
+  ],
+  [
+   "Person",
+   "UC3"
+  ]
+ ],
+ "deps": [
+  {
+   "from": "UC5",
+   "to": "UC4",
+   "label": "«include»"
+  }
+ ],
+ "notes": [
+  {
+   "on": "UC4",
+   "text": "publishing queues the read",
+   "wrap": 130
+  }
+ ],
+ "legend": [
+  {
+   "line": "solid",
+   "text": "actor takes part"
+  },
+  {
+   "line": "dash arrow",
+   "text": "dependency between use cases"
+  }
+ ]
+}

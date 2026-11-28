@@ -1,0 +1,94 @@
+{
+ "kind": "usecase",
+ "format": "portrait",
+ "title": "U-2.3  Use cases: upload checks (FR-2.3)",
+ "caption": "SRS v2 §3.2.2.3. From apps/documents/validators.py, apps/documents/scanning.py, apps/records/duplicates.py, ADR-074 at 2d8d4e4a (IR-1275).",
+ "system": "Upload checks",
+ "left": [
+  {
+   "id": "Person",
+   "label": "Person uploading"
+  }
+ ],
+ "right": [
+  {
+   "id": "Clam",
+   "label": "ClamAV",
+   "tone": "ext"
+  }
+ ],
+ "cases": [
+  {
+   "id": "UC1",
+   "label": "Upload a file",
+   "wrap": 160
+  },
+  {
+   "id": "UC2",
+   "label": "Check it is a real PDF of at most 50 MB",
+   "wrap": 160
+  },
+  {
+   "id": "UC3",
+   "label": "Scan it for malware during the upload",
+   "wrap": 160
+  },
+  {
+   "id": "UC4",
+   "label": "Refuse and audit a flagged file",
+   "wrap": 160
+  },
+  {
+   "id": "UC5",
+   "label": "Show a duplicate manuscript",
+   "wrap": 160
+  }
+ ],
+ "links": [
+  [
+   "Person",
+   "UC1"
+  ],
+  [
+   "Clam",
+   "UC3"
+  ]
+ ],
+ "deps": [
+  {
+   "from": "UC1",
+   "to": "UC2",
+   "label": "«include»"
+  },
+  {
+   "from": "UC1",
+   "to": "UC3",
+   "label": "«include»"
+  },
+  {
+   "from": "UC3",
+   "to": "UC4",
+   "label": "«extend»"
+  },
+  {
+   "from": "UC1",
+   "to": "UC5",
+   "label": "«extend»"
+  }
+ ],
+ "notes": [],
+ "legend": [
+  {
+   "line": "solid",
+   "text": "actor takes part"
+  },
+  {
+   "line": "dash arrow",
+   "text": "dependency between use cases"
+  },
+  {
+   "tone": "ext",
+   "text": "external system"
+  }
+ ]
+}

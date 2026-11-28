@@ -1,0 +1,72 @@
+{
+ "kind": "usecase",
+ "format": "portrait",
+ "title": "U-2.8  Use cases: Discover: browse and search (FR-2.8)",
+ "caption": "SRS v2 §3.2.2.8. From RecordViewSet (list, facets), apps/records/filters.py, features/discover at 2d8d4e4a (IR-1275).",
+ "system": "Discover",
+ "left": [
+  {
+   "id": "Reader",
+   "label": "Signed-in person"
+  }
+ ],
+ "right": [],
+ "cases": [
+  {
+   "id": "UC1",
+   "label": "Search published records by keyword",
+   "wrap": 160
+  },
+  {
+   "id": "UC2",
+   "label": "Filter by year, type, classification, PSCED, IP type",
+   "wrap": 160
+  },
+  {
+   "id": "UC3",
+   "label": "Sort: Best, Newest, Most viewed, Trending",
+   "wrap": 160
+  },
+  {
+   "id": "UC4",
+   "label": "Open a record's Paper View",
+   "wrap": 160
+  },
+  {
+   "id": "UC5",
+   "label": "Read the paper in the browser",
+   "wrap": 160
+  }
+ ],
+ "links": [
+  [
+   "Reader",
+   "UC1",
+   "UC3",
+   "UC4"
+  ]
+ ],
+ "deps": [
+  {
+   "from": "UC1",
+   "to": "UC2",
+   "label": "«extend»"
+  },
+  {
+   "from": "UC4",
+   "to": "UC5",
+   "label": "«extend»"
+  }
+ ],
+ "notes": [],
+ "legend": [
+  {
+   "line": "solid",
+   "text": "actor takes part"
+  },
+  {
+   "line": "dash arrow",
+   "text": "dependency between use cases"
+  }
+ ]
+}

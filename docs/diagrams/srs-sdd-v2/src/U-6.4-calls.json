@@ -1,0 +1,84 @@
+{
+ "kind": "usecase",
+ "format": "portrait",
+ "title": "U-6.4  Use cases: Calls & Conferences (FR-6.4)",
+ "caption": "SRS v2 §3.2.6.4. From apps/opportunities, features/opportunities, ADR-050 at 2d8d4e4a (IR-1275).",
+ "system": "Calls & Conferences",
+ "left": [
+  {
+   "id": "Reader",
+   "label": "Reader"
+  },
+  {
+   "id": "Adviser",
+   "label": "Adviser"
+  },
+  {
+   "id": "RDCO",
+   "label": "RDCO"
+  }
+ ],
+ "right": [],
+ "cases": [
+  {
+   "id": "UC1",
+   "label": "Browse and save calls",
+   "wrap": 160
+  },
+  {
+   "id": "UC2",
+   "label": "Add a call to my calendar",
+   "wrap": 160
+  },
+  {
+   "id": "UC3",
+   "label": "Post a call",
+   "wrap": 160
+  },
+  {
+   "id": "UC4",
+   "label": "Confirm or reject an Adviser's call",
+   "wrap": 160
+  },
+  {
+   "id": "UC5",
+   "label": "Remove a call with a reason; feature a call",
+   "wrap": 160
+  }
+ ],
+ "links": [
+  [
+   "Reader",
+   "UC1",
+   "UC2"
+  ],
+  [
+   "Adviser",
+   "UC3"
+  ],
+  [
+   "RDCO",
+   "UC3",
+   "UC4",
+   "UC5"
+  ]
+ ],
+ "deps": [],
+ "notes": [
+  {
+   "on": "UC3",
+   "text": "an Adviser's call waits for RDCO",
+   "wrap": 130
+  }
+ ],
+ "legend": [
+  {
+   "line": "solid",
+   "text": "actor takes part"
+  },
+  {
+   "line": "dash arrow",
+   "text": "dependency between use cases"
+  }
+ ]
+}

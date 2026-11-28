@@ -1,0 +1,83 @@
+{
+ "kind": "usecase",
+ "format": "portrait",
+ "title": "U-5.2  Use cases: chunking and embedding (FR-5.2)",
+ "caption": "SRS v2 §3.2.5.2. From apps/ai (chunking/, indexing.py, tasks.py), ADR-013, ADR-015, ADR-024 at 2d8d4e4a (IR-1275).",
+ "system": "Indexing",
+ "left": [
+  {
+   "id": "Worker",
+   "label": "Celery workers"
+  }
+ ],
+ "right": [
+  {
+   "id": "Voy",
+   "label": "Voyage AI",
+   "tone": "ext"
+  }
+ ],
+ "cases": [
+  {
+   "id": "UC1",
+   "label": "Chunk the text (700-token target)",
+   "wrap": 160
+  },
+  {
+   "id": "UC2",
+   "label": "Swap in the new chunk set",
+   "wrap": 160
+  },
+  {
+   "id": "UC3",
+   "label": "Embed changed chunks (voyage-context-4)",
+   "wrap": 160,
+   "tone": "ai"
+  },
+  {
+   "id": "UC4",
+   "label": "Store vectors in pgvector (HNSW)",
+   "wrap": 160
+  },
+  {
+   "id": "UC5",
+   "label": "Rerank retrieved passages",
+   "wrap": 160,
+   "tone": "ai"
+  }
+ ],
+ "links": [
+  [
+   "Worker",
+   "UC1",
+   "UC2",
+   "UC3",
+   "UC4"
+  ],
+  [
+   "Voy",
+   "UC3",
+   "UC5"
+  ]
+ ],
+ "deps": [],
+ "notes": [],
+ "legend": [
+  {
+   "line": "solid",
+   "text": "actor takes part"
+  },
+  {
+   "line": "dash arrow",
+   "text": "dependency between use cases"
+  },
+  {
+   "tone": "ai",
+   "text": "AI-assisted"
+  },
+  {
+   "tone": "ext",
+   "text": "external system"
+  }
+ ]
+}

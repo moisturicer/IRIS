@@ -1,0 +1,163 @@
+{
+ "kind": "columns",
+ "format": "portrait",
+ "title": "C-5.2  Classes: chunks and vectors",
+ "caption": "SDD v2 §3.5.2. From apps/ai (models/, chunking/, indexing.py, repositories.py), ADR-013, ADR-015 at 2d8d4e4a (IR-1275).",
+ "gutter": 60,
+ "vgap": 30,
+ "nodes": [
+  {
+   "id": "indexing",
+   "shape": "class",
+   "label": "indexing",
+   "sections": [
+    [],
+    [
+     "build_embedding_provider()",
+     "embed_active_chunk_set()",
+     "embed_record_summary()"
+    ]
+   ],
+   "stereotype": "module"
+  },
+  {
+   "id": "EmbeddingProvider",
+   "shape": "class",
+   "label": "EmbeddingProvider",
+   "sections": [
+    [
+     "«port»"
+    ],
+    [
+     "embed_document_chunks()",
+     "embed_query()"
+    ]
+   ]
+  },
+  {
+   "id": "ChunkSet",
+   "shape": "class",
+   "label": "ChunkSet",
+   "sections": [
+    [
+     "record → Record",
+     "source_revision",
+     "strategy_id",
+     "is_active"
+    ]
+   ]
+  },
+  {
+   "id": "DocumentChunk",
+   "shape": "class",
+   "label": "DocumentChunk",
+   "sections": [
+    [
+     "chunk_set → ChunkSet",
+     "sequence",
+     "text_hash",
+     "token_count",
+     "section_key",
+     "search_vector"
+    ]
+   ]
+  },
+  {
+   "id": "ChunkEmbedding",
+   "shape": "class",
+   "label": "ChunkEmbedding",
+   "sections": [
+    [
+     "chunk → DocumentChunk",
+     "space → EmbeddingSpace",
+     "embedding (1024)"
+    ]
+   ]
+  },
+  {
+   "id": "EmbeddingSpace",
+   "shape": "class",
+   "label": "EmbeddingSpace",
+   "sections": [
+    [
+     "model_id",
+     "dimensions",
+     "metric",
+     "state"
+    ]
+   ]
+  },
+  {
+   "id": "RecordSpaceEmbedding",
+   "shape": "class",
+   "label": "RecordSpaceEmbedding",
+   "sections": [
+    [
+     "record → Record",
+     "space → EmbeddingSpace",
+     "embedding"
+    ]
+   ]
+  }
+ ],
+ "columns": [
+  [
+   "indexing",
+   "EmbeddingProvider"
+  ],
+  [
+   "ChunkSet",
+   "DocumentChunk"
+  ],
+  [
+   "ChunkEmbedding",
+   "EmbeddingSpace",
+   "RecordSpaceEmbedding"
+  ]
+ ],
+ "edges": [
+  {
+   "from": "indexing",
+   "to": "EmbeddingProvider",
+   "dash": true
+  },
+  {
+   "from": "ChunkSet",
+   "to": "DocumentChunk",
+   "tail": "diamond",
+   "head": "none",
+   "mFrom": "1",
+   "mTo": "0..*"
+  },
+  {
+   "from": "DocumentChunk",
+   "to": "ChunkEmbedding",
+   "tail": "diamond",
+   "head": "none",
+   "mFrom": "1",
+   "mTo": "0..*"
+  },
+  {
+   "from": "ChunkEmbedding",
+   "to": "EmbeddingSpace"
+  },
+  {
+   "from": "RecordSpaceEmbedding",
+   "to": "EmbeddingSpace"
+  }
+ ],
+ "legend": [
+  {
+   "line": "diamond",
+   "text": "composition (owner at the diamond)"
+  },
+  {
+   "line": "arrow",
+   "text": "association"
+  },
+  {
+   "line": "dash arrow",
+   "text": "uses / calls"
+  }
+ ]
+}
