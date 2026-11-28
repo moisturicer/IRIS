@@ -459,6 +459,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-1331** | My Library: reading history is a pop-up of compact rows; the reader ticks papers (or Select all) and confirms to clear them; no Pause control — ADR-044 amendment 2026-11-24 b (Accepted); no FR- id | [details](traceability/IR-1331.md) | **IMPLEMENTED** |
 | **IR-1342** | Guided tours for newly registered students: each page's and Publish's tour once, remembered on the account, existing accounts counted as toured, Students only, taken again from Settings › Help; the Review tour's look; no ADR, no FR- id | [details](traceability/IR-1342.md) | **IMPLEMENTED** |
 | **IR-1350** | The two remaining staff queues update live: a comment reported or its reports closed tells RDCO and the System Admin `queues` (Reported comments and its sidebar count refresh), and an account deletion asked, cancelled, confirmed or rejected tells the System Admin (Account deletions refreshes) — ADR-073 amendment 2026-11-28 (Accepted); no FR- id | [details](traceability/IR-1350.md) | **PARTIAL** |
+| **IR-1344** | The guided tours' highlight: its maroon outline shows, and its corner is a 6 px `rounded-spotlight` token for that highlight only; both tours; follows IR-1342 | [details](traceability/IR-1344.md) | **IMPLEMENTED** |
 | NFR-U3 | Responsive at 360 px, no horizontal scroll | [details](traceability/NFR-U3.md) | **PARTIAL** |
 | NFR-A1 | WCAG 2.1 AA on interactive controls | [details](traceability/NFR-A1.md) | **PARTIAL** |
 
