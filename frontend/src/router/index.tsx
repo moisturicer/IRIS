@@ -58,8 +58,9 @@ export const routes: RouteObject[] = [{
     children: [
       {
         element: <AppShell />,
-        // Every page is centred at the standard width unless its handle says
-        // `width: "full"`: the PDF reader and the wide admin tables (IR-521).
+        // Every page sits in one frame, the same margin and width for every
+        // role (IR-1353); a wide admin table scrolls inside its own box. Only
+        // Ask IRIS and the record's reader and review fill the window.
         children: [{
         // A page that crashes is replaced by the error screen inside the
         // shell, so the sidebar and in-memory state survive it (IR-745).
@@ -74,7 +75,7 @@ export const routes: RouteObject[] = [{
           {
             path: "records/:id",
             element: <DeferredPage message="Opening the paper"><PaperViewPage /></DeferredPage>,
-            handle: { title: "Paper", width: "full" },
+            handle: { title: "Paper" },
           },
           { path: "records/mine",          element: <DeferredPage message="Loading your Library"><MyLibraryPage /></DeferredPage>,   handle: { title: "My Library" } },
           { path: "opportunities",         element: <DeferredPage message="Loading calls and conferences"><CallsAndConferencesPage /></DeferredPage>, handle: { title: "Calls & Conferences" } },
@@ -154,7 +155,7 @@ export const routes: RouteObject[] = [{
           {
             element: <ProtectedRoute allowedRoles={rolesFor("reviewAnalytics")} />,
             children: [
-              { path: pathFor("reviewAnalytics"), element: <DeferredPage message="Loading workflow analytics"><ReviewAnalyticsPage /></DeferredPage>, handle: { title: "Workflow analytics", width: "full" } },
+              { path: pathFor("reviewAnalytics"), element: <DeferredPage message="Loading workflow analytics"><ReviewAnalyticsPage /></DeferredPage>, handle: { title: "Workflow analytics" } },
             ],
           },
 
@@ -171,12 +172,12 @@ export const routes: RouteObject[] = [{
               {
                 path: pathFor("roleRequests"),
                 element: <DeferredPage message="Loading role requests"><RoleRequestsPage /></DeferredPage>,
-                handle: { title: "Role requests", width: "full" },
+                handle: { title: "Role requests" },
               },
               {
                 path: pathFor("downloadRequests"),
                 element: <DeferredPage message="Loading download requests"><DownloadRequestsPage /></DeferredPage>,
-                handle: { title: "Download requests", width: "full" },
+                handle: { title: "Download requests" },
               },
               {
                 path: pathFor("callRequests"),
@@ -186,7 +187,7 @@ export const routes: RouteObject[] = [{
               {
                 path: pathFor("deleteRequests"),
                 element: <DeferredPage message="Loading delete requests"><DeleteRequestsPage /></DeferredPage>,
-                handle: { title: "Delete requests", width: "full" },
+                handle: { title: "Delete requests" },
               },
               {
                 path: pathFor("setup"),
@@ -202,7 +203,7 @@ export const routes: RouteObject[] = [{
               {
                 path: pathFor("users"),
                 element: <DeferredPage message="Loading users"><UserListPage /></DeferredPage>,
-                handle: { title: "Users", width: "full" },
+                handle: { title: "Users" },
               },
             ],
           },
@@ -211,7 +212,7 @@ export const routes: RouteObject[] = [{
             children: [{
               path: pathFor("adminUsers"),
               element: <DeferredPage message="Loading users"><UserListPage /></DeferredPage>,
-              handle: { title: "Users", width: "full" },
+              handle: { title: "Users" },
             }],
           },
           {
@@ -221,7 +222,7 @@ export const routes: RouteObject[] = [{
               {
                 path: pathFor("audit"),
                 element: <DeferredPage message="Loading the audit log"><AuditLogPage /></DeferredPage>,
-                handle: { title: "Audit Log", width: "full" },
+                handle: { title: "Audit Log" },
               },
             ],
           },
@@ -231,7 +232,7 @@ export const routes: RouteObject[] = [{
             children: [{
               path: pathFor("accountDeletionRequests"),
               element: <DeferredPage message="Loading account deletion requests"><AccountDeletionRequestsPage /></DeferredPage>,
-              handle: { title: "Account Deletions", width: "full" },
+              handle: { title: "Account Deletions" },
             }],
           },
           {

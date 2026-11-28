@@ -5,7 +5,7 @@ import { failureMessage } from "@/lib/readFailure";
 import { NotFoundScreen } from "@/features/errors/NotFoundScreen";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { seatsApi } from "@/api/reviews";
-import { PAGE_WIDTH } from "@/components/layout/PageContainer";
+import { PAGE_GUTTER, PAGE_WIDTH } from "@/components/layout/PageContainer";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { useAuth } from "@/hooks/useAuth";
 import { useElementWidth } from "@/hooks/useElementWidth";
@@ -514,11 +514,7 @@ export default function PaperViewPage() {
       />
       <div
         className={cn(
-          onPaperTab || reviewWorkspace
-            ? "flex-1 min-h-0 flex"
-            : onReviewTab
-              ? "px-4 sm:px-7 pt-6 pb-7"
-              : "flex items-start",
+          onPaperTab || reviewWorkspace ? "flex-1 min-h-0 flex" : "flex items-start",
         )}
       >
         <div
@@ -528,14 +524,16 @@ export default function PaperViewPage() {
             (onPaperTab || reviewWorkspace) && "flex-1 min-h-0 flex flex-col",
             // Its own container, so the rail and the page read the room the
             // panel leaves them (IR-569), as the reader reads the paper's.
-            !onPaperTab && !onReviewTab && "flex-1 [container-type:inline-size] [container-name:overview]",
+            // The Overview takes every page's margin (IR-1353), outside its
+            // cap; the reader and the review workspace fill the window.
+            !onPaperTab && !onReviewTab && cn("flex-1 [container-type:inline-size] [container-name:overview]", PAGE_GUTTER),
           )}
         >
 
           <div
             className={cn(
               onPaperTab || reviewWorkspace ? "flex-1 min-h-0 flex flex-col" : "grid gap-8 items-start",
-              !onPaperTab && !onReviewTab && cn("px-4 sm:pl-14 sm:pr-8 pt-8", CORNER_CLEARANCE_CLASS, PAGE_WIDTH[showRail ? "wide-left" : "standard"]),
+              !onPaperTab && !onReviewTab && cn(CORNER_CLEARANCE_CLASS, PAGE_WIDTH[showRail ? "wide-left" : "standard"]),
               // Wide: the page takes the width it has, with what the record is
               // held under beside it while there is room, and under it when
               // the panel or the sidebar leave none (IR-569). Ask IRIS open

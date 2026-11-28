@@ -5,7 +5,6 @@ import { Link, useSearchParams } from "react-router-dom";
 
 import { accountsApi } from "@/api/accounts";
 import { recordsApi } from "@/api/records";
-import { PAGE_WIDTH } from "@/components/layout/PageContainer";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { InterruptedState } from "@/components/shared/InterruptedState";
 import { LoadingRegion } from "@/components/ui/LoadingRegion";
@@ -819,31 +818,28 @@ export default function DiscoverPage() {
   );
 
   return (
-    <div className="min-h-screen bg-surface flex flex-col">
-      {/* Discover paints its own background, so AppShell draws it full-bleed;
-          the width is still the app's standard one (IR-521). Its private bar
-          (menu button and bell) is gone: the bell is in the sidebar, and
-          AppShell's phone bar carries both below `md` (IR-519). */}
-      <div className={cn(PAGE_WIDTH.standard, "px-4 sm:px-7 pt-4 sm:pt-7 pb-12 flex-1")}>
-        <div ref={searchBox} id={TOUR_TARGETS.discover.search}>
-          <DiscoverSearchComposer value={searchInput} onChange={setSearchInput} />
-        </div>
-
-        <div className="mt-4 flex flex-wrap items-baseline gap-x-4 gap-y-0.5">
-          <h1 id={TOUR_TARGETS.discover.heading} className="font-display font-semibold text-title sm:text-display text-stone-900">Discover</h1>
-          <p className="text-body text-stone-600">Research, projects and reference papers in IRIS.</p>
-        </div>
-
-        <DiscoverTabs
-          tabs={[{ id: "research", label: "Research", content: research }]}
-          active={tab}
-          onSelect={setTab}
-        />
+    // AppShell's frame sets Discover's margin and width, the same as every
+    // other page's (IR-1353); it used to draw its own, with the padding inside
+    // the cap, so its content sat 28px in from everyone else's on a wide window.
+    <>
+      <div ref={searchBox} id={TOUR_TARGETS.discover.search}>
+        <DiscoverSearchComposer value={searchInput} onChange={setSearchInput} />
       </div>
+
+      <div className="mt-4 flex flex-wrap items-baseline gap-x-4 gap-y-0.5">
+        <h1 id={TOUR_TARGETS.discover.heading} className="font-display font-semibold text-title sm:text-display text-stone-900">Discover</h1>
+        <p className="text-body text-stone-600">Research, projects and reference papers in IRIS.</p>
+      </div>
+
+      <DiscoverTabs
+        tabs={[{ id: "research", label: "Research", content: research }]}
+        active={tab}
+        onSelect={setTab}
+      />
 
       <PaperCiteModal record={citeRecord} isOpen={Boolean(citeRecord)} onClose={() => setCiteRecord(null)} />
       {tour}
-    </div>
+    </>
   );
 }
 

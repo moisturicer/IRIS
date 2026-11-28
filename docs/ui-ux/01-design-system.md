@@ -130,6 +130,20 @@ Setup and Workflow analytics are one handbook layout (`frontend/src/components/l
 | **Notice** | The live version is a Bar Stone strip ("Live now", version, published); the publish form and version history follow on hairlines | A two-column grid of cards |
 | **Workflow analytics** | The Office/From/To fields sit in one `stone-100` bar with the "Updating…" status at its end. Tables: `stone-50` header row on a `stone-300` rule, `stone-200` row rules, office names semibold, **a zero steps back to Faint Ink** and Open and Overdue counts above zero are semibold Ink. Time in stage draws a thin bar beside each duration, against the longest 90th percentile in the table (`aria-hidden`, from `sm`); the figure always says it. The method notes are a two-column list behind a hairline | Plain tables, and a `stone-50` box for the method and the "figures start" line |
 
+### IR-1353 amendment: one page margin and width (2026-11-28)
+
+Asked for by **Ashlee Sean** (2026-11-28): every role and every page has the same left and right margin and the same width, except Ask IRIS, so switching pages does not move the content sideways. Her answers to the three open questions: the PDF reader and the review workspace stay full-width like Ask IRIS, the record Overview keeps its 1600 px cap, and Workflow analytics takes the frame.
+
+| Element | Now | Replaces |
+|---|---|---|
+| **The frame** | One gutter, `PAGE_GUTTER` (`p-4 sm:p-7`: 16 px on a phone, 28 px from 640 px), outside one centred cap, `PAGE_WIDTH.standard` (1440 px), both defined in `PageContainer.tsx` and drawn by `AppShell` | Padding on `AppShell`'s `main`, a per-route `width` handle, and two pages with their own copies |
+| **Admin tables** (Users, Role requests, Download requests, Delete requests, Audit log, Account deletions) and **Workflow analytics** | In the frame; each table already scrolls sideways inside its own box (`overflow-x-auto`, `DataTable`) | `width: "full"` (IR-521): edge to edge, so at 1920 px their content started 28 px from the sidebar (x = 284) while My Library's started 104.5 px in (x = 360.5); measured on the local stack, 2026-11-28 |
+| **Discover** | In the frame like any page | Full-bleed, with `px-4 sm:px-7` inside its own 1440 px cap, so its content was 1384 px wide and 28 px further in than other pages on a wide window |
+| **Record Overview** | `PAGE_GUTTER` under the record bar, around its `wide-left` (1600 px) grid | `sm:pl-14 sm:pr-8 pt-8` inside the cap: a 56 px left gutter |
+| **`RouteHandle.width`, `PageWidth` "full"** | Removed | IR-521's per-route choice |
+
+Measured, not asserted: `e2e/smoke/one-page-frame.spec.ts` checks every signed-in screen at 375, 768, 1280, 1920 and 2560 px against the frame.
+
 ### IR-1072 amendment: the UI/UX audit's design decisions (D1, D4, D5, D6)
 
 Decided on 2026-11-14 by **Lee Jasmin Adolfo** (project lead and frontend owner), from the audit in [`frontend_ui_audit_spec.md`](../frontend_ui_audit_spec.md) §7.1 and the prototype it points to. **Decided, not built:** the tickets named below build each one, and `DESIGN.md` carries the same text under "Decided changes". D2 and D3 are server decisions and live in [ADR-069](../adr/069-notifications-know-when-their-task-closed.md) and [ADR-032](../adr/032-adviser-first-review-and-office-reviewer-pools.md) §9.
@@ -334,7 +348,7 @@ Font Awesome 6 via CDN, `<i className="fas fa-…" />`, 95 usages.
 - **One new token:** `transition-shell` (`transitionProperty.shell`: transform, width, margin) in `tailwind.config.js`. The drawer slides, the rail narrows and the content margin follows. Two separate `transition-*` classes on one element silently override each other, because `cn` does not merge Tailwind classes.
 - **The app background is the `canvas` role** (white since IR-1132, IR-558), previously `stone-100` and before that `gray-100`; the sidebar and mobile bar are `surface`. The drawer backdrop is `stone-900/40`, previously `black/40`, following the palette rule at the top of this file.
 
-One quirk: the Discover home and Ask IRIS are special-cased full-bleed, with no `PageContainer` or breadcrumbs, and paint their own page.
+**One page frame (IR-1353).** Every page in the shell, for every role, is the same frame: `PAGE_GUTTER` (`p-4 sm:p-7`, 16 px then 28 px) outside `PAGE_WIDTH.standard` (centred, `max-w-page`, 1440 px), both in `PageContainer.tsx`. Discover is no longer full-bleed and no route names a width. Only Ask IRIS and a record (`/records/:id`) lay out their own page: the record's PDF reader and review workspace fill the window, and its Overview takes `PAGE_GUTTER` under the record bar with the 1600 px `wide-left` cap. Before this, Discover was special-cased full-bleed and drew its own padding inside the cap.
 
 ---
 

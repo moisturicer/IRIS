@@ -1,8 +1,7 @@
 import { forwardRef, useCallback, useEffect, useRef } from "react";
-import { Link, Outlet, useLocation, useMatches } from "react-router-dom";
+import { Link, Outlet, useLocation } from "react-router-dom";
 import { IrisMark, IrisWordmark } from "@/components/brand/IrisBrand";
 import { Sidebar } from "./Sidebar";
-import type { RouteHandle } from "./routeHandle";
 import { NotificationBell } from "./NotificationBell";
 import { useUnreadNotificationsFetch } from "@/hooks/useNotifications";
 import { PageContainer } from "./PageContainer";
@@ -72,20 +71,17 @@ export function AppShell() {
   const collapsed    = useUIStore(selectSidebarCollapsed);
   const closeSidebar = useUIStore((s) => s.closeSidebar);
   const { pathname } = useLocation();
-  // Routes that paint their own page and manage their own scrolling.
+  // Every other page sits in the one frame, PageContainer (IR-1353). These two
+  // lay out their own page and manage their own scrolling.
   // Ask IRIS is `/ai` and every conversation address under it (IR-548).
   const isAskIris = pathname === ASK_PATH || pathname.startsWith(`${ASK_PATH}/`);
-  // A record lays out its own bar and workspace (IR-569).
+  // A record lays out its own bar and workspace (IR-569); its Overview uses
+  // the frame's gutter under that bar, and the reader and review fill the window.
   const isRecord = /^\/records\/\d+\/?$/.test(pathname);
-  const isFullBleed = pathname === "/" || isAskIris || isRecord;
+  const isFullBleed = isAskIris || isRecord;
   // Ask IRIS fills the window exactly (`h-screen`) and its toolbar carries the
   // bell on a phone, so a bar above it would push the composer off screen.
   const showPhoneBar = !isAskIris;
-  // The deepest route that names a width wins; a page is standard otherwise.
-  const matches = useMatches();
-  const width = [...matches].reverse()
-    .map((m) => (m.handle as RouteHandle | undefined)?.width)
-    .find(Boolean) ?? "standard";
 
   // Below md the sidebar is a drawer over the page (IR-413). While it is
   // closed it is only slid off screen, so it is made inert to keep its links
@@ -212,11 +208,11 @@ export function AppShell() {
           id={MAIN_ID}
           ref={mainRef}
           tabIndex={-1}
-          className={cn("flex-1 focus:outline-none", isFullBleed ? "p-0" : "p-4 sm:p-7", isAskIris && "min-h-0")}>
+          className={cn("flex-1 focus:outline-none", isAskIris && "min-h-0")}>
           {isFullBleed ? (
             <Outlet />
           ) : (
-            <PageContainer width={width}>
+            <PageContainer>
               {/* A page starts with its own title: no breadcrumb above it (IR-1255). */}
               <Outlet />
             </PageContainer>
