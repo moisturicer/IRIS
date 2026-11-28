@@ -174,7 +174,7 @@ All three were left open in the first draft and decided by Ashlee Sean on 2026-1
 
 ## Amendment 2026-11-28: the remaining pages (IR-1350, IR-1351)
 
-**Status: Proposed.** Drafted by an AI agent at Lee Jasmin Adolfo's request. Lee settled the questions below in a design session on 2026-11-28. It stays a proposal until a person accepts it here.
+**Status: Accepted**, 2026-11-28, by Lee Jasmin Adolfo, in the session that drafted it (PR #1034). Drafted by an AI agent at Lee's request; Lee settled the questions below in a design session the same day.
 
 **Why.** The team asked for every remaining page to update without a reload. Wiring every page would add hints for data that rarely changes, and focus reads for pages nobody watches. So this amendment adds a rule for which pages are live, and applies it to every page decision 8 and the amendments above left out.
 
