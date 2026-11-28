@@ -145,17 +145,12 @@ afterEach(() => {
 // Each walk through the steps types key by key, which took close to the 15s
 // default in the dev container, so the blocks get room rather than a flaky edge.
 describe("the register steps", { timeout: 30_000 }, () => {
-  it("offers one Sign in link and opens help and policy dialogs without losing identity", async () => {
+  it("offers one Sign in link and opens the policy dialogs without losing identity", async () => {
     const user = userEvent.setup();
     renderSignup();
     expect(screen.getAllByRole("link", { name: "Sign in" })).toHaveLength(1);
     expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login");
     await user.type(firstName(), "Rea");
-    await user.click(within(screen.getByRole("banner")).getByRole("link", { name: "Help" }));
-    const help = screen.getByRole("dialog", { name: "Help" });
-    expect(within(help).getByRole("link", { name: "Reset your password" })).toHaveAttribute("href", "/password/forgot");
-    await expectNoBlockingA11yViolations(help);
-    await user.keyboard("{Escape}");
     const footer = screen.getByRole("contentinfo");
     expect(footer).not.toHaveTextContent(/Pilot institution/);
     for (const name of ["Data privacy", "Terms"]) {
@@ -177,9 +172,10 @@ describe("the register steps", { timeout: 30_000 }, () => {
     expect(currentStep(/Identity, current step$/)).toHaveAttribute("aria-current", "step");
     expect(within(steps()).queryByRole("link", { name: /^Identity, current step$/ })).not.toBeInTheDocument();
     expect(within(steps()).queryByRole("tab")).not.toBeInTheDocument();
+    // No Help in the masthead, as on sign in (IR-1281).
     const header = screen.getByRole("banner");
-    expect(within(header).getAllByRole("link")).toHaveLength(1);
-    expect(within(header).getByRole("link", { name: "Help" })).toHaveAttribute("aria-haspopup", "dialog");
+    expect(within(header).queryAllByRole("link")).toHaveLength(0);
+    expect(screen.queryByRole("link", { name: "Help" })).not.toBeInTheDocument();
     for (const name of [/^Affiliation, not started$/, /^Security & agreement, not started$/]) {
       expect(tab(name)).toHaveAttribute("aria-disabled", "true");
       expect(tab(name)).not.toHaveAttribute("href");

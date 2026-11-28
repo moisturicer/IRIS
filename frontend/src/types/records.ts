@@ -109,6 +109,11 @@ export interface MyResearchItem {
   submitter_status:     SubmitterStatus;
   created_at:           string;
   updated_at:           string;
+  /**
+   * What the owner's `DELETE /records/<id>/` would do, as Record detail names
+   * it (IR-508), or null while RDCO decides a delete request (IR-1282).
+   */
+  delete_act?:          "delete_record" | "withdraw_submission" | "request_deletion" | null;
 }
 
 /**
@@ -141,7 +146,7 @@ export interface ClearanceStripEntry {
 export interface WaitingItem {
   kind:         "revision" | "document";
   party:        Party;
-  /** "Revision requested by IERC". */
+  /** "Changes requested by IERC" (IR-1322). */
   label:        string;
   /** The act that answers it: "Submit a new version". */
   action_label: string;
@@ -153,7 +158,7 @@ export interface WaitingItem {
  * `awaiting_document`. Carries no reviewer's name or words.
  */
 export interface SubmitterStatus {
-  /** "With your Adviser", "In specialist review: ITSO, IERC", … */
+  /** "Adviser review", "Office review · ITSO, IERC", "Revision requested · IERC", … (IR-1306) */
   line:           string;
   waiting_on_you: WaitingItem[];
 }
@@ -804,6 +809,18 @@ export interface NewVersionHint {
   blocked:  string | null;
   /** The response to reviewers it would carry, as it stands (IR-876). */
   letter?:  ResponseLetterEntry[];
+  /**
+   * What it would carry that no version does yet (IR-1318): a revised
+   * manuscript, edited details, and each document uploaded since the latest
+   * version. The Documents tab marks these *not yet submitted*.
+   */
+  unsent?:  NewVersionUnsent;
+}
+
+export interface NewVersionUnsent {
+  manuscript: boolean;
+  details:    boolean;
+  uploads:    { id: number; label: string }[];
 }
 
 export interface OpenRevisionRequest {
@@ -1588,7 +1605,8 @@ export interface DeleteRequest {
 // Document requests (ADR-022, IR-262)
 // ---------------------------------------------------------------------------
 
-export type DocumentRequestState = "open" | "fulfilled" | "withdrawn";
+/** `draft`: asked, not sent yet; only its asker sees it (ADR-022 Amendment 9, IR-1325). */
+export type DocumentRequestState = "draft" | "open" | "fulfilled" | "withdrawn";
 export type DocumentRequestItemState = "missing" | "uploaded" | "accepted" | "rejected";
 
 export interface DocumentRequestItem {
@@ -1623,17 +1641,12 @@ export interface DocumentRequest {
   created_at:   string;
   closed_at:    string | null;
   /**
-   * The viewer can staff the party that asked, so may accept, reject or
-   * withdraw (ADR-022 §3.4, §4). Server-decided; the controls follow it.
+   * The viewer can staff the party that asked, so may withdraw (ADR-022 §4;
+   * nothing is accepted or rejected since Amendment 10, IR-1338). Server-decided; the controls follow it.
    */
   can_manage:   boolean;
   items:        DocumentRequestItem[];
 }
-
-/** `PATCH /document-request-items/<id>/` (IR-263). A rejection needs a reason. */
-export type DocumentRequestItemDecision =
-  | { action: "accept" }
-  | { action: "reject"; reason: string };
 
 /** One entry of a new request: a picklist slot, or free text for "Other". */
 export type DocumentRequestItemInput = { slot: number } | { label: string };

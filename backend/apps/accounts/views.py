@@ -498,6 +498,48 @@ class MeView(generics.RetrieveUpdateAPIView):
         return self.request.user
 
 
+class MeTourSeenView(APIView):
+    """`POST /users/me/tours/<key>/`: the signed-in person has been shown tour `key` (IR-1342).
+
+    There is no id in the address: it marks `request.user` and nobody else, and
+    writes `tours_seen` alone. An unknown key is a 400. Marking a tour again is
+    a no-op that answers the same way, so a retried request is harmless.
+    Taking a tour again from Settings needs nothing here: Settings starts a
+    tour whether or not it was seen.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, key):
+        from apps.accounts import tours
+
+        try:
+            seen = tours.mark_seen(request.user, key)
+        except tours.UnknownTour:
+            return Response({"detail": "There is no such tour."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"tours_seen": seen})
+
+
+class MeToursOffView(APIView):
+    """`PUT /users/me/tours-off/` with `{"off": true|false}` (IR-1349).
+
+    "Don't show tours again", from a tour's card or Settings › Help. Like
+    `MeTourSeenView` it acts on `request.user` alone and writes `tours_off`
+    alone. Anything but a JSON boolean is a 400, so `"false"` can never be
+    read as set.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request):
+        from apps.accounts import tours
+
+        off = request.data.get("off") if isinstance(request.data, dict) else None
+        if not isinstance(off, bool):
+            return Response({"detail": "Send off as true or false."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"tours_off": tours.set_off(request.user, off)})
+
+
 class PersonalDataExportView(APIView):
     """One JSON file of the signed-in person's own data (ADR-051 decision 13, IR-786).
 

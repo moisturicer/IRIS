@@ -361,7 +361,7 @@ def has_record_download_file(record) -> bool:
     if record.abstract_file:
         return True
     return (
-        RecordUpload.objects.filter(record=record).exclude(file="").exists()
+        RecordUpload.objects.filter(record=record).sent().exclude(file="").exists()
     )
 
 
@@ -374,7 +374,7 @@ def resolve_record_download_file(record):
         return record.abstract_file.open("rb"), _manuscript_download_name(record)
 
     upload = (
-        RecordUpload.objects.filter(record=record)
+        RecordUpload.objects.filter(record=record).sent()
         .exclude(file="")
         .order_by("-created_at")
         .first()

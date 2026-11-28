@@ -167,12 +167,32 @@ describe("the sidebar's list", () => {
     expect(preloadScreen).toHaveBeenCalledWith("/guidelines");
   });
 
-  it("shows My Reviews to an office member with review work", async () => {
+  // IR-1337: an office member's My Reviews is in a group named for the office,
+  // not the main list.
+  it("shows My Reviews to an office member with review work, under the office's name", async () => {
     signIn(ROLES.ITSO, true);
     renderAt("/records/mine");
 
     await screen.findByRole("heading", { name: "My Library" });
-    expect(mainLinks()).toContain("My Reviews");
+    const office = screen.getByRole("list", { name: "ITSO" });
+    expect(within(office).getByRole("link", { name: "My Reviews" })).toHaveAttribute("href", "/review");
+  });
+
+  it("puts an Adviser's My Reviews and My Templates under Adviser (IR-1337)", async () => {
+    signIn(ROLES.ADVISER, true);
+    renderAt("/records/mine");
+
+    await screen.findByRole("heading", { name: "My Library" });
+    const adviser = screen.getByRole("list", { name: "Adviser" });
+    expect(within(adviser).getAllByRole("link").map((l) => l.textContent?.trim())).toEqual(["My Reviews", "My Templates"]);
+  });
+
+  it("leaves a student's sidebar with no role group (IR-1337)", async () => {
+    signIn(ROLES.STUDENT);
+    renderAt("/records/mine");
+
+    await screen.findByRole("heading", { name: "My Library" });
+    expect(screen.getAllByRole("list").filter((list) => list.hasAttribute("aria-labelledby"))).toEqual([]);
   });
 
   it("hides My Reviews from an Adviser with no review work", async () => {
@@ -196,7 +216,8 @@ describe("the sidebar's list", () => {
 
     await screen.findByRole("heading", { name: "My Library" });
     const admin = screen.getByRole("list", { name: "RDCO" });
-    expect(within(admin).getAllByRole("link").map((l) => l.textContent?.trim())[0]).toBe("Import Records");
+    // My Reviews leads RDCO's group since IR-1337 (changed deliberately: it was Import Records).
+    expect(within(admin).getAllByRole("link").map((l) => l.textContent?.trim())[0]).toMatch(/^My Reviews/);
     expect(await within(admin).findByRole("link", { name: "Role Requests, 3 pending" })).toHaveAttribute("href", "/rdco/role-requests");
     expect(within(admin).getByRole("link", { name: "Users" })).toHaveAttribute("href", "/rdco/users");
     expect(within(admin).getByRole("link", { name: "Download Requests, 2 pending" })).toHaveAttribute("href", "/rdco/download-requests");

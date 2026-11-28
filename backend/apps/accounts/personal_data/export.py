@@ -83,6 +83,10 @@ def account(user) -> dict:
             row.interest.name
             for row in user.interest_links.select_related("interest").order_by("position")
         ],
+        # The student guided tours this person has been shown (IR-1342).
+        "tours_seen": list(user.tours_seen or []),
+        # "Don't show tours again" (IR-1349).
+        "tours_off": user.tours_off,
         "student_profile": None,
         "adviser_profile": None,
     }
@@ -429,6 +433,18 @@ def viewed_marks(user) -> list[dict]:
         {"record_id": row.record_id, "version": row.version.number, "section": row.section_key,
          "created_at": row.created_at}
         for row in ViewedMark.objects.filter(user=user).select_related("version").order_by("id")
+    ]
+
+
+def uploads_seen(user) -> list[dict]:
+    """The supplied documents the person opened (IR-1338): which paper,
+    document and version, and when. Each mark only clears their own New badge."""
+    from apps.documents.models import UploadSeen
+
+    return [
+        {"record_id": row.upload.record_id, "document": row.upload.slot.name,
+         "version": row.upload.version, "seen_at": row.seen_at}
+        for row in UploadSeen.objects.filter(user=user).select_related("upload__slot").order_by("id")
     ]
 
 
@@ -850,6 +866,7 @@ SECTIONS: dict[str, Callable] = {
     "reading_highlights": reading_highlights,
     "saved_replies": saved_replies,
     "viewed_marks": viewed_marks,
+    "uploads_seen": uploads_seen,
     "review_mentions": review_mentions,
     "comments": comments,
     "comment_reports": comment_reports,

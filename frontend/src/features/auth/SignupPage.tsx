@@ -481,7 +481,6 @@ export default function SignupPage() {
   if (registered) {
     return (
       <EntryFrame
-        help
         lede={LEDE}
         wide
         tabs={<EntrySteps steps={STEPS.map(({ name, shortName }) => ({ name, shortName, state: "completed" }))} />}
@@ -578,7 +577,6 @@ export default function SignupPage() {
 
   return (
     <EntryFrame
-      help
       lede={LEDE}
       wide
       tabs={<EntrySteps steps={tabs} onSelect={goTo} />}
@@ -635,7 +633,9 @@ export default function SignupPage() {
           )}
         </div>
 
-        <div key={step} className="flex flex-col gap-5 motion-safe:animate-step-fade lg:col-span-3">
+        {/* gap-3, as on sign in: each field already keeps a 20px error line
+            under it, so gap-5 on top of that read as loose. */}
+        <div key={step} className="flex flex-col gap-3 motion-safe:animate-step-fade lg:col-span-3">
           {loadFailed && step === 1 && (
             <AuthAlert variant="error" title="Some of this form didn't load">
               IRIS couldn&apos;t load the colleges, programs and departments to choose from.
@@ -687,7 +687,7 @@ export default function SignupPage() {
                 </div>
               </fieldset>
 
-              <div className="grid gap-5 sm:grid-cols-2 sm:gap-3">
+              <div className="grid gap-3 sm:grid-cols-2">
                 <Input id="signup-first-name" label="First name" required
                   autoComplete="given-name" {...field("first_name")} />
                 <Input id="signup-last-name" label="Last name" required
@@ -841,7 +841,7 @@ export default function SignupPage() {
           {/* The forward action first in the source, so a phone reads it
               first; from `sm` up Back sits on its left. `size="full"` carries
               the 44px step. */}
-          <div className="flex flex-col gap-3 sm:flex-row-reverse">
+          <div className="mt-2 flex flex-col gap-3 sm:flex-row-reverse">
             <div className="sm:flex-1">
               {step < LAST_STEP ? (
                 <Button type="submit" variant="primary" size="full">

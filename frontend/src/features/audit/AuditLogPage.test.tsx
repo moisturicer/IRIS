@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { auditApi } from "@/api/audit";
-import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
+import { act, renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
 import AuditLogPage from "./AuditLogPage";
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { AUDIT_EVENT_LABELS } from "@/types/audit";
@@ -44,6 +44,20 @@ it("shows labelled workflow details and grouped filters with the API actor name"
     expect(screen.getByRole("option", { name: label })).toHaveValue(type);
   }
   await expectNoBlockingA11yViolations(container);
+});
+
+// IR-1313: the Event type box is one width, before and after the types arrive.
+it("keeps the Event type filter one width and names the chosen type on hover", async () => {
+  renderScreen(<AuditLogPage />);
+  const select = screen.getByRole("combobox", { name: "Event type" });
+  const box = select.closest("[class~='sm:w-80']");
+  expect(box).toHaveClass("w-full");
+  expect(select).toHaveAttribute("title", "All events");
+
+  await screen.findByRole("option", { name: "Login" });
+  expect(select.closest("[class~='sm:w-80']")).toBe(box);
+  await userEvent.setup().selectOptions(select, "LOGIN");
+  expect(select).toHaveAttribute("title", "Login");
 });
 
 it("offers a type the frontend has never heard of, under Other, the moment the server lists it", async () => {
@@ -200,3 +214,33 @@ it("downloads the CSV returned by the API", async () => {
   expect(click.mock.instances[0]).toHaveAttribute("download", "iris-audit.csv");
 });
 
+// IR-1351 (ADR-073 amendment 2026-11-28): read again when the tab is shown.
+const shownAgain = () => act(() => { window.dispatchEvent(new Event("focus")); });
+
+it("shows events written meanwhile when the tab is shown again, with the same filters and page", async () => {
+  renderScreen(<AuditLogPage />, { route: "/admin/audit?event_type=RESUBMITTED" });
+  expect(await screen.findByText("Lee Cruz")).toBeInTheDocument();
+
+  vi.mocked(auditApi.list).mockResolvedValue({ data: { count: 2, results: [
+    { id: 2, event_type: "RESUBMITTED", user: 4, user_name: "Ana Reyes", record: 3, record_title: "Water study",
+      created_at: "2026-10-02T09:00:00Z", metadata: {} },
+    { id: 1, event_type: "RESUBMITTED", user: 2, user_name: "Lee Cruz", record: 3, record_title: "Water study",
+      created_at: "2026-10-01T12:13:14Z", metadata: {} },
+  ] } } as unknown as Awaited<ReturnType<typeof auditApi.list>>);
+  shownAgain();
+
+  expect(await screen.findByText("Ana Reyes")).toBeInTheDocument();
+  expect(auditApi.list).toHaveBeenLastCalledWith({ event_type: "RESUBMITTED", page: 1, page_size: 20 });
+});
+
+it("keeps the rows when reading again fails, with no error banner", async () => {
+  renderScreen(<AuditLogPage />);
+  expect(await screen.findByText("Lee Cruz")).toBeInTheDocument();
+
+  vi.mocked(auditApi.list).mockRejectedValueOnce(new Error("offline"));
+  shownAgain();
+
+  await waitFor(() => expect(auditApi.list).toHaveBeenCalledTimes(2));
+  expect(screen.getByText("Lee Cruz")).toBeInTheDocument();
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+});

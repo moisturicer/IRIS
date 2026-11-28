@@ -9,7 +9,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AccountDeletionRequest } from "@/api/accounts";
 import { expectNoBlockingA11yViolations } from "@/test/axe";
-import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
+import { emitLiveHint } from "@/lib/live";
+import { act, renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
 
 import AccountDeletionRequestsPage from "./AccountDeletionRequestsPage";
 
@@ -222,3 +223,31 @@ describe("AccountDeletionRequestsPage", () => {
   });
 });
 
+describe("AccountDeletionRequestsPage, live (ADR-073, IR-1350)", () => {
+  const ana = request();
+  const ben = request({ id: 5, user: { id: 10, name: "Ben Lim", email: "ben@cit.edu", role: "Student" } });
+
+  it("shows a request made elsewhere once a queues hint arrives", async () => {
+    deletionRequests.mockResolvedValue({ data: { results: [ana], next: null } });
+    renderScreen(<AccountDeletionRequestsPage />);
+    await screen.findByRole("listitem", { name: "Ana Reyes" });
+
+    deletionRequests.mockResolvedValue({ data: { results: [ana, ben], next: null } });
+    act(() => { emitLiveHint(["queues"]); });
+
+    expect(await screen.findByRole("listitem", { name: "Ben Lim" })).toBeInTheDocument();
+    expect(screen.getByRole("listitem", { name: "Ana Reyes" })).toBeInTheDocument();
+  });
+
+  it("keeps the list when the live read fails", async () => {
+    deletionRequests.mockResolvedValue({ data: { results: [ana], next: null } });
+    renderScreen(<AccountDeletionRequestsPage />);
+    await screen.findByRole("listitem", { name: "Ana Reyes" });
+
+    deletionRequests.mockRejectedValue(new Error("offline"));
+    act(() => { emitLiveHint(["queues"]); });
+
+    await waitFor(() => expect(deletionRequests).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole("listitem", { name: "Ana Reyes" })).toBeInTheDocument();
+  });
+});

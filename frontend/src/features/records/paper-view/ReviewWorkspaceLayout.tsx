@@ -16,7 +16,8 @@ import { ReadinessPanel } from "./ReadinessPanel";
 import { ReviewActionBar } from "./ReviewActionBar";
 import { detailsTarget, ReviewDetails } from "./ReviewDetails";
 import { ReviewTimeline } from "./ReviewTimeline";
-import { ADD_COLLEAGUE, REVIEWER_FOOTER_ACTIONS, REVIEW_ACTIONS, type DialogReviewAction } from "./reviewActions";
+import { REVIEWER_FOOTER_ACTIONS, REVIEW_ACTIONS, addReviewerSeat, type DialogReviewAction } from "./reviewActions";
+import { AddColleagueLink } from "./AddColleagueLink";
 import { ReviewFooterActions } from "./ReviewFooterActions";
 import type { ShowPlace } from "./changes/ChangeItem";
 import { ChangesTab } from "./changes/ChangesTab";
@@ -26,7 +27,7 @@ import { isDiscussion } from "./threads/threadModel";
 import { useThreadsWorkspace } from "./threads/useThreadsWorkspace";
 import { ReviewPaneContext, type ReviewPane } from "./reviewPane";
 import { DRAWER_BELOW_PX, fitWidths, maxWidth, minWidth, SIDE_TAB_MIN_PX, type Widths } from "./reviewGeometry";
-import { GuidedTour } from "./tour/GuidedTour";
+import { GuidedTour } from "@/components/tour/GuidedTour";
 import { markTourSeen, tourSeen } from "./tour/tourStorage";
 import { reviewTourSteps, tourTargets, type TourTab } from "./tour/tourSteps";
 import { YourPartFooter } from "./YourPartFooter";
@@ -133,6 +134,11 @@ function useShownOnce(shown: boolean): boolean {
   return once || shown;
 }
 
+/** Out of reach -- unclickable, unfocusable and unread -- while `hidden` (IR-1336). */
+function hiddenWhile(hidden: boolean) {
+  return hidden ? { inert: "", "aria-hidden": true } : {};
+}
+
 /**
  * Who sent the Version under review, and when, as a pull request says who
  * opened it (IR-1131): "Ana Cruz sent v2 · Nov 3, 2026". The name and date
@@ -216,8 +222,14 @@ export function ReviewWorkspaceLayout({
     try { localStorage.setItem(WIDTHS_KEY, JSON.stringify(next)); } catch { /* Defaults still render. */ }
   };
 
+  // The server offers `open_review` for every seat still being worked on, an
+  // opened one included, so only a seat not yet opened asks for it here: an
+  // opened one finishes instead (IR-875).
+  const unopened = can.has("open_review") && seatToOpen(record) !== null;
+  // Not claimed, or not started: the reader's Comment waits for both (IR-1341).
+  const notStarted = !authorView && (unopened || Boolean(record.review_claim));
   const tw = useThreadsWorkspace({
-    record, can, onChanged,
+    record, can, onChanged, notStarted,
     showThreads: () => { reveal("threads"); if (drawer) setOpen(true); },
     // Threads and Changes point into the manuscript, so a document steps aside for it (IR-1203).
     showPaper: () => { onShowManuscript?.(); if (drawer && open) closeDrawer(); },
@@ -225,10 +237,22 @@ export function ReviewWorkspaceLayout({
     announce: setRouted,
   });
   const finishing = can.has("finish_review");
-  // The server offers `open_review` for every seat still being worked on, an
-  // opened one included, so only a seat not yet opened asks for it here: an
-  // opened one finishes instead (IR-875).
-  const unopened = can.has("open_review") && seatToOpen(record) !== null;
+  // A review not yet started is covered until Start review records it (IR-1336).
+  // Claim comes first: an office review nobody holds is claimed, not started.
+  const covered = unopened && !authorView && !record.review_claim;
+  const [starting, setStarting] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
+  const startReview = async () => {
+    setStarting(true);
+    setStartError(null);
+    try {
+      await onOpenReview?.();
+    } catch {
+      setStartError("Your review could not be started. Try again.");
+    } finally {
+      setStarting(false);
+    }
+  };
   // Changes needs two Versions to compare (ADR-058 §3, IR-873).
   const versions = record.versions ?? [];
   const comparable = versions.length >= 2;
@@ -344,7 +368,7 @@ export function ReviewWorkspaceLayout({
     <div role="group" aria-label="Guided tour"
       className="flex w-full flex-wrap items-center gap-x-4 gap-y-2 rounded-control border border-stone-300 bg-white px-4 py-3">
       <p className="min-w-0 flex-1 basis-56 text-small text-stone-800">
-        New to the review workspace? A four-step tour shows where everything is.
+        New to the review workspace? A guided tour shows what each part is for and how a review goes, step by step.
       </p>
       <div className="ml-auto flex shrink-0 items-center gap-1">
         <button type="button" className={cn("review-control px-3 font-semibold text-stone-700 hover:text-stone-900", FOCUS_RING)}
@@ -414,14 +438,18 @@ export function ReviewWorkspaceLayout({
   // of our own, so a change to the party graph needs no change here.
   const targets = record.routing.targets;
   const mayRequest = can.has("route") && targets.length > 0 && ROUTE !== undefined;
+  // The office a colleague joins: the viewer's open office seat (IR-1340).
+  const colleagueSeat = addReviewerSeat(record);
   const renderDetails = (tracker: RecordTracker) => (
     <div className="space-y-5">
     {authorView && authorDetails}
     <ReviewDetails record={record} tracker={tracker} ids={ids}
       readiness={authorView ? null : record.readiness} onReadinessAction={authorView ? undefined : onReadinessAction}
       requestReview={mayRequest ? { targets: targets.map((t) => t.label), onOpen: () => { setRouted(""); setRequesting(true); } } : undefined}
-      addColleague={<ReviewActionBar record={record} can={can} actions={ADD_COLLEAGUE} label="Reviewer actions"
-        primary={false} onChanged={onChanged} className="pt-1" />} />
+      addColleague={colleagueSeat && can.has("add_reviewer") ? {
+        party: colleagueSeat.party,
+        control: (office) => <AddColleagueLink record={record} office={office} onChanged={onChanged} />,
+      } : undefined} />
     </div>
   );
   const RouteDialog = ROUTE?.Dialog;
@@ -500,7 +528,7 @@ export function ReviewWorkspaceLayout({
           aria-hidden={drawer && !open || undefined} {...(drawer && !open ? { inert: "" } : {})}
           className={cn("review-pane", open && "review-pane-open")}>
           {!drawer && reader && edge("mid", "Resize the review pane")}
-          <header className="review-pane-head">
+          <header id={target.head} className="review-pane-head" {...hiddenWhile(covered)}>
             <div className="-mr-2 flex items-center gap-1">
               <h2 className="mr-auto font-display text-xl font-semibold text-stone-900">Review</h2>
               {!authorView && <button ref={tourButton} type="button"
@@ -532,7 +560,7 @@ export function ReviewWorkspaceLayout({
                 document.getElementById(`${ids}-tab-${next}`)?.focus();
               }}>
                 {tabs.map((name) => (
-                  <button key={name} type="button" role="tab" id={`${ids}-tab-${name}`}
+                  <button key={name} type="button" role="tab" id={target.tab(name)}
                     aria-selected={shown === name} aria-controls={`${ids}-${name}`} tabIndex={shown === name ? 0 : -1}
                     aria-describedby={name === "conversation" && commentCount > 0 ? `${ids}-comment-count` : undefined}
                     onClick={() => setTab(name)} className={cn("review-tab", FOCUS_RING)}>
@@ -548,7 +576,7 @@ export function ReviewWorkspaceLayout({
                   {commentCount} comment{commentCount === 1 ? "" : "s"}
                 </span>
               )}
-              {roomy && <TabBesideMenu choices={tabs.map((t) => ({ id: t, label: TAB_NAMES[t] }))}
+              {roomy && <TabBesideMenu buttonId={target.beside} choices={tabs.map((t) => ({ id: t, label: TAB_NAMES[t] }))}
                 onChoose={chooseSide} />}
             </div>
           </header>
@@ -557,6 +585,7 @@ export function ReviewWorkspaceLayout({
             aria-label="Review pane content"
             tabIndex={0}
             className={cn("review-pane-body", FOCUS_RING)}
+            {...hiddenWhile(covered)}
           >
             {allTabs.map(panel)}
           </div>
@@ -569,18 +598,32 @@ export function ReviewWorkspaceLayout({
               </footer>
             )
           ) : (
-          <YourPartFooter footerRef={footer} id={target.foot} part={part} hasFacts={hasFacts} onShowFacts={() => goTo("readiness")}>
+          <YourPartFooter footerRef={footer} id={target.foot} part={part} hasFacts={hasFacts} onShowFacts={() => goTo("readiness")}
+            hidden={covered}>
             <ReviewFooterActions record={record} can={can} actions={REVIEWER_FOOTER_ACTIONS} onChanged={onChanged}
               finishing={finishing && !record.review_claim && !unopened} onFinish={tw.finish} drafts={tw.threads.drafts.length}
               lead={record.review_claim
                 ? <button type="button" disabled={claiming} onClick={() => void claim()} className={cn(PILL_PRIMARY, FOCUS_RING)}>{claiming ? "Claiming…" : record.review_claim.label}</button>
-                : unopened ? <button type="button" onClick={() => void onOpenReview?.()} className={cn(PILL_PRIMARY, FOCUS_RING)}>Open review</button> : undefined} />
+                : undefined} />
             {claimError && <p role="alert" className="basis-full text-small text-brand">{claimError}</p>}
           </YourPartFooter>
           )}
+          {covered && (
+            // IR-1336: until the review starts, the pane is covered and its one
+            // control is Start review, which records the start (ADR-032 §4).
+            <div role="group" aria-label="Your review hasn't started" className="review-cover">
+              <p className="text-body font-semibold text-stone-900">Your review hasn&apos;t started</p>
+              <p className="max-w-xs text-small text-stone-700">Read the paper on the left at any time. Start the review to comment and decide.</p>
+              <button type="button" disabled={starting} onClick={() => void startReview()} className={cn(PILL_PRIMARY, FOCUS_RING)}>
+                {starting ? "Starting…" : "Start review"}
+              </button>
+              {startError && <p role="alert" className="text-small font-semibold text-brand">{startError}</p>}
+              {drawer && <button type="button" onClick={() => setOpen(false)} className={cn("review-control text-brand font-semibold", FOCUS_RING)}>Back to paper</button>}
+            </div>
+          )}
         </section>
         {sideTab && (
-          <aside aria-label={`${TAB_NAMES[sideTab]} on the right`} className="review-side">
+          <aside id={target.side} aria-label={`${TAB_NAMES[sideTab]} on the right`} className="review-side" {...hiddenWhile(covered)}>
             {edge("side", "Resize the right column")}
             <header className="review-side-head">
               <h2 className="font-display text-xl font-semibold text-stone-900">{TAB_NAMES[sideTab]}</h2>
@@ -610,9 +653,11 @@ export function ReviewWorkspaceLayout({
           </div>
         )}
         {tour && (
-          <GuidedTour opener={tour.opener} onClose={closeTour}
+          <GuidedTour label="Review workspace tour" opener={tour.opener} onClose={closeTour}
             steps={reviewTourSteps({ ids, hasPaper: Boolean(reader), drawer, paneOpen: open,
-              tabs: allTabs.filter((t): t is TourTab => t !== "readiness"), beside: roomy })} />
+              tabs: allTabs.filter((t): t is TourTab => t !== "readiness"), beside: roomy,
+              sideTab: sideTab === "readiness" ? null : sideTab, canStart: can.has("start_thread"),
+              canComment: can.has("comment_review"), drafting: finishing })} />
         )}
       </div>
     </div>

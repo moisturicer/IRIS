@@ -37,6 +37,12 @@ export interface RecordUpload {
   /** Why it can't be deleted, or null: a version names it, or it answered a
    *  document request (ADR-058 §2, IR-872). The server's text, shown as is. */
   delete_refused:   string | null;
+  /** Held until its owner sends it (ADR-022 Amendment 8, IR-1322). Only an
+   *  owner is ever served a held upload. */
+  held?:            boolean;
+  /** Supplied to a document request and not yet opened by this viewer
+   *  (ADR-022 Amendment 10, IR-1338). Never true for an owner. */
+  is_new?:          boolean;
 }
 
 /** UploadSlot with its uploads for a specific record -- returned by slotsForRecord() */

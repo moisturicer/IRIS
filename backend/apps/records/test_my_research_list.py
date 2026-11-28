@@ -33,6 +33,8 @@ LIST_FIELDS = {
     "id", "title", "record_type_name", "authors", "adviser_name",
     "pipeline_status", "workflow_state", "workflow_state_label",
     "holders", "cleared_offices", "clearance_strip", "submitter_status", "created_at", "updated_at", "can_continue",
+    # Which delete a row's trash can does (IR-1282).
+    "delete_act",
 }
 
 

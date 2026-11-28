@@ -4,10 +4,10 @@ What a submitter is told about their own record (IR-625).
 `submitter_status` is one block, sent to an owner only, on My Library's list
 and on Record detail:
 
-- `line`: one plain sentence saying where the record is -- *With your
-  Adviser*, *In specialist review: IERC, KTTO*, *Revision requested by IERC:
-  action needed*. The frontend shows it as sent and words nothing itself
-  (IR-342's rule).
+- `line`: a short label saying where the record is -- *Adviser review*,
+  *Office review · IERC, KTTO*, *Revision requested · IERC* (IR-1306 trimmed
+  the earlier sentences). The frontend shows it as sent and words nothing
+  itself (IR-342's rule).
 - `waiting_on_you`: one item per party with an open revision request or
   document request, each naming the act that answers it. It is non-empty
   exactly when `workflow_state` is in `OWNER_ACTION_STATES`, the states
@@ -80,22 +80,22 @@ def status_line(
 ) -> str:
     """Where the record is, in one sentence. `record` names terminal states."""
     if workflow_state == WorkflowState.AWAITING_RESUBMISSION:
-        return f"Revision requested by {_named(_ordered(revision_parties))}: action needed"
+        return f"Revision requested · {_named(_ordered(revision_parties))}"
     if workflow_state == WorkflowState.AWAITING_DOCUMENT:
-        return f"Documents requested by {_named(_ordered(document_parties))}: action needed"
+        return f"Documents requested · {_named(_ordered(document_parties))}"
     if workflow_state == PipelineStatus.DRAFT:
-        return "Draft: not yet submitted"
+        return "Draft"
     if workflow_state in (
         WorkflowState.SUBMITTED, WorkflowState.IN_REVIEW, WorkflowState.FINAL_REVIEW,
     ):
         held = _ordered(holders)
         offices = [p for p in held if p in _OFFICES]
         if offices:
-            return f"In specialist review: {_named(offices)}"
+            return f"Office review · {_named(offices)}"
         if str(Party.RDCO) in held:
-            return "With RDCO for a decision"
+            return "RDCO decision"
         if str(Party.ADVISER) in held:
-            return "With your Adviser"
+            return "Adviser review"
         return "In review"
     from .tracker import record_state_label
 
@@ -107,23 +107,22 @@ def waiting_on_you(*, workflow_state: str, revision_parties: Iterable, document_
     What the owner owes, one item per asking party. Empty outside
     `OWNER_ACTION_STATES`: a request on a record no longer in review waits on
     nobody.
+
+    A party that asked for a revision and for documents is one item, *Changes
+    requested by {party}* (ADR-022 Amendment 8, point 3; IR-1322). Its `kind`
+    is `revision` while that party's revision is open, since a new version
+    answers both, otherwise `document`.
     """
     if workflow_state not in OWNER_ACTION_STATES:
         return []
+    revising = {str(p) for p in revision_parties}
     return [
         {
-            "kind": "revision", "party": p,
-            "label": f"Revision requested by {party_label(p)}",
-            "action_label": "Submit a new version",
+            "kind": "revision" if p in revising else "document", "party": p,
+            "label": f"Changes requested by {party_label(p)}",
+            "action_label": "Submit a new version" if p in revising else "Upload the documents",
         }
-        for p in _ordered(revision_parties)
-    ] + [
-        {
-            "kind": "document", "party": p,
-            "label": f"Documents requested by {party_label(p)}",
-            "action_label": "Upload the documents",
-        }
-        for p in _ordered(document_parties)
+        for p in _ordered(set(revising) | set(document_parties))
     ]
 
 

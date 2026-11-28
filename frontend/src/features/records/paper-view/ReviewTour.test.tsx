@@ -98,49 +98,66 @@ describe("being offered the tour (IR-997)", () => {
   });
 });
 
+/** Every step's title, from the one shown to the last, leaving the tour on its last step. */
+async function walk(user: ReturnType<typeof userEvent.setup>) {
+  const titles = [stepTitle()];
+  while (screen.queryByRole("button", { name: "Next" })) {
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    titles.push(stepTitle());
+  }
+  return titles;
+}
+
+/** Shows the step titled `title`, by pressing Next. */
+async function stepNamed(user: ReturnType<typeof userEvent.setup>, title: string) {
+  while (stepTitle() !== title) await user.click(screen.getByRole("button", { name: "Next" }));
+  return within(screen.getByRole("dialog", { name: "Review workspace tour" }));
+}
+
+const REVIEWER_WALK = [
+  "The paper", "Where the review stands", "The pane's tabs",
+  "Documents", "Conversation", "Threads", "Changes", "Details",
+  "Your part", "How a review goes",
+];
+
 describe("walking through the tour (IR-997)", () => {
   it("shows one step at a time, with progress, Next and Previous", async () => {
     const user = userEvent.setup();
     openWorkspace();
     await user.click(screen.getByRole("button", { name: "Start tour" }));
 
-    expect(progress()).toBe("Step 1 of 3");
+    expect(progress()).toBe(`Step 1 of ${REVIEWER_WALK.length}`);
     expect(stepTitle()).toBe("The paper");
     expect(screen.getByRole("button", { name: "Previous" })).toBeDisabled();
 
     await user.click(screen.getByRole("button", { name: "Next" }));
-    expect(progress()).toBe("Step 2 of 3");
-    expect(stepTitle()).toBe("Review pane sections");
+    expect(progress()).toBe(`Step 2 of ${REVIEWER_WALK.length}`);
+    expect(stepTitle()).toBe("Where the review stands");
 
     await user.click(screen.getByRole("button", { name: "Previous" }));
-    expect(progress()).toBe("Step 1 of 3");
+    expect(progress()).toBe(`Step 1 of ${REVIEWER_WALK.length}`);
   });
 
-  it("names Changes on the first version too, since it is always a tab (IR-1139)", async () => {
+  it("gives every tab a step of its own, in the row's order (IR-1309)", async () => {
+    const user = userEvent.setup();
+    openWorkspace();
+    await user.click(screen.getByRole("button", { name: "Start tour" }));
+    expect(await walk(user)).toEqual(REVIEWER_WALK);
+  });
+
+  it("keeps a step for Changes on the first version too, since it is always a tab (IR-1139)", async () => {
     const user = userEvent.setup();
     openWorkspace({ versions: 1 });
     await user.click(screen.getByRole("button", { name: "Start tour" }));
-    await user.click(screen.getByRole("button", { name: "Next" }));
-    const step = within(screen.getByRole("dialog", { name: "Review workspace tour" }));
-    expect(step.getByText(/Conversation/)).toBeInTheDocument();
-    expect(step.getByText(/Threads/)).toBeInTheDocument();
-    expect(step.getByText(/Changes/)).toBeInTheDocument();
-  });
-
-  it("describes Changes once there are two Versions to compare", async () => {
-    const user = userEvent.setup();
-    openWorkspace({ versions: 2 });
-    await user.click(screen.getByRole("button", { name: "Start tour" }));
-    await user.click(screen.getByRole("button", { name: "Next" }));
-    expect(within(screen.getByRole("dialog", { name: "Review workspace tour" })).getByText(/Changes/)).toBeInTheDocument();
+    expect(await walk(user)).toContain("Changes");
   });
 
   it("finishes on the last step with Done, and closes", async () => {
     const user = userEvent.setup();
     openWorkspace();
     await user.click(screen.getByRole("button", { name: "Start tour" }));
-    for (let i = 0; i < 2; i += 1) await user.click(screen.getByRole("button", { name: "Next" }));
-    expect(progress()).toBe("Step 3 of 3");
+    await walk(user);
+    expect(progress()).toBe(`Step ${REVIEWER_WALK.length} of ${REVIEWER_WALK.length}`);
     expect(screen.queryByRole("button", { name: "Next" })).toBeNull();
     await user.click(screen.getByRole("button", { name: "Done" }));
     expect(tourDialog()).toBeNull();
@@ -150,8 +167,8 @@ describe("walking through the tour (IR-997)", () => {
     const user = userEvent.setup();
     openWorkspace({ reader: false });
     await user.click(screen.getByRole("button", { name: "Start tour" }));
-    expect(progress()).toBe("Step 1 of 2");
-    expect(stepTitle()).toBe("Review pane sections");
+    expect(progress()).toBe(`Step 1 of ${REVIEWER_WALK.length - 1}`);
+    expect(stepTitle()).toBe("Where the review stands");
   });
 
   it("points a narrow workspace at the launcher, since the pane is closed", async () => {
@@ -182,31 +199,101 @@ describe("walking through the tour (IR-997)", () => {
 
     // The paper sits behind the open drawer, so its step goes.
     await user.click(screen.getByRole("button", { name: "Open review pane" }));
-    expect(progress()).toBe("Step 1 of 2");
-    expect(stepTitle()).toBe("Review pane sections");
+    expect(progress()).toBe(`Step 1 of ${REVIEWER_WALK.length - 1}`);
+    expect(stepTitle()).toBe("Where the review stands");
   });
 
-  it("ends on Your part, and has no step for a People & details column that is gone (IR-1094)", async () => {
+  it("ends on Your part and how a review goes, with no People & details column step (IR-1094, IR-1309)", async () => {
     widthOf(1000);
     const user = userEvent.setup();
     openWorkspace();
     await user.click(screen.getByRole("button", { name: "Start tour" }));
-    for (let i = 0; i < 2; i += 1) await user.click(screen.getByRole("button", { name: "Next" }));
-    expect(stepTitle()).toBe("Your part");
+    const titles = await walk(user);
+    expect(titles.slice(-2)).toEqual(["Your part", "How a review goes"]);
+    expect(titles).not.toContain("People & details");
+    const step = within(screen.getByRole("dialog", { name: "Review workspace tour" }));
+    expect(step.getByText("1. Claim or start it")).toBeInTheDocument();
+    expect(step.getByText("3. Finish review")).toBeInTheDocument();
   });
 
-  it("mentions the columns button only where a tab may open on the right (IR-1094)", async () => {
+  it("gives the columns button a step only where a tab may open on the right (IR-1094, IR-1309)", async () => {
     const user = userEvent.setup();
     for (const [width, offered] of [[1000, false], [1400, true]] as const) {
       widthOf(width);
       const { unmount } = openWorkspace();
       await user.click(screen.getByRole("button", { name: "Take a tour" }));
-      await user.click(screen.getByRole("button", { name: "Next" }));
-      const step = within(screen.getByRole("dialog", { name: "Review workspace tour" }));
-      expect(step.getByText(/Details/)).toBeInTheDocument();
-      expect(step.queryByText(/Columns button/) !== null).toBe(offered);
+      expect((await walk(user)).includes("Two tabs side by side")).toBe(offered);
       unmount();
     }
+  });
+
+  it("describes a tab moved to the right column there, not in the row (IR-1309)", async () => {
+    localStorage.setItem("iris-review-side-tab", "threads");
+    widthOf(1400);
+    const user = userEvent.setup();
+    openWorkspace();
+    await user.click(screen.getByRole("button", { name: "Take a tour" }));
+    const titles = await walk(user);
+    expect(titles).toContain("Threads, on the right");
+    expect(titles).not.toContain("Threads");
+  });
+});
+
+describe("what the steps explain (IR-1309)", () => {
+  it("tells a reviewer who may start a thread how to comment on a passage", async () => {
+    const user = userEvent.setup();
+    openWorkspace({ caps: ["comment_review", "start_thread"] });
+    await user.click(screen.getByRole("button", { name: "Start tour" }));
+    const step = within(screen.getByRole("dialog", { name: "Review workspace tour" }));
+    expect(step.getByText("Comment on a passage")).toBeInTheDocument();
+    expect(step.getByText(/press C or the Comment button/)).toBeInTheDocument();
+    expect(step.getByText("Pins")).toBeInTheDocument();
+  });
+
+  it("does not offer commenting on a passage to a reviewer who may not start a thread", async () => {
+    const user = userEvent.setup();
+    openWorkspace({ caps: ["comment_review"] });
+    await user.click(screen.getByRole("button", { name: "Start tour" }));
+    const step = within(screen.getByRole("dialog", { name: "Review workspace tour" }));
+    expect(step.queryByText("Comment on a passage")).toBeNull();
+    expect(step.getByText("Pins")).toBeInTheDocument();
+  });
+
+  it("explains drafts in Threads only while new threads can wait as drafts", async () => {
+    const user = userEvent.setup();
+    const cases: [Capability[], boolean][] = [
+      [["comment_review", "start_thread"], false],
+      [["comment_review", "start_thread", "finish_review"], true],
+    ];
+    for (const [caps, drafting] of cases) {
+      const { unmount } = openWorkspace({ caps });
+      await user.click(screen.getByRole("button", { name: "Take a tour" }));
+      const step = await stepNamed(user, "Threads");
+      expect(step.getByText("Start a thread")).toBeInTheDocument();
+      expect(step.queryByText("Drafts") !== null).toBe(drafting);
+      await user.click(screen.getByRole("button", { name: "Skip tour" }));
+      unmount();
+    }
+  });
+
+  it("explains the pane's header, with the resize edge only where it exists", async () => {
+    const user = userEvent.setup();
+    for (const [width, edge] of [[1000, true], [700, false]] as const) {
+      widthOf(width);
+      const { unmount } = openWorkspace();
+      if (width === 700) await user.click(screen.getByRole("button", { name: "Open review pane" }));
+      await user.click(screen.getByRole("button", { name: "Take a tour" }));
+      const step = await stepNamed(user, "Where the review stands");
+      expect(step.getByText("With …")).toBeInTheDocument();
+      expect(step.queryByText("Pane width") !== null).toBe(edge);
+      await user.click(screen.getByRole("button", { name: "Skip tour" }));
+      unmount();
+    }
+  });
+
+  it("no longer promises a fixed number of steps in the offer", () => {
+    openWorkspace();
+    expect(screen.getByRole("group", { name: "Guided tour" })).not.toHaveTextContent(/four-step/);
   });
 });
 
@@ -254,7 +341,7 @@ describe("leaving the tour (IR-997)", () => {
     await user.click(screen.getByRole("button", { name: "Start tour" }));
     await user.click(screen.getByRole("button", { name: "Skip tour" }));
     await user.click(screen.getByRole("button", { name: "Take a tour" }));
-    expect(progress()).toBe("Step 1 of 3");
+    expect(progress()).toBe(`Step 1 of ${REVIEWER_WALK.length}`);
   });
 
   it("has no blocking accessibility violations while open", async () => {

@@ -15,6 +15,8 @@ export const readingVariants = {
   "overview-wide": "@container overview (min-width: 64rem)",
   // Past a phone's width: the Overview's title takes its larger size (IR-1264).
   "overview-roomy": "@container overview (min-width: 40rem)",
+  // Ask IRIS's starter questions sit two to a row once their own box has room (IR-1306).
+  "starters-wide": "@container starters (min-width: 34rem)",
   // A handbook page (Guidelines, Setup, Workflow analytics): its Contents rail
   // sits beside the column once the page's own box has room for both, so the
   // sidebar opening changes the layout as surely as a narrower window does.
@@ -33,7 +35,7 @@ export default {
   ],
 
   theme: {
-    // Three corner radii (IR-1043; 01-design-system.md "Radius, shadow, spacing").
+    // Three corner radii, plus the tours' spotlight (IR-1043, IR-1344; 01-design-system.md "Radius, shadow, spacing").
     // Named for what the shape is, so a reviewer can say a card has the wrong
     // one. This REPLACES Tailwind's scale rather than extending it, so `rounded`,
     // `rounded-lg` and the rest emit no CSS at all; `src/test/radius.test.ts`
@@ -46,6 +48,9 @@ export default {
       card:    "1rem",
       // Modals, sheets and the dialogs' bottom sheet.
       dialog:  "1.25rem",
+      // The guided tours' highlight around a step's target (IR-1344): a white
+      // cut-out on a dark overlay reads much rounder than a row at 12 px.
+      spotlight: "0.375rem",
       full:    "9999px",
     },
 
@@ -356,6 +361,13 @@ export default {
           "0%":   { opacity: "0" },
           "100%": { opacity: "1" },
         },
+        // A research verb arriving (IR-1306): it rises out of a soft focus, like
+        // a line coming clear on the page, instead of popping in.
+        "verb-in": {
+          "0%":   { opacity: "0", transform: "translateY(0.45em)", filter: "blur(3px)" },
+          "100%": { opacity: "1", transform: "translateY(0)", filter: "blur(0)" },
+        },
+
         // A citation's passage briefly reads stronger on arrival, so a
         // reader's eye finds it on the page rather than searching for a
         // static box among the surrounding text (IR-335). Maroon, the colour of
@@ -395,6 +407,7 @@ export default {
         "fade-in-up": "fade-in-up 0.3s ease-out",
         "fade-in":    "fade-in 0.2s ease-out",
         "citation-flash": "citation-flash 1.6s ease-out",
+        "verb-in": "verb-in 380ms cubic-bezier(0.16, 1, 0.3, 1) backwards",
       },
     },
   },

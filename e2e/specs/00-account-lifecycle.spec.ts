@@ -4,7 +4,7 @@
 // emailed link, and (in the idle pass only) inactivity expiry followed by
 // explicit reauthentication.
 import { expect, test } from "@playwright/test";
-import { as, login } from "../support/api";
+import { REFRESH_COOKIE, as, login, placeSession } from "../support/api";
 import { A11yLedger } from "../support/a11y";
 import { linkPath, waitForMail } from "../support/mailpit";
 import { NEW_PASSWORD, approveRole, freshEmail, letters } from "../support/people";
@@ -101,10 +101,15 @@ test("three wrong passwords lock the account, and the screen says what the serve
     await page.getByLabel("Email Address").fill(email);
     await page.getByLabel("Password", { exact: true }).fill(`wrong-${i}-password`);
     await page.getByRole("button", { name: "Sign in" }).click();
-    // The first two are inline errors; the third is the lockout itself, which
-    // the login screen shows as an "Account Locked" dialog with the server's
-    // own countdown and disables the form behind it.
-    if (i < 2) await expect(page.getByRole("alert").first()).toBeVisible();
+    // The first two say so in a dialog the reader closes (IR-1303); the third
+    // is the lockout itself, which the login screen shows as an "Account
+    // Locked" dialog with the server's own countdown and disables the form
+    // behind it.
+    if (i < 2) {
+      const refused = page.getByRole("alertdialog", { name: "Invalid email or password" });
+      await expect(refused).toContainText(`Attempt ${i + 1} of 3`);
+      await refused.getByRole("button", { name: "Close" }).click();
+    }
   }
   const notice = page.getByRole("dialog", { name: "Account Locked" });
   await expect(notice).toBeVisible();
@@ -135,7 +140,10 @@ test("recovery by emailed link sets a new password and ends old sessions", async
   await expect(page.getByRole("link", { name: "Return to sign in" })).toBeVisible();
 
   const anon = await (await import("../support/api")).anonymous();
-  const stale = await anon.post("/api/v1/auth/token/refresh/", { data: { refresh: earlierRefresh } });
+  // ADR-072: refresh reads the cookie and asks for the app's own header.
+  const stale = await anon.post("/api/v1/auth/token/refresh/", {
+    headers: { Cookie: `${REFRESH_COOKIE}=${earlierRefresh}`, "X-IRIS-Auth": "1" },
+  });
   expect(stale.status(), "a session from before the reset is ended").toBe(401);
   // ADR-045 §1: a reset leaves the axes lockout as it was, so even the new
   // password waits it out. Lifting it (as the cool-off would) lets it in.
@@ -154,7 +162,7 @@ test("inactivity ends the session and the next request needs reauthentication", 
   const minutes = Number(process.env.E2E_IDLE_MINUTES ?? 2);
   test.setTimeout((minutes + 3) * 60_000);
   const session = await login("student@iris.test");
-  await page.addInitScript((r) => sessionStorage.setItem("iris_refresh_token", r), session.refresh);
+  await placeSession(page, session);
   await page.goto("/");
   await page.waitForTimeout((minutes + 1) * 60_000);
   await page.reload();

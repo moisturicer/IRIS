@@ -72,10 +72,16 @@ class SeatTestBase(ThreadTestBase):
         slot = UploadSlot.objects.get_or_create(
             name="Ethics Clearance", record_type=record.record_type, record=None,
         )[0]
-        return self.post(
+        response = self.post(
             reverse("record-document-requests", args=[record.pk]), as_user,
             {"message": "Please send the signed forms.", "items": [{"slot": slot.pk}]},
         )
+        if response.status_code == status.HTTP_201_CREATED:
+            # A draft until Finish review sends it (ADR-022 Amendment 9, IR-1325).
+            from apps.documents.testing import send_drafted_requests
+
+            send_drafted_requests(self, record, as_user, response.data["party"])
+        return response
 
     def withdraw_request(self, request_id, as_user):
         self.client.force_authenticate(as_user)

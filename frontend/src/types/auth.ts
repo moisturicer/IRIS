@@ -66,6 +66,18 @@ export interface User {
   research_interests?: string[];
   /** Relative to the API base, fetched with auth as a blob. Never an open media URL. */
   photo_url?:          string | null;
+  /**
+   * The student guided tours this person has been shown (IR-1342). Own
+   * payload only, like `review_access`, and written only through
+   * `accountsApi.markTourSeen`. Absent means "not known": no tour starts.
+   */
+  tours_seen?:         string[];
+  /**
+   * "Don't show tours again" (IR-1349): while true no student tour starts by
+   * itself. Own payload only, written only through `accountsApi.setToursOff`.
+   * Absent reads as false.
+   */
+  tours_off?:          boolean;
 }
 
 export interface OwnRoleRequest {

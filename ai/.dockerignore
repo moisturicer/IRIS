@@ -1,0 +1,11 @@
+# IR-1320: the server's ai/.env holds vendor keys and the runtime login. The
+# services get them from Compose's env_file, never from a file in the image,
+# and ai-migrate must not carry them at all (ADR-014). The settings read
+# /app/.env, which never existed, so leaving ai/.env out changes nothing that
+# runs.
+.env
+.env.*
+!.env.example
+__pycache__/
+*.pyc
+.pytest_cache/

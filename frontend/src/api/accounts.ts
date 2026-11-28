@@ -128,6 +128,17 @@ export const accountsApi = {
   changeAiAnswer: (data: { ai_consent: boolean; papers?: "all" | "from_now" }) =>
     apiClient.post<{ answer: NoticeAnswer; changed: boolean; papers_updated: number }>("/users/me/ai-answer/", data),
 
+  /**
+   * The caller has been shown one student tour (IR-1342). Idempotent; the
+   * server knows the keys and answers 400 for any other.
+   */
+  markTourSeen: (key: string) =>
+    apiClient.post<{ tours_seen: string[] }>(`/users/me/tours/${encodeURIComponent(key)}/`, {}),
+
+  /** The caller's "Don't show tours again" (IR-1349). */
+  setToursOff: (off: boolean) =>
+    apiClient.put<{ tours_off: boolean }>("/users/me/tours-off/", { off }),
+
   /** One JSON file of the caller's own data (ADR-051 decision 13, IR-786). */
   downloadMyData: () => apiClient.get<Blob>("/users/me/data/", { responseType: "blob" }),
 

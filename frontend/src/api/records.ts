@@ -6,7 +6,7 @@ import type {
   Classification, PSCEDClassification, RecordType,
   DownloadRequest, ReaderDownloadRequest, DeleteRequest, RecordTracker, ReviewComment, MentionedPerson,
   ThreadSeverity, ThreadAnchor, FinishReviewRequest, ReviewCommentKind,
-  DocumentRequest, DocumentRequestItemDecision, DocumentRequestItemInput,
+  DocumentRequest, DocumentRequestItemInput,
   DocumentRequestSlot, DecisionOutcome, OfficeReviewOutcome, Party, RouteOptions, RouteRequest,
   DiscoverInterests, ForYouPage, MetadataSuggestions, VersionComparisonPayload, ResponseLetter,
   PublicComment, PublicCommentReportReason, PublicCommentsResponse,
@@ -178,9 +178,6 @@ export const recordsApi = {
     id: number,
     body: { message: string; items: DocumentRequestItemInput[]; party?: Party },
   ) => apiClient.post<DocumentRequest>(`/records/${id}/document-requests/`, body),
-  /** The requesting party accepts or rejects one upload; answers with the request. */
-  decideDocumentRequestItem: (itemId: number, body: DocumentRequestItemDecision) =>
-    apiClient.patch<DocumentRequest>(`/document-request-items/${itemId}/`, body),
   /** The requesting party withdraws an open request (IR-263). No reason is recorded. */
   withdrawDocumentRequest: (requestId: number) =>
     apiClient.patch<DocumentRequest>(`/document-requests/${requestId}/`, { action: "withdraw" }),
@@ -221,6 +218,9 @@ export const recordsApi = {
    */
   submitNewVersion: (id: number) =>
     apiClient.post<RecordTracker>(`/records/${id}/new-version/`),
+  /** *Submit added documents* (ADR-022 Amendment 8, IR-1322): send every held upload. */
+  sendDocuments: (id: number) =>
+    apiClient.post<{ sent: number; requests_fulfilled: number }>(`/records/${id}/documents/send/`),
   /** The picklist: the record type's upload slots. */
   documentRequestSlots: (id: number) =>
     apiClient.get<DocumentRequestSlot[]>(`/records/${id}/document-requests/slots/`),

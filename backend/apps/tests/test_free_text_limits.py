@@ -139,17 +139,8 @@ class DocumentRequestLimitTests(ItemDecisionBase):
         self.assertIn(LIMIT_MESSAGE, message_of(response))
         self.assertFalse(DocumentRequest.objects.filter(record=record).exists())
 
-    def test_a_rejection_reason_over_the_limit_is_refused_and_the_item_kept(self):
-        # The reason is checked before the item's state, so no upload is needed
-        # (and none can be made where the PDF checker isn't available).
-        record = self.at_parallel_review()
-        [item] = self.requested(record, self.ierc, [{"label": "Consent form"}])["items"]
-        item_id = item["id"]
-        before = self.item_state(item_id)
-        response = self.decide(item_id, self.ierc, "reject", TOO_LONG)
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
-        self.assertIn(LIMIT_MESSAGE, message_of(response))
-        self.assertEqual(self.item_state(item_id), before)
+    # The rejection-reason limit test went with the reject action
+    # (ADR-022 Amendment 10, IR-1338): nothing is rejected any more.
 
 
 class DeletionRejectionReasonLimitTests(DeletionBase):

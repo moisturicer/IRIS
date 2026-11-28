@@ -16,7 +16,7 @@ import { Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { importedReference } from "@/test/fixtures/importedReference";
 import { pretendLaidOut } from "@/test/layout";
-import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
+import { act, renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
 import { recordsApi } from "@/api/records";
 import { peopleApi } from "@/api/people";
 import { RequestTimeoutError } from "@/api/requestPolicy";
@@ -27,6 +27,8 @@ import type { ForYouItem, RecordListItem } from "@/types/records";
 import type { User } from "@/types/auth";
 
 import DiscoverPage from "./DiscoverPage";
+import { accountsApi } from "@/api/accounts";
+import { useTourSession } from "@/features/onboarding/tourSession";
 
 function listItem(overrides: Partial<RecordListItem>): RecordListItem {
   return {
@@ -139,6 +141,7 @@ vi.mock("@/api/accounts", () => ({
   accountsApi: {
     colleges: vi.fn(() => page([{ id: 4, name: "College of Engineering" }])),
     departments: vi.fn(() => page([{ id: 8, name: "Computer Studies", college: 4, college_name: "College of Engineering" }])),
+    markTourSeen: vi.fn(() => Promise.resolve({ data: { tours_seen: ["discover"] } })),
   },
 }));
 
@@ -557,6 +560,31 @@ describe("browsing", () => {
       q: "climate", page: 1, page_size: 20, college: 4, department: 8, role: "Student",
     }));
     await expectNoBlockingA11yViolations(container);
+  });
+
+  // IR-1313: a filter keeps one width from `sm` up, whatever its options, so
+  // choosing a College (which reloads Departments) moves nothing beside it.
+  it("gives each People filter a fixed width that holds its longest name, and names the choice on hover", async () => {
+    people = [discoverPerson(1)];
+    renderDiscover();
+    await userEvent.click(screen.getByRole("button", { name: "People" }));
+
+    const college = screen.getByRole("combobox", { name: "College" });
+    const department = screen.getByRole("combobox", { name: "Department" });
+    const role = screen.getByRole("combobox", { name: "Role" });
+    for (const [box, width] of [[college, "sm:w-[26rem]"], [department, "sm:w-64"], [role, "sm:w-36"]] as const) {
+      expect(box.closest("label")).toHaveClass("w-full", width);
+      expect(box).toHaveClass("w-full");
+      expect(box.className).not.toMatch(/min-w-/);
+    }
+    expect(college).toHaveAttribute("title", "All colleges");
+
+    await screen.findByRole("option", { name: "College of Engineering" });
+    await userEvent.selectOptions(college, "4");
+    expect(college).toHaveAttribute("title", "College of Engineering");
+    await userEvent.selectOptions(await screen.findByRole("combobox", { name: "Department" }), "8");
+    expect(screen.getByRole("combobox", { name: "Department" })).toHaveAttribute("title", "Computer Studies");
+    expect(screen.getByRole("combobox", { name: "College" }).closest("label")).toHaveClass("sm:w-[26rem]");
   });
 
   it("keeps Discover usable when the people-search response has a malformed person, and offers Try again on the People tab", async () => {
@@ -1747,5 +1775,116 @@ describe("a question is offered Ask IRIS (IR-1095)", () => {
     const marked = [...card.querySelectorAll("mark")].map((m) => m.textContent);
     // The title, then the abstract.
     expect(marked).toEqual(["Dengue", "Dengue", "weather"]);
+  });
+});
+
+describe("a new student's Discover tour (IR-1342)", () => {
+  function signInNewStudent(role = "Student") {
+    signInAs(role);
+    const user = useAuthStore.getState().user!;
+    useAuthStore.setState({ user: { ...user, tours_seen: [] } });
+  }
+
+  beforeEach(() => useTourSession.getState().reset());
+
+  it("opens on the first visit once the results are in, and Skip tour marks it seen once", async () => {
+    signInNewStudent();
+    renderDiscover();
+
+    const tour = await screen.findByRole("dialog", { name: "Discover tour" });
+    expect(tour).toHaveTextContent("Welcome to IRIS");
+    await expectNoBlockingA11yViolations(document.body);
+    await userEvent.click(within(tour).getByRole("button", { name: "Skip tour" }));
+    expect(screen.queryByRole("dialog", { name: "Discover tour" })).not.toBeInTheDocument();
+    expect(accountsApi.markTourSeen).toHaveBeenCalledTimes(1);
+    expect(accountsApi.markTourSeen).toHaveBeenCalledWith("discover");
+  });
+
+  it("waits while the first read is pending, and posts nothing", async () => {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    vi.mocked(recordsApi.list).mockImplementation(() => held.then(() => page(listed)) as never);
+    vi.mocked(recordsApi.forYou).mockImplementation(() => held.then(() => ({ data: recommended })) as never);
+    signInNewStudent();
+    renderDiscover();
+
+    await screen.findByRole("heading", { name: "Discover", level: 1 });
+    expect(screen.queryByRole("dialog", { name: "Discover tour" })).not.toBeInTheDocument();
+    expect(accountsApi.markTourSeen).not.toHaveBeenCalled();
+
+    release();
+    expect(await screen.findByRole("dialog", { name: "Discover tour" })).toBeInTheDocument();
+  });
+
+  it("does not open once seen", async () => {
+    signInAs("Student");
+    useAuthStore.setState({ user: { ...useAuthStore.getState().user!, tours_seen: ["discover"] } });
+    renderDiscover();
+    await screen.findByRole("heading", { name: publishedThesis.title });
+    expect(screen.queryByRole("dialog", { name: "Discover tour" })).not.toBeInTheDocument();
+  });
+
+  it.each(["Adviser", "RDCO", "KTTO"])("never opens for %s", async (role) => {
+    signInNewStudent(role);
+    renderDiscover();
+    await screen.findByRole("heading", { name: publishedThesis.title });
+    expect(screen.queryByRole("dialog", { name: "Discover tour" })).not.toBeInTheDocument();
+    expect(accountsApi.markTourSeen).not.toHaveBeenCalled();
+  });
+});
+
+describe("read again when the tab is shown (ADR-073 amendment 2026-11-28, IR-1351)", () => {
+  const solarDryers = listItem({ id: 2, title: "Solar Dryers for Rural Farms" });
+  const shown = () => act(() => { window.dispatchEvent(new Event("focus")); });
+  const listCalls = () => vi.mocked(recordsApi.list).mock.calls.length;
+  const settle = () => act(async () => { await new Promise((resolve) => setTimeout(resolve, 700)); });
+
+  it("shows a paper published meanwhile, keeping the search and filters", async () => {
+    renderDiscover("/?q=humidity&type=1");
+    await screen.findByText(publishedThesis.title);
+
+    listed = [solarDryers, publishedThesis];
+    shown();
+
+    expect(await screen.findByText(solarDryers.title)).toBeInTheDocument();
+    expect(screen.getByText(publishedThesis.title)).toBeInTheDocument();
+    expect(lastListParams()).toMatchObject({ search: "humidity", record_type: "1", page: 1 });
+    expect(screen.getByRole("textbox", { name: "Search records" })).toHaveValue("humidity");
+  });
+
+  it("keeps the results when the read fails, with no error shown", async () => {
+    renderDiscover();
+    await screen.findByText(publishedThesis.title);
+    const before = listCalls();
+
+    vi.mocked(recordsApi.list).mockImplementationOnce(() => Promise.reject(new Error("offline")));
+    shown();
+
+    await waitFor(() => expect(listCalls()).toBe(before + 1));
+    expect(screen.getByText(publishedThesis.title)).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("waits while the reader is in the search box", async () => {
+    renderDiscover();
+    await screen.findByText(publishedThesis.title);
+    await userEvent.click(screen.getByRole("textbox", { name: "Search records" }));
+    const before = listCalls();
+
+    shown();
+    await settle();
+    expect(listCalls()).toBe(before);
+  });
+
+  it("leaves Best's recommendations alone", async () => {
+    renderDiscover("/?feed=for_you");
+    await screen.findByText(publishedThesis.title);
+    const feedCalls = vi.mocked(recordsApi.forYou).mock.calls.length;
+    const before = listCalls();
+
+    shown();
+    await settle();
+    expect(vi.mocked(recordsApi.forYou).mock.calls.length).toBe(feedCalls);
+    expect(listCalls()).toBe(before);
   });
 });

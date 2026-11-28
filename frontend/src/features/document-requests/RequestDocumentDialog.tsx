@@ -124,8 +124,9 @@ export function RequestDocumentDialog({
               Request documents
             </h2>
             <p className="text-xs text-stone-600 mt-1 leading-relaxed">
-              The owner is asked to upload these. The record stays in review and no clearance
-              changes — use this instead of Request Revision when only a file is missing.
+              Added to your review, not sent yet. The owner is asked for these when you finish
+              your review with Request changes or Comment only. The record stays in review and no
+              clearance changes.
             </p>
           </div>
 
@@ -224,7 +225,7 @@ export function RequestDocumentDialog({
               disabled={sending}
               className="px-4 py-2 rounded-control bg-brand text-white text-sm font-bold hover:bg-brand-light disabled:opacity-60"
             >
-              {sending ? "Sending…" : "Send request"}
+              {sending ? "Adding…" : "Add to review"}
             </button>
           </div>
         </form>

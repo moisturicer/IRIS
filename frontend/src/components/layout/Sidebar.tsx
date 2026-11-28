@@ -1,4 +1,5 @@
 import { forwardRef, useEffect, useRef, useState } from "react";
+import { isControl } from "@/components/ui/isControl";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { dashboardApi, type QueueCounts } from "@/api/dashboard";
 import { onQueueCountsChanged } from "@/lib/queueCounts";
@@ -397,6 +398,10 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
       aria-label="Sidebar"
       // React 18 has no `inert` prop; an empty string sets the attribute.
       {...(inert ? { inert: "" } : {})}
+      // Collapsed, a press on its empty space opens it again (IR-1306). Links,
+      // buttons and the account menu keep their own job; the toggle stays the
+      // keyboard's way in.
+      onClick={collapsed ? (e) => { if (!isControl(e.target)) onToggle(); } : undefined}
       className={cn(
         // Below md: a 256px drawer over the page. From md: 256px, or the 76px
         // rail when collapsed. AppShell's left margin follows the same widths,
@@ -407,7 +412,7 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
         // `shell` carries transform (the drawer's slide) and width (the rail)
         // together; AppShell sets the translate classes, not a transition.
         "transition-shell duration-200 ease-out motion-reduce:transition-none",
-        collapsed ? "md:w-rail" : "md:w-64",
+        collapsed ? "md:w-rail md:cursor-e-resize" : "md:w-64",
         mode === "rail" && !collapsed && "shadow-card-md",
         className,
       )}

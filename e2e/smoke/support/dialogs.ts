@@ -10,7 +10,7 @@
 // dialog-coverage.spec.ts, so a new dialog cannot ship without a decision.
 import type { Locator, Page, Route } from "@playwright/test";
 import type { MockApi } from "./mock-api";
-import { PAPER, PAPER_DETAIL, paginated, type SmokeRole } from "./fixtures";
+import { account, PAPER, PAPER_DETAIL, paginated, type SmokeRole } from "./fixtures";
 import { ADVISERS_TEMPLATES, GUIDELINES, OPPORTUNITY } from "./screens";
 
 export interface DialogCase {
@@ -30,6 +30,13 @@ export interface DialogCase {
   /** The dialog itself. */
   dialog: (page: Page) => Locator;
 }
+
+/** A student who has seen every tour but `key` (IR-1342), so only that one starts. */
+const newStudent = (key: string) => (api: MockApi) => {
+  const keys = ["discover", "library", "ask", "calls", "guidelines", "notifications", "publish"];
+  api.on("GET", "/users/me/", { ...account("Student"), tours_seen: keys.filter((k) => k !== key) });
+  api.on("POST", `/users/me/tours/${key}/`, { tours_seen: keys });
+};
 
 const anyDialog = (page: Page) => page.locator('[role="dialog"], [role="alertdialog"]').last();
 const press = (name: string | RegExp) => async (page: Page) => {
@@ -227,6 +234,20 @@ export const DIALOGS: DialogCase[] = [
     override: (api) => api.on("GET", "/users/advisers/", paginated([])),
     open: press("Publish"), dialog: anyDialog,
   },
+  // IR-1342: a new student's tours start by themselves, so `open` only waits for them.
+  {
+    id: "the discover tour", screen: "discover", sources: ["components/tour/GuidedTour.tsx"],
+    override: newStudent("discover"),
+    open: async () => {}, dialog: (page) => page.getByRole("dialog", { name: "Discover tour" }),
+  },
+  {
+    id: "the publish tour", screen: "discover", path: "/?publish=new", sources: ["components/tour/GuidedTour.tsx"],
+    override: (api) => {
+      newStudent("publish")(api);
+      api.on("GET", "/users/advisers/", paginated([]));
+    },
+    open: async () => {}, dialog: (page) => page.getByRole("dialog", { name: "Publish tour" }),
+  },
   // IR-973: Publish's Documents step, as wide as a laptop and as narrow as 320 px.
   publishDocuments("publish documents step"),
   publishDocuments("publish documents step at 320 px", { width: 320, height: 800 }),
@@ -393,6 +414,47 @@ export const DIALOGS: DialogCase[] = [
     open: async () => {},
     dialog: (page) => page.getByRole("dialog", { name: "Session Expired" }),
   },
+  // IR-1324: Saved Papers names a new folder, and renames one, in a dialog.
+  {
+    id: "name a new folder", screen: "my-library", path: "/records/mine?section=saved",
+    sources: ["features/library/ReadingPanel.tsx"],
+    open: press("Folder"),
+    dialog: (page) => page.getByRole("dialog", { name: "New folder" }),
+  },
+  {
+    id: "rename a folder", screen: "my-library", path: "/records/mine?section=saved",
+    sources: ["features/library/ReadingPanel.tsx"],
+    override: (api) => api.on("GET", "/library/folders/", { limit: 10, results: [
+      { id: 1, name: "Thesis", record_ids: [], created_at: "2026-11-01T08:00:00+08:00", updated_at: "2026-11-01T08:00:00+08:00" },
+    ] }),
+    open: fromRowMenu("Rename"),
+    dialog: (page) => page.getByRole("dialog", { name: "Rename folder" }),
+  },
+  // IR-1331: reading history is a pop-up over the Overview, and clearing asks once more.
+  {
+    id: "reading history", screen: "my-library",
+    sources: ["features/library/HistoryDialog.tsx"],
+    override: (api) => api.on("GET", "/library/history/", { results: [
+      { record_id: PAPER.id, available: true, viewed_at: "2026-11-20T08:00:00+08:00", record: PAPER },
+      { record_id: 77, available: false },
+    ] }),
+    open: press(/^Manage history/),
+    dialog: (page) => page.getByRole("dialog", { name: "History" }),
+  },
+  {
+    id: "clear chosen papers from history", screen: "my-library",
+    sources: ["features/library/HistoryDialog.tsx"],
+    override: (api) => api.on("GET", "/library/history/", { results: [
+      { record_id: PAPER.id, available: true, viewed_at: "2026-11-20T08:00:00+08:00", record: PAPER },
+      { record_id: 77, available: false },
+    ] }),
+    open: async (page) => {
+      await press(/^Manage history/)(page);
+      await page.getByRole("checkbox", { name: `Select ${PAPER.title}` }).check();
+      await press("Clear history")(page);
+    },
+    dialog: (page) => page.getByRole("dialog", { name: "Clear 1 paper from your history?" }),
+  },
   {
     id: "ask again for a download", screen: "my-library", path: "/records/mine?section=downloads",
     sources: ["components/records/DownloadRequestModal.tsx"],
@@ -404,7 +466,7 @@ export const DIALOGS: DialogCase[] = [
   },
   {
     id: "delete a draft", screen: "my-library", path: "/records/mine?section=research",
-    sources: ["features/library/DeleteDraft.tsx"],
+    sources: ["features/library/DeleteRecord.tsx"],
     override: (api) => api.on("GET", "/records/mine/", [{
       id: 12, title: "Community Water Monitoring", authors: [{ id: 1, name: "Lee Cruz", role: null }],
       adviser_name: "Dr Santos", record_type_name: "Thesis / Research", pipeline_status: "draft",
@@ -462,7 +524,10 @@ export const DIALOGS: DialogCase[] = [
     open: press(button), dialog: anyDialog,
   })),
   {
-    id: "submit a new version", screen: "paper-view", sources: ["features/records/paper-view/NewVersionDialog.tsx"],
+    id: "submit a new version", screen: "paper-view",
+    sources: ["features/records/paper-view/NewVersionDialog.tsx"],
+    // Submitted from Review's Documents tab, where the owner uploads (IR-1318).
+    path: `/records/${PAPER.id}?section=review&documents=open`,
     override: (api) => {
       api.on("GET", `/records/${PAPER.id}/tracker/`, { ...TRACKER, workflow_state: "revision_requested", workflow_state_label: "Revision requested" });
       api.on("GET", `/records/${PAPER.id}/document-requests/`, []);
@@ -482,8 +547,8 @@ export const DIALOGS: DialogCase[] = [
   {
     id: "ask iris chat history on a narrow screen", screen: "ask-iris-conversation", sources: ["features/ai/components/ChatDrawer.tsx", "features/ai/RAGChatPage.tsx"],
     viewport: { width: 640, height: 900 },
-    // IR-1233: the one pane toggle, "Show conversations", opens this dialog at 640px and below.
-    open: press("Show conversations"), dialog: (page) => page.getByRole("dialog", { name: "Conversations" }),
+    // IR-1233: the one pane toggle, "Show history", opens this dialog at 640px and below.
+    open: press("Show history"), dialog: (page) => page.getByRole("dialog", { name: "History" }),
   },
   consoleAction("assign a reviewer", "Assign", "pool", "features/review/AssignReviewerDialog.tsx"),
   consoleAction("reassign a reviewer", "Reassign", "seat", "features/review/ReassignDialog.tsx"),
@@ -494,12 +559,17 @@ export const DIALOGS: DialogCase[] = [
   // Finish review (IR-875): the footer's one way to finish where `finish_review` is granted.
   reviewAction("finish a review", "finish_review", "Finish review…", "features/records/paper-view/threads/FinishReviewDialog.tsx"),
   // The guided tour (IR-997): a non-modal dialog opened from the pane header's Take a tour.
-  reviewAction("take the review workspace tour", "comment_review", "Take a tour", "features/records/paper-view/tour/GuidedTour.tsx"),
+  reviewAction("take the review workspace tour", "comment_review", "Take a tour", "components/tour/GuidedTour.tsx"),
   reviewAction("request a revision", "request_revision", "Request Revision…", "features/records/paper-view/RequestRevisionDialog.tsx"),
   reviewAction("clear a paper at an office", "office_review", "Clear…", "features/records/paper-view/OfficeReviewDialog.tsx"),
   reviewAction("record an office finding", "office_review", "Record finding…", "features/records/paper-view/OfficeReviewDialog.tsx"),
-  reviewAction("add a reviewer", "add_reviewer", "Add a colleague…", "features/records/paper-view/AddReviewerDialog.tsx",
+  // IR-1340: a "+ Add a colleague" link under the viewer's own office in Details → Reviewers.
+  reviewAction("add a reviewer", "add_reviewer", "Add a colleague to ITSO", "features/records/paper-view/AddReviewerDialog.tsx",
     (api) => {
+      api.on("GET", `/records/${PAPER.id}/tracker/`, { ...TRACKER, parties: [{
+        party: "itso", label: "ITSO", state: "active", state_label: "Active", at: null, outcome: null, outcome_label: null,
+        in_pool: false, seats: [], carryover: null, changes_requested: false,
+      }] });
       api.on("GET", `/records/${PAPER.id}/`, {
         ...PAPER_DETAIL, is_participant: true, workflow_state: "under_review", workflow_state_label: "Under review",
         stage_label: "Under review", capabilities: ["cite", "add_reviewer"],

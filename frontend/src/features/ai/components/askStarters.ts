@@ -21,3 +21,18 @@ export const PAPER_STARTERS: readonly string[] = [
   "What are the main findings and limitations of this paper?",
   "What does this paper say about its data?",
 ];
+
+/**
+ * What kind of question each starter is (IR-1306), shown above it so a reader
+ * can scan four questions by what they will get back. Presentation only.
+ */
+export const STARTER_KINDS: Readonly<Record<string, { kind: string; icon: string }>> = {
+  [ASK_STARTERS[0]]: { kind: "Topics", icon: "fa-shapes" },
+  [ASK_STARTERS[1]]: { kind: "Findings", icon: "fa-flask" },
+  [ASK_STARTERS[2]]: { kind: "Data", icon: "fa-database" },
+  [ASK_STARTERS[3]]: { kind: "Summary", icon: "fa-align-left" },
+  [PAPER_STARTERS[0]]: { kind: "Plain language", icon: "fa-align-left" },
+  [PAPER_STARTERS[1]]: { kind: "Method", icon: "fa-diagram-project" },
+  [PAPER_STARTERS[2]]: { kind: "Findings", icon: "fa-flask" },
+  [PAPER_STARTERS[3]]: { kind: "Data", icon: "fa-database" },
+};

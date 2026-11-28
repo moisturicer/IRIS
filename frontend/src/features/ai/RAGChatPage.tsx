@@ -6,7 +6,7 @@
  * opens read-only (`EarlierConversation`), so nothing a reader asked is lost,
  * and continuing it means asking again here.
  */
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useConsumeHandoff } from "@/lib/askHandoff";
 import { isAxiosError } from "axios";
@@ -20,12 +20,14 @@ import { EarlierConversation } from "./components/EarlierConversations";
 import { ChatToolbar } from "./components/ChatToolbar";
 import { ChatDrawer } from "./components/ChatDrawer";
 import {
-  ConversationHistoryList, ConversationSidebar, NewConversationButton, SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN,
+  ConversationHistoryList, ConversationSidebar, SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN,
   type RenameConversation,
 } from "./components/ConversationSidebar";
 import { ASK_PHONE_MAX_PX } from "./components/answerLayout";
 import { useConversationHistory } from "./hooks/useConversationHistory";
 import { CONNECTION_WIDE, type TroubleKind } from "./runtime/trouble";
+import { askTourSteps, TOUR_TARGETS } from "@/features/onboarding/studentTours";
+import { useStudentTour } from "@/features/onboarding/useStudentTour";
 
 const RUNTIME_ID = /^[0-9a-f-]{36}$/i;
 const SIDEBAR_KEY = "iris-ask-sidebar-width";
@@ -104,7 +106,8 @@ function RuntimeAskPage() {
   // closed to a strip, and the choice is kept per browser. On a phone it is a
   // dialog over the chat instead, closed whenever the page is.
   const phone = pageWidth > 0 && pageWidth <= ASK_PHONE_MAX_PX;
-  const paneId = useId();
+  // Fixed, not `useId`: the student tour points at the pane (IR-1342), and the page has one.
+  const paneId = TOUR_TARGETS.ask.history;
   const [paneOpen, setPaneOpen] = useState(readPaneOpen);
   const [dialogOpen, setDialogOpen] = useState(false);
   const dialogOpener = useRef<HTMLElement | null>(null);
@@ -137,6 +140,9 @@ function RuntimeAskPage() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [paneShown, openSearch]);
+
+  // The student's first-visit tour (IR-1342). It starts once the question box is drawn.
+  const tour = useStudentTour("ask", { ready: true, steps: askTourSteps() });
 
   // A conversation names the tab with its own title (IR-1073); an empty page keeps "Ask IRIS".
   usePageTitle(titleOf(conversationId));
@@ -176,6 +182,7 @@ function RuntimeAskPage() {
 
   return <div ref={observePage} className="relative flex h-full min-h-0 flex-col overflow-hidden bg-canvas">
     <div className="relative flex min-h-0 min-w-0 flex-1" {...(dialogOpen ? { inert: "" } : {})}>
+      {/* History on the left, beside the answer it opens. */}
       {!phone && <ConversationSidebar id={paneId} conversations={conversations} activeId={conversationId ?? null}
         open={paneOpen} search={historySearch} searchRef={searchRef} onNewConversation={newConversation} onSearch={openSearch}
         onToggle={() => setPane(!paneOpen)}
@@ -183,13 +190,14 @@ function RuntimeAskPage() {
         onDelete={id => setDeleteTarget(conversations.find(c => c.id === id) ?? null)} />}
       <div className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-surface">
         <ChatToolbar sessionTitle={title} eyebrow={conversationId !== undefined}
-          phoneHistory={phone ? { open: dialogOpen, onOpen: openDialog } : undefined}
+          phoneHistory={phone ? { open: dialogOpen, onOpen: openDialog, id: TOUR_TARGETS.ask.phoneHistory } : undefined}
           onNewConversation={phone && conversationId && !dialogOpen ? newConversation : undefined}
           onDownload={conversationId ? () => api.download(conversationId) : undefined} />
         <div className="flex min-h-0 flex-1 flex-col">
           <RuntimeReader key={`${recordId}:${conversationId}`} conversationId={conversationId} recordId={recordId}
             initialDraft={conversationId ? undefined : draft ?? undefined}
             focusRequest={focusRequest}
+            composerId={TOUR_TARGETS.ask.question}
             onAnswered={() => void refreshList()}
             onTitle={retitle} onProblem={setChatProblem}
             onConversation={id => {
@@ -200,18 +208,16 @@ function RuntimeAskPage() {
       </div>
     </div>
 
-    {phone && dialogOpen && <ChatDrawer title="Conversations" side="start" closeLabel="Close conversations"
+    {phone && dialogOpen && <ChatDrawer title="History" side="start" closeLabel="Close history"
       onClose={() => setDialogOpen(false)} returnTo={dialogOpener.current}>
-      <div className="flex shrink-0 px-3 pt-3">
-        <NewConversationButton onClick={() => { setDialogOpen(false); newConversation(); }} />
-      </div>
       <ConversationHistoryList conversations={conversations} activeId={conversationId ?? null} search={historySearch}
-        searchRef={searchRef}
+        searchRef={searchRef} onNewConversation={() => { setDialogOpen(false); newConversation(); }}
         onRename={rename} onDelete={id => { setDialogOpen(false); setDeleteTarget(conversations.find(c => c.id === id) ?? null); }} />
     </ChatDrawer>}
     <ConfirmDialog open={deleteTarget !== null} title="Delete conversation?"
       message={`Delete “${deleteTarget?.title || "New conversation"}” and its messages? This cannot be undone.`}
       confirmLabel="Delete conversation" danger focusCancel confirming={deleting} error={deleteError}
       onCancel={() => setDeleteTarget(null)} onConfirm={() => void remove()} />
+    {tour}
   </div>;
 }

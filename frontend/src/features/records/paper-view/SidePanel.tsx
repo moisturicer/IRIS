@@ -17,6 +17,8 @@ interface SidePanelProps {
   arrival: ComponentProps<typeof PaperChatPanel>["arrival"];
   onReviewTab: boolean;
   askOffered: boolean;
+  /** Notes is kept on published papers only (IR-1326). */
+  notesOffered: boolean;
   highlights: ReturnType<typeof useReadingHighlights>;
   onOpenHighlight: (h: ReadableHighlight) => void;
   /** An earlier version the reader may open a highlight in. */
@@ -39,6 +41,7 @@ export function SidePanel({
   arrival,
   onReviewTab,
   askOffered,
+  notesOffered,
   highlights,
   onOpenHighlight,
   canOpenVersion,
@@ -84,13 +87,13 @@ export function SidePanel({
           onRestore={panel.restore}
           viewingVersion={viewingVersion}
           returnTo={chatReturn}
-          onOpenNotes={onReviewTab ? undefined : panel.openNotes}
+          onOpenNotes={onReviewTab || !notesOffered ? undefined : panel.openNotes}
           selection={chat.selection}
           onSelectionChange={chat.setSelection}
           className={panel.panelClass}
         />
       )}
-      {chat.open && chat.tool === "notes" && (
+      {chat.open && chat.tool === "notes" && notesOffered && !onReviewTab && (
         <NotesPanel
           record={record}
           note={panel.note}
@@ -115,7 +118,7 @@ export function SidePanel({
           (IR-569, IR-1079). On the bar while minimized, which is its way back. */}
       {!chat.open && !onReviewTab && (
         <>
-          <NotesFab onOpen={panel.openNotes} buttonRef={panel.notesButtonRef} />
+          {notesOffered && <NotesFab onOpen={panel.openNotes} buttonRef={panel.notesButtonRef} />}
           {askOffered && <AskIrisFab onOpen={panel.openAsk} buttonRef={panel.askButtonRef} />}
         </>
       )}

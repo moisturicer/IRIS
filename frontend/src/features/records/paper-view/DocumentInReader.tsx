@@ -58,7 +58,10 @@ export function DocumentInReader({
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState(false);
   // Where the workspace lets this viewer open a thread on it (IR-1204).
-  const commentOnDocument = useReaderAnnotations()?.onCommentDocument;
+  const annotations = useReaderAnnotations();
+  const commentOnDocument = annotations?.onCommentDocument;
+  // Greyed out until the review is started (IR-1341).
+  const commentHeld = annotations?.commentHeld ?? null;
   const commentLabel = doc.kind === "upload" ? doc.commentLabel : undefined;
 
   useEffect(() => {
@@ -117,7 +120,8 @@ export function DocumentInReader({
         <div className="flex flex-wrap gap-2">
           {commentOnDocument && commentLabel && (
             <button type="button" onClick={() => commentOnDocument(doc.id, commentLabel)}
-              className={cn(PILL_SECONDARY, FOCUS_RING, CONTROL_SIZE, "px-3")}>
+              disabled={commentHeld !== null} title={commentHeld ?? undefined}
+              className={cn(PILL_SECONDARY, FOCUS_RING, CONTROL_SIZE, "px-3 disabled:cursor-not-allowed disabled:opacity-60")}>
               <i className="fas fa-comment text-2xs" aria-hidden />
               Comment on this document
             </button>

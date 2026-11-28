@@ -19,6 +19,14 @@ and that service's own checks and refusals stand:
 **Comment only** is a recorded review round with no outcome: it writes a
 `ReviewRound` and no `Review`, changes no Clearance and leaves the Seat open.
 
+**Document requests go with it** (ADR-022 Amendment 9, IR-1325, which
+replaces Amendment 8's documents inside *Request changes*). A reviewer asks
+for documents in the Documents tab, where each request waits as the
+caller's draft, like a draft thread. *Request changes* and *Comment only*
+send the caller's drafts for this Seat's party with the round, in this same
+transaction; every other verdict is refused while any wait, so a reviewer
+removes them first. *Request changes* always asks for a new version.
+
 **In one transaction**, after the record lock: the caller's drafts are sent,
 the verdict is taken, and a `ReviewRound` records the round, naming the
 `Review` the verdict wrote. A refused verdict sends nothing. Before
@@ -26,7 +34,9 @@ anything is written, it refuses -- who before what:
 
 - a caller with no open Seat here (403; 404 to one who may not read the review);
 - a record not in review, an unknown verdict, an unopened Seat (400);
-- *Comment only* with neither a summary nor a draft (400);
+- *Comment only* with neither a summary, a draft nor a draft document request (400);
+- any verdict but *Request changes* or *Comment only* while the caller has
+  draft document requests for this party (400, Amendment 9);
 - an approval -- *Accept & send to RDCO*, *Clear*, *Accept* -- that would send
   one of the caller's own *Must fix* drafts: it would be refused by that very
   thread as soon as it was sent (400).
@@ -56,6 +66,9 @@ from core.text_limits import too_long, too_long_message
 
 from . import decisions, mentions, office_review, revisions, routing, seats
 from .models import ReviewComment, ReviewerSeat, ReviewRound
+
+#: Verdicts that send the caller's draft document requests (ADR-022 Amendment 9).
+SENDS_DOCUMENT_REQUESTS = (ReviewVerdict.REQUEST_REVISION, ReviewVerdict.COMMENT_ONLY)
 
 #: Verdicts that approve, so a *Must fix* sent with one would refuse it.
 APPROVALS = (ReviewVerdict.SEND_TO_RDCO, ReviewVerdict.CLEARED, ReviewVerdict.ACCEPT)
@@ -115,6 +128,7 @@ def _take_verdict(record, actor, verdict, summary, *, to, suggested_offices, tok
 def finish_review(record, actor, *, verdict, summary="", to=None, suggested_offices=None,
                   token=None) -> ReviewRound:
     """Finish the caller's review of `record` (module note). Returns the round."""
+    from apps.documents import requests
     record = routing._locked(record)
     if not may_read_review(actor, record):
         raise FinishNotFound
@@ -137,7 +151,14 @@ def finish_review(record, actor, *, verdict, summary="", to=None, suggested_offi
                 kind=ReviewCommentKind.THREAD)
         .order_by("created_at", "pk")
     )
-    if verdict == ReviewVerdict.COMMENT_ONLY and not summary and not drafts:
+    party = str(seat.assignment.party)
+    waiting = requests.drafts_of(record, actor, party).count()
+    if waiting and verdict not in SENDS_DOCUMENT_REQUESTS:
+        raise FinishError(
+            f"You have {waiting} document request{'s' if waiting != 1 else ''} waiting. "
+            "Remove them in the Documents tab, or choose Request changes or Comment only."
+        )
+    if verdict == ReviewVerdict.COMMENT_ONLY and not summary and not drafts and not waiting:
         raise FinishError("Write a summary or a comment first.")
     must_fix = sum(1 for d in drafts if d.severity == ThreadSeverity.MUST_FIX)
     if verdict in APPROVALS and must_fix:
@@ -152,7 +173,6 @@ def finish_review(record, actor, *, verdict, summary="", to=None, suggested_offi
             "Suggestion, or request a revision."
         )
 
-    party = str(seat.assignment.party)
     version = latest_version(record)
     now = timezone.now()
     # Sent before the verdict, so a Decision closes them with the rest. A sent
@@ -168,6 +188,11 @@ def finish_review(record, actor, *, verdict, summary="", to=None, suggested_offi
             record, actor, verdict, summary,
             to=to, suggested_offices=suggested_offices, token=token, threads=len(drafts),
         )
+    if waiting:
+        try:
+            requests.send_drafts(record, actor, party)
+        except requests.NotAHolder as exc:
+            raise FinishRefused(str(exc))
     round_ = ReviewRound.objects.create(
         record=record, actor=actor, party=party, version=version,
         verdict=verdict, summary=summary, review=review,

@@ -352,6 +352,9 @@ export interface PaperPdfReaderProps {
  * the bearer token in memory can reach it. Saving a copy is not this blob:
  * it goes through the download route, which marks it (`downloadControl`).
  */
+/** No outline: the reader clicked elsewhere on the paper (IR-1306). */
+const NO_REGIONS: Region[] = [];
+
 export function PaperPdfReader(props: PaperPdfReaderProps) {
   const epoch = useAuthStore((state) => state.sessionEpoch);
   const shows = props.document ? readerDocumentKey(props.document) : props.version ?? "current";
@@ -408,7 +411,13 @@ function PaperPdfReaderSource({
     [annotations?.marks, shownVersion],
   );
   // Drawn and landed on only on its own Version: a removed passage is in v1, an added one in v2.
-  const threadLanding = annotations?.landing?.version === shownVersion ? annotations.landing : null;
+  const landedThread = annotations?.landing?.version === shownVersion ? annotations.landing : null;
+  // A click elsewhere on the paper puts a citation's outline away (IR-1306); a new citation draws it again.
+  const citationKey = landingLook === "citation"
+    ? highlightRegions.map((r) => `${r.page}:${r.left}:${r.top}:${r.right}:${r.bottom}`).join("|") : "";
+  const [putAway, setPutAway] = useState<{ citation: string; thread: string | null }>({ citation: "", thread: null });
+  const shownRegions = citationKey && putAway.citation === citationKey ? NO_REGIONS : highlightRegions;
+  const threadLanding = landedThread && putAway.thread === String(landedThread.key) ? null : landedThread;
   const landingFocus = useRef<HTMLElement | null>(null);
   const landingFocusRef = useCallback((el: HTMLElement | null) => { landingFocus.current = el; }, []);
   const [commentable, setCommentable] = useState(false);
@@ -647,6 +656,8 @@ function PaperPdfReaderSource({
   currentRangeRef.current = currentRange;
   // Only a passage of a known Version can be anchored (ADR-032 §7).
   const commentOn = shownVersion !== null ? annotations?.onComment ?? null : null;
+  // Shown but greyed out until the review is started (IR-1341).
+  const commentHeld = annotations?.commentHeld ?? null;
   const commentOnRef = useRef(commentOn);
   commentOnRef.current = commentOn;
   const onComment = useMemo(
@@ -746,6 +757,7 @@ function PaperPdfReaderSource({
     if (!(window.getSelection()?.isCollapsed ?? true)) return;
     if (menuOpen) closeMenu();
     if (highlightsShown && highlights.length > 0) onHighlightsShownChange?.(false);
+    if (citationKey || landedThread) setPutAway({ citation: citationKey, thread: landedThread ? String(landedThread.key) : null });
   };
   const drawn = useMemo(() => {
     const shown = highlightsShown ? highlights : NO_HIGHLIGHTS;
@@ -754,12 +766,12 @@ function PaperPdfReaderSource({
 
   const comment = () => {
     const passage = currentPassageRef.current();
-    if (passage && onComment) onComment(passage);
+    if (passage && onComment && !commentHeld) onComment(passage);
   };
   // C comments on the passage, as the prototype's reader does -- not while
   // typing, and not under a dialog.
   useEffect(() => {
-    if (!onComment) return;
+    if (!onComment || commentHeld) return;
     const onKey = (e: globalThis.KeyboardEvent) => {
       if (e.key.toLowerCase() !== "c" || e.metaKey || e.ctrlKey || e.altKey || e.defaultPrevented) return;
       const target = e.target instanceof HTMLElement ? e.target : null;
@@ -775,7 +787,7 @@ function PaperPdfReaderSource({
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [onComment]);
+  }, [onComment, commentHeld]);
 
   // A citation's page and find's are painted before the reader is moved
   // there (`liveWindow`'s pins), and loaded out of turn if the background
@@ -884,14 +896,14 @@ function PaperPdfReaderSource({
           )}
           {onComment && (
             <Button
-              variant={commentable ? "outline" : "ghost"}
+              variant={commentable && !commentHeld ? "outline" : "ghost"}
               size="sm"
               onClick={comment}
               // Pressing it must not drop the selection it comments on.
               onMouseDown={(e) => e.preventDefault()}
-              disabled={!ready || !commentable}
-              aria-keyshortcuts="C"
-              title={commentable ? "Comment on this passage (C)" : "Select a passage, or find one, to comment on it"}
+              disabled={!ready || !commentable || commentHeld !== null}
+              aria-keyshortcuts={commentHeld ? undefined : "C"}
+              title={commentHeld ?? (commentable ? "Comment on this passage (C)" : "Select a passage, or find one, to comment on it")}
             >
               <i className="fas fa-note-sticky" aria-hidden />
               Comment
@@ -965,7 +977,7 @@ function PaperPdfReaderSource({
               onPaint={onPaint}
               pageNumber={index + 1}
               scale={scale}
-              regions={highlightRegions}
+              regions={shownRegions}
               landingLook={landingLook}
               marks={marks}
               landing={threadLanding}

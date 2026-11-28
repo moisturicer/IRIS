@@ -57,6 +57,7 @@ from .serializers import (
     DownloadRequestSerializer,
     DeleteRequestSerializer,
 )
+from .completion import with_completion_year
 from .filters import RecordFilter, RecordOrderingFilter
 from .services import ImportChoices, check_import_pdf, check_import_row, soft_delete_record, parse_excel_import
 from apps.notifications.services import (
@@ -1271,14 +1272,15 @@ class RecordViewSet(viewsets.ModelViewSet):
         POST body: `{"message": str, "items": [{"slot": id} | {"label": str}],
         "party"?: str}`. `party` is needed only by someone holding the record
         as two parties at once (RDCO as Intake and as RDCO Final).
+
+        A new request is a **draft** (ADR-022 Amendment 9, IR-1325): only its
+        asker sees it, nobody is told, and their *Finish review* sends it with
+        Request changes or Comment only.
         """
         from apps.documents import requests as document_requests
         from apps.documents.request_serializers import (
             DocumentRequestCreateSerializer, first_error, serialize_request, serialize_requests,
         )
-        from apps.notifications.services import notify_document_requested
-        from apps.reviews.tracker import party_label
-
         record = self.get_object()
 
         if request.method == "GET":
@@ -1289,7 +1291,7 @@ class RecordViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_403_FORBIDDEN,
                 )
             return Response(serialize_requests(
-                record, request.user, document_requests.requests_for(record)
+                record, request.user, document_requests.requests_for(record, request.user)
             ))
 
         # Who may ask comes before what they asked: a non-holder is a 403
@@ -1313,15 +1315,13 @@ class RecordViewSet(viewsets.ModelViewSet):
                 record, request.user, party=party,
                 message=body.validated_data["message"],
                 specs=body.validated_data["items"],
+                draft=True,
             )
         except document_requests.NotAHolder as exc:
             # The party's turn closed after the check above -- a Decision (IR-270).
             return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
 
-        notify_document_requested(
-            created, party_label=party_label(created.party, staff_viewer=False)
-        )
-        created = document_requests.requests_for(record).get(pk=created.pk)
+        created = document_requests.requests_for(record, request.user).get(pk=created.pk)
         return Response(
             serialize_request(created, request.user), status=status.HTTP_201_CREATED
         )
@@ -1512,6 +1512,52 @@ class RecordViewSet(viewsets.ModelViewSet):
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         record.refresh_from_db()
         return Response(tracker_payload(record, request.user))
+
+    @action(detail=True, methods=["post"], url_path="documents/send")
+    def send_documents(self, request, pk=None):
+        """
+        POST /records/<id>/documents/send/  (no body)
+
+        *Submit added documents* (ADR-022 Amendment 8, IR-1322): an owner sends
+        every upload they are holding, which answers the document requests
+        they fulfil, each asking party told once. No Version is written and no
+        review round starts. 404 for a record the caller cannot see, 403 for
+        a caller who does not own it, 409 while a revision is open (the owner
+        sends with *Submit new version*), 400 when nothing is held. Answers
+        with how many uploads went and how many requests they fulfilled.
+        """
+        from django.db import transaction
+
+        from apps.audit.services import create_audit_event
+        from apps.documents.models import RecordUpload
+        from apps.documents.requests import may_fulfil, send_held_uploads
+        from apps.reviews import revisions
+
+        record = self.get_object()
+        if not may_fulfil(record, request.user):
+            return Response(
+                {"detail": "Only the record's owners can send its documents."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        with transaction.atomic():
+            if revisions.open_requests(record).exists():
+                return Response(
+                    {"detail": "A revision is asked for, so these go with the new version. "
+                               "Use Submit new version."},
+                    status=status.HTTP_409_CONFLICT,
+                )
+            if not RecordUpload.objects.filter(record=record).held().exists():
+                return Response(
+                    {"detail": "There's nothing to send: upload a document first."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            sent = send_held_uploads(record, request.user)
+            # Recorded as an upload event: what reached the reviewers, and when.
+            create_audit_event(
+                "UPLOAD", request.user, record=record,
+                metadata={"sent": sent.uploads, "requests_fulfilled": [r.pk for r in sent.fulfilled]},
+            )
+        return Response({"sent": sent.uploads, "requests_fulfilled": len(sent.fulfilled)})
 
     @action(detail=True, methods=["post"], url_path="discard-revised-manuscript")
     def discard_revised_manuscript(self, request, pk=None):
@@ -1724,15 +1770,15 @@ class RecordViewSet(viewsets.ModelViewSet):
         """GET /records/facets/ -- the filter choices Discover offers (IR-560).
 
         Drawn from the whole catalogue `list` serves, so a year held only by
-        Records beyond the first page is still offered. `year_accomplished`
+        Records beyond the first page is still offered. The completion year
         is what `year_from`/`year_to` filter on, so every year returns a
         Record. Distinct values only: no count of anything is exposed.
         """
         years = (
-            self.get_queryset()
-            .exclude(year_accomplished__isnull=True)
-            .order_by("-year_accomplished")
-            .values_list("year_accomplished", flat=True)
+            with_completion_year(self.get_queryset())
+            .exclude(completion_year__isnull=True)
+            .order_by("-completion_year")
+            .values_list("completion_year", flat=True)
             .distinct()
         )
         return Response({"years": list(years)})

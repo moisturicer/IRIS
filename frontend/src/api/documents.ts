@@ -65,6 +65,10 @@ export const documentsApi = {
   viewUpload: (uploadId: number, options?: { signal?: AbortSignal }) =>
     apiClient.get<Blob>(`/documents/uploads/${uploadId}/download/?inline=true`, { responseType: "blob", ...options }),
 
+  // The viewer opened a supplied version, which clears its New (IR-1338).
+  uploadSeen: (uploadId: number) =>
+    apiClient.post<void>(`/documents/uploads/${uploadId}/seen/`),
+
   downloadFile: (fileId: number) =>
     apiClient.get<Blob>(`/documents/files/${fileId}/download/`, { responseType: "blob" }),
 

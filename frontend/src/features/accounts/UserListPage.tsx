@@ -9,10 +9,11 @@
  * TODO: add "Create user" button.
  * TODO: add bulk import from CSV.
  */
-import { useCallback, useEffect, useId, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { accountsApi }  from "@/api/accounts";
 import { failureMessage } from "@/lib/readFailure";
 import { PageHeader }   from "@/components/layout/PageHeader";
+import { useFocusRefresh } from "@/hooks/useFocusRefresh";
 import { DataTable }    from "@/components/shared/DataTable";
 import { EmptyState }   from "@/components/shared/EmptyState";
 import { RoleBadge }    from "@/components/shared/RoleBadge";
@@ -74,7 +75,14 @@ export default function UserListPage() {
   const [coordConfirming, setCoordConfirming] = useState(false);
   const [coordError, setCoordError]           = useState<string | null>(null);
 
+  /** What the table shows was read with: the search text only counts once it is searched. */
+  const shownQuery = useRef({ page, search, role });
+  /** Bumped by every read, so a quiet read never lands over a newer one. */
+  const readSeq = useRef(0);
+
   const load = (p = page, r = role) => {
+    readSeq.current += 1;
+    shownQuery.current = { page: p, search, role: r };
     setLoading(true);
     accountsApi
       .userList({ page: p, search, ...(r ? { role: r } : {}) })
@@ -87,6 +95,23 @@ export default function UserListPage() {
       .catch((error: unknown) => { setLoadFailed(true); setLoadError(error); })
       .finally(() => setLoading(false));
   };
+
+  // Read again quietly when the tab is shown (ADR-073 amendment 2026-11-28,
+  // IR-1351): the page, role and search the table shows, never text typed and
+  // not yet searched. A failed read keeps the rows; a newer read wins.
+  useFocusRefresh(() => {
+    if (loading || loadFailed) return;
+    const seq = ++readSeq.current;
+    const { page: p, search: q, role: r } = shownQuery.current;
+    accountsApi
+      .userList({ page: p, search: q, ...(r ? { role: r } : {}) })
+      .then(({ data }) => {
+        if (seq !== readSeq.current) return;
+        setUsers(data.results);
+        setTotal(data.count);
+      })
+      .catch(() => { /* What is shown stays; the next look tries again. */ });
+  });
 
   useEffect(() => { load(page); }, [page]);
 

@@ -292,9 +292,12 @@ class DocumentRequestState(models.TextChoices):
 
     ADR-022 §1. `OPEN` holds the record at `awaiting_document`; `FULFILLED`
     means every item has an upload; `WITHDRAWN` is the requesting party
-    dropping it, or a decision closing it (§3, §4).
+    dropping it, or a decision closing it (§3, §4). `DRAFT` (Amendment 9,
+    IR-1325) is asked but not sent: only the reviewer who asked sees it, and
+    their *Finish review* sends it, as it sends their draft comments.
     """
 
+    DRAFT = "draft", "Draft"
     OPEN = "open", "Open"
     FULFILLED = "fulfilled", "Fulfilled"
     WITHDRAWN = "withdrawn", "Withdrawn"

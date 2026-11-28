@@ -70,7 +70,8 @@ def test_research_13_is_research_12_plus_one_paragraph_on_paper_details():
     assert "paper_details" in DETAILS_INSTRUCTIONS
     # No earlier pin is told about a tool it is never offered.
     assert not any("paper_details" in text for pin, text in PROMPTS.items()
-                   if pin != ("agent-research-13", "research-13"))
+                   if pin not in {("agent-research-13", "research-13"), ("agent-research-14", "research-13"),
+                                   ("agent-research-15", "research-14")})
 
 
 def test_only_the_research_13_pin_offers_paper_details():

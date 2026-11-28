@@ -28,6 +28,18 @@ _Avoid_: Institutional by default
 The recorded year a work was published, distinct from its completion year and the date it was added to IRIS.
 _Avoid_: Completion year, added year
 
+**Completion year**:
+The one year a work was finished: what its submitter recorded, or else what an import recorded.
+_Avoid_: Publication year, added date
+
+**Date added**:
+The day a Record was created in IRIS, in campus time; what a reader means by uploaded.
+_Avoid_: Publication date
+
+**Recent**:
+In Ask IRIS, a completion or publication year from this year or the four before it, or a date added in the last 90 days.
+_Avoid_: Trending (about views)
+
 **Author**:
 A person or organization explicitly credited with creating the work.
 _Avoid_: Submitting owner, import actor
@@ -343,6 +355,10 @@ _Avoid_: Access (the audit log's word for one opening), hit, read, reader count.
 **Trending**:
 Published papers ordered by the [[View]]s they gained in the last 30 days, then by all-time views, then newest first. Distinct from Most Viewed, which orders by all-time views alone.
 _Avoid_: Popular, hot, most viewed.
+
+**Vote**:
+A reader marking a published paper **Useful** or **Not useful**: whether it was useful to them, not whether they agree with it. Each account has at most one vote per paper and can switch or clear it. A paper shows both counts, never who voted. Its owners, its Adviser and the System Admin don't vote on it. Votes never change any ordering or anything Ask IRIS finds ([ADR-075](docs/adr/075-votes-on-published-papers.md)).
+_Avoid_: Upvote, downvote, like, rating, score, feedback (that is an Ask IRIS answer's).
 
 ### Calls & Conferences
 

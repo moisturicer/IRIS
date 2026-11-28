@@ -60,6 +60,7 @@ INCLUDED: dict[str, str] = {
     "library.ReadingPosition": "reading_positions",
     "reviews.SavedReply": "saved_replies",
     "reviews.ViewedMark": "viewed_marks",
+    "documents.UploadSeen": "uploads_seen",
     "reviews.ReviewMention": "review_mentions",
     "records.PublicComment": "comments",
     "records.CommentReport": "comment_reports",

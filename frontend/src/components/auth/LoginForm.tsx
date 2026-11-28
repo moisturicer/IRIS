@@ -61,7 +61,9 @@ export function LoginForm({
   const password = register("password");
 
   return (
-    <form className="flex flex-col gap-5" noValidate onSubmit={handleSubmit(onSubmit)}>
+    // gap-3, not gap-5: each field already keeps a 20px error line under it
+    // (reserveErrorSpace), so the two stacked into a gap that read as loose.
+    <form className="flex flex-col gap-3" noValidate onSubmit={handleSubmit(onSubmit)}>
       {/* Field names and their order are unchanged: renaming them would
           break autofill and anything downstream keyed to them. */}
       <Input
@@ -119,8 +121,11 @@ export function LoginForm({
 
       {/* Self-service recovery (IR-642, ADR-045 §7). IR-536's disclosure
           naming RDCO answered a dead end; there is a journey now, and RDCO
-          stays as support guidance in its email and confirmation. */}
-      <div className="-mt-1 flex flex-wrap items-center justify-between gap-x-4">
+          stays as support guidance in its email and confirmation.
+          -mt-3 takes back the padding the 44px targets add above the text,
+          so this row sits as far from the password field as the fields sit
+          from each other. */}
+      <div className="-mt-3 flex flex-wrap items-center justify-between gap-x-4">
         {/* ADR-072 decision 3. Off by default: unticked, the session ends after
             30 idle minutes; ticked, it lasts 30 days from sign-in. */}
         <div className="flex items-center gap-2.5">
@@ -148,7 +153,7 @@ export function LoginForm({
       {/* `size="full"` carries the full width and the larger step. Passing
           those as a className instead would collide with the primitive's
           own sizing -- clsx keeps both and stylesheet order decides. */}
-      <Button ref={submitRef} type="submit" variant="primary" size="full" loading={isSubmitting} disabled={disabled}>
+      <Button ref={submitRef} type="submit" variant="primary" size="full" className="mt-2" loading={isSubmitting} disabled={disabled}>
         {isSubmitting ? "Signing in…" : "Sign in"}
       </Button>
     </form>

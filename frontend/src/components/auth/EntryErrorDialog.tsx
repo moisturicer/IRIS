@@ -1,5 +1,5 @@
 import { useId, useRef, type ReactNode } from "react";
-import { Button } from "@/components/ui/Button";
+import { DialogCloseX } from "@/components/ui/DialogCloseX";
 import { useDialogFocus } from "@/hooks/useDialogFocus";
 
 export interface EntryError {
@@ -24,7 +24,8 @@ interface EntryErrorDialogProps {
  * It was an alert inside the form, which pushed every field down as it
  * appeared. The shell is the account-locked dialog's, so the entry screens
  * have one look for "this didn't work". It is an `alertdialog`: it interrupts,
- * and is answered only by closing it.
+ * and is answered only by closing it, with the X in its corner (IR-1327),
+ * Escape or a click outside.
  */
 export function EntryErrorDialog({ error, onClose, returnTo }: EntryErrorDialogProps) {
   const panelRef = useRef<HTMLDivElement>(null);
@@ -46,6 +47,8 @@ export function EntryErrorDialog({ error, onClose, returnTo }: EntryErrorDialogP
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
       >
+        <DialogCloseX onClose={onClose} />
+
         {/* The error glyph AuthAlert used, at the lock dialog's size. */}
         <div
           className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-brand text-title font-bold text-white"
@@ -57,13 +60,9 @@ export function EntryErrorDialog({ error, onClose, returnTo }: EntryErrorDialogP
         <h2 id={titleId} className="text-title font-bold text-stone-900">
           {error.title}
         </h2>
-        <div id={descriptionId} className="mt-3 text-body text-stone-600 leading-relaxed">
+        <div id={descriptionId} className="mt-3 text-body text-stone-600 leading-relaxed text-justified">
           {error.body}
         </div>
-
-        <Button type="button" variant="secondary" size="full" onClick={onClose} className="mt-8">
-          Close
-        </Button>
       </div>
     </div>
   );

@@ -1,11 +1,11 @@
 """
-The requesting party accepts, rejects or withdraws (IR-263, ADR-022 §3.4, §4).
+The requesting party withdraws (IR-263, ADR-022 §4).
 
-ADR-022 §3.4: the party that asked for documents decides whether each upload
-satisfies it. A rejected item goes back to `missing` with a reason, the
-request reopens and the owner is told. Accepting marks the item `accepted`.
 §4: the requesting party may withdraw an open request; it closes and stays in
-the history.
+the history. It no longer accepts or rejects an upload: a sent document is
+supplied (ADR-022 Amendment 10, IR-1338), so the Accept and Reject tests that
+were here are gone with `PATCH /document-request-items/<id>/`. A rejection made
+before then is still on file, and the tests that read one set it up directly.
 
 §Amendment 2: the requesting party cannot fulfil its own request. Only the
 Record's owners answer an item, so a staff upload against a `request_item` is
@@ -37,24 +37,19 @@ REASON = "The scan is unreadable; please rescan at 300 dpi."
 
 class DecisionTestBase(DocumentRequestTestBase):
 
-    def item_url(self, item_id):
-        return f"/api/v1/document-request-items/{item_id}/"
-
     def request_url(self, request_id):
         return f"/api/v1/document-requests/{request_id}/"
 
-    def decide(self, item_id, actor, action, reason=None):
-        self.client.force_authenticate(actor)
-        body = {"action": action}
-        if reason is not None:
-            body["reason"] = reason
-        with self.captureOnCommitCallbacks(execute=True):
-            return self.client.patch(self.item_url(item_id), body, format="json")
-
-    def decided(self, item_id, actor, action, reason=None):
-        response = self.decide(item_id, actor, action, reason)
-        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
-        return response.data
+    def rejected_before(self, item_id, reason=REASON):
+        """
+        An item the requesting party rejected before IR-1338, as it stays on
+        file: back to `missing` with its reason, and its request open again.
+        """
+        item = DocumentRequestItem.objects.get(pk=item_id)
+        DocumentRequestItem.objects.filter(pk=item_id).update(
+            state="missing", upload=None, rejection_reason=reason,
+        )
+        DocumentRequest.objects.filter(pk=item.request_id).update(state="open", closed_at=None)
 
     def withdraw(self, request_id, actor):
         self.client.force_authenticate(actor)
@@ -75,133 +70,6 @@ class DecisionTestBase(DocumentRequestTestBase):
 
     def request_state(self, request_id):
         return DocumentRequest.objects.get(pk=request_id).state
-
-
-class RejectTests(DecisionTestBase):
-
-    def test_a_rejected_item_goes_back_to_missing_and_the_request_reopens(self):
-        record, request_id, item_id = self.one_item_uploaded()
-        self.assertEqual(self.request_state(request_id), "fulfilled")
-
-        data = self.decided(item_id, self.ierc, "reject", REASON)
-
-        self.assertEqual(data["state"], "open")
-        self.assertIsNone(data["closed_at"])
-        [item] = data["items"]
-        self.assertEqual(item["state"], "missing")
-        self.assertEqual(item["rejection_reason"], REASON)
-        self.assertIsNone(item["upload"])
-        self.assertEqual(self.detail(record)["workflow_state"], "awaiting_document")
-
-    def test_the_owner_sees_the_reason_in_the_list(self):
-        record, _, item_id = self.one_item_uploaded()
-
-        self.decided(item_id, self.ierc, "reject", REASON)
-
-        [request] = self.listed(record, self.owner)
-        self.assertEqual(request["state"], "open")
-        self.assertEqual(request["items"][0]["rejection_reason"], REASON)
-
-    def test_the_owner_is_notified_with_the_reason(self):
-        record, _, item_id = self.one_item_uploaded()
-        before = Notification.objects.filter(recipient=self.owner, record=record).count()
-
-        self.decided(item_id, self.ierc, "reject", REASON)
-
-        notices = Notification.objects.filter(recipient=self.owner, record=record)
-        self.assertEqual(notices.count(), before + 1)
-        notice = notices.latest("created_at")
-        self.assertIn("Consent form", notice.message)
-        self.assertIn(REASON, notice.message)
-        self.assertEqual(notice.notif_type.name, "Document Rejected")
-
-    def test_the_rejected_file_stays_on_the_record(self):
-        # The item forgets the upload; the file version itself is not deleted.
-        record, _, item_id = self.one_item_uploaded()
-
-        self.decided(item_id, self.ierc, "reject", REASON)
-
-        self.assertTrue(RecordUpload.objects.filter(record=record).exists())
-
-    def test_the_owner_can_upload_again_and_the_request_is_fulfilled_again(self):
-        record, request_id, item_id = self.one_item_uploaded()
-        self.decided(item_id, self.ierc, "reject", REASON)
-
-        self.uploaded(record, item_id)
-
-        self.assertEqual(self.item_state(item_id), "uploaded")
-        self.assertEqual(self.request_state(request_id), "fulfilled")
-
-    def test_a_rejection_needs_a_reason(self):
-        _, _, item_id = self.one_item_uploaded()
-
-        for reason in (None, "", "   "):
-            with self.subTest(reason=reason):
-                response = self.decide(item_id, self.ierc, "reject", reason)
-                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(self.item_state(item_id), "uploaded")
-
-    def test_rejecting_one_item_of_an_open_request_leaves_the_rest_alone(self):
-        record = self.at_parallel_review()
-        data = self.requested(record, self.ierc, [{"label": "Consent form"}, {"label": "Protocol"}])
-        first, second = data["items"]
-        self.uploaded(record, first["id"])
-
-        data = self.decided(first["id"], self.ierc, "reject", REASON)
-
-        self.assertEqual(data["state"], "open")
-        self.assertEqual([i["state"] for i in data["items"]], ["missing", "missing"])
-        self.assertIsNone(data["items"][1]["rejection_reason"])
-
-
-class AcceptTests(DecisionTestBase):
-
-    def test_accepting_every_item_closes_the_request_and_the_tracker_shows_accepted(self):
-        record = self.at_parallel_review()
-        data = self.requested(record, self.ierc, [{"label": "Consent form"}, {"label": "Protocol"}])
-        for item in data["items"]:
-            self.uploaded(record, item["id"])
-
-        for item in data["items"]:
-            self.decided(item["id"], self.ierc, "accept")
-
-        [request] = self.tracker_ok(record, self.ierc)["document_requests"]
-        self.assertEqual(request["state"], "fulfilled")
-        self.assertIsNotNone(request["closed_at"])
-        self.assertEqual([i["state"] for i in request["items"]], ["accepted", "accepted"])
-        self.assertEqual(self.detail(record)["workflow_state"], "in_review")
-
-    def test_accepting_one_item_of_an_open_request_leaves_it_open(self):
-        record = self.at_parallel_review()
-        data = self.requested(record, self.ierc, [{"label": "Consent form"}, {"label": "Protocol"}])
-        first, _ = data["items"]
-        self.uploaded(record, first["id"])
-
-        data = self.decided(first["id"], self.ierc, "accept")
-
-        self.assertEqual(data["state"], "open")
-        self.assertEqual([i["state"] for i in data["items"]], ["accepted", "missing"])
-
-    def test_only_an_uploaded_item_can_be_decided(self):
-        record = self.at_parallel_review()
-        [missing] = self.requested(record, self.ierc, [{"label": "Consent form"}])["items"]
-        _, _, accepted = self.one_item_uploaded()
-        self.decided(accepted, self.ierc, "accept")
-
-        for item_id, action in (
-            (missing["id"], "accept"), (missing["id"], "reject"), (accepted, "reject"),
-        ):
-            with self.subTest(item=item_id, action=action):
-                response = self.decide(item_id, self.ierc, action, REASON)
-                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_an_unknown_action_is_refused(self):
-        _, _, item_id = self.one_item_uploaded()
-
-        response = self.decide(item_id, self.ierc, "approve")
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(self.item_state(item_id), "uploaded")
 
 
 class WithdrawTests(DecisionTestBase):
@@ -237,7 +105,7 @@ class WithdrawTests(DecisionTestBase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(self.request_state(request_id), "fulfilled")
 
-    def test_a_withdrawn_request_takes_no_uploads_and_no_decisions(self):
+    def test_a_withdrawn_request_takes_no_uploads(self):
         record = self.at_parallel_review()
         data = self.requested(record, self.ierc, [{"label": "Consent form"}, {"label": "Protocol"}])
         first, second = data["items"]
@@ -246,10 +114,6 @@ class WithdrawTests(DecisionTestBase):
 
         self.assertEqual(
             self.upload_against(record, second["id"]).status_code, status.HTTP_400_BAD_REQUEST
-        )
-        self.assertEqual(
-            self.decide(first["id"], self.ierc, "accept").status_code,
-            status.HTTP_400_BAD_REQUEST,
         )
 
     def test_an_unknown_action_is_refused(self):
@@ -268,15 +132,12 @@ class WithdrawTests(DecisionTestBase):
 class OnlyTheRequestingPartyTests(DecisionTestBase):
     """Anyone who may read the request but is not its party: 403, and nothing moves."""
 
-    def test_the_owner_and_other_parties_are_refused_on_every_action(self):
+    def test_the_owner_and_other_parties_may_not_withdraw(self):
         record, request_id, item_id = self.one_item_uploaded()
         # All three may read the request (IR-349): the owner, ITSO (held and
         # cleared), KTTO (holds now). None of them asked.
         for actor in (self.owner, self.itso, self.ktto):
             with self.subTest(actor=actor.email):
-                for action in ("accept", "reject"):
-                    response = self.decide(item_id, actor, action, REASON)
-                    self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
                 response = self.withdraw(request_id, actor)
                 self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
@@ -285,23 +146,25 @@ class OnlyTheRequestingPartyTests(DecisionTestBase):
 
     def test_the_party_is_what_counts_not_the_person(self):
         """
-        Another IERC reviewer decides on a request a colleague made: it is
+        Another IERC reviewer withdraws a request a colleague made: it is
         IERC's, not theirs. Changed deliberately by IR-1226 (ADR-022
         Amendment 7): they act once seated on IERC's review. An unseated
-        IERC member no longer does.
+        IERC member no longer does. (By IR-1338 it withdraws: the
+        Accept it was shown with is gone.)
         """
         from apps.documents.tests.test_record_document_authorization import seat_on
         from apps.records.test_tracker import make_user
         from core.enums import RoleName
 
         colleague = make_user("tracker-ierc-2@cit.edu", RoleName.IERC)
-        record, _, item_id = self.one_item_uploaded()
-        self.assertEqual(self.decide(item_id, colleague, "accept").status_code, status.HTTP_403_FORBIDDEN)
+        record = self.at_parallel_review()
+        request_id = self.requested(record, self.ierc, [{"label": "Consent form"}])["id"]
+        self.assertEqual(self.withdraw(request_id, colleague).status_code, status.HTTP_403_FORBIDDEN)
 
         seat_on(RecordAssignment.objects.get(record=record, party="ierc", state="active"), colleague)
-        self.decided(item_id, colleague, "accept")
+        self.assertEqual(self.withdraw(request_id, colleague).status_code, status.HTTP_200_OK)
 
-        self.assertEqual(self.item_state(item_id), "accepted")
+        self.assertEqual(self.request_state(request_id), "withdrawn")
 
     def test_can_manage_is_true_only_for_the_requesting_party(self):
         record, _, _ = self.one_item_uploaded()
@@ -321,11 +184,9 @@ class RefusalTests(DecisionTestBase):
     """
 
     def assert_refused(self, actor, request_id, item_id, code):
-        decided = self.decide(item_id, actor, "accept")
         withdrawn = self.withdraw(request_id, actor)
-        self.assertEqual(decided.status_code, code)
         self.assertEqual(withdrawn.status_code, code)
-        return decided, withdrawn
+        return (withdrawn,)
 
     def test_a_user_who_cannot_see_the_record_gets_404(self):
         _, request_id, item_id = self.one_item_uploaded()
@@ -383,7 +244,7 @@ class DecisionDataIsInternalTests(DecisionTestBase):
         record = self.at_parallel_review()
         rejected = self.requested(record, self.ierc, [{"label": "Consent form"}])
         self.uploaded(record, rejected["items"][0]["id"])
-        self.decided(rejected["items"][0]["id"], self.ierc, "reject", REASON)
+        self.rejected_before(rejected["items"][0]["id"])
         withdrawn = self.requested(record, self.ierc, [{"label": "Protocol"}])
         self.withdraw(withdrawn["id"], self.ierc)
         Record.objects.filter(pk=record.pk).update(pipeline_status=PipelineStatus.PUBLISHED)
@@ -407,7 +268,7 @@ class RejectedThenSlotUploadTests(DecisionTestBase):
         data = self.requested(record, self.ierc, [{"slot": ethics.pk}])
         [item] = data["items"]
         self.uploaded(record, item["id"])
-        self.decided(item["id"], self.ierc, "reject", REASON)
+        self.rejected_before(item["id"])
         self.assertEqual(self.request_state(data["id"]), "open")
 
         self.client.force_authenticate(self.owner)
@@ -418,6 +279,9 @@ class RejectedThenSlotUploadTests(DecisionTestBase):
             )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        # Held until the owner sends it (ADR-022 Amendment 8, IR-1322).
+        self.assertEqual(self.item_state(item["id"]), "missing")
+        self.send_what_is_held(record, self.owner, response)
         self.assertEqual(self.item_state(item["id"]), "uploaded")
         self.assertEqual(self.request_state(data["id"]), "fulfilled")
         self.assertEqual(

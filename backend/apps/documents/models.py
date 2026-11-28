@@ -99,6 +99,26 @@ class UploadStatus(models.Model):
     def __str__(self): return self.name
 
 
+class RecordUploadQuerySet(models.QuerySet):
+    """
+    Held and sent uploads (ADR-022 Amendment 8, IR-1322). An owner's upload to
+    a submitted Record is *held* (`sent_at` null) until *Submit new version*
+    or *Submit added documents* sends it; until then it is the owners' alone.
+    """
+
+    def sent(self):
+        return self.filter(sent_at__isnull=False)
+
+    def held(self):
+        return self.filter(sent_at__isnull=True)
+
+    def visible_to(self, user, record):
+        """The one predicate: every upload for an owner, the sent ones for anyone else."""
+        from core.permissions import is_record_owner
+
+        return self if is_record_owner(user, record) else self.sent()
+
+
 class RecordUpload(models.Model):
     """
     A versioned file uploaded to a specific UploadSlot for a Record.
@@ -115,6 +135,17 @@ class RecordUpload(models.Model):
         "accounts.User", on_delete=models.SET_NULL, null=True, related_name="uploaded_documents"
     )
     created_at  = models.DateTimeField(auto_now_add=True)
+    #: When it reached the reviewers (ADR-022 Amendment 8, IR-1322). Null while
+    #: an owner's upload to a submitted Record is held, unsent. Sent unless
+    #: `create_upload` holds it, so a file stored any other way (seed_demo, a
+    #: test) is never hidden from reviewers by accident.
+    sent_at     = models.DateTimeField(null=True, blank=True, default=timezone.now)
+
+    objects = RecordUploadQuerySet.as_manager()
+
+    @property
+    def held(self) -> bool:
+        return self.sent_at is None
 
     class Meta:
         ordering = ["-version"]
@@ -550,12 +581,31 @@ class DocumentRequestItem(models.Model):
         return f"Request {self.request_id} | {self.label} | {self.state}"
 
 
+class UploadSeen(models.Model):
+    """
+    A person opened a supplied document version (ADR-022 Amendment 10,
+    IR-1338). Until they do, it shows them as **New**; each reviewer's mark is
+    their own. Private: read only for its own `user`, and decides nothing.
+    """
+
+    upload  = models.ForeignKey(RecordUpload, on_delete=models.CASCADE, related_name="seen_by")
+    user    = models.ForeignKey("accounts.User", on_delete=models.CASCADE, related_name="uploads_seen")
+    seen_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["upload", "user"], name="one_seen_mark_per_upload_user"),
+        ]
+
+
 class DocumentRejection(models.Model):
     """
     One rejection of one upload, kept for good (IR-1201, ADR-022 §3.4).
+    Nothing is rejected any more (ADR-022 Amendment 10, IR-1338: a sent
+    document is supplied); these rows are the history of rejections before.
 
-    `reject_item` sends the item back to `missing`, forgets its upload and
-    overwrites `item.rejection_reason`, which the owner's panel reads as "why
+    `reject_item` sent the item back to `missing`, forgot its upload and
+    overwrote `item.rejection_reason`, which the owner's panel reads as "why
     it was sent back". This row is the history: which file was rejected, by
     whom, when and why, however many times the item goes round. Request data
     (ADR-022 §Amendment 5), so it is served only under `may_read_requests`.

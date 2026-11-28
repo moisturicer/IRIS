@@ -16,6 +16,7 @@ import secrets
 from contextvars import ContextVar
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
+from datetime import date
 
 import asyncpg
 
@@ -92,8 +93,11 @@ class RecordRef:
     title: str
     #: None for a paper with no Manuscript read yet: it can be named, not read (IR-750).
     source: Source | None
-    #: Completion year, carried only by a listing (IR-994).
+    #: Completion year, carried by a listing (IR-994) and a search (IR-1316).
     year: int | None = None
+    publication_year: int | None = None
+    #: The day the paper was added (IR-1316).
+    added: date | None = None
 
 
 @dataclass(frozen=True)
@@ -205,6 +209,9 @@ class Count:
     #: The Records counted: provenance for rechecks, never shown to a model or reader.
     population: frozenset[int] = frozenset()
     relative_to: str = metadata.RELATIVE_TO
+    #: Records a year range left out for having no such year; None with no year range (IR-1316).
+    #: Not compared: a paper outside the population never makes a stated count stale.
+    undated: int | None = field(default=None, compare=False)
 
     @property
     def figures(self) -> set[int]:
@@ -264,6 +271,12 @@ class PaperDetails:
     requires_ethics_review: bool = False
     #: Offices the submitter hinted the paper needs (ADR-018).
     requested_offices: tuple[str, ...] = ()
+    #: The day the paper was added to IRIS (IR-1316).
+    date_added: date | None = None
+
+    @property
+    def completion_year(self) -> int | None:
+        return self.year_accomplished if self.year_accomplished is not None else self.year_completed
 
     @property
     def years(self) -> set[int]:
@@ -289,6 +302,8 @@ class ToolResult:
     signals: tuple[tuple[str, str], ...] = ()
     #: Recorded details of the papers a details call could read (IR-1278).
     details: tuple[PaperDetails, ...] = ()
+    #: Papers a search's year range left out for having no such year (IR-1316).
+    undated: int | None = None
 
     @classmethod
     def unavailable(cls, reason: str, **kw) -> "ToolResult":
@@ -309,25 +324,55 @@ def _is_int(value) -> bool:
     return type(value) is int
 
 
+def _day(value) -> date | None:
+    """`value` as a day when it is exactly YYYY-MM-DD, else None (IR-1316)."""
+    try:
+        day = date.fromisoformat(value) if isinstance(value, str) else None
+    except ValueError:
+        return None
+    return day if day is not None and day.isoformat() == value else None
+
+
 def valid_filters(filters) -> bool:
     """Metadata filters as `count` and `hybrid_search` both accept them (IR-750, IR-886)."""
     return (isinstance(filters, dict) and not set(filters) - set(metadata.FILTERS)
             and all(isinstance(filters[n], str) and filters[n].strip()
                     for n in metadata.TAXONOMIES if n in filters)
             and all(_is_int(filters[n]) and metadata.YEAR_RANGE[0] <= filters[n] <= metadata.YEAR_RANGE[1]
-                    for n in ("year_from", "year_to") if n in filters)
+                    for n in metadata.YEARS if n in filters)
+            and all(_day(filters[n]) is not None for n in metadata.DAYS if n in filters)
             and ("is_ip" not in filters or type(filters["is_ip"]) is bool))
 
 
+#: The one completion year: what the Publish form records, else an import's (IR-1316).
+COMPLETION_YEAR = "coalesce(r.year_accomplished, r.year_completed)"
+#: The day a paper was added, in campus time (IR-1316).
+DATE_ADDED = "(r.created_at AT TIME ZONE 'Asia/Manila')::date"
+_DATES = f"{COMPLETION_YEAR} AS year, r.publication_year, {DATE_ADDED} AS added"
+#: `list_records` orders; a date sorts newest first, unrecorded last (IR-1316).
+_ORDERS = {
+    "title": "",
+    "completed": f"{COMPLETION_YEAR} DESC NULLS LAST, ",
+    "published": "r.publication_year DESC NULLS LAST, ",
+    "added": f"{DATE_ADDED} DESC, ",
+}
+#: How many parameters `_filter_sql` reads.
+FILTER_PARAMS = 10
+
+
 def _filter_sql(first: int) -> str:
-    """Conditions on Record `r` for the six filter parameters starting at `$first`."""
-    n = range(first, first + 6)
+    """Conditions on Record `r` for the FILTER_PARAMS parameters starting at `$first`."""
+    n = range(first, first + FILTER_PARAMS)
     return (f" AND (${n[0]}::bigint IS NULL OR r.classification_id = ${n[0]})"
             f" AND (${n[1]}::bigint IS NULL OR r.psced_id = ${n[1]})"
             f" AND (${n[2]}::bigint IS NULL OR r.record_type_id = ${n[2]})"
-            f" AND (${n[3]}::int IS NULL OR r.year_completed >= ${n[3]})"
-            f" AND (${n[4]}::int IS NULL OR r.year_completed <= ${n[4]})"
-            f" AND (${n[5]}::boolean IS NULL OR r.is_ip = ${n[5]})")
+            f" AND (${n[3]}::int IS NULL OR {COMPLETION_YEAR} >= ${n[3]})"
+            f" AND (${n[4]}::int IS NULL OR {COMPLETION_YEAR} <= ${n[4]})"
+            f" AND (${n[5]}::boolean IS NULL OR r.is_ip = ${n[5]})"
+            f" AND (${n[6]}::int IS NULL OR r.publication_year >= ${n[6]})"
+            f" AND (${n[7]}::int IS NULL OR r.publication_year <= ${n[7]})"
+            f" AND (${n[8]}::date IS NULL OR {DATE_ADDED} >= ${n[8]})"
+            f" AND (${n[9]}::date IS NULL OR {DATE_ADDED} <= ${n[9]})")
 
 
 _COLUMNS = ("c.id, c.record_id, c.chunk_set_id, cs.extraction_hash, c.source_page,"
@@ -421,10 +466,11 @@ def shown_bytes(text: str) -> int:
 
 #: $1 Record ids. Every table here is read under the row policy; the Adviser's name only
 #: through `research_advisers`, which answers for Records this grant may read (IR-1278).
-DETAILS_SQL = """
+DETAILS_SQL = f"""
     SELECT r.id, r.title, r.year_completed, r.year_accomplished, r.publication_year, r.abstract,
            r.keywords, r.origin, r.is_ip, r.ip_type, r.for_commercialization, r.community_extension,
            r.requires_ethics_review, r.requested_itso, r.requested_ierc, r.requested_ktto,
+           {DATE_ADDED} AS date_added,
            c.name AS classification, p.name AS psced, t.name AS record_type,
            ARRAY(SELECT a.name FROM public.records_author a WHERE a.record_id = r.id ORDER BY a.id) AS authors,
            adv.name AS adviser
@@ -451,7 +497,14 @@ def _paper_details_from_row(handle: str, row) -> PaperDetails:
         for_commercialization=row["for_commercialization"], community_extension=row["community_extension"],
         requires_ethics_review=row["requires_ethics_review"],
         requested_offices=tuple(office for column, office in REQUESTED_OFFICES if row[column]),
+        date_added=row["date_added"],
     )
+
+
+def _dates(row) -> dict:
+    """A row's three dates as `RecordRef` fields; none when the paper was not read (IR-1316)."""
+    return {} if row is None else {
+        "year": row["year"], "publication_year": row["publication_year"], "added": row["added"]}
 
 
 def _span(rows, first: int, last: int) -> Span:
@@ -667,9 +720,13 @@ class ResearchTools:
         passage_handles = await self._handles(
             conn, [("P", r["record_id"], r["chunk_set_id"], r["id"]) for r in rows])
         passages = self._passages(None, rows, passage_handles, overlaps=overlaps, placed=placed)
+        dates = {row["id"]: row for row in await conn.fetch(
+            f"SELECT r.id, {_DATES} FROM public.records_record r WHERE r.id = ANY($1::bigint[])",
+            [r["record_id"] for r in firsts])}
         records = tuple(
             RecordRef(h, r["record_id"], r["title"],
-                      Source(r["record_id"], r["chunk_set_id"], r["extraction_hash"]))
+                      Source(r["record_id"], r["chunk_set_id"], r["extraction_hash"]),
+                      **_dates(dates.get(r["record_id"])))
             for r, h in zip(firsts, record_handles))
         return records, passages
 
@@ -937,7 +994,7 @@ class ResearchTools:
         lost access to is never counted. There is no topic filter: a topic total
         is a screened subset, never a count.
         """
-        if not valid_filters(filters) or (group_by is not None and group_by not in metadata.GROUPS):
+        if not valid_filters(filters) or (group_by is not None and group_by not in metadata.DATED_GROUPS):
             return ToolResult.unavailable("invalid_argument")
 
         async def body(conn):
@@ -946,8 +1003,8 @@ class ResearchTools:
             except _Refused as refused:
                 return ToolResult.unavailable(refused.reason)
             rows = await conn.fetch(
-                """SELECT r.id, c.name AS classification, p.name AS psced, t.name AS record_type,
-                          r.year_completed AS year
+                f"""SELECT r.id, c.name AS classification, p.name AS psced, t.name AS record_type,
+                          {_DATES}
                      FROM public.records_record r
                      LEFT JOIN public.records_classification c ON c.id = r.classification_id
                      LEFT JOIN public.records_pscedclassification p ON p.id = r.psced_id
@@ -964,20 +1021,40 @@ class ResearchTools:
                 groups=tuple(sorted((v, n) for v, n in groups.items() if v is not None)),
                 ungrouped=groups.get(None, 0), scope_record_id=self.scope,
                 population=frozenset(row["id"] for row in rows),
+                undated=await self._undated(conn, params),
             )
             return ToolResult(OK if rows else NO_MATCH, count=fact,
                               coverage=Coverage(len(rows), len(rows)))
 
         return await self._call("count", body)
 
-    async def list_records(self, filters: dict, limit: int | None = None, offset: int = 0) -> ToolResult:
-        """Readable Records matching metadata filters, by title, with the exact total (IR-994).
+    async def _undated(self, conn, params: list) -> int | None:
+        """Records a year range left out only for having no such year recorded (IR-1316)."""
+        completed, published = params[3:5] != [None, None], params[6:8] != [None, None]
+        if not completed and not published:
+            return None
+        blank = " OR ".join(sql for used, sql in (
+            (completed, f"{COMPLETION_YEAR} IS NULL"), (published, "r.publication_year IS NULL")) if used)
+        rest = [*params[:3], None, None, params[5], None, None, *params[8:]]
+        # A recorded year must still be in its own range: only a blank one is forgiven.
+        n = 2 + FILTER_PARAMS
+        kept = "".join(
+            f" AND ({sql} IS NULL OR ((${i}::int IS NULL OR {sql} >= ${i}) AND (${i + 1}::int IS NULL OR {sql} <= ${i + 1})))"
+            for i, sql in ((n, COMPLETION_YEAR), (n + 2, "r.publication_year")))
+        return await conn.fetchval(
+            f"SELECT count(*) FROM public.records_record r WHERE ($1::bigint IS NULL OR r.id = $1) AND ({blank})"
+            + _filter_sql(2) + kept, self.scope, *rest, *params[3:5], *params[6:8])
 
+    async def list_records(self, filters: dict, limit: int | None = None, offset: int = 0,
+                           sort: str = "title") -> ToolResult:
+        """Readable Records matching metadata filters, with the exact total (IR-994).
+
+        By title, or newest first by one of the three dates (IR-1316).
         `offset` pages through a long list: the next titles, in the same order.
         """
         cap = metadata.MAX_LISTED if limit is None else limit
         if (not valid_filters(filters) or not _is_int(cap) or not 0 < cap <= metadata.MAX_LISTED
-                or not _is_int(offset) or offset < 0):
+                or not _is_int(offset) or offset < 0 or sort not in _ORDERS):
             return ToolResult.unavailable("invalid_argument")
 
         async def body(conn):
@@ -986,11 +1063,12 @@ class ResearchTools:
             except _Refused as refused:
                 return ToolResult.unavailable(refused.reason)
             rows = await conn.fetch(
-                """SELECT r.id AS record_id, r.title, r.year_completed AS year,
+                f"""SELECT r.id AS record_id, r.title, {_DATES},
                           cs.id AS chunk_set_id, cs.extraction_hash
                      FROM public.records_record r
                      LEFT JOIN iris_ai.research_chunksets() cs ON cs.record_id = r.id AND cs.is_active
-                    WHERE ($1::bigint IS NULL OR r.id = $1)""" + _filter_sql(2) + " ORDER BY r.title, r.id",
+                    WHERE ($1::bigint IS NULL OR r.id = $1)""" + _filter_sql(2)
+                + f" ORDER BY {_ORDERS[sort]}r.title, r.id",
                 self.scope, *params,
             )
             named = rows[offset:offset + cap]
@@ -998,10 +1076,11 @@ class ResearchTools:
             records = tuple(
                 RecordRef(h, r["record_id"], r["title"],
                           Source(r["record_id"], r["chunk_set_id"], r["extraction_hash"])
-                          if r["chunk_set_id"] is not None else None, r["year"])
+                          if r["chunk_set_id"] is not None else None, **_dates(r))
                 for h, r in zip(handles, named))
             fact = Count(total=len(rows), filters=tuple(sorted(applied)), scope_record_id=self.scope,
-                         population=frozenset(r["record_id"] for r in rows))
+                         population=frozenset(r["record_id"] for r in rows),
+                         undated=await self._undated(conn, params))
             return ToolResult(OK if rows else NO_MATCH, records=records, count=fact,
                               coverage=Coverage(len(records), len(rows), offset + len(records) < len(rows)))
 
@@ -1040,7 +1119,7 @@ class ResearchTools:
         return await self._call("paper_details", body)
 
     async def _filters(self, conn, filters: dict) -> tuple[list, list]:
-        """The six `_filter_sql` parameters and the filters as applied, or raise _Refused.
+        """The `_filter_sql` parameters and the filters as applied, or raise _Refused.
 
         An unknown or ambiguous taxonomy name is refused, never ignored; case, hyphens and
         spacing do not matter (IR-995).
@@ -1059,9 +1138,11 @@ class ResearchTools:
                 raise _Refused("ambiguous_filter_value")
             ids[name] = rows[0]["id"]
             applied.append((name, rows[0]["name"]))
-        applied += [(n, filters[n]) for n in ("year_from", "year_to", "is_ip") if n in filters]
+        applied += [(n, filters[n]) for n in (*metadata.YEARS, *metadata.DAYS, "is_ip") if n in filters]
         params = [ids.get("classification"), ids.get("psced"), ids.get("record_type"),
-                  filters.get("year_from"), filters.get("year_to"), filters.get("is_ip")]
+                  filters.get("year_from"), filters.get("year_to"), filters.get("is_ip"),
+                  filters.get("published_from"), filters.get("published_to"),
+                  *(_day(filters.get(n)) for n in metadata.DAYS)]
         return params, applied
 
     async def recall(self, record_ids) -> ToolResult:
@@ -1345,13 +1426,15 @@ class ResearchTools:
                       AND ($2::bigint IS NULL OR c.record_id = $2)""",
                 [r["id"] for r in ordered], self.scope))
             rows = [r for r in ordered if r["id"] in still]
+            undated = await self._undated(conn, params)
             if not rows:
                 return ToolResult(NO_MATCH, coverage=Coverage(0, None, truncated, found["inspected"]),
-                                  signals=signals)
+                                  signals=signals, undated=undated)
             records, passages = await self._found(conn, rows, limit)
             coverage = Coverage(_retrieved(passages), None, truncated, found["inspected"])
             return ToolResult(OK, records=records, passages=passages, coverage=coverage,
-                              dependencies=frozenset(p.source for p in passages), signals=signals)
+                              dependencies=frozenset(p.source for p in passages), signals=signals,
+                              undated=undated)
 
         return await self._call("hybrid_search", body)
 

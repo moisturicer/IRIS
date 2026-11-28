@@ -3,7 +3,8 @@ from .views import (
     SubmitDocumentView,
     UploadSlotListView, RecordSlotListView,
     RecordUploadListView, RecordUploadCreateView,
-    RecordUploadDownloadView, RecordUploadDeleteView,
+    RecordUploadDownloadView,
+    RecordUploadSeenView, RecordUploadDeleteView,
     RecordFileListView, RecordFileUploadView,
     RecordFileDownloadView, RecordFileDeleteView, RecordFileDownloadAllView,
     UploadReviewCreateView,
@@ -53,6 +54,7 @@ urlpatterns = [
     path("uploads/",                             RecordUploadListView.as_view(),        name="record-uploads"),
     path("uploads/create/",                      RecordUploadCreateView.as_view(),      name="record-upload-create-legacy"),
     path("uploads/<int:pk>/download/",           RecordUploadDownloadView.as_view(),    name="record-upload-download"),
+    path("uploads/<int:pk>/seen/",               RecordUploadSeenView.as_view(),        name="record-upload-seen"),
     path("uploads/<int:pk>/",                    RecordUploadDeleteView.as_view(),      name="record-upload-delete"),
     # Staff: set document status (For Application → Reviewed → Filed → Approved/Disapproved)
     path("upload-reviews/",                      UploadReviewCreateView.as_view(),      name="upload-reviews"),

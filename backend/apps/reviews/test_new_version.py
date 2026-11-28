@@ -21,6 +21,7 @@ from rest_framework import status
 from rest_framework.test import APITransactionTestCase
 
 from apps.documents.models import RecordUpload, UploadSlot
+from apps.documents.services import create_upload
 from apps.notifications.models import Notification
 from apps.documents.testing import real_pdf_bytes
 from apps.records import lifecycle
@@ -440,6 +441,37 @@ class NothingChangedTests(NewVersionTestBase):
         self.assertIsNone(self.detail(record, self.owner)["revision"]["new_version"]["blocked"])
         # Nobody but an owner is offered it.
         self.assertIsNone(self.detail(record, self.ierc)["revision"]["new_version"])
+
+
+class UnsentTests(NewVersionTestBase):
+    """What the Documents tab marks *not yet submitted* (IR-1318)."""
+
+    def unsent(self, record):
+        return self.detail(record, self.owner)["revision"]["new_version"]["unsent"]
+
+    def test_nothing_is_unsent_before_the_owner_changes_anything(self):
+        record = self.itso_cleared_and_ierc_asked()
+
+        self.assertEqual(self.unsent(record), {"manuscript": False, "details": False, "uploads": []})
+
+    def test_each_change_since_the_latest_version_is_named_until_it_is_submitted(self):
+        record = self.itso_cleared_and_ierc_asked()
+        slot = UploadSlot.objects.create(name="Consent form", record_type=record.record_type)
+        # The owner's upload to a submitted record is held until it is sent
+        # (ADR-022 Amendment 8, IR-1322), which is what makes it unsent.
+        upload = create_upload(record, slot, _pdf(b"%PDF-1.7 consent"), self.owner)
+        self.upload_manuscript(record)
+        self.edit_title(record)
+
+        self.assertEqual(self.unsent(record), {
+            "manuscript": True, "details": True,
+            "uploads": [{"id": upload.pk, "label": "Consent form"}],
+        })
+
+        self.submitted(record)
+        # The version carries them; asked again, nothing is unsent.
+        self.asked(record, self.ierc)
+        self.assertEqual(self.unsent(record), {"manuscript": False, "details": False, "uploads": []})
 
 
 # --- AC: two requests --------------------------------------------------------------------

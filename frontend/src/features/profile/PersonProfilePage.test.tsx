@@ -15,7 +15,7 @@ import { RequestTimeoutError } from "@/api/requestPolicy";
 import { forgetFirstPages } from "@/lib/firstPages";
 import { useAuthStore } from "@/store/auth.store";
 import { expectNoBlockingA11yViolations } from "@/test/axe";
-import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
+import { act, renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
 import type { Collaborator, ProfilePaper, PublicProfile } from "@/types/people";
 
 import PersonProfilePage from "./PersonProfilePage";
@@ -338,5 +338,51 @@ describe("loading and failing", () => {
     await userEvent.click(within(section).getByRole("button", { name: "Try again" }));
     expect(await screen.findByRole("link", { name: "Paper 500" })).toBeVisible();
     expect(research).toHaveBeenLastCalledWith(101, 1);
+  });
+});
+
+describe("read again when the tab is shown (ADR-073 amendment 2026-11-28, IR-1351)", () => {
+  const shown = () => act(() => { window.dispatchEvent(new Event("focus")); });
+
+  it("shows a paper published meanwhile", async () => {
+    serve();
+    open(101);
+    await screen.findByRole("link", { name: "Paper 500" });
+
+    vi.mocked(peopleApi.research).mockImplementation(() => Promise.resolve(page([paper(501), paper(500)])) as never);
+    shown();
+
+    expect(await screen.findByRole("link", { name: "Paper 501" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Paper 500" })).toBeInTheDocument();
+  });
+
+  it("keeps a list the reader has shown more of", async () => {
+    const first = Array.from({ length: 10 }, (_, i) => paper(600 + i));
+    const second = Array.from({ length: 4 }, (_, i) => paper(700 + i));
+    const advised = vi.fn().mockImplementation((_id: number, n: number) =>
+      Promise.resolve(n === 1 ? page(first, true) : page(second)));
+    serve({ advised });
+    open(101);
+    const list = await screen.findByRole("list", { name: "Advised" });
+    await userEvent.click(screen.getByRole("button", { name: "Show more advised papers" }));
+    await waitFor(() => expect(within(list).getAllByRole("listitem")).toHaveLength(14));
+
+    shown();
+
+    await waitFor(() => expect(peopleApi.get).toHaveBeenCalledTimes(2));
+    expect(within(list).getAllByRole("listitem")).toHaveLength(14);
+  });
+
+  it("keeps the profile when reading again fails", async () => {
+    serve();
+    open(101);
+    await screen.findByRole("link", { name: "Paper 500" });
+
+    vi.mocked(peopleApi.get).mockImplementation(() => Promise.reject(new Error("offline")) as never);
+    shown();
+
+    await waitFor(() => expect(peopleApi.get).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole("link", { name: "Paper 500" })).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });
