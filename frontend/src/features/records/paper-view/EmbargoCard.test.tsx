@@ -218,7 +218,7 @@ describe("releasing", () => {
   });
 });
 
-describe("KTTO's release of an IP mark", () => {
+describe("ITSO's release of an IP mark (KTTO's until IR-1355)", () => {
   const marked = (capabilities: Capability[]) =>
     paper({ state: "released", until: null }, capabilities, {
       isIp: true, ipRelease: { released: false, released_at: null },
@@ -247,14 +247,14 @@ describe("KTTO's release of an IP mark", () => {
 
   it("shows a refused release in the server's words", async () => {
     vi.mocked(recordsApi.releaseIp).mockRejectedValue(
-      refusal({ detail: "KTTO has already released this paper's IP mark." }),
+      refusal({ detail: "ITSO has already released this paper's IP mark." }),
     );
     renderCard(marked(["release_ip"]));
 
     await userEvent.click(screen.getByRole("button", { name: "Release IP mark" }));
     await userEvent.click(screen.getByRole("button", { name: "Release" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("KTTO has already released this paper's IP mark.");
+    expect(await screen.findByRole("alert")).toHaveTextContent("ITSO has already released this paper's IP mark.");
   });
 });
 

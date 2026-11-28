@@ -40,7 +40,7 @@ A paper's embargo status is separate from its publication status, intellectual p
 
 Under the adopted design, owners or the assigned adviser may set or extend an embargo. A new manuscript version inherits the existing embargo answer; uploading a revision does not clear a restriction or create fresh disclosure authorization. Availability of the corresponding controls depends on the pilot's implementation.
 
-The release rules adopted for IRIS reserve embargo release to the assigned adviser or RDCO, and IP release to KTTO. Owners must not assume that a release action is available in the current pilot or that changing a tag is an authorized substitute. Ask the responsible office when a control is unavailable. A paper subject to both restrictions needs both resolved, with disclosure consent still applicable.
+The release rules adopted for IRIS reserve embargo release to the assigned adviser or RDCO, and IP release to ITSO (KTTO until IR-1355). Owners must not assume that a release action is available in the current pilot or that changing a tag is an authorized substitute. Ask the responsible office when a control is unavailable. A paper subject to both restrictions needs both resolved, with disclosure consent still applicable.
 
 Give accurate embargo information at submission and promptly report new or extended restrictions. A later restriction cannot recall text already transmitted, copies already downloaded or information already seen. Do not rely on a later embargo to undo an earlier disclosure.
 

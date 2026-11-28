@@ -10,7 +10,7 @@ PostgreSQL full-text path a vendor outage degrades to.
 Four facts, kept independent because a single combined flag is how a case goes
 missing: IP status, embargo, consent (ADR-015), and publication (ADR-052 as
 amended 2026-11-21, IR-1252: only a published paper reaches the AI, because Ask
-IRIS should see what users can see). An IP mark refuses until KTTO releases it
+IRIS should see what users can see). An IP mark refuses until ITSO releases it
 (ADR-052 §11-13), and that release opens nothing else.
 
 Pure -- no database, no network, no clock. **It reads an embargo's state and
@@ -40,7 +40,7 @@ class Reason(enum.Enum):
 
 _EXPLANATIONS = {
     Reason.UNRELEASED_IP: (
-        "the record is marked intellectual property and KTTO has not released "
+        "the record is marked intellectual property and ITSO has not released "
         "it, and disclosing unprotected IP to a third party can defeat a later "
         "claim over it"
     ),
@@ -66,7 +66,7 @@ class DisclosureInputs:
     is_ip: bool
     embargo: EmbargoState
     consent_given: bool
-    #: KTTO's release of the mark. Defaults to unreleased, so a caller that
+    #: ITSO's release of the mark (KTTO's until IR-1355). Defaults to unreleased, so a caller that
     #: forgets it is refused rather than let through.
     ip_released: bool = False
     #: Published and not deleted (IR-1252). Defaults to unpublished, so a caller

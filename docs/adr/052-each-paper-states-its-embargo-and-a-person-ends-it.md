@@ -16,6 +16,8 @@
 
 It answers the four questions IR-250 left open, and it amends [ADR-015](015-voyage-embedding-and-reranking.md)'s disclosure gate. ADR-015 calls these questions CIT-U has to answer. The answers here come from the project team, and no CIT-U office's sign-off is recorded.
 
+> **Amended 2026-11-28 ([IR-1355](https://citiris.atlassian.net/browse/IR-1355); decided by Hermoine Zozobrado; Proposed until its pull request merges after review).** Decisions 11 and 12 now read **ITSO**, not KTTO: ITSO handles IP and patents, so ITSO alone releases an IP-marked paper for the AI. KTTO, RDCO, the Adviser and owners may not. See [ADR-068](068-tbi-is-a-specialist-office.md)'s amendment.
+
 ## Context
 
 ADR-015 requires a gate before any paper's text reaches an outside AI company. It checks three facts: IP status, embargo and author consent. Observed on `main`, 2026-11-01:

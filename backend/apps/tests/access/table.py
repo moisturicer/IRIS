@@ -62,9 +62,10 @@ OWNER_ACTS = row(ANON, HIDE, OK, DENY, DENY, DENY, DENY, DENY, HIDE, HIDE)
 SETS_EMBARGO = row(ANON, HIDE, DENY, OK, DENY, DENY, DENY, OK, HIDE, HIDE)
 # ADR-052 §6: the Adviser or RDCO release one, and never a student owner.
 RELEASES_EMBARGO = row(ANON, HIDE, DENY, OK, DENY, DENY, DENY, OK, HIDE, HIDE)
-# ADR-052 §11: KTTO alone releases an IP mark. The world seats no KTTO member,
-# so everyone here is refused; KTTO's success is `records/test_ip_release.py`.
-RELEASES_IP = row(ANON, HIDE, DENY, DENY, DENY, DENY, DENY, DENY, HIDE, HIDE)
+# ADR-052 §11 as amended by IR-1355: ITSO alone releases an IP mark, whether
+# or not seated. The world's paper is unmarked, so ITSO is answered 400, which
+# still counts as allowed; the release itself is `records/test_ip_release.py`.
+RELEASES_IP = row(ANON, HIDE, DENY, DENY, OK, OK, OK, DENY, HIDE, HIDE)
 #: `record`, the seated ITSO reviewer's act alone.
 SEAT_ACTS = row(ANON, HIDE, DENY, DENY, OK, DENY, DENY, DENY, HIDE, HIDE)
 #: `feed`, a reader's private saved feed (IR-577): its owner alone; everyone

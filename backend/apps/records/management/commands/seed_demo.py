@@ -599,10 +599,10 @@ class Command(BaseCommand):
                 (Office.IERC, RoleName.IERC),
                 (Office.KTTO, RoleName.KTTO),
             )],
-            reason="The project needs technical, ethics and commercialisation review.",
+            reason="The project needs IP, ethics and commercialisation review.",
         )
         for office, role, comment in (
-            (Office.ITSO, RoleName.ITSO, "Technical review complete; no issues found."),
+            (Office.ITSO, RoleName.ITSO, "IP review complete; nothing to file before publishing."),
             (Office.KTTO, RoleName.KTTO, "Commercialisation potential noted."),
         ):
             reviewer = users[role]
@@ -743,17 +743,17 @@ class Command(BaseCommand):
         entry = self._submit(record, student)
         seats.open_review(entry.seats.get(), adviser)
         rdco = users[RoleName.RDCO]
-        accept_and_route(record, adviser, to=[{"party": "rdco", "nominees": [rdco.pk]}], reason="The sensor fusion method needs technical review.")
+        accept_and_route(record, adviser, to=[{"party": "rdco", "nominees": [rdco.pk]}], reason="The sensor fusion method may be patentable.")
         rdco_assignment = RecordAssignment.objects.get(record=record, party="rdco", state="active")
         seats.open_review(rdco_assignment.seats.get(reviewer=rdco), rdco)
-        route(record, rdco, to=[{"party": "itso", "nominees": [itso.pk]}], reason="Review the sensor fusion method.")
+        route(record, rdco, to=[{"party": "itso", "nominees": [itso.pk]}], reason="Check the sensor fusion method for patentability.")
         seat = ReviewerSeat.objects.get(
             assignment__record=record, assignment__party="itso", reviewer=itso,
         )
         seats.open_review(seat, itso)
         record_office_review(
             record, itso, outcome=CLEARED,
-            comment="Technical review complete; no issues found.",
+            comment="IP review complete; nothing to file before publishing.",
         )
         self._done(record)
 
@@ -778,7 +778,7 @@ class Command(BaseCommand):
             seats.open_review(entry.seats.get(), adviser)
             accept_and_route(
                 record, adviser, to=[{"party": "rdco"}],
-                reason="The method needs technical review, and the study involved human participants.",
+                reason="The method may be patentable, and the study involved human participants.",
                 suggested_offices=["itso", "ierc"],
             )
             self._done(record)
@@ -822,7 +822,7 @@ class Command(BaseCommand):
                 {"party": "ierc"},
                 {"party": "ktto", "nominees": [ktto.pk, ktto_coordinator.pk]},
             ],
-            reason="The project needs technical, ethics and commercialisation review.",
+            reason="The project needs IP, ethics and commercialisation review.",
         )
         itso_assignment = RecordAssignment.objects.get(record=record, party="itso", state="active")
         seats.open_review(itso_assignment.seats.get(reviewer=itso), itso)

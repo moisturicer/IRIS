@@ -77,10 +77,10 @@ ROUTABLE_TYPES = (RecordTypeName.THESIS_RESEARCH, RecordTypeName.PROJECT)
 
 #: The author's flags on the publish form, in the form's order, and the office
 #: each hints at (ADR-032 §3): shown to the router, routing nothing by itself.
-#: KTTO evaluates IP submissions, so the IP flag points there. ITSO handles
-#: technical review, which the form doesn't ask about, so no flag points at it.
+#: ITSO handles IP and patents, so the IP flag points there; KTTO (and TBI,
+#: once built) handles commercialization (ADR-068 as amended, IR-1355).
 _AUTHOR_FLAGS = (
-    ("is_ip", str(Office.KTTO), "The author flagged possible intellectual property."),
+    ("is_ip", str(Office.ITSO), "The author flagged possible intellectual property."),
     (
         "requires_ethics_review", str(Office.IERC),
         "The author flagged human participants, animal subjects or sensitive data.",

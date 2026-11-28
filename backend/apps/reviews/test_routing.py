@@ -389,6 +389,20 @@ class RoutingOptionsTests(RoutingTestBase):
         self.assertEqual([t["party"] for t in data["targets"]], [Party.RDCO])
         self.assertEqual({m["id"] for m in data["targets"][0]["members"]}, {self.rdco.pk})
 
+    # IR-1355: ITSO handles IP and patents; KTTO (and TBI, once built) handles
+    # commercialization. Changed from the IP flag pointing at KTTO.
+    def test_the_ip_flag_points_at_itso_and_commercialization_at_ktto(self):
+        record = self.new_model(is_ip=True, for_commercialization=True)
+        self.accepted_to(record, Party.RDCO)
+        self.seat(record, Party.RDCO, self.rdco)
+        self.client.force_authenticate(self.rdco)
+
+        hints = {t["party"]: t["author_hint"] for t in self.client.get(options_url(record)).data["targets"]}
+
+        self.assertEqual(hints[Party.ITSO], "The author flagged possible intellectual property.")
+        self.assertEqual(hints[Party.KTTO], "The author flagged possible commercialisation.")
+        self.assertIsNone(hints[Party.IERC])
+
     def test_someone_who_cannot_route_gets_no_picklist(self):
         record = self.new_model()
         self.client.force_authenticate(self.itso)

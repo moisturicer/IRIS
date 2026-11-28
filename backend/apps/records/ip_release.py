@@ -1,5 +1,6 @@
 """
-KTTO's release of an IP-marked paper (ADR-052 decisions 11 to 13, IR-813).
+ITSO's release of an IP-marked paper (ADR-052 decisions 11 to 13, IR-813;
+ITSO, which handles IP, since IR-1355; it was KTTO).
 
 The only place that writes `Record.ip_released_*`, so every release is audited.
 The mark itself stays: the paper is still IP, and only what the disclosure check
@@ -17,10 +18,10 @@ from core.enums import PipelineStatus
 from .models import Record
 
 NOTHING_TO_RELEASE = "This paper isn't marked as intellectual property."
-ALREADY_RELEASED = "KTTO has already released this paper's IP mark."
+ALREADY_RELEASED = "ITSO has already released this paper's IP mark."
 DRAFT_HAS_NOTHING_TO_RELEASE = "This paper hasn't been submitted, so its IP mark can't be released yet."
 MARK_CANNOT_BE_CLEARED = (
-    "An IP mark can't be removed. KTTO releases a marked paper for the AI instead."
+    "An IP mark can't be removed. ITSO releases a marked paper for the AI instead."
 )
 
 

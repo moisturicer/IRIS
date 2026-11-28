@@ -24,7 +24,7 @@ def inputs_for_record(record: Any) -> DisclosureInputs:
     unanswered paper and an answered "no" both store, and reading it as "no
     embargo" would clear every paper that was never asked.
 
-    The IP release is ``Record.ip_released`` (ADR-052 §11), KTTO's act. The mark
+    The IP release is ``Record.ip_released`` (ADR-052 §11), ITSO's act since IR-1355. The mark
     itself stays on the paper, so ``is_ip`` alone still says it is IP.
 
     Consent is ``Record.ai_consent`` (ADR-054 decisions 9-10, IR-791) -- the

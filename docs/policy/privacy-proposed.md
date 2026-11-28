@@ -50,7 +50,7 @@ The research disclosure check considers intellectual property status, embargo st
 
 The review date never releases an embargo automatically. Publication does not clear it, and an embargo does not itself prevent publication or authorized human access. Embargo state and date are shown to owners, the assigned adviser and office staff rather than ordinary catalogue readers.
 
-The adopted release design assigns embargo release to the adviser or RDCO and IP release to KTTO. Some associated controls and reminders may not yet be available. A planned release mechanism is not permission to bypass the current gate. Contact the responsible office about a restriction that needs review.
+The adopted release design assigns embargo release to the adviser or RDCO and IP release to ITSO (KTTO until IR-1355). Some associated controls and reminders may not yet be available. A planned release mechanism is not permission to bypass the current gate. Contact the responsible office about a restriction that needs review.
 
 An embargo controls external AI disclosure of research content; it does not prevent all external processing associated with accounts, email or questions you type. Adding a restriction cannot retrieve information already sent to a provider or copied by an authorized reader. Report new restrictions promptly rather than relying on retroactive removal.
 

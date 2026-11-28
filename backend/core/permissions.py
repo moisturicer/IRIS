@@ -335,10 +335,11 @@ def may_release_embargo(user, record) -> bool:
 
 def may_release_ip(user, record) -> bool:
     """
-    KTTO alone releases an IP-marked paper, because KTTO evaluates IP (ADR-052
-    §11-12). Not RDCO, not the Adviser and not an owner.
+    ITSO alone releases an IP-marked paper, because ITSO handles IP and
+    patents (ADR-052 §11-12, as amended by IR-1355; it was KTTO). Not KTTO,
+    not RDCO, not the Adviser and not an owner.
     """
-    return get_role_name(user) == ROLE_KTTO
+    return get_role_name(user) == ROLE_ITSO
 
 
 def is_record_owner(user, record) -> bool:

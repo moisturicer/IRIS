@@ -22,7 +22,7 @@ Do not publish a blanket liability waiver, new research licence, disciplinary po
 | --- | --- |
 | Unknown and Active refuse; None and Released pass only the embargo check; IP and disclosure consent remain independent | `backend/apps/ai/policy/disclosure.py`, `records.py` |
 | Submission records the answer, actor and time; unanswered historical records remain Unknown | `backend/apps/records/embargo.py`, migration `0025_record_embargo.py` |
-| A date never releases; publication and embargo are independent; adviser/RDCO release embargo, KTTO releases IP | [ADR-052](../adr/052-each-paper-states-its-embargo-and-a-person-ends-it.md), accepted project design, not proof every control has shipped |
+| A date never releases; publication and embargo are independent; adviser/RDCO release embargo, ITSO releases IP (KTTO until IR-1355) | [ADR-052](../adr/052-each-paper-states-its-embargo-and-a-person-ends-it.md), accepted project design, not proof every control has shipped |
 | Ordinary catalogue readers do not receive embargo state/date | `backend/apps/records/test_embargo.py` and record serialization |
 | No general automatic conversation expiry; deletion relationships cascade | `backend/apps/ai/models/conversation.py` |
 | Interim registration notice; disclosure consent wording still pending DPO review | `frontend/src/features/auth/DataNotice.tsx`, `frontend/src/lib/dpaTerms.ts` |
