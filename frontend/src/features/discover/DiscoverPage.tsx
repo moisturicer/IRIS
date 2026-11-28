@@ -16,6 +16,7 @@ import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { SELECTED_SEGMENT } from "@/components/ui/highlightRoles";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { PUBLISH_PARAM } from "@/features/publish/PublishDialog";
+import { useFocusRefresh } from "@/hooks/useFocusRefresh";
 import { canAuthor } from "@/lib/access";
 import { useSidebarMode } from "@/lib/layout";
 import { discoverTourSteps, TOUR_TARGETS } from "@/features/onboarding/studentTours";
@@ -384,7 +385,38 @@ export default function DiscoverPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [feedKey, attempt]);
 
+  /* ── Read again when the tab is shown (ADR-073 amendment 2026-11-28) ── */
+  // The catalogue reruns quietly at the depth already shown: no spinner, the
+  // query, filters, tab and scroll stay, and a failed read keeps the results.
+  // It waits while anything is loading, while the search box has focus or
+  // holds text not yet searched, and on For you, whose cursor and dismissals
+  // a fresh first page would reset. A Load more started meanwhile wins.
+  const searchBox = useRef<HTMLDivElement>(null);
+  const quietFence = useRef(0);
+  const refreshQuietly = () => {
+    if (feed === "for_you" || discoverView !== "papers") return;
+    if (loading || loadingMore || failed) return;
+    if (searchInput.trim() !== query.q) return;
+    if (searchBox.current?.contains(document.activeElement)) return;
+    const current = generation.current;
+    const fence = ++quietFence.current;
+    const depth = page;
+    recordsApi.list({ ...listParams(query), page: 1, page_size: PAGE_SIZE * depth })
+      .then(({ data }) => {
+        if (current !== generation.current || fence !== quietFence.current) return;
+        const results = data.results ?? [];
+        setRecords(results);
+        setTotalCount(data.count ?? results.length);
+        const loaded = Math.max(1, Math.floor(results.length / PAGE_SIZE));
+        setPage(loaded);
+        position.current = { key: queryKey, pages: loaded };
+      })
+      .catch(() => { /* What is shown stays; the next look tries again. */ });
+  };
+  useFocusRefresh(refreshQuietly);
+
   const loadMore = useCallback(() => {
+    quietFence.current += 1;
     const current = generation.current;
     const nextPage = page + 1;
     const loadingFeed = feed === "for_you";
@@ -793,7 +825,7 @@ export default function DiscoverPage() {
           (menu button and bell) is gone: the bell is in the sidebar, and
           AppShell's phone bar carries both below `md` (IR-519). */}
       <div className={cn(PAGE_WIDTH.standard, "px-4 sm:px-7 pt-4 sm:pt-7 pb-12 flex-1")}>
-        <div id={TOUR_TARGETS.discover.search}>
+        <div ref={searchBox} id={TOUR_TARGETS.discover.search}>
           <DiscoverSearchComposer value={searchInput} onChange={setSearchInput} />
         </div>
 

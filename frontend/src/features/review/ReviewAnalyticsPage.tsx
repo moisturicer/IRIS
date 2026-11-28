@@ -1,9 +1,10 @@
-import { useEffect, useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 import { reviewsApi } from "@/api/reviews";
 import { Handbook, RAIL_LIST, RailCaption, railItemClass, useSectionInView } from "@/components/layout/Handbook";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { useFocusRefresh } from "@/hooks/useFocusRefresh";
 import { Button, Input, Select, Skeleton } from "@/components/ui";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { failureMessage } from "@/lib/readFailure";
@@ -169,14 +170,28 @@ export default function ReviewAnalyticsPage() {
 
   const invalidRange = Boolean(from && to && from > to);
 
+  // Read again quietly when the tab is shown (ADR-073 amendment 2026-11-28,
+  // IR-1351): the same office and dates, the figures stay on screen, and a
+  // failed read keeps them. Never on a hint: these totals move with every act.
+  const quiet = useRef(false);
+  useFocusRefresh(() => {
+    if (invalidRange || loading || loadError || !data) return;
+    quiet.current = true;
+    setReload((n) => n + 1);
+  });
+
   useEffect(() => {
     if (invalidRange) {
       setLoading(false);
       return;
     }
     let cancelled = false;
-    setLoading(true);
-    setLoadError(null);
+    const isQuiet = quiet.current;
+    quiet.current = false;
+    if (!isQuiet) {
+      setLoading(true);
+      setLoadError(null);
+    }
     reviewsApi.analytics({ office, from, to })
       .then(({ data: next }) => {
         if (cancelled) return;
@@ -184,10 +199,10 @@ export default function ReviewAnalyticsPage() {
         if (!office) setOffices(next.parties);
       })
       .catch((err: unknown) => {
-        if (!cancelled) setLoadError(failureMessage(err));
+        if (!cancelled && !isQuiet) setLoadError(failureMessage(err));
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled && !isQuiet) setLoading(false);
       });
     return () => {
       cancelled = true;
