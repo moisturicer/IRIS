@@ -188,13 +188,14 @@ Also added: `--maroon-press` `#5a0c0f` for a pressed filled button, and `--field
 
 ### Radius, shadow, spacing
 
-**Three corner radii (IR-1043, decided 2026-11-12), named for what the shape is.** `tailwind.config.js` *replaces* Tailwind's `borderRadius` scale with five keys, so `rounded`, `rounded-lg` and the rest generate no CSS at all, and `src/test/radius.test.ts` fails the build naming any that come back.
+**Three corner radii (IR-1043, decided 2026-11-12), named for what the shape is,** plus one single-purpose token for the tours' highlight (IR-1344). `tailwind.config.js` *replaces* Tailwind's `borderRadius` scale with six keys, so `rounded`, `rounded-lg` and the rest generate no CSS at all, and `src/test/radius.test.ts` fails the build naming any that come back.
 
 | Token | Size | For |
 |---|---|---|
 | `rounded-control` | 12 px (`0.75rem`) | Inputs, selects, buttons that are not pills, chips, rows, table cells and small marks: anything a hand or eye lands on inside a card |
 | `rounded-card` | 16 px (`1rem`) | Cards and panels: any bordered block with its own padding (a notice, a preview, a saved-feed strip, a match warning), and a floating popover. A menu or list row inside one is `control` |
 | `rounded-dialog` | 20 px (`1.25rem`) | `Modal` and its sheet, a bottom sheet, `AccountLockedModal`, `RequestDocumentDialog` |
+| `rounded-spotlight` | 6 px (`0.375rem`) | **Only** the guided tours' highlight around a step's target (`GuidedTour`, IR-1344, 2026-11-28). A white cut-out on the dark overlay read far rounder at 12 px than a row does. Not for controls, cards or anything else |
 | `rounded-full` | pill | Pills, avatars and badges, and the three lines of `AssistantMessageSkeleton`. **Never a card or a button that is not a pill** |
 | `rounded-none` | square | Where a shape must meet its neighbour: a text highlight laid over a PDF's own text boxes (`ReaderHighlights`, `CitationOverlay`, `readerAnnotations`), search-match marks, a deleted-text mark, the Stop square, one corner of a chat bubble |
 
