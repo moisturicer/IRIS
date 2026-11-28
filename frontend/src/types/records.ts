@@ -466,7 +466,7 @@ export interface RecordEmbargo {
   notice?: string;
 }
 
-/** KTTO's release of an IP mark (ADR-052 §11). The mark itself stays. */
+/** ITSO's release of an IP mark (ADR-052 §11; KTTO's until IR-1355). The mark itself stays. */
 export interface RecordIpRelease {
   released:    boolean;
   released_at: string | null;

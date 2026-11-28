@@ -191,8 +191,9 @@ export const HELP_SECTIONS: HelpSection[] = [
         <p>
           For a Thesis / Research or Project, the Adviser can request a revision, reject it, or
           accept it and send it to RDCO, suggesting which offices should look at it. RDCO decides
-          what happens next. It can ask ITSO for technical review, IERC for ethics compliance or
-          KTTO to evaluate commercial potential, and those offices review at the same time, each
+          what happens next. It can ask ITSO to review intellectual property and patents, IERC for
+          ethics compliance or KTTO to evaluate commercial potential, and those offices review at
+          the same time, each
           settling its own clearance. Only RDCO can publish a paper or keep it unlisted. It can do
           that, or reject the paper, at any time, even while offices are still reviewing.
         </p>

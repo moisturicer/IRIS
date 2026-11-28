@@ -81,7 +81,7 @@ class AuditEvent(models.Model):
     EMBARGO_SET      = "EMBARGO_SET"
     EMBARGO_EXTENDED = "EMBARGO_EXTENDED"
     EMBARGO_RELEASED = "EMBARGO_RELEASED"
-    # KTTO's release of an IP-marked paper (ADR-052 §11, IR-813).
+    # ITSO's release of an IP-marked paper (ADR-052 §11, IR-813; KTTO's until IR-1355).
     IP_RELEASED      = "IP_RELEASED"
 
     # Account recovery (ADR-045 §8, IR-642). Metadata is an allowlist --

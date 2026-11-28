@@ -117,15 +117,18 @@ class PaperDetailsTests(DecisionTestBase):
         people = self.details(record, self.owner)["participants"]
         self.assertEqual([p["id"] for p in people], [self.owner.pk, self.adviser.pk, self.rdco.pk])
 
-    def test_the_ip_and_commercial_flags_both_point_at_ktto_and_none_at_itso(self):
+    # Changed deliberately by IR-1355: ITSO handles IP and patents, and KTTO
+    # commercialization, so the two flags now point at different offices.
+    def test_the_ip_flag_points_at_itso_and_the_commercial_flag_at_ktto(self):
         record = self.routed(Party.ITSO)
         record.is_ip = record.for_commercialization = True
         record.requested_itso = True  # the form never writes this, and no hint reads it
         record.save(update_fields=["is_ip", "for_commercialization", "requested_itso"])
         flags = self.details(record, self.owner)["author_flags"]
-        self.assertEqual([f["office"] for f in flags], [Party.KTTO])
+        self.assertEqual([f["office"] for f in flags], [Party.ITSO, Party.KTTO])
         self.assertIn("intellectual property", flags[0]["hint"])
-        self.assertIn("commercialisation", flags[0]["hint"])
+        self.assertNotIn("commercialisation", flags[0]["hint"])
+        self.assertIn("commercialisation", flags[1]["hint"])
 
     def test_flags_are_adr018_office_hints_and_deadlines_keep_paused_and_overdue(self):
         record = self.routed(Party.ITSO, Party.IERC)
@@ -139,7 +142,8 @@ class PaperDetailsTests(DecisionTestBase):
         ierc.due_at, ierc.document_pause_started_at = past, timezone.now()
         ierc.save(update_fields=["due_at", "document_pause_started_at"])
         details = self.details(record, self.owner)
-        self.assertEqual([f["office"] for f in details["author_flags"]], [Party.KTTO, Party.IERC])
+        # IR-1355 changed this deliberately: the IP flag now points at ITSO.
+        self.assertEqual([f["office"] for f in details["author_flags"]], [Party.ITSO, Party.IERC])
         self.assertTrue(all(f["label"] and f["hint"] for f in details["author_flags"]))
         dues = {d["party"]: d for d in details["due_dates"]}
         self.assertTrue(dues[Party.ITSO]["is_overdue"])

@@ -58,12 +58,12 @@ export function PaperGovernance({ record, full = false, showStatus = false }: {
         : "Not declared",
       quiet: !record.is_ip,
     },
-    // KTTO's release (ADR-052 §11): sent only for a marked paper, to the people
+    // ITSO's release (ADR-052 §11; KTTO's until IR-1355): sent only for a marked paper, to the people
     // who see its embargo.
     ...(record.ip_release
       ? [{
           label: "IP Release",
-          value: record.ip_release.released ? "Released for the AI by KTTO" : "Not released for the AI",
+          value: record.ip_release.released ? "Released for the AI by ITSO" : "Not released for the AI",
         }]
       : []),
     {

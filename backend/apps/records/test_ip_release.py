@@ -1,9 +1,10 @@
 """
-KTTO's release of an IP-marked paper (ADR-052 decisions 11 to 13, IR-813).
+ITSO's release of an IP-marked paper (ADR-052 decisions 11 to 13, IR-813;
+ITSO, not KTTO, since IR-1355, changed deliberately: ITSO handles IP).
 
 The mark stays on the paper and the release is its own stamp, so a marked paper
-reaches the AI only once KTTO has acted. Three things are pinned hardest. No one
-but KTTO releases, not RDCO, not the Adviser and not an owner. `tags/` can no
+reaches the AI only once ITSO has acted. Three things are pinned hardest. No one
+but ITSO releases, not KTTO, not RDCO, not the Adviser and not an owner. `tags/` can no
 longer clear the mark, which would open the check with no release. And the IP
 mark and the embargo are independent: each needs its own release, and consent
 still applies.
@@ -55,7 +56,7 @@ class IpReleaseFixtures:
             stamps.update(is_embargoed=False, embargo_released_at=now,
                           embargo_released_by=self.adviser)
         if ip_released:
-            stamps.update(ip_released_at=now, ip_released_by=self.ktto)
+            stamps.update(ip_released_at=now, ip_released_by=self.itso)
         record = Record.objects.create(
             title="An IP paper", abstract="An abstract long enough to read.",
             record_type=self.record_type, added_by=self.owner, adviser=self.adviser,
@@ -100,22 +101,22 @@ class ReleaseBase(IpReleaseFixtures, APITestCase):
 
 
 class WhoReleasesTests(ReleaseBase):
-    def test_ktto_releases_it_with_who_and_when_and_the_mark_stays(self):
+    def test_itso_releases_it_with_who_and_when_and_the_mark_stays(self):
         record = self._paper()
         self.assertEqual(decision_for_record(record).reasons, (Reason.UNRELEASED_IP,))
 
-        response = self._release(record, self.ktto)
+        response = self._release(record, self.itso)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertEqual(response.data, {"marked": True, "released": True})
         record.refresh_from_db()
         self.assertTrue(record.is_ip)
-        self.assertEqual(record.ip_released_by, self.ktto)
+        self.assertEqual(record.ip_released_by, self.itso)
         self.assertIsNotNone(record.ip_released_at)
         self.assertTrue(decision_for_record(record).allowed)
 
-    def test_no_one_else_can_not_rdco_nor_the_adviser_nor_an_owner(self):
-        for user in (self.rdco, self.itso, self.ierc, self.adviser, self.owner):
+    def test_no_one_else_can_not_ktto_rdco_the_adviser_nor_an_owner(self):
+        for user in (self.ktto, self.rdco, self.ierc, self.adviser, self.owner):
             with self.subTest(user=user.email):
                 record = self._paper()
 
@@ -145,7 +146,7 @@ class WhatCanBeReleasedTests(ReleaseBase):
     def test_an_unmarked_paper_has_nothing_to_release(self):
         record = self._paper(is_ip=False)
 
-        response = self._release(record, self.ktto)
+        response = self._release(record, self.itso)
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         record.refresh_from_db()
@@ -155,7 +156,7 @@ class WhatCanBeReleasedTests(ReleaseBase):
         record = self._paper(ip_released=True)
         first = Record.objects.get(pk=record.pk).ip_released_at
 
-        response = self._release(record, self.ktto)
+        response = self._release(record, self.itso)
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         record.refresh_from_db()
@@ -164,9 +165,9 @@ class WhatCanBeReleasedTests(ReleaseBase):
     def test_a_draft_cannot_be_released(self):
         record = self._paper(PipelineStatus.DRAFT)
 
-        response = self._release(record, self.ktto)
+        response = self._release(record, self.itso)
 
-        # KTTO cannot see it: a draft is its creator's alone (IR-1227, ADR-009 decision 6), so it is a missing record.
+        # ITSO cannot see it: a draft is its creator's alone (IR-1227, ADR-009 decision 6), so it is a missing record.
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         record.refresh_from_db()
         self.assertFalse(record.ip_released)
@@ -174,7 +175,7 @@ class WhatCanBeReleasedTests(ReleaseBase):
     def test_a_paper_in_review_can_be_released(self):
         record = self._paper(PipelineStatus.IN_REVIEW)
 
-        self.assertEqual(self._release(record, self.ktto).status_code, status.HTTP_200_OK)
+        self.assertEqual(self._release(record, self.itso).status_code, status.HTTP_200_OK)
 
 
 QUEUE = "apps.ai.tasks.index_record.delay"
@@ -185,7 +186,7 @@ class SendingItOnTests(ReleaseBase):
         record = self._paper()
 
         with mock.patch(QUEUE) as queue, self.captureOnCommitCallbacks(execute=True):
-            self._release(record, self.ktto)
+            self._release(record, self.itso)
 
         queue.assert_called_once_with(record.pk)
 
@@ -201,7 +202,7 @@ class SendingItOnTests(ReleaseBase):
         record = self._paper(until=_in_days(60))
 
         with mock.patch(QUEUE) as queue, self.captureOnCommitCallbacks(execute=True):
-            response = self._release(record, self.ktto)
+            response = self._release(record, self.itso)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         queue.assert_not_called()
@@ -234,7 +235,7 @@ class IndependentFactsTests(ReleaseBase):
 
     def _act(self, record, which):
         if which == "ip":
-            response = self._release(record, self.ktto)
+            response = self._release(record, self.itso)
         else:
             self.client.force_authenticate(self.adviser)
             response = self.client.post(reverse("record-embargo-release", args=[record.pk]))
@@ -246,16 +247,16 @@ class AuditTests(ReleaseBase):
         record = self._paper()
         Record.objects.filter(pk=record.pk).update(ip_type="patent")
 
-        self._release(record, self.ktto)
+        self._release(record, self.itso)
 
         event = AuditEvent.objects.get(event_type=AuditEvent.IP_RELEASED, record=record)
-        self.assertEqual(event.user, self.ktto)
+        self.assertEqual(event.user, self.itso)
         self.assertEqual(event.metadata["ip_type"], "patent")
 
     def test_a_refused_release_records_nothing(self):
         record = self._paper(is_ip=False)
 
-        self._release(record, self.ktto)
+        self._release(record, self.itso)
         self._release(self._paper(), self.rdco)
 
         self.assertFalse(AuditEvent.objects.filter(event_type=AuditEvent.IP_RELEASED).exists())
@@ -333,19 +334,19 @@ class OfferedTests(IpReleaseFixtures, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         return "release_ip" in response.data["capabilities"]
 
-    def test_only_ktto_is_offered_it_on_a_marked_paper(self):
+    def test_only_itso_is_offered_it_on_a_marked_paper(self):
         record = self._paper()
 
-        self.assertTrue(self._offers_release(record, self.ktto))
-        for user in (self.rdco, self.itso, self.ierc, self.adviser, self.owner, self.reader):
+        self.assertTrue(self._offers_release(record, self.itso))
+        for user in (self.ktto, self.rdco, self.ierc, self.adviser, self.owner, self.reader):
             with self.subTest(user=user.email):
                 self.assertFalse(self._offers_release(record, user))
 
     def test_it_is_not_offered_with_nothing_to_release(self):
-        # A draft is not offered either: KTTO cannot open it (a draft is its creator's alone (IR-1227, ADR-009 decision 6)).
+        # A draft is not offered either: ITSO cannot open it (a draft is its creator's alone (IR-1227, ADR-009 decision 6)).
         for record in (self._paper(is_ip=False), self._paper(ip_released=True)):
             with self.subTest(record=record.pk):
-                self.assertFalse(self._offers_release(record, self.ktto))
+                self.assertFalse(self._offers_release(record, self.itso))
 
 
 class WhoSeesTheReleaseTests(IpReleaseFixtures, APITestCase):

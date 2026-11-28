@@ -421,13 +421,13 @@ class Record(models.Model):
         """
         return EmbargoState.ACTIVE if self.is_embargoed else EmbargoState.RELEASED
 
-    # KTTO's release of an IP mark (ADR-052 §11-13, IR-813). The mark stays on
+    # ITSO's release of an IP mark (ADR-052 §11-13, IR-813; KTTO's until IR-1355). The mark stays on
     # the paper, and this is what opens the disclosure check for it. Stamped by
     # `apps.records.ip_release` and nothing else. A release can't outlive its
     # mark (the constraint below), so a paper marked again starts unreleased.
     ip_released_at = models.DateTimeField(
         null=True, blank=True,
-        help_text="When KTTO released the IP mark for the AI. Null means it has not been released.",
+        help_text="When ITSO released the IP mark for the AI. Null means it has not been released.",
     )
     ip_released_by = models.ForeignKey(
         "accounts.User", on_delete=models.SET_NULL, null=True, blank=True,

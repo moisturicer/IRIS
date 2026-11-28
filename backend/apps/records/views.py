@@ -459,8 +459,8 @@ class RecordViewSet(viewsets.ModelViewSet):
         """
         POST /records/<id>/ip-release/
 
-        KTTO releases an IP-marked paper for the AI and sends it on (ADR-052 §11,
-        IR-813). The mark stays. Who may ask is checked before whether there is a
+        ITSO releases an IP-marked paper for the AI and sends it on (ADR-052 §11,
+        IR-813; ITSO since IR-1355). The mark stays. Who may ask is checked before whether there is a
         mark to release, so a refusal says nothing about the paper.
         """
         record = self._paper_under_lock()
@@ -1694,7 +1694,7 @@ class RecordViewSet(viewsets.ModelViewSet):
         PATCH /records/<id>/tags/
         Staff (KTTO, RDCO, ITSO, IERC) may update IP classification
         flags and the structured ip_type label on any record. `is_ip` can be
-        set and never cleared: KTTO releases a marked paper with `ip-release/`.
+        set and never cleared: ITSO releases a marked paper with `ip-release/`.
 
         Boolean fields (all optional):
           { "is_ip": true, "for_commercialization": false, "community_extension": false }
@@ -1720,7 +1720,7 @@ class RecordViewSet(viewsets.ModelViewSet):
                     )
                 updates[field] = value
 
-        # Only KTTO's release opens the disclosure check for a marked paper
+        # Only ITSO's release opens the disclosure check for a marked paper
         # (ADR-052 §12, IR-813), so no office clears the mark, KTTO included.
         if updates.get("is_ip") is False and record.is_ip:
             return Response(

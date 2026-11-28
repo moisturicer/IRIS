@@ -6,6 +6,8 @@
 
 It amends [ADR-018](018-conditional-parallel-office-routing.md) (KTTO's review question is IP; commercial potential is TBI's, and `for_commercialization` hints at TBI) and [ADR-066](066-ip-applications-beside-publishing.md) (a publishing-gate override notifies the office that owns the application). It follows [ADR-032](032-adviser-first-review-and-office-reviewer-pools.md) for TBI's pool, seats and coordinators, and [ADR-051](051-system-admin-account-deletion-and-consent.md) §4 for who grants its role.
 
+> **Amended 2026-11-28 ([IR-1355](https://citiris.atlassian.net/browse/IR-1355); decided by Hermoine Zozobrado; Proposed until its pull request merges after review).** ITSO handles IP and patents. KTTO and TBI handle commercialization as **one shared step with the same papers**, as in IPAMS. Decisions 1–4, 8 and 9 change. See *Amendment, 2026-11-28* below.
+
 ## Context
 
 Observed on `main`, 2026-11-13:
@@ -47,6 +49,20 @@ Observed on `main`, 2026-11-13:
 10. **TBI is added at each site that names the offices**, the list in `docs/institution_configuration_boundary.md` §4b, together with a **guard test that every office set and map names the same offices**. Missing a site, above all `CLEARANCE_OFFICES`, then fails a test instead of silently dropping TBI from clearance-aware resubmission. The single office registry stays a recorded finding (§4b), not done here.
 11. **No data migration.** No paper in review moves: KTTO finishes any commercialization question it already holds, and TBI receives papers routed after it exists. `seed_demo` routes its commercialization papers to TBI and adds `tbi@iris.test` (a member) and `tbi.coordinator@iris.test` (a coordinator).
 12. **Outside the MVP, but part of the main workflow**, like ADR-066. MVP validation doesn't wait for it.
+
+### Amendment, 2026-11-28 (IR-1355)
+
+Decided by Hermoine Zozobrado on 2026-11-28, in chat; transcribed by an agent. **Proposed** until IR-1355's pull request merges after review.
+
+- **ITSO's question is IP and patents**: whether the paper holds something to protect (patent, utility model, industrial design, trademark, copyright), prior art, and whether to file. This restores ADR-018's office table.
+  - The author's `is_ip` flag hints at **ITSO**.
+  - ITSO alone releases an IP mark for the AI (ADR-052 §11 as amended).
+- **KTTO's question is commercialization, shared with TBI.** Decision 3 is reversed: KTTO does not take IP.
+  - `for_commercialization` hints at KTTO, and at TBI once TBI exists.
+- **TBI shares KTTO's step, with the same papers** (decisions 1–2 change). IPAMS's "KTTO / TBI" step is the model. This is the alternative the original decision rejected below.
+  - **Its cost stands:** with one step, a revision request is not recorded as TBI's apart from KTTO's, so clearance-aware resubmission resets the shared step as one.
+  - How the shared step is staffed (one party, or TBI staff in KTTO's pool) is IR-1068's to settle, reworded to this model before it is built.
+- **There are no separate applications** (decisions 8–9 fall away). ADR-066 is superseded. An IP application stays in the main paper flow: `is_ip` marks the paper's IP as in application, and ITSO moves each IP document through For Application → Reviewed → Filed → Approved / Disapproved (IR-1356). Commercialization has no application of its own.
 
 ## Alternatives Considered
 

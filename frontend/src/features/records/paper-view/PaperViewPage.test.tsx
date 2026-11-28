@@ -4366,14 +4366,15 @@ describe("the embargo in Record details (IR-817)", () => {
     await expectNoBlockingA11yViolations(document.body);
   });
 
-  it("says in About this record whether KTTO released the IP mark", async () => {
+  // IR-1355 changed this deliberately: ITSO, which handles IP, releases the mark.
+  it("says in About this record whether ITSO released the IP mark", async () => {
     shownRecord = { ...underEmbargo, is_ip: true, ip_type: "patent", ip_release: { released: true, released_at: "2026-11-03T02:00:00Z" } };
     workspaceAt(1400);
     renderPaperView();
     await waitForRecord(record.title);
 
     const governance = screen.getByRole("region", { name: "About this record" });
-    expect(within(governance).getByText("Released for the AI by KTTO")).toBeInTheDocument();
+    expect(within(governance).getByText("Released for the AI by ITSO")).toBeInTheDocument();
   });
 });
 

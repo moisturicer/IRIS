@@ -338,7 +338,7 @@ export const recordsApi = {
   acknowledgeDuplicates: (id: number, candidateIds: number[]) =>
     apiClient.post<{ acknowledged: boolean; matches: ManuscriptMatch[] }>(`/records/${id}/acknowledge-duplicates/`, { candidate_ids: candidateIds }),
   // Every paper starts embargoed; after submission the Adviser or RDCO date or
-  // release it, and KTTO releases an IP mark (ADR-052 §5, §6, §11, IR-882).
+  // release it, and ITSO releases an IP mark (ADR-052 §5, §6, §11, IR-882, IR-1355).
   setEmbargo:     (id: number, until: string) =>
     apiClient.post<RecordEmbargo>(`/records/${id}/embargo-set/`, { embargoed_until: until }),
   releaseEmbargo: (id: number) => apiClient.post<RecordEmbargo>(`/records/${id}/embargo-release/`),
