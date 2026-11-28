@@ -217,9 +217,15 @@ def delete(record, user, comment_id) -> None:
 
 def close_reports(comment, state, *, by, at) -> int:
     """Close `comment`'s open reports as `state`; how many closed."""
-    return comment.reports.filter(state=CommentReportState.OPEN).update(
+    closed = comment.reports.filter(state=CommentReportState.OPEN).update(
         state=state, resolved_by=by, resolved_at=at,
     )
+    if closed:
+        # A bulk update sends no signal, so the queue is told here (IR-1350).
+        from apps.live.signals import comment_reports_changed
+
+        comment_reports_changed()
+    return closed
 
 
 def _reason(reason, note) -> tuple[str, str]:

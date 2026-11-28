@@ -12,6 +12,9 @@ including ones a future act adds without remembering to publish:
   id; a seat's holder hears `reviews` and the record on their own channel;
 - a role, download, delete or call request is made or decided: RDCO hears
   `queues`;
+- a comment is reported, or its reports closed (IR-1350): RDCO and the System
+  Admin, who share that queue, hear `queues`; an account deletion is asked,
+  cancelled, confirmed or rejected: the System Admin hears `queues`;
 - the person who asked hears what became of it (IR-1289): a role request
   saved, or their role changed, tells them `account`; a Call saved or
   removed tells its poster `calls`, each on their own channel only;
@@ -86,6 +89,30 @@ def _rdco_queue_changed(sender, instance, **kwargs):
 for _model in ("accounts.RoleRequest", "records.DownloadRequest", "records.DeleteRequest",
                "opportunities.Opportunity"):
     post_save.connect(_rdco_queue_changed, sender=_model, dispatch_uid=f"live-queue-{_model}")
+
+
+# --- the moderation and account deletion queues (IR-1350) -----------------------
+
+
+def comment_reports_changed() -> None:
+    """
+    Tell the Reported comments queue, which RDCO and the System Admin share
+    (IR-693), that it changed. Nobody else hears it: reports are theirs alone.
+    Closing reports is a bulk `update()` that sends no signal, so
+    `public_comments.close_reports` calls this itself.
+    """
+    publish([ch.role_channel(RoleName.RDCO), ch.role_channel(RoleName.SYSTEM_ADMIN)], [ch.QUEUES])
+
+
+@receiver(post_save, sender="records.CommentReport")
+def comment_report_saved(sender, instance, **kwargs):
+    comment_reports_changed()
+
+
+@receiver(post_save, sender="accounts.AccountDeletionRequest")
+def deletion_request_saved(sender, instance, **kwargs):
+    """Asked, cancelled, confirmed or rejected: the System Admin's queue changed."""
+    publish([ch.role_channel(RoleName.SYSTEM_ADMIN)], [ch.QUEUES])
 
 
 # --- the person who asked (IR-1289) ---------------------------------------------

@@ -8,7 +8,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { moderationApi } from "@/api/moderation";
 import { expectNoBlockingA11yViolations } from "@/test/axe";
-import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
+import { emitLiveHint } from "@/lib/live";
+import { act, renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
 import { useUIStore } from "@/store/ui.store";
 import * as queueCounts from "@/lib/queueCounts";
 import type { ReportedComment } from "@/types/records";
@@ -140,4 +141,39 @@ describe("acting on a comment", () => {
     expect(await screen.findByText("No reported comments")).toBeInTheDocument();
   });
 
+});
+
+describe("live (ADR-073, IR-1350)", () => {
+  it("shows a comment reported elsewhere once a queues hint arrives", async () => {
+    render();
+    await screen.findByRole("article", { name: /Ana Cruz's comment/ });
+
+    listed = [row(), row({ id: 42, author_name: "Ben Lim" })];
+    act(() => { emitLiveHint(["queues"]); });
+
+    expect(await screen.findByRole("article", { name: /Ben Lim's comment/ })).toBeInTheDocument();
+    expect(list).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps the queue when the live read fails", async () => {
+    render();
+    await screen.findByRole("article", { name: /Ana Cruz's comment/ });
+
+    list.mockRejectedValueOnce(new Error("offline"));
+    act(() => { emitLiveHint(["queues"]); });
+
+    await waitFor(() => expect(list).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole("article", { name: /Ana Cruz's comment/ })).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("ignores hints for other pages", async () => {
+    render();
+    await screen.findByRole("article", { name: /Ana Cruz's comment/ });
+
+    act(() => { emitLiveHint(["reviews", "library"]); });
+
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    expect(list).toHaveBeenCalledTimes(1);
+  });
 });

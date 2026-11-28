@@ -27,6 +27,7 @@ import { InterruptedState } from "@/components/shared/InterruptedState";
 import { LoadFailedAlert } from "@/components/shared/LoadFailedAlert";
 import { LoadMore } from "@/components/shared/LoadMore";
 import { failureMessage } from "@/lib/readFailure";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { pageParam, toPage, usePagedRead } from "@/hooks/usePagedRead";
 import { errorDetail, fieldError } from "@/lib/errorDetail";
 import { formatDate } from "@/lib/utils";
@@ -176,6 +177,8 @@ export default function AccountDeletionRequestsPage() {
   );
   const requests = read.rows;
   const loading = read.status === "loading";
+  // Live updates (ADR-073, IR-1350): the System Admin's queue, reloaded quietly.
+  useLiveRefresh(["queues"], read.refresh);
 
   const [confirming, setConfirming] = useState<AccountDeletionRequest | null>(null);
   const [rejecting, setRejecting] = useState<AccountDeletionRequest | null>(null);
